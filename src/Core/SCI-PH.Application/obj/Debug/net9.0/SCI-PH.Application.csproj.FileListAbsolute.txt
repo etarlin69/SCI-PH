@@ -9,3 +9,8 @@ C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\n
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\refint\SCI-PH.Application.dll
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\SCI-PH.Application.pdb
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\ref\SCI-PH.Application.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\bin\Debug\net9.0\SCI-PH.Domain.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\bin\Debug\net9.0\SCI-PH.Domain.pdb
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\SCI-PH.Application.csproj.AssemblyReference.cache
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\SCI-PH.Application.sourcelink.json
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\SCI-PH.A.4BD1445C.Up2Date

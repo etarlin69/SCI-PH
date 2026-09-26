@@ -33,6 +33,29 @@
             "related": ".pdb;.xml"
           }
         }
+      },
+      "SCI-PH.Application/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v9.0",
+        "dependencies": {
+          "SCI-PH.Domain": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/SCI-PH.Application.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/SCI-PH.Application.dll": {}
+        }
+      },
+      "SCI-PH.Domain/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v9.0",
+        "compile": {
+          "bin/placeholder/SCI-PH.Domain.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/SCI-PH.Domain.dll": {}
+        }
       }
     }
   },
@@ -67,11 +90,22 @@
         "microsoft.openapi.1.6.17.nupkg.sha512",
         "microsoft.openapi.nuspec"
       ]
+    },
+    "SCI-PH.Application/1.0.0": {
+      "type": "project",
+      "path": "../../Core/SCI-PH.Application/SCI-PH.Application.csproj",
+      "msbuildProject": "../../Core/SCI-PH.Application/SCI-PH.Application.csproj"
+    },
+    "SCI-PH.Domain/1.0.0": {
+      "type": "project",
+      "path": "../../Core/SCI-PH.Domain/SCI-PH.Domain.csproj",
+      "msbuildProject": "../../Core/SCI-PH.Domain/SCI-PH.Domain.csproj"
     }
   },
   "projectFileDependencyGroups": {
     "net9.0": [
-      "Microsoft.AspNetCore.OpenApi >= 9.0.9"
+      "Microsoft.AspNetCore.OpenApi >= 9.0.9",
+      "SCI-PH.Application >= 1.0.0"
     ]
   },
   "packageFolders": {
@@ -106,7 +140,11 @@
       "frameworks": {
         "net9.0": {
           "targetAlias": "net9.0",
-          "projectReferences": {}
+          "projectReferences": {
+            "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj": {
+              "projectPath": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj"
+            }
+          }
         }
       },
       "warningProperties": {

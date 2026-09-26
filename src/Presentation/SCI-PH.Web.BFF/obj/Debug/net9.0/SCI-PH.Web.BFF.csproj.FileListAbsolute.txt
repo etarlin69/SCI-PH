@@ -30,3 +30,8 @@ C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Web.BFF\obj\Deb
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Web.BFF\obj\Debug\net9.0\SCI-PH.Web.BFF.pdb
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Web.BFF\obj\Debug\net9.0\SCI-PH.Web.BFF.genruntimeconfig.cache
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Web.BFF\obj\Debug\net9.0\ref\SCI-PH.Web.BFF.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Web.BFF\bin\Debug\net9.0\SCI-PH.Application.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Web.BFF\bin\Debug\net9.0\SCI-PH.Domain.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Web.BFF\bin\Debug\net9.0\SCI-PH.Application.pdb
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Web.BFF\bin\Debug\net9.0\SCI-PH.Domain.pdb
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Web.BFF\obj\Debug\net9.0\SCI-PH.Web.BFF.sourcelink.json

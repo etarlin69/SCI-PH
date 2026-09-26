@@ -1,0 +1,185 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|c:\\users\\dellg15\\documents\\github\\sci-ph\\src\\core\\sci-ph.application\\abstractions\\qr\\iqrservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|solutionrelative:src\\core\\sci-ph.application\\abstractions\\qr\\iqrservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|c:\\users\\dellg15\\documents\\github\\sci-ph\\src\\core\\sci-ph.application\\abstractions\\persistence\\iunitofwork.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|solutionrelative:src\\core\\sci-ph.application\\abstractions\\persistence\\iunitofwork.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|c:\\users\\dellg15\\documents\\github\\sci-ph\\src\\core\\sci-ph.application\\abstractions\\ai\\iaiassistantservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|solutionrelative:src\\core\\sci-ph.application\\abstractions\\ai\\iaiassistantservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|c:\\users\\dellg15\\documents\\github\\sci-ph\\src\\core\\sci-ph.application\\abstractions\\ocr\\iocrservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|solutionrelative:src\\core\\sci-ph.application\\abstractions\\ocr\\iocrservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|c:\\users\\dellg15\\documents\\github\\sci-ph\\src\\core\\sci-ph.application\\abstractions\\biometrics\\ifingerprintservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|solutionrelative:src\\core\\sci-ph.application\\abstractions\\biometrics\\ifingerprintservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|c:\\users\\dellg15\\documents\\github\\sci-ph\\src\\core\\sci-ph.application\\abstractions\\biometrics\\ifaceverificationservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|solutionrelative:src\\core\\sci-ph.application\\abstractions\\biometrics\\ifaceverificationservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|c:\\users\\dellg15\\documents\\github\\sci-ph\\src\\core\\sci-ph.application\\abstractions\\documents\\idocumentservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|solutionrelative:src\\core\\sci-ph.application\\abstractions\\documents\\idocumentservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|c:\\users\\dellg15\\documents\\github\\sci-ph\\src\\core\\sci-ph.application\\abstractions\\storage\\istorageservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|solutionrelative:src\\core\\sci-ph.application\\abstractions\\storage\\istorageservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|c:\\users\\dellg15\\documents\\github\\sci-ph\\src\\core\\sci-ph.application\\sci-ph.application.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{120EDC60-7FEC-434F-BC00-F2D27DA903F8}|src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj|solutionrelative:src\\core\\sci-ph.application\\sci-ph.application.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 2,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "IUnitOfWork.cs",
+              "DocumentMoniker": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\Persistence\\IUnitOfWork.cs",
+              "RelativeDocumentMoniker": "src\\Core\\SCI-PH.Application\\Abstractions\\Persistence\\IUnitOfWork.cs",
+              "ToolTip": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\Persistence\\IUnitOfWork.cs",
+              "RelativeToolTip": "src\\Core\\SCI-PH.Application\\Abstractions\\Persistence\\IUnitOfWork.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-26T01:22:55.353Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "IAiAssistantService.cs",
+              "DocumentMoniker": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\AI\\IAiAssistantService.cs",
+              "RelativeDocumentMoniker": "src\\Core\\SCI-PH.Application\\Abstractions\\AI\\IAiAssistantService.cs",
+              "ToolTip": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\AI\\IAiAssistantService.cs",
+              "RelativeToolTip": "src\\Core\\SCI-PH.Application\\Abstractions\\AI\\IAiAssistantService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-26T01:22:28.296Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "IQrService.cs",
+              "DocumentMoniker": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\QR\\IQrService.cs",
+              "RelativeDocumentMoniker": "src\\Core\\SCI-PH.Application\\Abstractions\\QR\\IQrService.cs",
+              "ToolTip": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\QR\\IQrService.cs",
+              "RelativeToolTip": "src\\Core\\SCI-PH.Application\\Abstractions\\QR\\IQrService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-26T01:22:13.919Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "IOcrService.cs",
+              "DocumentMoniker": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\OCR\\IOcrService.cs",
+              "RelativeDocumentMoniker": "src\\Core\\SCI-PH.Application\\Abstractions\\OCR\\IOcrService.cs",
+              "ToolTip": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\OCR\\IOcrService.cs",
+              "RelativeToolTip": "src\\Core\\SCI-PH.Application\\Abstractions\\OCR\\IOcrService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-26T01:21:54.643Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "IFingerprintService.cs",
+              "DocumentMoniker": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\Biometrics\\IFingerprintService.cs",
+              "RelativeDocumentMoniker": "src\\Core\\SCI-PH.Application\\Abstractions\\Biometrics\\IFingerprintService.cs",
+              "ToolTip": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\Biometrics\\IFingerprintService.cs",
+              "RelativeToolTip": "src\\Core\\SCI-PH.Application\\Abstractions\\Biometrics\\IFingerprintService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-26T01:21:41.565Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "IFaceVerificationService.cs",
+              "DocumentMoniker": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\Biometrics\\IFaceVerificationService.cs",
+              "RelativeDocumentMoniker": "src\\Core\\SCI-PH.Application\\Abstractions\\Biometrics\\IFaceVerificationService.cs",
+              "ToolTip": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\Biometrics\\IFaceVerificationService.cs",
+              "RelativeToolTip": "src\\Core\\SCI-PH.Application\\Abstractions\\Biometrics\\IFaceVerificationService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-26T01:21:27.542Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "IDocumentService.cs",
+              "DocumentMoniker": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\Documents\\IDocumentService.cs",
+              "RelativeDocumentMoniker": "src\\Core\\SCI-PH.Application\\Abstractions\\Documents\\IDocumentService.cs",
+              "ToolTip": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\Documents\\IDocumentService.cs",
+              "RelativeToolTip": "src\\Core\\SCI-PH.Application\\Abstractions\\Documents\\IDocumentService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-26T01:20:03.887Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "IStorageService.cs",
+              "DocumentMoniker": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\Storage\\IStorageService.cs",
+              "RelativeDocumentMoniker": "src\\Core\\SCI-PH.Application\\Abstractions\\Storage\\IStorageService.cs",
+              "ToolTip": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\Abstractions\\Storage\\IStorageService.cs",
+              "RelativeToolTip": "src\\Core\\SCI-PH.Application\\Abstractions\\Storage\\IStorageService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-26T01:19:28.187Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "SCI-PH.Application",
+              "DocumentMoniker": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj",
+              "RelativeDocumentMoniker": "src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj",
+              "ToolTip": "C:\\Users\\DELLG15\\Documents\\GitHub\\SCI-PH\\src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj",
+              "RelativeToolTip": "src\\Core\\SCI-PH.Application\\SCI-PH.Application.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-09-26T01:16:44.562Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{6d52cee1-a15c-42fd-8d30-faacc8d1dd02}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{cce594b6-0c39-4442-ba28-10c64ac7e89f}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{56df62a4-05a3-4e5b-aa1a-99371ccfb997}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

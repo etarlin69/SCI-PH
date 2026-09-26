@@ -1,5 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <ProjectReference Include="..\SCI-PH.Domain\SCI-PH.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Common\" />
+    <Folder Include="Features\" />
+    <Folder Include="DTOs\" />
+    <Folder Include="Validators\" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <RootNamespace>SCI_PH.Application</RootNamespace>

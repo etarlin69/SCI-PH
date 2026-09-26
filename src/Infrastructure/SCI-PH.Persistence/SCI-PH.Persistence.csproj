@@ -1,5 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\SCI-PH.Application\SCI-PH.Application.csproj" />
+    <ProjectReference Include="..\..\Core\SCI-PH.Domain\SCI-PH.Domain.csproj" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <RootNamespace>SCI_PH.Persistence</RootNamespace>
