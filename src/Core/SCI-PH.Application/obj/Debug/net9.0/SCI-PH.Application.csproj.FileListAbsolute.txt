@@ -1,0 +1,11 @@
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\bin\Debug\net9.0\SCI-PH.Application.deps.json
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\bin\Debug\net9.0\SCI-PH.Application.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\bin\Debug\net9.0\SCI-PH.Application.pdb
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\SCI-PH.Application.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\SCI-PH.Application.AssemblyInfoInputs.cache
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\SCI-PH.Application.AssemblyInfo.cs
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\SCI-PH.Application.csproj.CoreCompileInputs.cache
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\SCI-PH.Application.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\refint\SCI-PH.Application.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\SCI-PH.Application.pdb
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Core\SCI-PH.Application\obj\Debug\net9.0\ref\SCI-PH.Application.dll

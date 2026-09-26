@@ -1,0 +1,11 @@
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Infrastructure\bin\Debug\net9.0\SCI-PH.Infrastructure.deps.json
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Infrastructure\bin\Debug\net9.0\SCI-PH.Infrastructure.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Infrastructure\bin\Debug\net9.0\SCI-PH.Infrastructure.pdb
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Infrastructure\obj\Debug\net9.0\SCI-PH.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Infrastructure\obj\Debug\net9.0\SCI-PH.Infrastructure.AssemblyInfoInputs.cache
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Infrastructure\obj\Debug\net9.0\SCI-PH.Infrastructure.AssemblyInfo.cs
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Infrastructure\obj\Debug\net9.0\SCI-PH.Infrastructure.csproj.CoreCompileInputs.cache
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Infrastructure\obj\Debug\net9.0\SCI-PH.Infrastructure.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Infrastructure\obj\Debug\net9.0\refint\SCI-PH.Infrastructure.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Infrastructure\obj\Debug\net9.0\SCI-PH.Infrastructure.pdb
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Infrastructure\obj\Debug\net9.0\ref\SCI-PH.Infrastructure.dll

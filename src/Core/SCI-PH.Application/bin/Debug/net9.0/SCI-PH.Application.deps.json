@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v9.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v9.0": {
+      "SCI-PH.Application/1.0.0": {
+        "runtime": {
+          "SCI-PH.Application.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "SCI-PH.Application/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

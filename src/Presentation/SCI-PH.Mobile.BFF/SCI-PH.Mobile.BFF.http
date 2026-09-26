@@ -1,0 +1,6 @@
+@SCI_PH.Mobile.BFF_HostAddress = http://localhost:5191
+
+GET {{SCI_PH.Mobile.BFF_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
