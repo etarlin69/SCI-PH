@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SCI-PH.Application")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d6363e5e3208fb610a251bed3a7ca6afa100fc59")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+25336a81e8ad9aedbf09e6eab7122f033c58aff8")]
 [assembly: System.Reflection.AssemblyProductAttribute("SCI-PH.Application")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SCI-PH.Application")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

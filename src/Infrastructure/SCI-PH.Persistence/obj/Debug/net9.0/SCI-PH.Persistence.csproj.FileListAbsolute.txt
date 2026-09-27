@@ -9,3 +9,12 @@ C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Persistence\o
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Persistence\obj\Debug\net9.0\refint\SCI-PH.Persistence.dll
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Persistence\obj\Debug\net9.0\SCI-PH.Persistence.pdb
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Persistence\obj\Debug\net9.0\ref\SCI-PH.Persistence.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Persistence\bin\Debug\net9.0\SCI-PH.Application.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Persistence\bin\Debug\net9.0\SCI-PH.Domain.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Persistence\bin\Debug\net9.0\SCI-PH.Application.pdb
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Persistence\bin\Debug\net9.0\SCI-PH.Domain.pdb
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Persistence\obj\Debug\net9.0\SCI-PH.Persistence.csproj.AssemblyReference.cache
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Persistence\obj\Debug\net9.0\SCI-PH.Persistence.sourcelink.json
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Persistence\obj\Debug\net9.0\SCI-PH.P.D18E3A91.Up2Date
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Persistence\bin\Debug\net9.0\SCI-PH.Persistence.runtimeconfig.json
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Infrastructure\SCI-PH.Persistence\obj\Debug\net9.0\SCI-PH.Persistence.genruntimeconfig.cache

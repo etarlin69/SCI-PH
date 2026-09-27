@@ -30,3 +30,4 @@ C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Device.API\obj\
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Device.API\obj\Debug\net9.0\SCI-PH.Device.API.pdb
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Device.API\obj\Debug\net9.0\SCI-PH.Device.API.genruntimeconfig.cache
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Device.API\obj\Debug\net9.0\ref\SCI-PH.Device.API.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Device.API\obj\Debug\net9.0\SCI-PH.Device.API.sourcelink.json

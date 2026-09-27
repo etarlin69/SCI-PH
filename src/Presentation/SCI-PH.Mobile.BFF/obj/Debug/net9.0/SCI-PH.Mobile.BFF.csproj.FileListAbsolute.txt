@@ -30,3 +30,4 @@ C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Mobile.BFF\obj\
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Mobile.BFF\obj\Debug\net9.0\SCI-PH.Mobile.BFF.pdb
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Mobile.BFF\obj\Debug\net9.0\SCI-PH.Mobile.BFF.genruntimeconfig.cache
 C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Mobile.BFF\obj\Debug\net9.0\ref\SCI-PH.Mobile.BFF.dll
+C:\Users\DELLG15\Documents\GitHub\SCI-PH\src\Presentation\SCI-PH.Mobile.BFF\obj\Debug\net9.0\SCI-PH.Mobile.BFF.sourcelink.json

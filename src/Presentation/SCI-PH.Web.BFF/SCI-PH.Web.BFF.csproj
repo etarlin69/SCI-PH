@@ -1,10 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>SCI_PH.Web.BFF</RootNamespace>
+    <UserSecretsId>993dcc7f-cf44-475a-a61e-a3bf32457f8e</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Core\SCI-PH.Application\SCI-PH.Application.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\SCI-PH.Persistence\SCI-PH.Persistence.csproj" />
   </ItemGroup>
 
 </Project>
