@@ -1,6 +1,10 @@
 @SCI_PH.Mobile.BFF_HostAddress = http://localhost:5191
 
-GET {{SCI_PH.Mobile.BFF_HostAddress}}/weatherforecast/
+GET {{SCI_PH.Mobile.BFF_HostAddress}}/health
+
+###
+
+GET {{SCI_PH.Mobile.BFF_HostAddress}}/openapi/v1.json
 Accept: application/json
 
 ###
