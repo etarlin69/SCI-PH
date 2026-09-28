@@ -1,6 +1,10 @@
 @SCI_PH.Device.API_HostAddress = http://localhost:5139
 
-GET {{SCI_PH.Device.API_HostAddress}}/weatherforecast/
+GET {{SCI_PH.Device.API_HostAddress}}/health
+
+###
+
+GET {{SCI_PH.Device.API_HostAddress}}/openapi/v1.json
 Accept: application/json
 
 ###

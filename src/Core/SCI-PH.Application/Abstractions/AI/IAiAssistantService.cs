@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace SCI_PH.Application.Abstractions.AI
+﻿namespace SCI_PH.Application.Abstractions.AI
 {
-    internal class IAiAssistantService
+    public interface IAiAssistantService
     {
     }
 }
