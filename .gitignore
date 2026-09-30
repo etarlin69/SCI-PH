@@ -425,7 +425,7 @@ test-results/
 # Mac bundle stuff
 *.dmg
 *.app
-
+!**/SCI-PH.Mobile.App/
 # content below from: https://github.com/github/gitignore/blob/main/Global/macOS.gitignore
 # General
 .DS_Store
@@ -489,3 +489,17 @@ $RECYCLE.BIN/
 .env
 .env.*
 !.env.example
+
+## .NET MAUI / Mobile Specifics
+
+# Android build outputs & key stores
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# iOS build outputs & provisioning
+*.ipa
+*.dSYM/
+*.mobileprovision
+*.p12
