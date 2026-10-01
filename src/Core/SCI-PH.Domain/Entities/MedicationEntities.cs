@@ -8,6 +8,13 @@ public enum PrescriptionStatus
     Expired = 3
 }
 
+public enum HomeMedicationStatus
+{
+    Active = 0,
+    Stopped = 1,
+    Unknown = 2
+}
+
 public sealed class Medication
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -39,7 +46,6 @@ public sealed class Prescription
     public DateTimeOffset? IssuedAtUtc { get; set; }
     public DateTimeOffset? ValidUntilUtc { get; set; }
     public string? Notes { get; set; }
-
     public ICollection<PrescriptionItem> Items { get; set; } = new List<PrescriptionItem>();
 }
 
@@ -59,19 +65,19 @@ public sealed class PrescriptionItem
     public int AuthorizedRefills { get; set; }
 }
 
-// Records medication administered during a clinical encounter, separately from a prescription.
-public sealed class MedicationAdministration
+public sealed class HomeMedication
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid ClinicalEncounterId { get; set; }
-    public ClinicalEncounter Encounter { get; set; } = null!;
-    public Guid MedicationId { get; set; }
-    public Medication Medication { get; set; } = null!;
-    public Guid AdministeredByStaffId { get; set; }
-    public ClinicalStaff AdministeredByStaff { get; set; } = null!;
-    public decimal Dose { get; set; }
-    public string DoseUnit { get; set; } = string.Empty;
+    public Guid MedicalHistoryId { get; set; }
+    public PatientMedicalHistory MedicalHistory { get; set; } = null!;
+    public Guid? MedicationId { get; set; }
+    public Medication? Medication { get; set; }
+    public string MedicationName { get; set; } = string.Empty;
+    public string? DoseInstructions { get; set; }
+    public string? FrequencyInstructions { get; set; }
     public string? Route { get; set; }
-    public DateTimeOffset AdministeredAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    public HomeMedicationStatus Status { get; set; } = HomeMedicationStatus.Unknown;
+    public DateOnly? StartedOn { get; set; }
+    public DateOnly? StoppedOn { get; set; }
     public string? Notes { get; set; }
 }
