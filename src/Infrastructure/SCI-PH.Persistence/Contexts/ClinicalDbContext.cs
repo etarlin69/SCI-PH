@@ -243,7 +243,7 @@ public class ClinicalDbContext : DbContext
         });
         builder.Entity<ClinicalDocument>(entity =>
         {
-            entity.ToTable(t => t.HasCheckConstraint("CK_ClinicalDocuments_Target", ""PatientId" IS NOT NULL OR "ClinicalEncounterId" IS NOT NULL"));
+                        entity.ToTable(t => t.HasCheckConstraint("CK_ClinicalDocuments_Target", \"PatientId\" IS NOT NULL OR \"ClinicalEncounterId\" IS NOT NULL"));
             entity.HasKey(x => x.Id);
             entity.Property(x => x.FileName).HasMaxLength(255).IsRequired();
             entity.Property(x => x.BlobPath).HasMaxLength(1024).IsRequired();
