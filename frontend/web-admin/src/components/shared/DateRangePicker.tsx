@@ -44,9 +44,9 @@ export function DateRangePicker({
         return () => document.removeEventListener('mousedown', onPointerDown);
     }, [open]);
 
-    const select = (field: Field, iso: ISODate) => {
-        if (field === 'from') onChange({ from: iso, to: iso > value.to ? iso : value.to });
-        else onChange({ from: value.from, to: iso });
+    const select = (field: Field, _iso: ISODate) => {
+        if (field === 'from') onChange({ from: _iso, to: _iso > value.to ? _iso : value.to });
+        else onChange({ from: value.from, to: _iso });
         setOpen(null);
     };
 

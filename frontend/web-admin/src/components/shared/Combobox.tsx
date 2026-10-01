@@ -12,7 +12,7 @@ export interface ComboboxProps {
     label: string;
     options: ComboboxOption[];
     value: string;
-    onChange: (value: string) => void;
+    onChange: (_value: string) => void;
     placeholder?: string;
     emptyLabel?: string;
 }

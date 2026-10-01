@@ -18,7 +18,7 @@ export interface TabsProps<V extends string> {
 
 export const tabIds = (idPrefix: string, value: string) => ({ tab: `${idPrefix}-tab-${value}`, panel: `${idPrefix}-panel` });
 
-export function Tabs<V extends string>({ label, tabs, value, onChange, idPrefix, variant = 'underline' }: TabsProps<V>) {
+export function Tabs<V extends string>({ label, tabs, value: _value, onChange, idPrefix, variant = 'underline' }: TabsProps<V>) {
     const refs = useRef<(HTMLButtonElement | null)[]>([]);
 
     const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -50,7 +50,7 @@ export function Tabs<V extends string>({ label, tabs, value, onChange, idPrefix,
             className={cn('flex gap-1', variant === 'underline' ? 'border-b border-line' : 'w-fit rounded-lg bg-surface-hover p-1')}
         >
             {tabs.map((t, i) => {
-                const selected = t.value === value;
+                const selected = t.value === _value;
                 const ids = tabIds(idPrefix, t.value);
                 return (
                     <button

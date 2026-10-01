@@ -7,9 +7,8 @@ import { Badge, Card, Table, TRANSFER_STATUS_TONE, type Column } from '../shared
 export interface RecentEventsProps {
     events: RecentTransfer[];
     loading?: boolean;
-    onViewDetails?: (event: RecentTransfer) => void;
+    onViewDetails?: (_event: RecentTransfer) => void;
 }
-
 export function RecentEvents({ events, loading = false, onViewDetails }: RecentEventsProps) {
     const columns: Column<RecentTransfer>[] = [
         {

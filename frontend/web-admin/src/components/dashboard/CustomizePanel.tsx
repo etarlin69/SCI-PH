@@ -12,7 +12,7 @@ export interface CustomizePanelProps {
     onClose: () => void;
     widgets: WidgetConfig[];
     viewName: string;
-    onSave: (view: SavedView) => void;
+    onSave: (_: SavedView) => void;
 }
 
 const schema = z.object({
@@ -40,7 +40,7 @@ export function CustomizePanel({ open, onClose, widgets, viewName, onSave }: Cus
         register,
         handleSubmit,
         reset,
-        formState: { errors },
+        formState: { errors: _errors },
     } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { name: '' } });
 
     useEffect(() => {
@@ -132,7 +132,7 @@ export function CustomizePanel({ open, onClose, widgets, viewName, onSave }: Cus
                 <Input
                     label="Guardar como vista"
                     placeholder="Ej.: Mi Dashboard Personal"
-                    error={errors.name?.message}
+                    error={_errors.name?.message}
                     {...register('name')}
                 />
             </form>

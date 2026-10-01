@@ -41,10 +41,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const dismiss = useCallback((id: number) => setItems((xs) => xs.filter((x) => x.id !== id)), []);
 
     const push = useCallback<PushToast>(
-        (options) => {
+        (_options) => {
             const id = ++nextId.current;
-            setItems((xs) => [...xs, { ...options, id }]);
-            window.setTimeout(() => dismiss(id), options.durationMs ?? 4000);
+            setItems((xs) => [...xs, { ..._options, id }]);
+            window.setTimeout(() => dismiss(id), _options.durationMs ?? 4000);
         },
         [dismiss],
     );

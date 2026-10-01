@@ -74,6 +74,7 @@ export function useDashboard() {
                 setData(next);
                 setLastUpdated(new Date());
             }
+        } catch {
         } finally {
             if (id === requestId.current) setLoading(false);
         }

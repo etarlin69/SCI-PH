@@ -7,14 +7,14 @@ import { Button, DateRangePicker, MultiSelect, type DateRangePreset } from '../s
 
 export interface FilterPanelProps {
     range: DateRange;
-    onRangeChange: (range: DateRange) => void;
+    onRangeChange: (_: DateRange) => void;
     presets: DateRangePreset[];
     minDate: ISODate;
     maxDate: ISODate;
     hospitals: HospitalId[];
-    onHospitalsChange: (ids: HospitalId[]) => void;
+    onHospitalsChange: (_ids: HospitalId[]) => void;
     metrics: MetricType[];
-    onToggleMetric: (metric: MetricType) => void;
+    onToggleMetric: (_metric: MetricType) => void;
     loading: boolean;
     onRefresh: () => void;
 }
@@ -26,20 +26,20 @@ const METRIC_LABEL: Record<MetricType, string> = {
 };
 
 export function FilterPanel({
-    range,
+    range: _range,
     onRangeChange,
     presets,
     minDate,
     maxDate,
     hospitals,
     onHospitalsChange,
-    metrics,
+    metrics: _metrics,
     onToggleMetric,
     loading,
     onRefresh,
 }: FilterPanelProps) {
-    const days = diffDays(range.from, range.to) + 1;
-    const preset = presets.find((p) => p.range.from === range.from && p.range.to === range.to);
+    const days = diffDays(_range.from, _range.to) + 1;
+    const preset = presets.find((p) => p.range.from === _range.from && p.range.to === _range.to);
     const scope = [
         preset?.label ?? 'Rango personalizado',
         `${days} ${days === 1 ? 'día' : 'días'}`,
@@ -55,7 +55,7 @@ export function FilterPanel({
         >
             <div className="flex flex-wrap items-end gap-6">
                 <DateRangePicker
-                    value={range}
+                    value={_range}
                     onChange={onRangeChange}
                     min={minDate}
                     max={maxDate}
@@ -76,7 +76,7 @@ export function FilterPanel({
                     <span className="text-xs font-semibold text-ink-3">Tipo de métrica</span>
                     <div role="group" aria-label="Tipo de métrica" className="flex gap-1.5">
                         {(Object.keys(METRIC_LABEL) as MetricType[]).map((m) => {
-                            const on = metrics.includes(m);
+                            const on = _metrics.includes(m);
                             return (
                                 <button
                                     key={m}

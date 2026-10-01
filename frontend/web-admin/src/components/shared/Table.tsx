@@ -59,7 +59,7 @@ export function Table<T>({
     onRowClick,
 }: TableProps<T>) {
     const [sort, setSort] = useState<SortState | null>(initialSort ?? null);
-    const [page, setPage] = useState(1);
+    const [_page, setPage] = useState(1);
 
     useEffect(() => setPage(1), [resetPageKey]);
 
@@ -76,7 +76,7 @@ export function Table<T>({
     }, [rows, sort, columns]);
 
     const pageCount = pageSize ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1;
-    const current = Math.min(page, pageCount);
+    const current = Math.min(_page, pageCount);
     const visible = pageSize ? sorted.slice((current - 1) * pageSize, current * pageSize) : sorted;
 
     const toggleSort = (columnId: string) =>
@@ -138,8 +138,8 @@ export function Table<T>({
                     </thead>
                     <tbody>
                         {loading ? (
-                            Array.from({ length: Math.min(pageSize ?? 5, 5) }, (_, i) => (
-                                <tr key={`sk-${i}`} className="border-b border-line-soft">
+                            Array.from({ length: Math.min(pageSize ?? 5, 5) }, (_, _i) => (
+                                <tr key={`sk-${_i}`} className="border-b border-line-soft">
                                     {columns.map((c) => (
                                         <td key={c.id} className={cn('px-3', dense ? 'h-10' : 'h-12')}>
                                             <span className="block h-3 w-3/4 animate-pulse rounded bg-line-soft" />
@@ -154,13 +154,13 @@ export function Table<T>({
                                 </td>
                             </tr>
                         ) : (
-                            visible.map((row) => {
-                                const id = getRowId(row);
+                            visible.map((_row) => {
+                                const id = getRowId(_row);
                                 const expanded = !!renderExpanded && !!expandedRowIds?.has(id);
                                 const handleClick = onRowClick
                                     ? (e: MouseEvent<HTMLTableRowElement>) => {
                                           if ((e.target as HTMLElement).closest('button, a, input, select, textarea, label')) return;
-                                          onRowClick(row);
+                                          onRowClick(_row);
                                       }
                                     : undefined;
                                 return (
@@ -171,7 +171,7 @@ export function Table<T>({
                                                 'border-b border-line-soft hover:bg-surface-subtle',
                                                 onRowClick && 'cursor-pointer',
                                                 expanded && 'border-b-0 bg-surface-subtle',
-                                                rowClassName?.(row),
+                                                rowClassName?.(_row),
                                             )}
                                         >
                                             {columns.map((c) => (
@@ -179,14 +179,14 @@ export function Table<T>({
                                                     key={c.id}
                                                     className={cn('px-3', dense ? 'h-10' : 'h-12', ALIGN[c.align ?? 'left'], c.className)}
                                                 >
-                                                    {c.cell(row)}
+                                                    {c.cell(_row)}
                                                 </td>
                                             ))}
                                         </tr>
                                         {expanded && (
                                             <tr className="border-b border-line-soft bg-surface-subtle">
                                                 <td id={expandedRegionId(id)} colSpan={columns.length} className="px-3 pb-4 pt-1">
-                                                    {renderExpanded(row)}
+                                                    {renderExpanded(_row)}
                                                 </td>
                                             </tr>
                                         )}

@@ -22,7 +22,7 @@ export interface MultiSelectProps<V extends string> {
 export function MultiSelect<V extends string>({
     label,
     options,
-    value,
+    value: _value,
     onChange,
     allLabel = 'Todos',
     minSelected = 1,
@@ -41,15 +41,15 @@ export function MultiSelect<V extends string>({
         return () => document.removeEventListener('mousedown', onPointerDown);
     }, [open]);
 
-    const all = value.length === options.length;
+    const all = _value.length === options.length;
     const summary = all
         ? `${allLabel} (${options.length})`
-        : value.length === 1
-          ? options.find((o) => o.value === value[0])?.label
-          : `${value.length} seleccionados`;
+        : _value.length === 1
+          ? options.find((o) => o.value === _value[0])?.label
+          : `${_value.length} seleccionados`;
 
     const toggle = (v: V) => {
-        const next = value.includes(v) ? value.filter((x) => x !== v) : [...value, v];
+        const next = _value.includes(v) ? _value.filter((x) => x !== v) : [..._value, v];
         if (next.length >= minSelected) onChange(options.map((o) => o.value).filter((x) => next.includes(x)));
     };
 
@@ -92,18 +92,18 @@ export function MultiSelect<V extends string>({
                         <Checkbox
                             label={<span className="font-semibold">{allLabel}</span>}
                             checked={all}
-                            indeterminate={!all && value.length > 0}
+                            indeterminate={!all && _value.length > 0}
                             onChange={() => onChange(options.map((o) => o.value))}
                             containerClassName="min-h-10 items-center rounded-md px-2.5 hover:bg-surface-subtle"
                         />
                         <div className="my-1 h-px bg-line-soft" />
                         {options.map((o) => {
-                            const checked = value.includes(o.value);
+                            const checked = _value.includes(o.value);
                             return (
                                 <Checkbox
                                     key={o.value}
                                     checked={checked}
-                                    disabled={checked && value.length <= minSelected}
+                                    disabled={checked && _value.length <= minSelected}
                                     onChange={() => toggle(o.value)}
                                     containerClassName="min-h-10 items-center rounded-md px-2.5 hover:bg-surface-subtle"
                                     label={
@@ -124,7 +124,7 @@ export function MultiSelect<V extends string>({
                     </div>
                     <div className="flex items-center justify-between border-t border-line px-3.5 py-2.5 text-xs text-ink-3">
                         <span>
-                            {value.length} de {options.length} seleccionados
+                            {_value.length} de {options.length} seleccionados
                         </span>
                         <Button size="sm" onClick={() => setOpen(false)}>
                             Listo
