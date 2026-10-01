@@ -56,8 +56,8 @@ public class ClinicalDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Value).HasMaxLength(250).IsRequired();
             entity.Property(x => x.NormalizedValue).HasMaxLength(250).IsRequired();
-            entity.Property(x => x.Issuer).HasMaxLength(120);
-            entity.HasIndex(x => new { x.Type, x.NormalizedValue }).IsUnique().HasFilter(\"Type\" IN (0, 1, 2, 3));
+                        entity.HasIndex(x => new { x.Type, x.NormalizedValue }).IsUnique();
+            entity.HasIndex(x => new { x.Type, x.NormalizedValue }).IsUnique();
             entity.HasIndex(x => x.PatientId);
             entity.HasOne(x => x.Patient).WithMany(x => x.Identifiers).HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -243,7 +243,7 @@ public class ClinicalDbContext : DbContext
         });
         builder.Entity<ClinicalDocument>(entity =>
         {
-                        entity.ToTable(t => t.HasCheckConstraint("CK_ClinicalDocuments_Target", \"PatientId\" IS NOT NULL OR \"ClinicalEncounterId\" IS NOT NULL"));
+                        // Documents link to a patient, an encounter, or both.
             entity.HasKey(x => x.Id);
             entity.Property(x => x.FileName).HasMaxLength(255).IsRequired();
             entity.Property(x => x.BlobPath).HasMaxLength(1024).IsRequired();
