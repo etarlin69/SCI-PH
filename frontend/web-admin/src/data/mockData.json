@@ -1,0 +1,2286 @@
+{
+  "usuarios": [
+    {
+      "id": "USR001",
+      "nombre": "Dr. García",
+      "email": "garcia@scih.com",
+      "roles": ["Médico"],
+      "estado": "Activo",
+      "createdAt": "2026-09-01",
+      "updatedAt": "2026-09-28 14:30"
+    },
+    {
+      "id": "USR002",
+      "nombre": "Lic. Martínez",
+      "email": "martinez@scih.com",
+      "roles": ["Enfermero"],
+      "estado": "Activo",
+      "createdAt": "2026-09-05",
+      "updatedAt": "2026-09-28 14:32"
+    },
+    {
+      "id": "USR003",
+      "nombre": "Admin SCIH",
+      "email": "admin@scih.com",
+      "roles": ["Admin"],
+      "estado": "Activo",
+      "createdAt": "2026-08-15",
+      "updatedAt": "2026-08-15 08:00"
+    },
+    {
+      "id": "USR004",
+      "nombre": "Dr. López",
+      "email": "lopez@scih.com",
+      "roles": ["Médico"],
+      "estado": "Suspendido",
+      "createdAt": "2026-08-20",
+      "updatedAt": "2026-09-27 10:15"
+    },
+    {
+      "id": "USR005",
+      "nombre": "Dra. Ana Jiménez",
+      "email": "jimenez@scih.com",
+      "roles": ["Médico", "Admin"],
+      "estado": "Activo",
+      "createdAt": "2026-07-10",
+      "updatedAt": "2026-09-26 12:15"
+    },
+    {
+      "id": "USR006",
+      "nombre": "Carlos Pérez",
+      "email": "perez@scih.com",
+      "roles": ["Operador"],
+      "estado": "Activo",
+      "createdAt": "2026-06-02",
+      "updatedAt": "2026-06-02 08:00"
+    },
+    {
+      "id": "USR007",
+      "nombre": "María Santos",
+      "email": "maria@scih.com",
+      "roles": ["Operador"],
+      "estado": "Activo",
+      "createdAt": "2026-06-15",
+      "updatedAt": "2026-09-12 11:40"
+    },
+    {
+      "id": "USR008",
+      "nombre": "Lic. Rosa Peña",
+      "email": "pena@scih.com",
+      "roles": ["Enfermero"],
+      "estado": "Activo",
+      "createdAt": "2026-07-22",
+      "updatedAt": "2026-07-22 08:00"
+    },
+    {
+      "id": "USR009",
+      "nombre": "José Tavárez",
+      "email": "tavarez@scih.com",
+      "roles": ["Operador"],
+      "estado": "Suspendido",
+      "createdAt": "2026-05-30",
+      "updatedAt": "2026-09-14 09:02"
+    },
+    {
+      "id": "USR010",
+      "nombre": "Carmen Batista",
+      "email": "batista@scih.com",
+      "roles": ["Admin"],
+      "estado": "Activo",
+      "createdAt": "2026-05-12",
+      "updatedAt": "2026-05-12 08:00"
+    },
+    {
+      "id": "USR011",
+      "nombre": "Dr. Ramón Ortiz",
+      "email": "ortiz@scih.com",
+      "roles": ["Médico"],
+      "estado": "Activo",
+      "createdAt": "2026-08-03",
+      "updatedAt": "2026-08-03 08:00"
+    },
+    {
+      "id": "USR012",
+      "nombre": "Lic. Pedro Rosario",
+      "email": "rosario@scih.com",
+      "roles": ["Enfermero", "Operador"],
+      "estado": "Activo",
+      "createdAt": "2026-08-28",
+      "updatedAt": "2026-09-20 16:05"
+    },
+    {
+      "id": "USR013",
+      "nombre": "Dra. Sofía Vargas",
+      "email": "vargas@scih.com",
+      "roles": ["Médico"],
+      "estado": "Activo",
+      "createdAt": "2026-09-10",
+      "updatedAt": "2026-09-10 08:00"
+    },
+    {
+      "id": "USR014",
+      "nombre": "Laura Méndez",
+      "email": "mendez@scih.com",
+      "roles": ["Operador"],
+      "estado": "Activo",
+      "createdAt": "2026-09-18",
+      "updatedAt": "2026-09-18 08:00"
+    }
+  ],
+  "historialPermisos": [
+    {
+      "id": "PH001",
+      "userId": "USR001",
+      "fecha": "2026-09-01 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial"
+    },
+    {
+      "id": "PH002",
+      "userId": "USR001",
+      "fecha": "2026-09-28 14:30",
+      "administrador": "Admin SCIH",
+      "cambio": "Rol agregado",
+      "detalle": "Médico"
+    },
+    {
+      "id": "PH003",
+      "userId": "USR002",
+      "fecha": "2026-09-05 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial · Enfermero"
+    },
+    {
+      "id": "PH004",
+      "userId": "USR003",
+      "fecha": "2026-08-15 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial · Admin"
+    },
+    {
+      "id": "PH005",
+      "userId": "USR004",
+      "fecha": "2026-08-20 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial · Médico"
+    },
+    {
+      "id": "PH006",
+      "userId": "USR005",
+      "fecha": "2026-07-10 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial · Médico, Admin"
+    },
+    {
+      "id": "PH007",
+      "userId": "USR006",
+      "fecha": "2026-06-02 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial · Operador"
+    },
+    {
+      "id": "PH008",
+      "userId": "USR007",
+      "fecha": "2026-06-15 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial · Operador"
+    },
+    {
+      "id": "PH009",
+      "userId": "USR008",
+      "fecha": "2026-07-22 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial · Enfermero"
+    },
+    {
+      "id": "PH010",
+      "userId": "USR009",
+      "fecha": "2026-05-30 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial · Operador"
+    },
+    {
+      "id": "PH011",
+      "userId": "USR010",
+      "fecha": "2026-05-12 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial · Admin"
+    },
+    {
+      "id": "PH012",
+      "userId": "USR011",
+      "fecha": "2026-08-03 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial · Médico"
+    },
+    {
+      "id": "PH013",
+      "userId": "USR012",
+      "fecha": "2026-08-28 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial · Enfermero, Operador"
+    },
+    {
+      "id": "PH014",
+      "userId": "USR013",
+      "fecha": "2026-09-10 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial · Médico"
+    },
+    {
+      "id": "PH015",
+      "userId": "USR014",
+      "fecha": "2026-09-18 08:00",
+      "administrador": "Sistema",
+      "cambio": "Usuario creado",
+      "detalle": "Acceso inicial · Operador"
+    },
+    {
+      "id": "PH016",
+      "userId": "USR004",
+      "fecha": "2026-09-27 10:15",
+      "administrador": "Admin SCIH",
+      "cambio": "Estado cambio",
+      "detalle": "Activo → Suspendido"
+    },
+    {
+      "id": "PH017",
+      "userId": "USR009",
+      "fecha": "2026-09-14 09:02",
+      "administrador": "Carmen Batista",
+      "cambio": "Estado cambio",
+      "detalle": "Activo → Suspendido"
+    },
+    {
+      "id": "PH018",
+      "userId": "USR005",
+      "fecha": "2026-09-26 12:15",
+      "administrador": "Admin SCIH",
+      "cambio": "Rol agregado",
+      "detalle": "Admin"
+    },
+    {
+      "id": "PH019",
+      "userId": "USR007",
+      "fecha": "2026-09-12 11:40",
+      "administrador": "Carmen Batista",
+      "cambio": "Rol retirado",
+      "detalle": "Enfermero"
+    },
+    {
+      "id": "PH020",
+      "userId": "USR012",
+      "fecha": "2026-09-20 16:05",
+      "administrador": "Admin SCIH",
+      "cambio": "Rol agregado",
+      "detalle": "Operador"
+    }
+  ],
+  "auditLog": [
+    {
+      "id": "AUD001",
+      "timestamp": "2026-09-28 14:30:15",
+      "usuario": "Admin SCIH",
+      "tipo": "login",
+      "entidad": "Usuario",
+      "registroId": "USR003",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "AUD002",
+      "timestamp": "2026-09-28 14:32:45",
+      "usuario": "Admin SCIH",
+      "tipo": "crear",
+      "entidad": "Usuario",
+      "registroId": "USR002",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": {
+        "nombre": "Lic. Martínez",
+        "email": "martinez@scih.com",
+        "rol": "Enfermero"
+      }
+    },
+    {
+      "id": "AUD003",
+      "timestamp": "2026-09-28 15:00:20",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Usuario",
+      "registroId": "USR001",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "email": "garcia@old.com"
+      },
+      "after": {
+        "email": "garcia@scih.com"
+      }
+    },
+    {
+      "id": "AUD004",
+      "timestamp": "2026-09-28 16:15:10",
+      "usuario": "Admin SCIH",
+      "tipo": "cambio_rol",
+      "entidad": "Usuario",
+      "registroId": "USR004",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "rol": "Médico"
+      },
+      "after": {
+        "rol": "Médico",
+        "estado": "Suspendido"
+      }
+    },
+    {
+      "id": "AUD100",
+      "timestamp": "2026-08-30 10:50:52",
+      "usuario": "María Santos",
+      "tipo": "actualizar",
+      "entidad": "Ambulancia",
+      "registroId": "AMB-003",
+      "ip": "10.10.3.8",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "estado": "Disponible"
+      },
+      "after": {
+        "estado": "En Mantenimiento"
+      }
+    },
+    {
+      "id": "AUD101",
+      "timestamp": "2026-08-30 14:23:32",
+      "usuario": "Admin SCIH",
+      "tipo": "cambio_rol",
+      "entidad": "Usuario",
+      "registroId": "USR009",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "roles": ["Enfermero"]
+      },
+      "after": {
+        "roles": ["Enfermero", "Operador"]
+      }
+    },
+    {
+      "id": "AUD102",
+      "timestamp": "2026-08-30 17:36:13",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Configuración",
+      "registroId": "dashboard.autoRefresh",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "dashboard.autoRefresh": "10 min"
+      },
+      "after": {
+        "dashboard.autoRefresh": "5 min"
+      }
+    },
+    {
+      "id": "AUD103",
+      "timestamp": "2026-08-30 19:09:19",
+      "usuario": "Dra. Ana Jiménez",
+      "tipo": "login",
+      "entidad": "Usuario",
+      "registroId": "USR005",
+      "ip": "10.10.2.44",
+      "navegador": "Safari 17",
+      "sistema": "macOS 14",
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "AUD104",
+      "timestamp": "2026-08-31 10:57:34",
+      "usuario": "Carlos Pérez",
+      "tipo": "acceso",
+      "entidad": "Documento",
+      "registroId": "DOC-55863",
+      "ip": "10.20.4.17",
+      "navegador": "SCI-PH Móvil 2.3",
+      "sistema": "Android 14",
+      "before": null,
+      "after": {
+        "documento": "Informe prehospitalario EP-2026-0863"
+      }
+    },
+    {
+      "id": "AUD105",
+      "timestamp": "2026-08-31 12:10:47",
+      "usuario": "Carmen Batista",
+      "tipo": "cambio_rol",
+      "entidad": "Usuario",
+      "registroId": "USR011",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "roles": ["Enfermero"]
+      },
+      "after": {
+        "roles": ["Enfermero", "Operador"]
+      }
+    },
+    {
+      "id": "AUD106",
+      "timestamp": "2026-08-31 13:53:01",
+      "usuario": "María Santos",
+      "tipo": "login",
+      "entidad": "Usuario",
+      "registroId": "USR007",
+      "ip": "10.10.3.8",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "AUD107",
+      "timestamp": "2026-08-31 18:08:15",
+      "usuario": "Carmen Batista",
+      "tipo": "actualizar",
+      "entidad": "Configuración",
+      "registroId": "dashboard.autoRefresh",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "dashboard.autoRefresh": "10 min"
+      },
+      "after": {
+        "dashboard.autoRefresh": "5 min"
+      }
+    },
+    {
+      "id": "AUD108",
+      "timestamp": "2026-09-01 14:48:32",
+      "usuario": "María Santos",
+      "tipo": "actualizar",
+      "entidad": "Ambulancia",
+      "registroId": "AMB-003",
+      "ip": "10.10.3.8",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "estado": "Disponible"
+      },
+      "after": {
+        "estado": "En Mantenimiento"
+      }
+    },
+    {
+      "id": "AUD109",
+      "timestamp": "2026-09-01 15:18:08",
+      "usuario": "Carmen Batista",
+      "tipo": "cambio_rol",
+      "entidad": "Usuario",
+      "registroId": "USR009",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "roles": ["Enfermero"]
+      },
+      "after": {
+        "roles": ["Enfermero", "Operador"]
+      }
+    },
+    {
+      "id": "AUD110",
+      "timestamp": "2026-09-01 15:42:34",
+      "usuario": "Carmen Batista",
+      "tipo": "actualizar",
+      "entidad": "Episodio",
+      "registroId": "EP-2026-0905",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "estado": "En traslado",
+        "responsable": "Unidad A-07"
+      },
+      "after": {
+        "estado": "Recibido",
+        "responsable": "Hospital Central · Emergencias"
+      }
+    },
+    {
+      "id": "AUD111",
+      "timestamp": "2026-09-02 13:08:48",
+      "usuario": "Dra. Ana Jiménez",
+      "tipo": "actualizar",
+      "entidad": "Ambulancia",
+      "registroId": "AMB-003",
+      "ip": "10.10.2.44",
+      "navegador": "Safari 17",
+      "sistema": "macOS 14",
+      "before": {
+        "estado": "Disponible"
+      },
+      "after": {
+        "estado": "En Mantenimiento"
+      }
+    },
+    {
+      "id": "AUD112",
+      "timestamp": "2026-09-03 12:40:26",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Configuración",
+      "registroId": "dashboard.autoRefresh",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "dashboard.autoRefresh": "10 min"
+      },
+      "after": {
+        "dashboard.autoRefresh": "5 min"
+      }
+    },
+    {
+      "id": "AUD113",
+      "timestamp": "2026-09-03 13:37:25",
+      "usuario": "Carmen Batista",
+      "tipo": "actualizar",
+      "entidad": "Hospital",
+      "registroId": "central",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "telefono": "+1-809-555-0199"
+      },
+      "after": {
+        "telefono": "+1-809-555-0100"
+      }
+    },
+    {
+      "id": "AUD114",
+      "timestamp": "2026-09-03 17:03:25",
+      "usuario": "Carmen Batista",
+      "tipo": "crear",
+      "entidad": "Paciente",
+      "registroId": "PAC-40224",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": null,
+      "after": {
+        "identificacion": "NN-0314",
+        "metodo": "Manual"
+      }
+    },
+    {
+      "id": "AUD115",
+      "timestamp": "2026-09-04 08:47:12",
+      "usuario": "María Santos",
+      "tipo": "actualizar",
+      "entidad": "Ambulancia",
+      "registroId": "AMB-003",
+      "ip": "10.10.3.8",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "estado": "Disponible"
+      },
+      "after": {
+        "estado": "En Mantenimiento"
+      }
+    },
+    {
+      "id": "AUD116",
+      "timestamp": "2026-09-04 14:54:16",
+      "usuario": "Dr. García",
+      "tipo": "acceso",
+      "entidad": "Documento",
+      "registroId": "DOC-55805",
+      "ip": "10.10.2.31",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": {
+        "documento": "Informe prehospitalario EP-2026-0805"
+      }
+    },
+    {
+      "id": "AUD117",
+      "timestamp": "2026-09-04 20:24:52",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Configuración",
+      "registroId": "dashboard.autoRefresh",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "dashboard.autoRefresh": "10 min"
+      },
+      "after": {
+        "dashboard.autoRefresh": "5 min"
+      }
+    },
+    {
+      "id": "AUD118",
+      "timestamp": "2026-09-05 12:22:48",
+      "usuario": "Lic. Martínez",
+      "tipo": "login",
+      "entidad": "Usuario",
+      "registroId": "USR013",
+      "ip": "10.10.3.14",
+      "navegador": "Edge 125",
+      "sistema": "Windows 11",
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "AUD119",
+      "timestamp": "2026-09-05 14:59:58",
+      "usuario": "Admin SCIH",
+      "tipo": "crear",
+      "entidad": "Paciente",
+      "registroId": "PAC-40236",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": {
+        "identificacion": "NN-0326",
+        "metodo": "Manual"
+      }
+    },
+    {
+      "id": "AUD120",
+      "timestamp": "2026-09-06 07:25:49",
+      "usuario": "María Santos",
+      "tipo": "logout",
+      "entidad": "Usuario",
+      "registroId": "USR002",
+      "ip": "10.10.3.8",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "AUD121",
+      "timestamp": "2026-09-06 09:18:40",
+      "usuario": "Admin SCIH",
+      "tipo": "cambio_rol",
+      "entidad": "Usuario",
+      "registroId": "USR005",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "roles": ["Enfermero"]
+      },
+      "after": {
+        "roles": ["Enfermero", "Operador"]
+      }
+    },
+    {
+      "id": "AUD122",
+      "timestamp": "2026-09-06 10:55:43",
+      "usuario": "Carlos Pérez",
+      "tipo": "actualizar",
+      "entidad": "Paciente",
+      "registroId": "PAC-40284",
+      "ip": "10.20.4.17",
+      "navegador": "SCI-PH Móvil 2.3",
+      "sistema": "Android 14",
+      "before": {
+        "telefono": "809-555-0142",
+        "alergias": "Ninguna conocida"
+      },
+      "after": {
+        "telefono": "829-555-0199",
+        "alergias": "Penicilina"
+      }
+    },
+    {
+      "id": "AUD123",
+      "timestamp": "2026-09-06 14:41:58",
+      "usuario": "Carmen Batista",
+      "tipo": "eliminar",
+      "entidad": "Diagnóstico",
+      "registroId": "DIA099",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "codigo": "Z99.9",
+        "descripcion": "Registro duplicado"
+      },
+      "after": null
+    },
+    {
+      "id": "AUD124",
+      "timestamp": "2026-09-07 13:01:53",
+      "usuario": "Carmen Batista",
+      "tipo": "actualizar",
+      "entidad": "Configuración",
+      "registroId": "dashboard.autoRefresh",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "dashboard.autoRefresh": "10 min"
+      },
+      "after": {
+        "dashboard.autoRefresh": "5 min"
+      }
+    },
+    {
+      "id": "AUD125",
+      "timestamp": "2026-09-07 16:47:32",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Configuración",
+      "registroId": "dashboard.autoRefresh",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "dashboard.autoRefresh": "10 min"
+      },
+      "after": {
+        "dashboard.autoRefresh": "5 min"
+      }
+    },
+    {
+      "id": "AUD126",
+      "timestamp": "2026-09-09 07:04:34",
+      "usuario": "María Santos",
+      "tipo": "actualizar",
+      "entidad": "Episodio",
+      "registroId": "EP-2026-0892",
+      "ip": "10.10.3.8",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "estado": "En traslado",
+        "responsable": "Unidad A-07"
+      },
+      "after": {
+        "estado": "Recibido",
+        "responsable": "Hospital Central · Emergencias"
+      }
+    },
+    {
+      "id": "AUD127",
+      "timestamp": "2026-09-09 07:11:25",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Hospital",
+      "registroId": "central",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "telefono": "+1-809-555-0199"
+      },
+      "after": {
+        "telefono": "+1-809-555-0100"
+      }
+    },
+    {
+      "id": "AUD128",
+      "timestamp": "2026-09-09 16:55:44",
+      "usuario": "Admin SCIH",
+      "tipo": "cambio_rol",
+      "entidad": "Usuario",
+      "registroId": "USR009",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "roles": ["Enfermero"]
+      },
+      "after": {
+        "roles": ["Enfermero", "Operador"]
+      }
+    },
+    {
+      "id": "AUD129",
+      "timestamp": "2026-09-10 09:31:49",
+      "usuario": "Carmen Batista",
+      "tipo": "eliminar",
+      "entidad": "Diagnóstico",
+      "registroId": "DIA099",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "codigo": "Z99.9",
+        "descripcion": "Registro duplicado"
+      },
+      "after": null
+    },
+    {
+      "id": "AUD130",
+      "timestamp": "2026-09-10 15:02:37",
+      "usuario": "Carmen Batista",
+      "tipo": "actualizar",
+      "entidad": "Hospital",
+      "registroId": "central",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "telefono": "+1-809-555-0199"
+      },
+      "after": {
+        "telefono": "+1-809-555-0100"
+      }
+    },
+    {
+      "id": "AUD131",
+      "timestamp": "2026-09-10 18:37:37",
+      "usuario": "Dra. Ana Jiménez",
+      "tipo": "actualizar",
+      "entidad": "Ambulancia",
+      "registroId": "AMB-003",
+      "ip": "10.10.2.44",
+      "navegador": "Safari 17",
+      "sistema": "macOS 14",
+      "before": {
+        "estado": "Disponible"
+      },
+      "after": {
+        "estado": "En Mantenimiento"
+      }
+    },
+    {
+      "id": "AUD132",
+      "timestamp": "2026-09-10 19:59:56",
+      "usuario": "Dra. Ana Jiménez",
+      "tipo": "login",
+      "entidad": "Usuario",
+      "registroId": "USR004",
+      "ip": "10.10.2.44",
+      "navegador": "Safari 17",
+      "sistema": "macOS 14",
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "AUD133",
+      "timestamp": "2026-09-11 08:23:50",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Hospital",
+      "registroId": "central",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "telefono": "+1-809-555-0199"
+      },
+      "after": {
+        "telefono": "+1-809-555-0100"
+      }
+    },
+    {
+      "id": "AUD134",
+      "timestamp": "2026-09-11 11:17:32",
+      "usuario": "Dr. García",
+      "tipo": "logout",
+      "entidad": "Usuario",
+      "registroId": "USR003",
+      "ip": "10.10.2.31",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "AUD135",
+      "timestamp": "2026-09-11 15:50:24",
+      "usuario": "Dra. Ana Jiménez",
+      "tipo": "actualizar",
+      "entidad": "Ambulancia",
+      "registroId": "AMB-003",
+      "ip": "10.10.2.44",
+      "navegador": "Safari 17",
+      "sistema": "macOS 14",
+      "before": {
+        "estado": "Disponible"
+      },
+      "after": {
+        "estado": "En Mantenimiento"
+      }
+    },
+    {
+      "id": "AUD136",
+      "timestamp": "2026-09-11 19:44:44",
+      "usuario": "Carmen Batista",
+      "tipo": "crear",
+      "entidad": "Medicamento",
+      "registroId": "MED011",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": null,
+      "after": {
+        "nombre": "Ketorolaco",
+        "codigo": "KTR-011",
+        "categoria": "Analgésico"
+      }
+    },
+    {
+      "id": "AUD137",
+      "timestamp": "2026-09-12 16:46:11",
+      "usuario": "Carmen Batista",
+      "tipo": "actualizar",
+      "entidad": "Ambulancia",
+      "registroId": "AMB-003",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "estado": "Disponible"
+      },
+      "after": {
+        "estado": "En Mantenimiento"
+      }
+    },
+    {
+      "id": "AUD138",
+      "timestamp": "2026-09-12 19:27:01",
+      "usuario": "Dra. Ana Jiménez",
+      "tipo": "acceso",
+      "entidad": "Documento",
+      "registroId": "DOC-55881",
+      "ip": "10.10.2.44",
+      "navegador": "Safari 17",
+      "sistema": "macOS 14",
+      "before": null,
+      "after": {
+        "documento": "Informe prehospitalario EP-2026-0881"
+      }
+    },
+    {
+      "id": "AUD139",
+      "timestamp": "2026-09-13 13:14:09",
+      "usuario": "Admin SCIH",
+      "tipo": "acceso",
+      "entidad": "Documento",
+      "registroId": "DOC-55844",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": {
+        "documento": "Informe prehospitalario EP-2026-0844"
+      }
+    },
+    {
+      "id": "AUD140",
+      "timestamp": "2026-09-13 14:03:29",
+      "usuario": "Carlos Pérez",
+      "tipo": "actualizar",
+      "entidad": "Ambulancia",
+      "registroId": "AMB-003",
+      "ip": "10.20.4.17",
+      "navegador": "SCI-PH Móvil 2.3",
+      "sistema": "Android 14",
+      "before": {
+        "estado": "Disponible"
+      },
+      "after": {
+        "estado": "En Mantenimiento"
+      }
+    },
+    {
+      "id": "AUD141",
+      "timestamp": "2026-09-13 14:07:25",
+      "usuario": "Dr. García",
+      "tipo": "actualizar",
+      "entidad": "Ambulancia",
+      "registroId": "AMB-003",
+      "ip": "10.10.2.31",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "estado": "Disponible"
+      },
+      "after": {
+        "estado": "En Mantenimiento"
+      }
+    },
+    {
+      "id": "AUD142",
+      "timestamp": "2026-09-13 14:50:00",
+      "usuario": "Carmen Batista",
+      "tipo": "eliminar",
+      "entidad": "Diagnóstico",
+      "registroId": "DIA099",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "codigo": "Z99.9",
+        "descripcion": "Registro duplicado"
+      },
+      "after": null
+    },
+    {
+      "id": "AUD143",
+      "timestamp": "2026-09-13 19:21:25",
+      "usuario": "Dra. Ana Jiménez",
+      "tipo": "acceso",
+      "entidad": "Documento",
+      "registroId": "DOC-55860",
+      "ip": "10.10.2.44",
+      "navegador": "Safari 17",
+      "sistema": "macOS 14",
+      "before": null,
+      "after": {
+        "documento": "Informe prehospitalario EP-2026-0860"
+      }
+    },
+    {
+      "id": "AUD144",
+      "timestamp": "2026-09-14 07:35:18",
+      "usuario": "Dra. Ana Jiménez",
+      "tipo": "actualizar",
+      "entidad": "Paciente",
+      "registroId": "PAC-40263",
+      "ip": "10.10.2.44",
+      "navegador": "Safari 17",
+      "sistema": "macOS 14",
+      "before": {
+        "telefono": "809-555-0142",
+        "alergias": "Ninguna conocida"
+      },
+      "after": {
+        "telefono": "829-555-0199",
+        "alergias": "Penicilina"
+      }
+    },
+    {
+      "id": "AUD145",
+      "timestamp": "2026-09-14 11:30:45",
+      "usuario": "María Santos",
+      "tipo": "actualizar",
+      "entidad": "Paciente",
+      "registroId": "PAC-40261",
+      "ip": "10.10.3.8",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "telefono": "809-555-0142",
+        "alergias": "Ninguna conocida"
+      },
+      "after": {
+        "telefono": "829-555-0199",
+        "alergias": "Penicilina"
+      }
+    },
+    {
+      "id": "AUD146",
+      "timestamp": "2026-09-14 17:30:34",
+      "usuario": "Carmen Batista",
+      "tipo": "login",
+      "entidad": "Usuario",
+      "registroId": "USR003",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "AUD147",
+      "timestamp": "2026-09-15 11:54:02",
+      "usuario": "Admin SCIH",
+      "tipo": "cambio_rol",
+      "entidad": "Usuario",
+      "registroId": "USR004",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "roles": ["Enfermero"]
+      },
+      "after": {
+        "roles": ["Enfermero", "Operador"]
+      }
+    },
+    {
+      "id": "AUD148",
+      "timestamp": "2026-09-15 15:23:16",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Episodio",
+      "registroId": "EP-2026-0898",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "estado": "En traslado",
+        "responsable": "Unidad A-07"
+      },
+      "after": {
+        "estado": "Recibido",
+        "responsable": "Hospital Central · Emergencias"
+      }
+    },
+    {
+      "id": "AUD149",
+      "timestamp": "2026-09-15 16:18:08",
+      "usuario": "Carmen Batista",
+      "tipo": "actualizar",
+      "entidad": "Configuración",
+      "registroId": "dashboard.autoRefresh",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "dashboard.autoRefresh": "10 min"
+      },
+      "after": {
+        "dashboard.autoRefresh": "5 min"
+      }
+    },
+    {
+      "id": "AUD150",
+      "timestamp": "2026-09-16 08:07:01",
+      "usuario": "Admin SCIH",
+      "tipo": "crear",
+      "entidad": "Medicamento",
+      "registroId": "MED011",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": {
+        "nombre": "Ketorolaco",
+        "codigo": "KTR-011",
+        "categoria": "Analgésico"
+      }
+    },
+    {
+      "id": "AUD151",
+      "timestamp": "2026-09-16 11:09:00",
+      "usuario": "Admin SCIH",
+      "tipo": "eliminar",
+      "entidad": "Diagnóstico",
+      "registroId": "DIA099",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "codigo": "Z99.9",
+        "descripcion": "Registro duplicado"
+      },
+      "after": null
+    },
+    {
+      "id": "AUD152",
+      "timestamp": "2026-09-16 17:48:50",
+      "usuario": "Lic. Martínez",
+      "tipo": "actualizar",
+      "entidad": "Episodio",
+      "registroId": "EP-2026-0919",
+      "ip": "10.10.3.14",
+      "navegador": "Edge 125",
+      "sistema": "Windows 11",
+      "before": {
+        "estado": "En traslado",
+        "responsable": "Unidad A-07"
+      },
+      "after": {
+        "estado": "Recibido",
+        "responsable": "Hospital Central · Emergencias"
+      }
+    },
+    {
+      "id": "AUD153",
+      "timestamp": "2026-09-16 20:29:14",
+      "usuario": "Carmen Batista",
+      "tipo": "crear",
+      "entidad": "Medicamento",
+      "registroId": "MED011",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": null,
+      "after": {
+        "nombre": "Ketorolaco",
+        "codigo": "KTR-011",
+        "categoria": "Analgésico"
+      }
+    },
+    {
+      "id": "AUD154",
+      "timestamp": "2026-09-17 06:29:58",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Hospital",
+      "registroId": "central",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "telefono": "+1-809-555-0199"
+      },
+      "after": {
+        "telefono": "+1-809-555-0100"
+      }
+    },
+    {
+      "id": "AUD155",
+      "timestamp": "2026-09-18 06:45:14",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Hospital",
+      "registroId": "central",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "telefono": "+1-809-555-0199"
+      },
+      "after": {
+        "telefono": "+1-809-555-0100"
+      }
+    },
+    {
+      "id": "AUD156",
+      "timestamp": "2026-09-18 12:36:02",
+      "usuario": "Carmen Batista",
+      "tipo": "eliminar",
+      "entidad": "Diagnóstico",
+      "registroId": "DIA099",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "codigo": "Z99.9",
+        "descripcion": "Registro duplicado"
+      },
+      "after": null
+    },
+    {
+      "id": "AUD157",
+      "timestamp": "2026-09-18 15:12:21",
+      "usuario": "Admin SCIH",
+      "tipo": "eliminar",
+      "entidad": "Diagnóstico",
+      "registroId": "DIA099",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "codigo": "Z99.9",
+        "descripcion": "Registro duplicado"
+      },
+      "after": null
+    },
+    {
+      "id": "AUD158",
+      "timestamp": "2026-09-18 15:37:41",
+      "usuario": "Carmen Batista",
+      "tipo": "actualizar",
+      "entidad": "Hospital",
+      "registroId": "central",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "telefono": "+1-809-555-0199"
+      },
+      "after": {
+        "telefono": "+1-809-555-0100"
+      }
+    },
+    {
+      "id": "AUD159",
+      "timestamp": "2026-09-18 19:24:14",
+      "usuario": "Admin SCIH",
+      "tipo": "crear",
+      "entidad": "Medicamento",
+      "registroId": "MED011",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": {
+        "nombre": "Ketorolaco",
+        "codigo": "KTR-011",
+        "categoria": "Analgésico"
+      }
+    },
+    {
+      "id": "AUD160",
+      "timestamp": "2026-09-19 19:06:00",
+      "usuario": "Carmen Batista",
+      "tipo": "crear",
+      "entidad": "Paciente",
+      "registroId": "PAC-40266",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": null,
+      "after": {
+        "identificacion": "NN-0356",
+        "metodo": "Manual"
+      }
+    },
+    {
+      "id": "AUD161",
+      "timestamp": "2026-09-20 12:21:13",
+      "usuario": "Admin SCIH",
+      "tipo": "crear",
+      "entidad": "Paciente",
+      "registroId": "PAC-40249",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": {
+        "identificacion": "NN-0339",
+        "metodo": "Manual"
+      }
+    },
+    {
+      "id": "AUD162",
+      "timestamp": "2026-09-20 19:03:52",
+      "usuario": "Dra. Ana Jiménez",
+      "tipo": "acceso",
+      "entidad": "Documento",
+      "registroId": "DOC-55861",
+      "ip": "10.10.2.44",
+      "navegador": "Safari 17",
+      "sistema": "macOS 14",
+      "before": null,
+      "after": {
+        "documento": "Informe prehospitalario EP-2026-0861"
+      }
+    },
+    {
+      "id": "AUD163",
+      "timestamp": "2026-09-20 19:28:10",
+      "usuario": "Lic. Martínez",
+      "tipo": "actualizar",
+      "entidad": "Ambulancia",
+      "registroId": "AMB-003",
+      "ip": "10.10.3.14",
+      "navegador": "Edge 125",
+      "sistema": "Windows 11",
+      "before": {
+        "estado": "Disponible"
+      },
+      "after": {
+        "estado": "En Mantenimiento"
+      }
+    },
+    {
+      "id": "AUD164",
+      "timestamp": "2026-09-20 20:37:06",
+      "usuario": "María Santos",
+      "tipo": "acceso",
+      "entidad": "Documento",
+      "registroId": "DOC-55804",
+      "ip": "10.10.3.8",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": {
+        "documento": "Informe prehospitalario EP-2026-0804"
+      }
+    },
+    {
+      "id": "AUD165",
+      "timestamp": "2026-09-21 12:26:27",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Episodio",
+      "registroId": "EP-2026-0867",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "estado": "En traslado",
+        "responsable": "Unidad A-07"
+      },
+      "after": {
+        "estado": "Recibido",
+        "responsable": "Hospital Central · Emergencias"
+      }
+    },
+    {
+      "id": "AUD166",
+      "timestamp": "2026-09-21 12:40:34",
+      "usuario": "Lic. Martínez",
+      "tipo": "actualizar",
+      "entidad": "Ambulancia",
+      "registroId": "AMB-003",
+      "ip": "10.10.3.14",
+      "navegador": "Edge 125",
+      "sistema": "Windows 11",
+      "before": {
+        "estado": "Disponible"
+      },
+      "after": {
+        "estado": "En Mantenimiento"
+      }
+    },
+    {
+      "id": "AUD167",
+      "timestamp": "2026-09-21 15:32:13",
+      "usuario": "Dra. Ana Jiménez",
+      "tipo": "acceso",
+      "entidad": "Documento",
+      "registroId": "DOC-55876",
+      "ip": "10.10.2.44",
+      "navegador": "Safari 17",
+      "sistema": "macOS 14",
+      "before": null,
+      "after": {
+        "documento": "Informe prehospitalario EP-2026-0876"
+      }
+    },
+    {
+      "id": "AUD168",
+      "timestamp": "2026-09-21 19:05:26",
+      "usuario": "Carmen Batista",
+      "tipo": "cambio_rol",
+      "entidad": "Usuario",
+      "registroId": "USR012",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "roles": ["Enfermero"]
+      },
+      "after": {
+        "roles": ["Enfermero", "Operador"]
+      }
+    },
+    {
+      "id": "AUD169",
+      "timestamp": "2026-09-23 06:16:12",
+      "usuario": "Admin SCIH",
+      "tipo": "login",
+      "entidad": "Usuario",
+      "registroId": "USR001",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "AUD170",
+      "timestamp": "2026-09-23 08:04:24",
+      "usuario": "María Santos",
+      "tipo": "acceso",
+      "entidad": "Documento",
+      "registroId": "DOC-55827",
+      "ip": "10.10.3.8",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": {
+        "documento": "Informe prehospitalario EP-2026-0827"
+      }
+    },
+    {
+      "id": "AUD171",
+      "timestamp": "2026-09-23 17:23:33",
+      "usuario": "Lic. Martínez",
+      "tipo": "actualizar",
+      "entidad": "Ambulancia",
+      "registroId": "AMB-003",
+      "ip": "10.10.3.14",
+      "navegador": "Edge 125",
+      "sistema": "Windows 11",
+      "before": {
+        "estado": "Disponible"
+      },
+      "after": {
+        "estado": "En Mantenimiento"
+      }
+    },
+    {
+      "id": "AUD172",
+      "timestamp": "2026-09-24 18:51:51",
+      "usuario": "Admin SCIH",
+      "tipo": "eliminar",
+      "entidad": "Diagnóstico",
+      "registroId": "DIA099",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "codigo": "Z99.9",
+        "descripcion": "Registro duplicado"
+      },
+      "after": null
+    },
+    {
+      "id": "AUD173",
+      "timestamp": "2026-09-25 09:01:51",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Configuración",
+      "registroId": "dashboard.autoRefresh",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "dashboard.autoRefresh": "10 min"
+      },
+      "after": {
+        "dashboard.autoRefresh": "5 min"
+      }
+    },
+    {
+      "id": "AUD174",
+      "timestamp": "2026-09-25 16:41:38",
+      "usuario": "Lic. Martínez",
+      "tipo": "acceso",
+      "entidad": "Documento",
+      "registroId": "DOC-55835",
+      "ip": "10.10.3.14",
+      "navegador": "Edge 125",
+      "sistema": "Windows 11",
+      "before": null,
+      "after": {
+        "documento": "Informe prehospitalario EP-2026-0835"
+      }
+    },
+    {
+      "id": "AUD175",
+      "timestamp": "2026-09-25 20:22:41",
+      "usuario": "Carlos Pérez",
+      "tipo": "login",
+      "entidad": "Usuario",
+      "registroId": "USR006",
+      "ip": "10.20.4.17",
+      "navegador": "SCI-PH Móvil 2.3",
+      "sistema": "Android 14",
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "AUD176",
+      "timestamp": "2026-09-26 11:51:16",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Paciente",
+      "registroId": "PAC-40264",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "telefono": "809-555-0142",
+        "alergias": "Ninguna conocida"
+      },
+      "after": {
+        "telefono": "829-555-0199",
+        "alergias": "Penicilina"
+      }
+    },
+    {
+      "id": "AUD177",
+      "timestamp": "2026-09-26 13:03:18",
+      "usuario": "Lic. Martínez",
+      "tipo": "logout",
+      "entidad": "Usuario",
+      "registroId": "USR002",
+      "ip": "10.10.3.14",
+      "navegador": "Edge 125",
+      "sistema": "Windows 11",
+      "before": null,
+      "after": null
+    },
+    {
+      "id": "AUD178",
+      "timestamp": "2026-09-26 13:20:15",
+      "usuario": "Carmen Batista",
+      "tipo": "eliminar",
+      "entidad": "Diagnóstico",
+      "registroId": "DIA099",
+      "ip": "10.10.1.5",
+      "navegador": "Firefox 127",
+      "sistema": "Ubuntu 22.04",
+      "before": {
+        "codigo": "Z99.9",
+        "descripcion": "Registro duplicado"
+      },
+      "after": null
+    },
+    {
+      "id": "AUD179",
+      "timestamp": "2026-09-27 07:47:57",
+      "usuario": "Admin SCIH",
+      "tipo": "cambio_rol",
+      "entidad": "Usuario",
+      "registroId": "USR009",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "roles": ["Enfermero"]
+      },
+      "after": {
+        "roles": ["Enfermero", "Operador"]
+      }
+    },
+    {
+      "id": "AUD180",
+      "timestamp": "2026-09-27 11:17:34",
+      "usuario": "Admin SCIH",
+      "tipo": "actualizar",
+      "entidad": "Configuración",
+      "registroId": "dashboard.autoRefresh",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": {
+        "dashboard.autoRefresh": "10 min"
+      },
+      "after": {
+        "dashboard.autoRefresh": "5 min"
+      }
+    },
+    {
+      "id": "AUD181",
+      "timestamp": "2026-09-28 12:36:00",
+      "usuario": "Admin SCIH",
+      "tipo": "logout",
+      "entidad": "Usuario",
+      "registroId": "USR004",
+      "ip": "192.168.1.100",
+      "navegador": "Chrome 125",
+      "sistema": "Windows 10",
+      "before": null,
+      "after": null
+    }
+  ],
+  "kpis": {
+    "episodiosActivos": 12,
+    "transferenciasHoy": 7,
+    "tasaExito": 100,
+    "pacientesIdentificados": 95,
+    "tiempoPromedioRespuesta": 8.5
+  },
+  "metodosIdentificacion": {
+    "ocr": 58,
+    "qr": 22,
+    "huella": 9,
+    "manual": 6,
+    "nn": 5
+  },
+  "hospitales": [
+    {
+      "id": "central",
+      "nombre": "Hospital Central",
+      "color": "#1B4F8A",
+      "region": "Santo Domingo",
+      "direccion": "Av. Independencia #120",
+      "telefono": "+1-809-555-0100",
+      "lat": 18.4655,
+      "lng": -69.9154
+    },
+    {
+      "id": "norte",
+      "nombre": "Hospital del Norte",
+      "color": "#1C7C7D",
+      "region": "Santiago",
+      "direccion": "Calle del Sol #45",
+      "telefono": "+1-809-555-0200",
+      "lat": 19.4517,
+      "lng": -70.697
+    },
+    {
+      "id": "sanrafael",
+      "nombre": "Clínica San Rafael",
+      "color": "#6B4FA0",
+      "region": "Santo Domingo",
+      "direccion": "Av. Abraham Lincoln #310",
+      "telefono": "+1-809-555-0300",
+      "lat": 18.4796,
+      "lng": -69.9392
+    },
+    {
+      "id": "este",
+      "nombre": "Hospital Regional Este",
+      "color": "#7FA9D9",
+      "region": "La Romana",
+      "direccion": "Carretera Mella km 12",
+      "telefono": "+1-809-555-0400",
+      "lat": 18.4273,
+      "lng": -68.9728
+    },
+    {
+      "id": "infantil",
+      "nombre": "Hospital Infantil Sur",
+      "color": "#E07B1F",
+      "region": "Baní",
+      "direccion": "Calle Duarte #8",
+      "telefono": "+1-809-555-0500",
+      "lat": 18.2796,
+      "lng": -70.3314
+    }
+  ],
+  "transferenciasRecientes": [
+    {
+      "id": "TR-0918",
+      "diasAtras": 0,
+      "hora": "14:27",
+      "paciente": "NN-0412",
+      "origen": "Unidad A-07",
+      "destino": "Hospital Central",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0917",
+      "diasAtras": 0,
+      "hora": "14:05",
+      "paciente": "M. Rodríguez",
+      "origen": "Unidad B-03",
+      "destino": "Hospital del Norte",
+      "estado": "En tránsito"
+    },
+    {
+      "id": "TR-0916",
+      "diasAtras": 0,
+      "hora": "13:48",
+      "paciente": "J. Martínez",
+      "origen": "Hospital del Norte",
+      "destino": "Clínica San Rafael",
+      "estado": "Pendiente"
+    },
+    {
+      "id": "TR-0915",
+      "diasAtras": 0,
+      "hora": "13:10",
+      "paciente": "A. Peña",
+      "origen": "Unidad A-02",
+      "destino": "Hospital Regional Este",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0914",
+      "diasAtras": 0,
+      "hora": "12:52",
+      "paciente": "L. Castillo",
+      "origen": "Hospital Central",
+      "destino": "Hospital Infantil Sur",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0913",
+      "diasAtras": 0,
+      "hora": "12:18",
+      "paciente": "NN-0409",
+      "origen": "Unidad C-11",
+      "destino": "Hospital Central",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0912",
+      "diasAtras": 0,
+      "hora": "11:41",
+      "paciente": "R. Almonte",
+      "origen": "Unidad B-05",
+      "destino": "Clínica San Rafael",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0911",
+      "diasAtras": 0,
+      "hora": "10:56",
+      "paciente": "C. Féliz",
+      "origen": "Hospital Regional Este",
+      "destino": "Hospital Central",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0910",
+      "diasAtras": 0,
+      "hora": "10:12",
+      "paciente": "D. Guzmán",
+      "origen": "Unidad A-07",
+      "destino": "Hospital del Norte",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0909",
+      "diasAtras": 0,
+      "hora": "09:35",
+      "paciente": "P. Reyes",
+      "origen": "Unidad C-02",
+      "destino": "Hospital Central",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0908",
+      "diasAtras": 1,
+      "hora": "18:40",
+      "paciente": "E. Santana",
+      "origen": "Unidad B-05",
+      "destino": "Hospital del Norte",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0907",
+      "diasAtras": 1,
+      "hora": "16:22",
+      "paciente": "NN-0405",
+      "origen": "Unidad A-02",
+      "destino": "Hospital Regional Este",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0906",
+      "diasAtras": 1,
+      "hora": "11:05",
+      "paciente": "F. Mercedes",
+      "origen": "Hospital Infantil Sur",
+      "destino": "Hospital Central",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0905",
+      "diasAtras": 2,
+      "hora": "20:14",
+      "paciente": "G. Paulino",
+      "origen": "Unidad C-02",
+      "destino": "Clínica San Rafael",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0904",
+      "diasAtras": 2,
+      "hora": "09:47",
+      "paciente": "H. Cabrera",
+      "origen": "Unidad A-07",
+      "destino": "Hospital Central",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0903",
+      "diasAtras": 3,
+      "hora": "15:30",
+      "paciente": "I. Batista",
+      "origen": "Hospital Central",
+      "destino": "Hospital del Norte",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0902",
+      "diasAtras": 4,
+      "hora": "13:12",
+      "paciente": "K. Rosario",
+      "origen": "Unidad B-03",
+      "destino": "Hospital Infantil Sur",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0901",
+      "diasAtras": 4,
+      "hora": "07:55",
+      "paciente": "NN-0398",
+      "origen": "Unidad C-11",
+      "destino": "Hospital Central",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0900",
+      "diasAtras": 5,
+      "hora": "22:03",
+      "paciente": "L. Ventura",
+      "origen": "Unidad A-02",
+      "destino": "Hospital Regional Este",
+      "estado": "Recibido"
+    },
+    {
+      "id": "TR-0899",
+      "diasAtras": 6,
+      "hora": "10:40",
+      "paciente": "M. Encarnación",
+      "origen": "Unidad B-05",
+      "destino": "Clínica San Rafael",
+      "estado": "Recibido"
+    }
+  ],
+  "medicamentos": [
+    {
+      "id": "MED001",
+      "nombre": "Ibuprofeno",
+      "codigo": "IBU-001",
+      "categoria": "Analgésico",
+      "disponible": true
+    },
+    {
+      "id": "MED002",
+      "nombre": "Paracetamol",
+      "codigo": "PAR-002",
+      "categoria": "Analgésico",
+      "disponible": true
+    },
+    {
+      "id": "MED003",
+      "nombre": "Amoxicilina",
+      "codigo": "AMX-003",
+      "categoria": "Antibiótico",
+      "disponible": false,
+      "enUso": true
+    },
+    {
+      "id": "MED004",
+      "nombre": "Adrenalina",
+      "codigo": "ADR-004",
+      "categoria": "Vasopresor",
+      "disponible": true,
+      "enUso": true
+    },
+    {
+      "id": "MED005",
+      "nombre": "Salbutamol",
+      "codigo": "SAL-005",
+      "categoria": "Broncodilatador",
+      "disponible": true,
+      "enUso": true
+    },
+    {
+      "id": "MED006",
+      "nombre": "Nitroglicerina",
+      "codigo": "NIT-006",
+      "categoria": "Vasodilatador",
+      "disponible": true
+    },
+    {
+      "id": "MED007",
+      "nombre": "Ácido acetilsalicílico",
+      "codigo": "AAS-007",
+      "categoria": "Antiagregante",
+      "disponible": true,
+      "enUso": true
+    },
+    {
+      "id": "MED008",
+      "nombre": "Diazepam",
+      "codigo": "DZP-008",
+      "categoria": "Anticonvulsivante",
+      "disponible": true
+    },
+    {
+      "id": "MED009",
+      "nombre": "Naloxona",
+      "codigo": "NAL-009",
+      "categoria": "Antídoto",
+      "disponible": true
+    },
+    {
+      "id": "MED010",
+      "nombre": "Solución salina 0.9 %",
+      "codigo": "SSN-010",
+      "categoria": "Solución intravenosa",
+      "disponible": true,
+      "enUso": true
+    },
+    {
+      "id": "MED011",
+      "nombre": "Ketorolaco",
+      "codigo": "KTR-011",
+      "categoria": "Analgésico",
+      "disponible": false
+    },
+    {
+      "id": "MED012",
+      "nombre": "Amiodarona",
+      "codigo": "AMD-012",
+      "categoria": "Antiarrítmico",
+      "disponible": true
+    }
+  ],
+  "diagnosticos": [
+    {
+      "id": "DIA001",
+      "codigo": "A00.0",
+      "descripcion": "Cólera debido a Vibrio cholerae 01, biotipo cholerae",
+      "sistemaAfectado": "Gastrointestinal"
+    },
+    {
+      "id": "DIA002",
+      "codigo": "J00",
+      "descripcion": "Rinofaringitis aguda (resfriado común)",
+      "sistemaAfectado": "Respiratorio",
+      "enUso": true
+    },
+    {
+      "id": "DIA003",
+      "codigo": "I21.9",
+      "descripcion": "Infarto agudo del miocardio, sin otra especificación",
+      "sistemaAfectado": "Cardiovascular",
+      "enUso": true
+    },
+    {
+      "id": "DIA004",
+      "codigo": "I46.9",
+      "descripcion": "Paro cardíaco, no especificado",
+      "sistemaAfectado": "Cardiovascular",
+      "enUso": true
+    },
+    {
+      "id": "DIA005",
+      "codigo": "I63.9",
+      "descripcion": "Infarto cerebral, no especificado",
+      "sistemaAfectado": "Neurológico",
+      "enUso": true
+    },
+    {
+      "id": "DIA006",
+      "codigo": "S06.0",
+      "descripcion": "Conmoción cerebral",
+      "sistemaAfectado": "Traumatológico",
+      "enUso": true
+    },
+    {
+      "id": "DIA007",
+      "codigo": "S72.0",
+      "descripcion": "Fractura del cuello del fémur",
+      "sistemaAfectado": "Traumatológico"
+    },
+    {
+      "id": "DIA008",
+      "codigo": "T07",
+      "descripcion": "Traumatismos múltiples, no especificados",
+      "sistemaAfectado": "Traumatológico",
+      "enUso": true
+    },
+    {
+      "id": "DIA009",
+      "codigo": "J45.9",
+      "descripcion": "Asma, no especificada",
+      "sistemaAfectado": "Respiratorio",
+      "enUso": true
+    },
+    {
+      "id": "DIA010",
+      "codigo": "J96.0",
+      "descripcion": "Insuficiencia respiratoria aguda",
+      "sistemaAfectado": "Respiratorio"
+    },
+    {
+      "id": "DIA011",
+      "codigo": "R56.8",
+      "descripcion": "Otras convulsiones y las no especificadas",
+      "sistemaAfectado": "Neurológico",
+      "enUso": true
+    },
+    {
+      "id": "DIA012",
+      "codigo": "E16.2",
+      "descripcion": "Hipoglicemia, no especificada",
+      "sistemaAfectado": "Endocrino"
+    },
+    {
+      "id": "DIA013",
+      "codigo": "R55",
+      "descripcion": "Síncope y colapso",
+      "sistemaAfectado": "Cardiovascular",
+      "enUso": true
+    },
+    {
+      "id": "DIA014",
+      "codigo": "K35.8",
+      "descripcion": "Apendicitis aguda, otras y las no especificadas",
+      "sistemaAfectado": "Gastrointestinal"
+    },
+    {
+      "id": "DIA015",
+      "codigo": "T78.2",
+      "descripcion": "Choque anafiláctico, no especificado",
+      "sistemaAfectado": "Otros"
+    }
+  ],
+  "procedimientos": [
+    {
+      "id": "PROC001",
+      "codigo": "PROC-001",
+      "nombre": "Radiografía de tórax",
+      "tipo": "Diagnóstico",
+      "duracion": 15,
+      "enUso": true
+    },
+    {
+      "id": "PROC002",
+      "codigo": "PROC-002",
+      "nombre": "Cirugía apendicitis",
+      "tipo": "Quirúrgico",
+      "duracion": 90
+    },
+    {
+      "id": "PROC003",
+      "codigo": "PROC-003",
+      "nombre": "Electrocardiograma de 12 derivaciones",
+      "tipo": "Diagnóstico",
+      "duracion": 10,
+      "enUso": true
+    },
+    {
+      "id": "PROC004",
+      "codigo": "PROC-004",
+      "nombre": "Intubación endotraqueal",
+      "tipo": "Terapéutico",
+      "duracion": 20,
+      "enUso": true
+    },
+    {
+      "id": "PROC005",
+      "codigo": "PROC-005",
+      "nombre": "Sutura de herida simple",
+      "tipo": "Quirúrgico",
+      "duracion": 30
+    },
+    {
+      "id": "PROC006",
+      "codigo": "PROC-006",
+      "nombre": "Inmovilización espinal",
+      "tipo": "Terapéutico",
+      "duracion": 15,
+      "enUso": true
+    },
+    {
+      "id": "PROC007",
+      "codigo": "PROC-007",
+      "nombre": "Tomografía de cráneo",
+      "tipo": "Diagnóstico",
+      "duracion": 20
+    },
+    {
+      "id": "PROC008",
+      "codigo": "PROC-008",
+      "nombre": "Reanimación cardiopulmonar avanzada",
+      "tipo": "Terapéutico",
+      "duracion": 30,
+      "enUso": true
+    },
+    {
+      "id": "PROC009",
+      "codigo": "PROC-009",
+      "nombre": "Colecistectomía laparoscópica",
+      "tipo": "Quirúrgico",
+      "duracion": 120
+    },
+    {
+      "id": "PROC010",
+      "codigo": "PROC-010",
+      "nombre": "Nebulización",
+      "tipo": "Terapéutico",
+      "duracion": 20
+    }
+  ],
+  "ambulancias": [
+    {
+      "id": "AMB001",
+      "matricula": "AMB-001",
+      "estado": "En Servicio",
+      "ubicacion": "Av. 27 de Febrero, Santo Domingo",
+      "hospitalId": "central"
+    },
+    {
+      "id": "AMB002",
+      "matricula": "AMB-002",
+      "estado": "Disponible",
+      "ubicacion": "Base Norte, Santiago",
+      "hospitalId": "norte"
+    },
+    {
+      "id": "AMB003",
+      "matricula": "AMB-003",
+      "estado": "En Mantenimiento",
+      "ubicacion": "Taller de flota, Santo Domingo",
+      "hospitalId": "sanrafael"
+    },
+    {
+      "id": "AMB004",
+      "matricula": "AMB-004",
+      "estado": "En Servicio",
+      "ubicacion": "Autopista del Este km 20",
+      "hospitalId": "este"
+    },
+    {
+      "id": "AMB005",
+      "matricula": "AMB-005",
+      "estado": "Disponible",
+      "ubicacion": "Base Central, Santo Domingo",
+      "hospitalId": "central"
+    },
+    {
+      "id": "AMB006",
+      "matricula": "AMB-006",
+      "estado": "Disponible",
+      "ubicacion": "Base Sur, Baní",
+      "hospitalId": "infantil"
+    }
+  ],
+  "turnos": [
+    {
+      "id": "TURN001",
+      "nombre": "Matutino",
+      "inicio": "06:00",
+      "fin": "14:00",
+      "personal": 8
+    },
+    {
+      "id": "TURN002",
+      "nombre": "Vespertino",
+      "inicio": "14:00",
+      "fin": "22:00",
+      "personal": 6
+    },
+    {
+      "id": "TURN003",
+      "nombre": "Nocturno",
+      "inicio": "22:00",
+      "fin": "06:00",
+      "personal": 4
+    },
+    {
+      "id": "TURN004",
+      "nombre": "Guardia fin de semana",
+      "inicio": "07:00",
+      "fin": "19:00",
+      "personal": 5
+    }
+  ]
+}
