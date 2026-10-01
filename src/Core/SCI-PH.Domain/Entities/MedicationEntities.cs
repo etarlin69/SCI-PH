@@ -81,3 +81,19 @@ public sealed class HomeMedication
     public DateOnly? StoppedOn { get; set; }
     public string? Notes { get; set; }
 }
+
+public sealed class MedicationAdministration
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ClinicalEncounterId { get; set; }
+    public ClinicalEncounter Encounter { get; set; } = null!;
+    public Guid MedicationId { get; set; }
+    public Medication Medication { get; set; } = null!;
+    public Guid AdministeredByStaffId { get; set; }
+    public ClinicalStaff AdministeredByStaff { get; set; } = null!;
+    public decimal Dose { get; set; }
+    public string DoseUnit { get; set; } = string.Empty;
+    public string? Route { get; set; }
+    public DateTimeOffset AdministeredAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    public string? Notes { get; set; }
+}
