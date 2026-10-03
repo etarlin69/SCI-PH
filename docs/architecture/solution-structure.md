@@ -46,11 +46,13 @@ Casos de uso y contratos que la aplicación necesita del exterior.
   | `OCR` | `IOcrService` |
   | `Persistence` | `IUnitOfWork` |
   | `QR` | `IQrService` |
+  | `Security` | `IIdentityService`, `ITokenService`, `IRefreshTokenStore`, `ISecurityAuditLog`, `ICurrentUser` (implementadas) |
   | `Storage` | `IStorageService` |
 
   > Estado actual: son `public interface` **vacías**. Sus métodos se definirán junto con cada funcionalidad, mediante PR revisado.
 
-- Registro de dependencias: `DependencyInjection.AddApplication()`.
+- Seguridad: roles, permisos y matriz en `Common/Security/`; casos de uso en `Features/Authentication/` y `Features/Accounts/` ([detalle](security.md)).
+- Registro de dependencias: `DependencyInjection.AddApplication()`, `AddAccountSecurity()` (Web y Mobile), `AddAccountManagement(configuration)` (Web) y `AddDeviceSecurity()` (Device API).
 - Paquetes: solo `Microsoft.Extensions.DependencyInjection.Abstractions`.
 
 ### SCI-PH.Persistence (`src/Infrastructure`)
@@ -60,8 +62,9 @@ Acceso a datos con EF Core y PostgreSQL (Npgsql).
 - `Contexts/IdentityDbContext.cs`: ASP.NET Core Identity, schema `identity`.
 - `Contexts/ClinicalDbContext.cs`: datos clínicos, schema `clinical`.
 - `Configurations/Clinical/`: una `IEntityTypeConfiguration<T>` por entidad clínica ([detalle](clinical-entities.md)).
-- `Identity/Models/ApplicationUser.cs`: cuenta autenticable (`IdentityUser<Guid>`).
-- `Migrations/Identity/`: migraciones de `IdentityDbContext` (existe `InitialIdentity`).
+- `Identity/`: `ApplicationUser` (cuenta, `IdentityUser<Guid>`), `RefreshToken`, `SecurityAuditEvent`, `AccountInvitation`, `DeviceCredential`, servicios sobre `UserManager` y los DbContexts, `IdentitySeeder` e `IdentityPolicy`.
+- `Configurations/Identity/`: configuraciones EF de las entidades de Identity.
+- `Migrations/Identity/`: migraciones de `IdentityDbContext` (`InitialIdentity`, `IdentitySecurityFoundation`, `IdentitySecurityCompletion`, `MfaChallengeReplayProtection`).
 - `Migrations/Clinical/`: migraciones de `ClinicalDbContext` (existe `InitialClinical`).
 - Registro de dependencias: `DependencyInjection.AddPersistence(configuration)`. Lee la cadena `ConnectionStrings:SciPhDatabase`.
 
@@ -69,7 +72,8 @@ Acceso a datos con EF Core y PostgreSQL (Npgsql).
 
 Implementaciones de servicios externos: Azure Blob Storage, verificación facial, OCR, QR, IA y otros.
 
-- Registro de dependencias: `DependencyInjection.AddInfrastructure(configuration)`. Actualmente vacío.
+- `Security/`: JWT, generador de secretos, `ICurrentUser`, esquema `DeviceApiKey` y autorización por recurso del paciente. `Email/`: SMTP y alternativas de desarrollo. `Web/`: CORS, rate limiting, cabeceras de seguridad y OpenAPI.
+- Registro de dependencias: `DependencyInjection.AddInfrastructure(configuration)` (servicios externos, aún vacío) y `AddJwtSecurity`, `AddEmailDelivery`, `AddFrontendCors`, `AddSecurityRateLimiting` y `AddDeviceAuthentication` según el host.
 
 ### SCI-PH.Web.BFF, SCI-PH.Mobile.BFF, SCI-PH.Device.API (`src/Presentation`)
 

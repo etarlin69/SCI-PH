@@ -46,7 +46,8 @@ Detalle en [docs/architecture/solution-structure.md](docs/architecture/solution-
 
 - .NET SDK 9.0.305 o superior dentro de 9.0.x (ver [`global.json`](global.json))
 - Docker (para PostgreSQL local)
-- `dotnet-ef` 9.x para migraciones: `dotnet tool install -g dotnet-ef`
+- Herramientas locales (incluye `dotnet-ef` 9.0.9, alineado con EF Core): `dotnet tool restore`
+- Docker también para las pruebas con PostgreSQL 17 (Testcontainers); sin Docker esas pruebas se omiten localmente
 
 ## Puesta en marcha local
 
@@ -68,6 +69,17 @@ Detalle en [docs/architecture/solution-structure.md](docs/architecture/solution-
 
    Usa los mismos valores que definiste en `.env`.
 
+   **Clave de firma JWT** (Web y Mobile BFF; sin ella no arrancan). Genera un valor aleatorio propio de al menos 32 bytes, por ejemplo con `openssl rand -base64 48`, y guárdalo solo en user-secrets:
+
+   ```bash
+   dotnet user-secrets set "Jwt:SigningKey" "<valor-aleatorio-generado-por-ti>" --project src/Presentation/SCI-PH.Web.BFF
+   dotnet user-secrets set "Jwt:SigningKey" "<valor-aleatorio-generado-por-ti>" --project src/Presentation/SCI-PH.Mobile.BFF
+   ```
+
+   Roles, permisos, administrador inicial, email (SMTP o carpeta local `.eml` en desarrollo) y orígenes CORS: ver
+   [Arquitectura de seguridad](docs/architecture/security.md#configuración). El front web usa la cookie `__Host-sciph-refresh`,
+   que exige HTTPS: ejecuta el Web BFF con el perfil `https` cuando pruebes el front.
+
 3. **Migraciones**
 
    ```bash
@@ -75,7 +87,7 @@ Detalle en [docs/architecture/solution-structure.md](docs/architecture/solution-
    dotnet ef database update --context ClinicalDbContext --project src/Infrastructure/SCI-PH.Persistence --startup-project src/Presentation/SCI-PH.Web.BFF
    ```
 
-   El modelo clínico está descrito en [Entidades clínicas](docs/architecture/clinical-entities.md).
+   El modelo clínico está descrito en [Entidades clínicas](docs/architecture/clinical-entities.md) y la seguridad en [Arquitectura de seguridad](docs/architecture/security.md).
 
 4. **Compilar, probar y ejecutar**
 
@@ -105,6 +117,8 @@ Detalle en [docs/architecture/solution-structure.md](docs/architecture/solution-
   - [ADR-003 PostgreSQL con dos contextos](docs/adr/ADR-003-postgresql-two-contexts.md)
   - [ADR-004 Almacenamiento de documentos](docs/adr/ADR-004-document-storage.md)
   - [ADR-005 Modelo de datos clínico](docs/adr/ADR-005-clinical-model.md)
+  - [ADR-006 Identidad y seguridad](docs/adr/ADR-006-identity-security.md)
+  - [ADR-007 Autenticación de dispositivos](docs/adr/ADR-007-device-authentication.md)
 - Contratos de API (previstos)
   - [Web BFF](docs/api/web-bff-contracts.md)
   - [Mobile BFF](docs/api/mobile-bff-contracts.md)
