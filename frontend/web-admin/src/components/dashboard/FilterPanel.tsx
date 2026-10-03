@@ -51,9 +51,9 @@ export function FilterPanel({
     return (
         <section
             aria-label="Filtros del dashboard"
-            className="relative z-10 flex flex-col gap-3.5 rounded-[10px] border border-line bg-white px-5 pb-4 pt-3.5"
+            className="relative z-10 flex flex-col gap-3.5 rounded-[10px] border border-line bg-white px-4 pb-4 pt-3.5 sm:px-5"
         >
-            <div className="flex flex-wrap items-end gap-6">
+            <div className="flex flex-wrap items-end gap-4 sm:gap-6">
                 <DateRangePicker
                     value={_range}
                     onChange={onRangeChange}
@@ -71,10 +71,10 @@ export function FilterPanel({
                 />
             </div>
 
-            <div className="flex flex-wrap items-end gap-6">
+            <div className="flex flex-wrap items-end gap-4 sm:gap-6">
                 <div className="flex flex-col gap-1.5">
                     <span className="text-xs font-semibold text-ink-3">Tipo de métrica</span>
-                    <div role="group" aria-label="Tipo de métrica" className="flex gap-1.5">
+                    <div role="group" aria-label="Tipo de métrica" className="flex flex-wrap gap-1.5">
                         {(Object.keys(METRIC_LABEL) as MetricType[]).map((m) => {
                             const on = _metrics.includes(m);
                             return (

@@ -10,6 +10,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.48.0",
     "react": "^18.3.1",
@@ -22,7 +23,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^8.57.0",
-    "@hookform/resolvers": "^5.9.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^8.71.0",

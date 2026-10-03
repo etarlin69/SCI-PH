@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import type { EstadoUsuario, TransferStatus } from '../../types';
 import { cn } from '../../utils/cn';
 
 export type BadgeTone = 'success' | 'info' | 'warning' | 'danger' | 'neutral' | 'accent';
@@ -34,14 +33,3 @@ export function Badge({ tone = 'neutral', dot = true, children, className }: Bad
         </span>
     );
 }
-
-export const USER_STATUS_TONE: Record<EstadoUsuario, BadgeTone> = {
-    Activo: 'success',
-    Suspendido: 'neutral',
-};
-
-export const TRANSFER_STATUS_TONE: Record<TransferStatus, BadgeTone> = {
-    Recibido: 'success',
-    'En tránsito': 'info',
-    Pendiente: 'warning',
-};

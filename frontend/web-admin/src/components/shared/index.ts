@@ -3,6 +3,7 @@ export * from './Button';
 export * from './Card';
 export * from './Checkbox';
 export * from './DateRangePicker';
+export * from './ErrorState';
 export * from './Input';
 export * from './LoadingSpinner';
 export * from './Modal';

@@ -73,7 +73,7 @@ export function MultiSelect<V extends string>({
                 aria-describedby={`${labelId}-value`}
                 onClick={() => setOpen((o) => !o)}
                 className={cn(
-                    'flex h-9 min-w-[250px] items-center justify-between gap-2 rounded-md border bg-white px-3 text-[13px] text-ink hover:bg-surface-hover',
+                    'flex h-9 w-full items-center sm:w-auto sm:min-w-[250px] justify-between gap-2 rounded-md border bg-white px-3 text-[13px] text-ink hover:bg-surface-hover',
                     open ? 'border-primary-600 ring-[3px] ring-primary-200' : 'border-line-strong',
                 )}
             >
@@ -86,7 +86,7 @@ export function MultiSelect<V extends string>({
                     role="dialog"
                     aria-label={label}
                     onKeyDown={onKeyDown}
-                    className="absolute left-0 top-full z-popover mt-2 flex w-[300px] flex-col rounded-[10px] border border-line bg-white shadow-[0_16px_40px_rgba(13,31,51,0.18)]"
+                    className="absolute left-0 top-full z-popover mt-2 flex w-[300px] max-w-[calc(100vw-7rem)] flex-col rounded-[10px] border border-line bg-white shadow-[0_16px_40px_rgba(13,31,51,0.18)]"
                 >
                     <div className="flex flex-col gap-0.5 p-2">
                         <Checkbox

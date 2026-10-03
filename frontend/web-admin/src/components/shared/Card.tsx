@@ -16,12 +16,12 @@ export function Card({ title, subtitle, actions, padding = 'md', as: Tag = 'sect
     return (
         <Tag
             aria-labelledby={Tag === 'div' ? undefined : titleId}
-            className={cn('rounded-[10px] border border-line bg-white', padding === 'md' && 'px-6 pb-6 pt-5', className)}
+            className={cn('rounded-[10px] border border-line bg-white', padding === 'md' && 'px-4 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5', className)}
             {...rest}
         >
             {(title || actions) && (
-                <div className="mb-4 flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 flex-col gap-1">
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                    <div className="flex min-w-0 flex-1 basis-48 flex-col gap-1">
                         {title && (
                             <h2 id={titleId} className="text-base font-semibold text-ink">
                                 {title}

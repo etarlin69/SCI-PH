@@ -89,7 +89,7 @@ export function DateRangePicker({
     return (
         <div ref={rootRef} className="flex flex-col gap-1.5">
             <span className="text-xs font-semibold text-ink-3">{label}</span>
-            <div className={cn('flex gap-2', layout === 'inline' ? 'items-center' : 'flex-col items-stretch')}>
+            <div className={cn('flex gap-2', layout === 'inline' ? 'flex-wrap items-center' : 'flex-col items-stretch')}>
                 {trigger('from')}
                 {layout === 'inline' && (
                     <span className="text-ink-muted" aria-hidden="true">
@@ -98,7 +98,7 @@ export function DateRangePicker({
                 )}
                 {trigger('to')}
                 {presets.length > 0 && (
-                    <div role="group" aria-label="Rangos rápidos" className={cn('flex gap-1.5', layout === 'inline' ? 'ml-2' : '')}>
+                    <div role="group" aria-label="Rangos rápidos" className={cn('flex flex-wrap gap-1.5', layout === 'inline' ? 'sm:ml-2' : '')}>
                         {presets.map((p) => {
                             const active = p.range.from === value.from && p.range.to === value.to;
                             return (
@@ -168,7 +168,7 @@ function CalendarPopover({ field, value, min, max, footnote, onSelect, onClose }
             role="dialog"
             aria-label={field === 'from' ? 'Seleccionar fecha desde' : 'Seleccionar fecha hasta'}
             onKeyDown={onKeyDown}
-            className="absolute left-0 top-full z-popover mt-2 flex w-[300px] flex-col gap-2.5 rounded-[10px] border border-line bg-white p-3.5 shadow-[0_16px_40px_rgba(13,31,51,0.18)]"
+            className="absolute left-0 top-full z-popover mt-2 flex w-[300px] max-w-[calc(100vw-7rem)] flex-col gap-2.5 rounded-[10px] border border-line bg-white p-3.5 shadow-[0_16px_40px_rgba(13,31,51,0.18)]"
         >
             <div className="flex items-center justify-between">
                 <button type="button" className={navBtn} disabled={!canPrev} onClick={() => shift(-1)} aria-label="Mes anterior">

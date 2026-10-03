@@ -1,9 +1,13 @@
-import { Suspense } from 'react';
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/common/Layout';
-import Dashboard from './pages/Dashboard';
+import Forbidden from './pages/Forbidden';
+import NotFound from './pages/NotFound';
 import NotImplemented from './pages/NotImplemented';
 import { LoadingSpinner } from './components/shared';
+
+// El Dashboard arrastra Recharts: se carga en su propio chunk solo cuando se visita.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
 
 function PageFallback() {
     return (
@@ -29,6 +33,8 @@ export default function App() {
                     <Route path="usuarios" element={<NotImplemented />} />
                     <Route path="auditoria" element={<NotImplemented />} />
                     <Route path="catalogos" element={<NotImplemented />} />
+                    <Route path="403" element={<Forbidden />} />
+                    <Route path="*" element={<NotFound />} />
                 </Route>
             </Routes>
         </BrowserRouter>

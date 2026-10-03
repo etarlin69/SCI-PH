@@ -10,7 +10,7 @@ export const DEFAULT_WIDGETS: WidgetConfig[] = [
     { id: 'trend', label: 'Tendencia de episodios', visible: true },
     { id: 'methods', label: 'Métodos de identificación', visible: true },
     { id: 'hospitals', label: 'Episodios por hospital', visible: true },
-    { id: 'events', label: 'Eventos recientes', visible: true },
+    { id: 'events', label: 'Transferencias por destino', visible: true },
 ];
 
 export const DEFAULT_VIEW_NAME = 'Predeterminada';
@@ -22,6 +22,8 @@ export const WIDGET_METRIC: Record<Exclude<WidgetId, 'kpis'>, MetricType> = {
     events: 'transferencias',
     methods: 'identificaciones',
 };
+
+export type DashboardStatus = 'loading' | 'success' | 'error';
 
 const STORAGE_KEY = 'sciph.dashboard.savedView.v1';
 const AUTO_REFRESH_MS = 5 * 60 * 1000;
@@ -56,7 +58,7 @@ export function useDashboard() {
     const [hospitals, setHospitals] = useState<HospitalId[]>(HOSPITAL_IDS);
     const [metrics, setMetrics] = useState<MetricType[]>(ALL_METRICS);
     const [data, setData] = useState<DashboardData | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [status, setStatus] = useState<DashboardStatus>('loading');
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
     const [savedView, setSavedView] = useState<SavedView | null>(loadSavedView);
@@ -67,16 +69,18 @@ export function useDashboard() {
 
     const load = useCallback(async () => {
         const id = ++requestId.current;
-        setLoading(true);
+        setStatus('loading');
         try {
             const next = await fetchDashboard({ range, hospitals });
-            if (id === requestId.current) {
-                setData(next);
-                setLastUpdated(new Date());
-            }
-        } catch {
-        } finally {
-            if (id === requestId.current) setLoading(false);
+            if (id !== requestId.current) return;
+            setData(next);
+            setLastUpdated(new Date());
+            setStatus('success');
+        } catch (error) {
+            if (id !== requestId.current) return;
+            // Los datos anteriores (si los hay) se conservan; la UI muestra el error y permite reintentar.
+            if (import.meta.env.DEV) console.error('No se pudo cargar el dashboard', error);
+            setStatus('error');
         }
     }, [range, hospitals]);
 
@@ -117,7 +121,8 @@ export function useDashboard() {
         metrics,
         toggleMetric,
         data,
-        loading,
+        status,
+        loading: status === 'loading',
         lastUpdated,
         refresh: load,
         widgets,

@@ -3,6 +3,7 @@ import { Activity, LogOut } from 'lucide-react';
 import type { CurrentUser } from '../../types';
 import { cn } from '../../utils/cn';
 import { initials } from '../../utils/formatters';
+import { ROLE_LABELS } from '../../utils/roles';
 import { NAV_SECTIONS } from './navigation';
 
 export interface SidebarProps {
@@ -60,7 +61,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                 </span>
                 <span className="sr-only min-w-0 flex-1 flex-col gap-0.5 lg:not-sr-only lg:flex">
                     <span className="truncate text-[13px] font-semibold text-white">{user.nombre}</span>
-                    <span className="truncate text-xs text-[#9FB0C3]">{user.email}</span>
+                    <span className="truncate text-xs text-[#9FB0C3]">{ROLE_LABELS[user.rol]}</span>
                 </span>
                 <button
                     type="button"

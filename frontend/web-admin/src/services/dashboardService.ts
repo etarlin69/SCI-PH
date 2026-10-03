@@ -5,7 +5,7 @@ import type {
     ISODate,
     MethodSlice,
     MetodoIdentificacion,
-    RecentTransfer,
+    TransferSummary,
     TrendPoint,
 } from '../types';
 import { HOSPITALES, TRANSFERENCIAS_MOCK } from '../data';
@@ -57,7 +57,7 @@ function buildMethods(pacientes: number, nn: number): MethodSlice[] {
     return slices;
 }
 
-export function computeDashboard({ range, hospitals }: DashboardFilters): DashboardData {
+function computeDashboard({ range, hospitals }: DashboardFilters): DashboardData {
     const from = Math.max(0, indexOf(range.from));
     const to = Math.min(series.days - 1, indexOf(range.to));
 
@@ -87,19 +87,20 @@ export function computeDashboard({ range, hospitals }: DashboardFilters): Dashbo
     const last7 = trend.slice(-7).reduce((t, p) => t + p.completados, 0);
     const prev7 = trend.slice(-14, -7).reduce((t, p) => t + p.completados, 0);
 
+    // Solo conteos por destino: ningún identificador de paciente sale del servicio.
     const selectedNames = new Set(HOSPITALES.filter((h) => hospitals.includes(h.id)).map((h) => h.nombre));
-    const events: RecentTransfer[] = TRANSFERENCIAS_MOCK.map((t) => ({
-        id: t.id,
-        paciente: t.paciente,
-        origen: t.origen,
-        destino: t.destino,
-        fecha: addDays(series.endDate, -t.diasAtras),
-        hora: t.hora,
-        estado: t.estado,
-    }))
-        .filter((t) => isWithin(t.fecha, range.from, range.to) && (selectedNames.has(t.origen) || selectedNames.has(t.destino)))
-        .sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora))
-        .slice(0, 10);
+    const byDestination = new Map<string, TransferSummary>();
+    for (const t of TRANSFERENCIAS_MOCK) {
+        const fecha = addDays(series.endDate, -t.diasAtras);
+        if (!isWithin(fecha, range.from, range.to) || !(selectedNames.has(t.origen) || selectedNames.has(t.destino))) continue;
+        const row = byDestination.get(t.destino) ?? { destino: t.destino, recibidas: 0, enTransito: 0, pendientes: 0, total: 0 };
+        if (t.estado === 'Recibido') row.recibidas++;
+        else if (t.estado === 'En tránsito') row.enTransito++;
+        else row.pendientes++;
+        row.total++;
+        byDestination.set(t.destino, row);
+    }
+    const transfers = [...byDestination.values()].sort((a, b) => b.total - a.total);
 
     return {
         kpis: {
@@ -120,7 +121,7 @@ export function computeDashboard({ range, hospitals }: DashboardFilters): Dashbo
             hospital,
             episodios: sumRange([hospital.id], from, to, (d) => d.episodios),
         })),
-        events,
+        transfers,
     };
 }
 

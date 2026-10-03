@@ -57,7 +57,7 @@ export function TrendChart({ data, range, change, height = 280 }: TrendChartProp
                 </span>
             }
             actions={
-                <div className="flex shrink-0 gap-4 text-[13px] text-ink-3" aria-hidden="true">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-ink-3" aria-hidden="true">
                     <span className="flex items-center gap-1.5">
                         <span className="h-3 w-3 rounded-sm bg-chart-band" />
                         Rango
