@@ -8,7 +8,7 @@
 - **Proyecto:** `SCI-PH.Mobile.BFF`
 - **Prefijo:** `/api/mobile`
 - **Formato:** JSON. Los errores se devuelven como `application/problem+json` (ProblemDetails).
-- **Autenticación:** el tipo de token y su emisión están pendientes de un ADR.
+- **Autenticación:** JWT Bearer + refresh token según [ADR-006](../adr/ADR-006-identity-security.md). Login con usuario/contraseña y sesión en `/api/mobile/auth` ([detalle](../architecture/security.md#endpoints)); el acceso por QR y verificación facial sigue previsto y emitirá la misma sesión. La cuenta autenticada se consulta en `GET /api/mobile/auth/me`.
 
 ## Patient — contratos iniciales previstos
 
@@ -16,7 +16,10 @@
 |---|---|---|---|---|
 | `POST` | `/api/mobile/auth/qr/challenge` | Inicia el acceso mediante QR | No | Previsto |
 | `POST` | `/api/mobile/auth/face/verify` | Verificación facial 1:1 para completar el acceso | Challenge válido | Previsto |
-| `GET` | `/api/mobile/me` | Información de la cuenta autenticada | Sí | Previsto |
+| `POST` | `/api/mobile/auth/login` · `/mfa/verify` | Inicio de sesión (con segundo factor si la cuenta tiene MFA) | No | Implementado |
+| `POST` | `/api/mobile/auth/refresh` · `/logout` | Renueva o cierra la sesión (refresh token en el cuerpo) | No | Implementado |
+| `POST` | `/api/mobile/auth/change-password` · `/revoke-sessions` | Contraseña y sesiones | Sí | Implementado |
+| `GET` | `/api/mobile/auth/me` | Información de la cuenta autenticada | Sí | Implementado |
 
 ### Flujo previsto de acceso
 
@@ -82,17 +85,19 @@ Las imágenes faciales no se registran en logs.
 
 ---
 
-### `GET /api/mobile/me`
+### `GET /api/mobile/auth/me`
 
 Devuelve la información de la cuenta autenticada.
 
-**Respuesta `200 OK` (forma propuesta):**
+**Respuesta `200 OK`:**
 
 ```json
 {
-  "userId": "00000000-0000-0000-0000-000000000000",
-  "displayName": "…",
-  "roles": ["…"]
+  "id": "00000000-0000-0000-0000-000000000000",
+  "userName": "…",
+  "email": "…",
+  "roles": ["…"],
+  "permissions": ["…"]
 }
 ```
 

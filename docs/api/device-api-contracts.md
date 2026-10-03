@@ -8,14 +8,14 @@
 - **Proyecto:** `SCI-PH.Device.API`
 - **Prefijo:** `/api/device`
 - **Formato:** JSON compacto (el ESP32 tiene memoria limitada). Los errores se devuelven como `application/problem+json` (ProblemDetails).
-- **Autenticación:** de **dispositivo**, no de usuario. El mecanismo está pendiente de un ADR. Ninguna credencial de dispositivo se guarda en el repositorio.
+- **Autenticación:** de **dispositivo**, no de usuario ([ADR-007](../adr/ADR-007-device-authentication.md)): cabeceras `X-Device-Id` (código) y `X-Device-Key` (clave entregada una sola vez al registrar el dispositivo), solo sobre HTTPS y nunca en la URL. Cada endpoint exige un scope (`Device.Heartbeat`, `Device.Fingerprint.Identify`). Ninguna credencial de dispositivo se guarda en el repositorio.
 
 ## Endpoints previstos
 
 | Método | Ruta | Descripción | Estado |
 |---|---|---|---|
 | `POST` | `/api/device/fingerprint/identify` | Identificación por huella en emergencia | Previsto |
-| `POST` | `/api/device/heartbeat` | Señal periódica de que el dispositivo está activo | Previsto |
+| `POST` | `/api/device/heartbeat` | Señal periódica de que el dispositivo está activo | Implementado |
 
 ---
 
@@ -51,16 +51,18 @@ Las plantillas de huella no se registran en logs. Cada identificación queda aud
 
 Informa que el dispositivo está encendido y conectado.
 
-**Body (forma propuesta):**
+Scope requerido: `Device.Heartbeat`. El dispositivo se identifica por su credencial, no por el cuerpo.
+
+**Body:**
 
 ```json
 {
-  "deviceId": "<identificador del dispositivo>",
   "firmwareVersion": "0.0.0",
   "uptimeSeconds": 0
 }
 ```
 
-**Respuestas previstas:** `204 No Content` (recibido), `401` / `403`.
+**Respuestas:** `204 No Content` (recibido), `401` (credencial ausente, inválida, revocada o sin HTTPS),
+`403` (sin el scope), `429` (límite de peticiones).
 
 La frecuencia del heartbeat se acordará con el equipo de hardware.

@@ -23,6 +23,25 @@ namespace SCI_PH.Persistence.Migrations.Identity
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FriendlyName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Xml")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DataProtectionKeys", "identity");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
                 {
                     b.Property<Guid>("Id")
@@ -153,6 +172,86 @@ namespace SCI_PH.Persistence.Migrations.Identity
                     b.ToTable("AspNetUserTokens", "identity");
                 });
 
+            modelBuilder.Entity("SCI_PH.Persistence.Identity.Models.AccountInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("AcceptedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IntendedRole")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SubjectType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("SubjectType", "SubjectId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AccountInvitations_PendingSubject")
+                        .HasFilter("\"Status\" = 1");
+
+                    b.ToTable("AccountInvitations", "identity", t =>
+                        {
+                            t.HasCheckConstraint("CK_AccountInvitations_Email", "length(btrim(\"Email\")) > 0");
+
+                            t.HasCheckConstraint("CK_AccountInvitations_Expiration", "\"ExpiresAtUtc\" > \"CreatedAtUtc\"");
+
+                            t.HasCheckConstraint("CK_AccountInvitations_Hash", "\"TokenHash\" ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("CK_AccountInvitations_Lifecycle", "((\"Status\" = 1) AND (\"AcceptedAtUtc\" IS NULL) AND (\"AcceptedByUserId\" IS NULL) AND (\"RevokedAtUtc\" IS NULL)) OR ((\"Status\" = 2) AND (\"AcceptedAtUtc\" IS NOT NULL) AND (\"RevokedAtUtc\" IS NULL)) OR ((\"Status\" = 3) AND (\"RevokedAtUtc\" IS NOT NULL) AND (\"AcceptedByUserId\" IS NULL))");
+
+                            t.HasCheckConstraint("CK_AccountInvitations_Role", "((\"SubjectType\" = 1) AND (\"IntendedRole\" = 'Patient')) OR ((\"SubjectType\" = 2) AND (\"IntendedRole\" IN ('Doctor', 'Nurse', 'Paramedic', 'Receptionist')))");
+
+                            t.HasCheckConstraint("CK_AccountInvitations_Status_Enum", "\"Status\" IN (1, 2, 3)");
+
+                            t.HasCheckConstraint("CK_AccountInvitations_SubjectType_Enum", "\"SubjectType\" IN (1, 2)");
+                        });
+                });
+
             modelBuilder.Entity("SCI_PH.Persistence.Identity.Models.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -166,12 +265,24 @@ namespace SCI_PH.Persistence.Migrations.Identity
                         .IsConcurrencyToken()
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DeactivatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("LastLoginAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
@@ -209,13 +320,251 @@ namespace SCI_PH.Persistence.Migrations.Identity
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedEmail")
+                        .IsUnique()
                         .HasDatabaseName("EmailIndex");
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
-                    b.ToTable("AspNetUsers", "identity");
+                    b.ToTable("AspNetUsers", "identity", t =>
+                        {
+                            t.HasCheckConstraint("CK_AspNetUsers_Deactivation", "\"IsActive\" = (\"DeactivatedAtUtc\" IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Persistence.Identity.Models.DeviceCredential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DeviceCode")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("FirmwareVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset?>("LastSeenAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RotatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Scopes")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("SecretHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceCode")
+                        .IsUnique();
+
+                    b.ToTable("DeviceCredentials", "identity", t =>
+                        {
+                            t.HasCheckConstraint("CK_DeviceCredentials_Code", "\"DeviceCode\" ~ '^[A-Z0-9][A-Z0-9-]{2,59}$'");
+
+                            t.HasCheckConstraint("CK_DeviceCredentials_Hash", "\"SecretHash\" ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("CK_DeviceCredentials_Name", "length(btrim(\"Name\")) > 0");
+
+                            t.HasCheckConstraint("CK_DeviceCredentials_Revocation", "((\"Status\" = 1) AND (\"RevokedAtUtc\" IS NULL)) OR ((\"Status\" = 2) AND (\"RevokedAtUtc\" IS NOT NULL))");
+
+                            t.HasCheckConstraint("CK_DeviceCredentials_Scopes", "\"Scopes\" ~ '^Device[.][A-Za-z.]+( Device[.][A-Za-z.]+)*$'");
+
+                            t.HasCheckConstraint("CK_DeviceCredentials_Status_Enum", "\"Status\" IN (1, 2)");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Persistence.Identity.Models.MfaLoginChallenge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ChallengeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<DateTimeOffset?>("ConsumedAtUtc")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChallengeHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "ExpiresAtUtc");
+
+                    b.ToTable("MfaLoginChallenges", "identity", t =>
+                        {
+                            t.HasCheckConstraint("CK_MfaLoginChallenges_Dates", "(\"ExpiresAtUtc\" > \"CreatedAtUtc\") AND (\"ConsumedAtUtc\" >= \"CreatedAtUtc\")");
+
+                            t.HasCheckConstraint("CK_MfaLoginChallenges_Hash", "\"ChallengeHash\" ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Persistence.Identity.Models.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedByIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ReplacedByTokenId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("RevocationReason")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RevokedByIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FamilyId");
+
+                    b.HasIndex("ReplacedByTokenId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "ExpiresAtUtc");
+
+                    b.HasIndex("UserId", "RevokedAtUtc");
+
+                    b.ToTable("RefreshTokens", "identity", t =>
+                        {
+                            t.HasCheckConstraint("CK_RefreshTokens_Expiration", "\"ExpiresAtUtc\" > \"CreatedAtUtc\"");
+
+                            t.HasCheckConstraint("CK_RefreshTokens_Hash", "\"TokenHash\" ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("CK_RefreshTokens_Revocation", "((\"RevokedAtUtc\" IS NULL) = (\"RevocationReason\" IS NULL)) AND (\"RevokedAtUtc\" >= \"CreatedAtUtc\") AND (NOT (\"ReplacedByTokenId\" IS NOT NULL) OR (\"RevocationReason\" = 1))");
+
+                            t.HasCheckConstraint("CK_RefreshTokens_RevocationReason_Enum", "\"RevocationReason\" IN (1, 2, 3, 4, 5, 6, 7, 8, 9)");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Persistence.Identity.Models.SecurityAuditEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("DeviceCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EventType")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("FailureReason")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.HasIndex("DeviceCredentialId", "OccurredAtUtc");
+
+                    b.HasIndex("EventType", "OccurredAtUtc");
+
+                    b.HasIndex("UserId", "OccurredAtUtc");
+
+                    b.ToTable("SecurityAuditEvents", "identity", t =>
+                        {
+                            t.HasCheckConstraint("CK_SecurityAuditEvents_EventType_Enum", "\"EventType\" IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34)");
+
+                            t.HasCheckConstraint("CK_SecurityAuditEvents_FailureReason_Enum", "\"FailureReason\" IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)");
+
+                            t.HasCheckConstraint("CK_SecurityAuditEvents_Outcome", "((\"Outcome\" = 1) AND (\"FailureReason\" IS NULL)) OR ((\"Outcome\" = 2) AND (\"FailureReason\" IS NOT NULL))");
+
+                            t.HasCheckConstraint("CK_SecurityAuditEvents_Outcome_Enum", "\"Outcome\" IN (1, 2)");
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -262,6 +611,29 @@ namespace SCI_PH.Persistence.Migrations.Identity
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
                 {
+                    b.HasOne("SCI_PH.Persistence.Identity.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SCI_PH.Persistence.Identity.Models.MfaLoginChallenge", b =>
+                {
+                    b.HasOne("SCI_PH.Persistence.Identity.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SCI_PH.Persistence.Identity.Models.RefreshToken", b =>
+                {
+                    b.HasOne("SCI_PH.Persistence.Identity.Models.RefreshToken", null)
+                        .WithMany()
+                        .HasForeignKey("ReplacedByTokenId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SCI_PH.Persistence.Identity.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")

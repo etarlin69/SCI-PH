@@ -1,5 +1,6 @@
 using SCI_PH.Application;
 using SCI_PH.Infrastructure;
+using SCI_PH.Infrastructure.Web;
 using SCI_PH.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,11 +11,15 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => options.AddDeviceKeySecurity());
 
-builder.Services.AddApplication();
+// Autenticación de dispositivo (X-Device-Id + X-Device-Key), independiente de las cuentas humanas: aquí no se
+// registra JWT, de modo que un token de usuario nunca sustituye a la credencial del dispositivo (ver ADR-007).
+builder.Services.AddApplication().AddDeviceSecurity();
 builder.Services.AddPersistence(builder.Configuration);
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration)
+    .AddDeviceAuthentication(builder.Configuration)
+    .AddSecurityRateLimiting(builder.Configuration);
 
 var app = builder.Build();
 
@@ -26,7 +31,7 @@ app.UseStatusCodePages();
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
-    app.MapOpenApi();
+    app.MapOpenApi().AllowAnonymous();
 }
 else
 {
@@ -35,7 +40,12 @@ else
     app.UseHttpsRedirection();
 }
 
-app.MapControllers();
-app.MapHealthChecks("/health");
+app.UseApiSecurityHeaders();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.Run();
+app.MapControllers();
+app.MapHealthChecks("/health").AllowAnonymous();
+
+await app.RunAsync();
