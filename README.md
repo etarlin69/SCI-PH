@@ -72,7 +72,10 @@ Detalle en [docs/architecture/solution-structure.md](docs/architecture/solution-
 
    ```bash
    dotnet ef database update --context IdentityDbContext --project src/Infrastructure/SCI-PH.Persistence --startup-project src/Presentation/SCI-PH.Web.BFF
+   dotnet ef database update --context ClinicalDbContext --project src/Infrastructure/SCI-PH.Persistence --startup-project src/Presentation/SCI-PH.Web.BFF
    ```
+
+   El modelo clínico está descrito en [Entidades clínicas](docs/architecture/clinical-entities.md).
 
 4. **Compilar, probar y ejecutar**
 
@@ -101,6 +104,7 @@ Detalle en [docs/architecture/solution-structure.md](docs/architecture/solution-
   - [ADR-002 Separación en BFFs](docs/adr/ADR-002-bff-separation.md)
   - [ADR-003 PostgreSQL con dos contextos](docs/adr/ADR-003-postgresql-two-contexts.md)
   - [ADR-004 Almacenamiento de documentos](docs/adr/ADR-004-document-storage.md)
+  - [ADR-005 Modelo de datos clínico](docs/adr/ADR-005-clinical-model.md)
 - Contratos de API (previstos)
   - [Web BFF](docs/api/web-bff-contracts.md)
   - [Mobile BFF](docs/api/mobile-bff-contracts.md)

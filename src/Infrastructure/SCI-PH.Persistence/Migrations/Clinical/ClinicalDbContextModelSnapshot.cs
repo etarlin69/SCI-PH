@@ -23,223 +23,27 @@ namespace SCI_PH.Persistence.Migrations.Clinical
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.Ambulance", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Auditing.ClinicalAuditEntry", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("CallSign")
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)");
-
-                    b.Property<Guid?>("ClinicId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("PlateNumber")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<string>("UnitCode")
-                        .IsRequired()
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClinicId");
-
-                    b.HasIndex("UnitCode")
-                        .IsUnique();
-
-                    b.ToTable("Ambulances", "clinical");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.BiometricIdentificationAttempt", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("AttemptedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("BiometricReferenceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ClinicalEncounterId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("MatchedPatientId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Modality")
+                    b.Property<int>("Action")
                         .HasColumnType("integer");
 
-                    b.Property<int>("Outcome")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("PerformedByStaffId")
+                    b.Property<Guid?>("ActorIdentityUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<string>("ProviderRequestReference")
+                    b.Property<string>("ActorReference")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PerformedByStaffId");
-
-                    b.HasIndex("BiometricReferenceId", "MatchedPatientId");
-
-                    b.HasIndex("ClinicalEncounterId", "AttemptedAtUtc");
-
-                    b.HasIndex("MatchedPatientId", "AttemptedAtUtc");
-
-                    b.ToTable("BiometricIdentificationAttempts", "clinical", t =>
-                        {
-                            t.HasCheckConstraint("CK_BiometricAttempt_Match", "((\"Outcome\" = 0 AND \"MatchedPatientId\" IS NOT NULL) OR (\"Outcome\" <> 0 AND \"MatchedPatientId\" IS NULL)) AND (\"BiometricReferenceId\" IS NULL OR \"MatchedPatientId\" IS NOT NULL)");
-                        });
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ChronicCondition", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<string>("CodeSystem")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<DateOnly?>("DiagnosedOn")
-                        .HasColumnType("date");
-
-                    b.Property<Guid>("MedicalHistoryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MedicalHistoryId");
-
-                    b.ToTable("ChronicConditions", "clinical");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.Clinic", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Address")
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
-                    b.Property<string>("FacilityCode")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Municipality")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(180)
-                        .HasColumnType("character varying(180)");
-
-                    b.Property<string>("PhoneNumber")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("Province")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Clinics", "clinical");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicStaffAffiliation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ClinicId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ClinicalStaffId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("EndedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClinicalStaffId");
-
-                    b.HasIndex("ClinicId", "ClinicalStaffId")
-                        .IsUnique();
-
-                    b.ToTable("ClinicStaffAffiliations", "clinical");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalAuditEntry", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<Guid>("ActorIdentityUserId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("ActorStaffId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("ActorType")
+                        .HasColumnType("integer");
 
                     b.Property<string>("ChangesJson")
                         .HasColumnType("jsonb");
@@ -248,8 +52,8 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                         .HasColumnType("uuid");
 
                     b.Property<string>("CorrelationId")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("EntityId")
                         .IsRequired()
@@ -261,26 +65,46 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<DateTimeOffset>("OccurredAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("PatientId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ActorStaffId");
+                    b.HasIndex("OccurredAtUtc");
 
-                    b.HasIndex("ClinicalEncounterId");
+                    b.HasIndex("ActorIdentityUserId", "OccurredAtUtc");
 
                     b.HasIndex("PatientId", "OccurredAtUtc");
 
                     b.HasIndex("EntityName", "EntityId", "OccurredAtUtc");
 
-                    b.ToTable("ClinicalAuditEntries", "clinical");
+                    b.ToTable("ClinicalAuditEntries", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClinicalAuditEntries_Action_Enum", "\"Action\" IN (1, 2, 3, 4, 5, 6, 7)");
+
+                            t.HasCheckConstraint("CK_ClinicalAuditEntries_Actor", "((\"ActorType\" = 1) AND (\"ActorIdentityUserId\" IS NOT NULL) AND (\"ActorReference\" IS NULL)) OR ((\"ActorType\" IN (2, 3)) AND (\"ActorIdentityUserId\" IS NULL) AND (\"ActorStaffId\" IS NULL) AND (\"ActorReference\" IS NOT NULL))");
+
+                            t.HasCheckConstraint("CK_ClinicalAuditEntries_ActorType_Enum", "\"ActorType\" IN (1, 2, 3)");
+
+                            t.HasCheckConstraint("CK_ClinicalAuditEntries_Entity", "(length(btrim(\"EntityName\")) > 0) AND (length(btrim(\"EntityId\")) > 0)");
+
+                            t.HasCheckConstraint("CK_ClinicalAuditEntries_Outcome", "((\"Outcome\" = 1) AND (\"FailureReason\" IS NULL)) OR ((\"Outcome\" = 2) AND (\"FailureReason\" IS NOT NULL))");
+
+                            t.HasCheckConstraint("CK_ClinicalAuditEntries_Outcome_Enum", "\"Outcome\" IN (1, 2)");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalDocument", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Documents.ClinicalDocument", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -306,6 +130,9 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -326,7 +153,7 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.Property<DateTimeOffset?>("UploadedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("UploadedByStaffId")
+                    b.Property<Guid?>("UploadedByIdentityUserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -334,27 +161,29 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.HasIndex("BlobPath")
                         .IsUnique();
 
-                    b.HasIndex("UploadedByStaffId");
-
                     b.HasIndex("ClinicalEncounterId", "CreatedAtUtc");
 
                     b.HasIndex("PatientId", "CreatedAtUtc");
 
                     b.ToTable("ClinicalDocuments", "clinical", t =>
                         {
-                            t.HasCheckConstraint("CK_Document_Available", "\"Status\" <> 1 OR (\"UploadedAtUtc\" IS NOT NULL AND \"ChecksumSha256\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_ClinicalDocuments_Checksum", "(\"ChecksumSha256\" IS NULL) OR (\"ChecksumSha256\" ~ '^[0-9a-f]{64}$')");
 
-                            t.HasCheckConstraint("CK_Document_Checksum", "\"ChecksumSha256\" IS NULL OR \"ChecksumSha256\" ~ '^[0-9a-fA-F]{64}$'");
+                            t.HasCheckConstraint("CK_ClinicalDocuments_Lifecycle", "(NOT (\"Status\" = 1) OR (\"UploadedAtUtc\" IS NULL)) AND (NOT (\"Status\" = 2) OR ((\"UploadedAtUtc\" IS NOT NULL) AND (\"ChecksumSha256\" IS NOT NULL))) AND ((\"Status\" = 4) = (\"DeletedAtUtc\" IS NOT NULL))");
 
-                            t.HasCheckConstraint("CK_Document_Owner", "\"PatientId\" IS NOT NULL OR \"ClinicalEncounterId\" IS NOT NULL");
+                            t.HasCheckConstraint("CK_ClinicalDocuments_Owner", "(\"PatientId\" IS NULL) <> (\"ClinicalEncounterId\" IS NULL)");
 
-                            t.HasCheckConstraint("CK_Document_Size", "\"SizeBytes\" >= 0");
+                            t.HasCheckConstraint("CK_ClinicalDocuments_Size", "\"SizeBytes\" > 0");
 
-                            t.HasCheckConstraint("CK_Document_StorageMetadata", "length(btrim(\"BlobPath\")) > 0 AND length(btrim(\"ContentType\")) > 0 AND length(btrim(\"FileName\")) > 0");
+                            t.HasCheckConstraint("CK_ClinicalDocuments_Status_Enum", "\"Status\" IN (1, 2, 3, 4)");
+
+                            t.HasCheckConstraint("CK_ClinicalDocuments_StorageMetadata", "(length(btrim(\"FileName\")) > 0) AND (length(btrim(\"BlobPath\")) > 0) AND (length(btrim(\"ContentType\")) > 0)");
+
+                            t.HasCheckConstraint("CK_ClinicalDocuments_Type_Enum", "\"Type\" IN (1, 2, 3, 4, 5, 6, 7)");
                         });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalEncounter", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -363,18 +192,14 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.Property<Guid?>("AmbulanceId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ChiefComplaint")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
                     b.Property<Guid?>("ClinicId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset?>("EndedAtUtc")
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("IdentificationStatus")
-                        .HasColumnType("integer");
+                    b.Property<DateTimeOffset?>("EndedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("IdentifiedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -386,10 +211,15 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                         .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Reason")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
                     b.Property<DateTimeOffset>("StartedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer");
 
                     b.Property<string>("TemporaryPatientCode")
@@ -399,6 +229,9 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AmbulanceId");
@@ -406,28 +239,35 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.HasIndex("IdentifiedByStaffId");
 
                     b.HasIndex("TemporaryPatientCode")
-                        .IsUnique()
-                        .HasFilter("\"TemporaryPatientCode\" IS NOT NULL");
+                        .IsUnique();
 
-                    b.HasIndex("ClinicId", "StartedAtUtc");
+                    b.HasIndex("ClinicId", "Status");
 
                     b.HasIndex("PatientId", "StartedAtUtc");
 
+                    b.HasIndex("Status", "StartedAtUtc");
+
                     b.ToTable("ClinicalEncounters", "clinical", t =>
                         {
-                            t.HasCheckConstraint("CK_Encounter_Dates", "\"EndedAtUtc\" IS NULL OR \"EndedAtUtc\" >= \"StartedAtUtc\"");
+                            t.HasCheckConstraint("CK_ClinicalEncounters_Clinic", "(\"Type\" = 3) OR (\"ClinicId\" IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_Encounter_Identification", "(\"IdentificationStatus\" = 0 AND \"PatientId\" IS NULL\n    AND \"TemporaryPatientCode\" IS NOT NULL AND length(btrim(\"TemporaryPatientCode\")) > 0\n    AND \"IdentifiedAtUtc\" IS NULL AND \"IdentifiedByStaffId\" IS NULL)\nOR (\"IdentificationStatus\" = 1 AND \"PatientId\" IS NOT NULL\n    AND \"IdentifiedAtUtc\" IS NULL AND \"IdentifiedByStaffId\" IS NULL)\nOR (\"IdentificationStatus\" = 2 AND \"PatientId\" IS NOT NULL\n    AND \"IdentifiedAtUtc\" IS NOT NULL AND \"IdentifiedByStaffId\" IS NOT NULL\n    AND \"IdentifiedAtUtc\" >= \"StartedAtUtc\")");
+                            t.HasCheckConstraint("CK_ClinicalEncounters_End", "((\"Status\" IN (6, 7)) = (\"EndedAtUtc\" IS NOT NULL)) AND (\"EndedAtUtc\" >= \"StartedAtUtc\")");
+
+                            t.HasCheckConstraint("CK_ClinicalEncounters_Identification", "((\"PatientId\" IS NULL) AND (\"TemporaryPatientCode\" IS NOT NULL) AND (\"IdentifiedAtUtc\" IS NULL) AND (\"IdentifiedByStaffId\" IS NULL) AND (\"Type\" IN (2, 3))) OR ((\"PatientId\" IS NOT NULL) AND (\"TemporaryPatientCode\" IS NULL) AND (\"IdentifiedAtUtc\" IS NULL) AND (\"IdentifiedByStaffId\" IS NULL)) OR ((\"PatientId\" IS NOT NULL) AND (\"TemporaryPatientCode\" IS NOT NULL) AND (\"IdentifiedAtUtc\" IS NOT NULL) AND (\"IdentifiedByStaffId\" IS NOT NULL) AND (\"IdentifiedAtUtc\" >= \"StartedAtUtc\"))");
+
+                            t.HasCheckConstraint("CK_ClinicalEncounters_Status_Enum", "\"Status\" IN (1, 2, 3, 4, 5, 6, 7)");
+
+                            t.HasCheckConstraint("CK_ClinicalEncounters_Type_Enum", "\"Type\" IN (1, 2, 3, 4)");
                         });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalNote", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.ClinicalNote", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AuthorStaffId")
+                    b.Property<Guid>("AuthorStaffId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("ClinicalEncounterId")
@@ -441,6 +281,9 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
@@ -448,12 +291,17 @@ namespace SCI_PH.Persistence.Migrations.Clinical
 
                     b.HasIndex("AuthorStaffId");
 
-                    b.HasIndex("ClinicalEncounterId", "CreatedAtUtc");
+                    b.HasIndex("ClinicalEncounterId", "OccurredAtUtc");
 
-                    b.ToTable("ClinicalNotes", "clinical");
+                    b.ToTable("ClinicalNotes", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClinicalNotes_Content", "length(btrim(\"Content\")) > 0");
+
+                            t.HasCheckConstraint("CK_ClinicalNotes_Type_Enum", "\"Type\" IN (1, 2, 3, 4, 5, 6)");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalProcedure", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.ClinicalProcedure", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -473,24 +321,24 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.Property<DateTimeOffset?>("CompletedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
-                    b.Property<string>("Notes")
+                    b.Property<string>("Description")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("Outcome")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTimeOffset?>("PerformedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("PerformedByStaffId")
                         .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("StartedAtUtc")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -499,12 +347,21 @@ namespace SCI_PH.Persistence.Migrations.Clinical
 
                     b.HasIndex("PerformedByStaffId");
 
-                    b.HasIndex("ClinicalEncounterId", "StartedAtUtc");
+                    b.HasIndex("ClinicalEncounterId", "PerformedAtUtc");
 
-                    b.ToTable("ClinicalProcedures", "clinical");
+                    b.ToTable("ClinicalProcedures", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClinicalProcedures_Code", "NOT (\"Code\" IS NOT NULL) OR (\"CodeSystem\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ClinicalProcedures_Lifecycle", "((\"PerformedAtUtc\" IS NULL) = (\"PerformedByStaffId\" IS NULL)) AND (\"CompletedAtUtc\" >= \"PerformedAtUtc\") AND (((\"Status\" = 1) AND (\"PerformedAtUtc\" IS NULL) AND (\"CompletedAtUtc\" IS NULL)) OR ((\"Status\" = 2) AND (\"PerformedAtUtc\" IS NOT NULL) AND (\"CompletedAtUtc\" IS NULL)) OR ((\"Status\" = 3) AND (\"PerformedAtUtc\" IS NOT NULL) AND (\"CompletedAtUtc\" IS NOT NULL)) OR ((\"Status\" = 4) AND (\"CompletedAtUtc\" IS NULL)))");
+
+                            t.HasCheckConstraint("CK_ClinicalProcedures_Name", "length(btrim(\"Name\")) > 0");
+
+                            t.HasCheckConstraint("CK_ClinicalProcedures_Status_Enum", "\"Status\" IN (1, 2, 3, 4)");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalResult", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.ClinicalResult", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -550,9 +407,12 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Unit")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
 
                     b.HasKey("Id");
 
@@ -562,97 +422,21 @@ namespace SCI_PH.Persistence.Migrations.Clinical
 
                     b.HasIndex("ClinicalProcedureId", "ClinicalEncounterId");
 
-                    b.ToTable("ClinicalResults", "clinical");
+                    b.ToTable("ClinicalResults", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClinicalResults_Code", "NOT (\"Code\" IS NOT NULL) OR (\"CodeSystem\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ClinicalResults_Name", "length(btrim(\"Name\")) > 0");
+
+                            t.HasCheckConstraint("CK_ClinicalResults_Status_Enum", "\"Status\" IN (1, 2, 3, 4)");
+
+                            t.HasCheckConstraint("CK_ClinicalResults_Type_Enum", "\"Type\" IN (1, 2, 3, 4, 5)");
+
+                            t.HasCheckConstraint("CK_ClinicalResults_Value", "(NOT (\"Status\" IN (1, 4)) OR (\"ResultedAtUtc\" IS NULL)) AND (NOT (\"Status\" IN (2, 3)) OR ((\"ResultedAtUtc\" IS NOT NULL) AND ((\"ResultText\" IS NOT NULL) OR (\"NumericValue\" IS NOT NULL))))");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalStaff", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("FamilyNames")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<string>("GivenNames")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.Property<Guid?>("IdentityUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("PhoneNumber")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("ProfessionalLicenseNumber")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<int>("Role")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Specialty")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IdentityUserId")
-                        .IsUnique();
-
-                    b.ToTable("ClinicalStaff", "clinical");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalTransfer", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("AmbulanceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ClinicalEncounterId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("FromClinicId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<Guid?>("ToClinicId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("TransferredAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AmbulanceId");
-
-                    b.HasIndex("ClinicalEncounterId");
-
-                    b.HasIndex("FromClinicId");
-
-                    b.HasIndex("ToClinicId");
-
-                    b.ToTable("ClinicalTransfers", "clinical");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.EncounterDiagnosis", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.Diagnosis", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -662,12 +446,15 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                         .HasColumnType("uuid");
 
                     b.Property<string>("Code")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
 
                     b.Property<string>("CodeSystem")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -680,8 +467,11 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.Property<DateTimeOffset>("RecordedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("RecordedByStaffId")
+                    b.Property<Guid>("RecordedByStaffId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -689,10 +479,19 @@ namespace SCI_PH.Persistence.Migrations.Clinical
 
                     b.HasIndex("RecordedByStaffId");
 
-                    b.ToTable("EncounterDiagnoses", "clinical");
+                    b.ToTable("Diagnoses", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_Diagnoses_Code", "NOT (\"Code\" IS NOT NULL) OR (\"CodeSystem\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Diagnoses_Confirmation", "((\"Type\" = 2) = (\"ConfirmedAtUtc\" IS NOT NULL)) AND (\"ConfirmedAtUtc\" >= \"RecordedAtUtc\")");
+
+                            t.HasCheckConstraint("CK_Diagnoses_Description", "length(btrim(\"Description\")) > 0");
+
+                            t.HasCheckConstraint("CK_Diagnoses_Type_Enum", "\"Type\" IN (1, 2)");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.EncounterStaffAssignment", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.EncounterStaffAssignment", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -707,6 +506,9 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.Property<Guid>("ClinicalStaffId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("Function")
+                        .HasColumnType("integer");
+
                     b.Property<DateTimeOffset?>("UnassignedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -715,105 +517,149 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.HasIndex("ClinicalStaffId");
 
                     b.HasIndex("ClinicalEncounterId", "ClinicalStaffId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("UX_EncounterStaffAssignments_Active")
+                        .HasFilter("\"UnassignedAtUtc\" IS NULL");
 
-                    b.ToTable("EncounterStaffAssignments", "clinical");
+                    b.ToTable("EncounterStaffAssignments", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_EncounterStaffAssignments_Dates", "\"UnassignedAtUtc\" >= \"AssignedAtUtc\"");
+
+                            t.HasCheckConstraint("CK_EncounterStaffAssignments_Function_Enum", "\"Function\" IN (1, 2, 3, 4, 5, 6)");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.HomeMedication", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.Triage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("DoseInstructions")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("FrequencyInstructions")
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
-                    b.Property<Guid>("MedicalHistoryId")
+                    b.Property<Guid>("ClinicalEncounterId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("MedicationId")
+                    b.Property<string>("Observations")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTimeOffset>("PerformedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PerformedByStaffId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("MedicationName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("Route")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<DateOnly?>("StartedOn")
-                        .HasColumnType("date");
-
-                    b.Property<int>("Status")
+                    b.Property<int>("Priority")
                         .HasColumnType("integer");
 
-                    b.Property<DateOnly?>("StoppedOn")
-                        .HasColumnType("date");
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("MedicalHistoryId");
+                    b.HasIndex("PerformedByStaffId");
 
-                    b.HasIndex("MedicationId");
+                    b.HasIndex("ClinicalEncounterId", "PerformedAtUtc");
 
-                    b.ToTable("HomeMedications", "clinical");
+                    b.ToTable("Triages", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_Triages_Priority_Enum", "\"Priority\" IN (1, 2, 3, 4, 5)");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.Medication", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.VitalSign", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("BrandName")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
+                    b.Property<Guid>("ClinicalEncounterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("MeasuredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("MeasuredByStaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TriageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MeasuredByStaffId");
+
+                    b.HasIndex("TriageId", "ClinicalEncounterId");
+
+                    b.HasIndex("ClinicalEncounterId", "Type", "MeasuredAtUtc");
+
+                    b.ToTable("VitalSigns", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_VitalSigns_Range", "((\"Type\" = 1) AND (\"Value\" BETWEEN 0 AND 300) AND (\"Unit\" = '/min')) OR ((\"Type\" = 2) AND (\"Value\" BETWEEN 0 AND 100) AND (\"Unit\" = '/min')) OR ((\"Type\" = 3) AND (\"Value\" BETWEEN 0 AND 300) AND (\"Unit\" = 'mm[Hg]')) OR ((\"Type\" = 4) AND (\"Value\" BETWEEN 0 AND 250) AND (\"Unit\" = 'mm[Hg]')) OR ((\"Type\" = 5) AND (\"Value\" BETWEEN 25 AND 45) AND (\"Unit\" = 'Cel')) OR ((\"Type\" = 6) AND (\"Value\" BETWEEN 0 AND 100) AND (\"Unit\" = '%')) OR ((\"Type\" = 7) AND (\"Value\" BETWEEN 0.2 AND 500) AND (\"Unit\" = 'kg')) OR ((\"Type\" = 8) AND (\"Value\" BETWEEN 20 AND 280) AND (\"Unit\" = 'cm')) OR ((\"Type\" = 9) AND (\"Value\" BETWEEN 0 AND 2000) AND (\"Unit\" = 'mg/dL')) OR ((\"Type\" = 10) AND (\"Value\" BETWEEN 0 AND 10) AND (\"Unit\" = '{score}')) OR ((\"Type\" = 11) AND (\"Value\" BETWEEN 3 AND 15) AND (\"Unit\" = '{score}'))");
+
+                            t.HasCheckConstraint("CK_VitalSigns_Type_Enum", "\"Type\" IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Medications.Medication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Code")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("DefaultRoute")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
-                    b.Property<string>("DosageForm")
+                    b.Property<string>("Concentration")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
-                    b.Property<string>("GenericName")
+                    b.Property<int?>("DefaultRoute")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Strength")
+                    b.Property<string>("Presentation")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.ToTable("Medications", "clinical");
+                    b.HasIndex("Name");
+
+                    b.ToTable("Medications", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_Medications_DefaultRoute_Enum", "\"DefaultRoute\" IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)");
+
+                            t.HasCheckConstraint("CK_Medications_Name", "length(btrim(\"Name\")) > 0");
+
+                            t.HasCheckConstraint("CK_Medications_Status_Enum", "\"Status\" IN (1, 2)");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.MedicationAdministration", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Medications.MedicationAdministration", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -834,19 +680,27 @@ namespace SCI_PH.Persistence.Migrations.Clinical
 
                     b.Property<string>("DoseUnit")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
 
                     b.Property<Guid>("MedicationId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
 
-                    b.Property<string>("Route")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                    b.Property<Guid?>("PrescriptionDetailId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PrescriptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Route")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -856,10 +710,445 @@ namespace SCI_PH.Persistence.Migrations.Clinical
 
                     b.HasIndex("ClinicalEncounterId", "AdministeredAtUtc");
 
-                    b.ToTable("MedicationAdministrations", "clinical");
+                    b.HasIndex("PrescriptionDetailId", "PrescriptionId");
+
+                    b.HasIndex("PrescriptionId", "ClinicalEncounterId");
+
+                    b.ToTable("MedicationAdministrations", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_MedicationAdministrations_Dose", "(\"Dose\" > 0) AND (length(btrim(\"DoseUnit\")) > 0)");
+
+                            t.HasCheckConstraint("CK_MedicationAdministrations_EnteredInError", "NOT (\"Status\" = 2) OR (\"Notes\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_MedicationAdministrations_Prescription", "NOT (\"PrescriptionDetailId\" IS NOT NULL) OR (\"PrescriptionId\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_MedicationAdministrations_Route_Enum", "\"Route\" IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)");
+
+                            t.HasCheckConstraint("CK_MedicationAdministrations_Status_Enum", "\"Status\" IN (1, 2)");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.Patient", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Medications.Prescription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ClinicalEncounterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("IssuedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("PrescribedByStaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("ValidUntilUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PrescribedByStaffId");
+
+                    b.HasIndex("ClinicalEncounterId", "CreatedAtUtc");
+
+                    b.ToTable("Prescriptions", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_Prescriptions_Lifecycle", "(NOT (\"Status\" = 1) OR ((\"IssuedAtUtc\" IS NULL) AND (\"CancelledAtUtc\" IS NULL))) AND (NOT (\"Status\" = 2) OR ((\"IssuedAtUtc\" IS NOT NULL) AND (\"CancelledAtUtc\" IS NULL))) AND (NOT (\"Status\" = 3) OR (\"CancelledAtUtc\" IS NOT NULL)) AND (\"ValidUntilUtc\" > \"IssuedAtUtc\")");
+
+                            t.HasCheckConstraint("CK_Prescriptions_Status_Enum", "\"Status\" IN (1, 2, 3)");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Medications.PrescriptionDetail", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Dose")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<string>("DoseUnit")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<int?>("DurationDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Instructions")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("MedicationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PrescriptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Route")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MedicationId");
+
+                    b.HasIndex("PrescriptionId");
+
+                    b.ToTable("PrescriptionDetails", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_PrescriptionDetails_Route_Enum", "\"Route\" IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)");
+
+                            t.HasCheckConstraint("CK_PrescriptionDetails_Values", "(\"Dose\" > 0) AND (\"DurationDays\" > 0) AND (length(btrim(\"DoseUnit\")) > 0) AND (length(btrim(\"Frequency\")) > 0)");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Organizations.Clinic", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<string>("FacilityCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Municipality")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Province")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FacilityCode")
+                        .IsUnique();
+
+                    b.ToTable("Clinics", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_Clinics_Names", "(length(btrim(\"Name\")) > 0) AND (length(btrim(\"Province\")) > 0) AND (length(btrim(\"Municipality\")) > 0)");
+
+                            t.HasCheckConstraint("CK_Clinics_Status_Enum", "\"Status\" IN (1, 2)");
+
+                            t.HasCheckConstraint("CK_Clinics_Type_Enum", "\"Type\" IN (1, 2, 3, 4, 5)");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Organizations.ClinicStaffAffiliation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClinicalStaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("EndedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicalStaffId");
+
+                    b.HasIndex("ClinicId", "ClinicalStaffId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ClinicStaffAffiliations_Active")
+                        .HasFilter("\"EndedAtUtc\" IS NULL");
+
+                    b.ToTable("ClinicStaffAffiliations", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClinicStaffAffiliations_Dates", "\"EndedAtUtc\" >= \"StartedAtUtc\"");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FamilyNames")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("GivenNames")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid?>("IdentityUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ProfessionalLicenseNumber")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Specialty")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdentityUserId")
+                        .IsUnique();
+
+                    b.HasIndex("ProfessionalLicenseNumber")
+                        .IsUnique();
+
+                    b.ToTable("ClinicalStaffMembers", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClinicalStaffMembers_Names", "(length(btrim(\"GivenNames\")) > 0) AND (length(btrim(\"FamilyNames\")) > 0)");
+
+                            t.HasCheckConstraint("CK_ClinicalStaffMembers_Status_Enum", "\"Status\" IN (1, 2)");
+
+                            t.HasCheckConstraint("CK_ClinicalStaffMembers_Type_Enum", "\"Type\" IN (1, 2, 3, 4, 5)");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.ChronicCondition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("CodeSystem")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateOnly?>("DiagnosedOn")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("MedicalHistoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MedicalHistoryId");
+
+                    b.ToTable("ChronicConditions", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_ChronicConditions_Code", "NOT (\"Code\" IS NOT NULL) OR (\"CodeSystem\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ChronicConditions_Name", "length(btrim(\"Name\")) > 0");
+
+                            t.HasCheckConstraint("CK_ChronicConditions_Status_Enum", "\"Status\" IN (1, 2, 3, 4)");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.HomeMedication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DoseInstructions")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Frequency")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid>("MedicalHistoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("MedicationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MedicationName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int?>("Route")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("StartedOn")
+                        .HasColumnType("date");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("StoppedOn")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MedicalHistoryId");
+
+                    b.HasIndex("MedicationId");
+
+                    b.ToTable("HomeMedications", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_HomeMedications_Dates", "\"StoppedOn\" >= \"StartedOn\"");
+
+                            t.HasCheckConstraint("CK_HomeMedications_Name", "length(btrim(\"MedicationName\")) > 0");
+
+                            t.HasCheckConstraint("CK_HomeMedications_Route_Enum", "\"Route\" IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)");
+
+                            t.HasCheckConstraint("CK_HomeMedications_Status_Enum", "\"Status\" IN (1, 2, 3)");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.IdentificationAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorIdentityUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BiometricReferenceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ClinicalEncounterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DeviceReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("FailureReason")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("PatientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PatientIdentifierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PerformedByStaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("ProviderRequestReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PerformedByStaffId");
+
+                    b.HasIndex("BiometricReferenceId", "PatientId");
+
+                    b.HasIndex("ClinicalEncounterId", "OccurredAtUtc");
+
+                    b.HasIndex("Method", "OccurredAtUtc");
+
+                    b.HasIndex("PatientId", "OccurredAtUtc");
+
+                    b.HasIndex("PatientIdentifierId", "PatientId");
+
+                    b.ToTable("IdentificationAttempts", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_IdentificationAttempts_Actor", "(\"ActorIdentityUserId\" IS NOT NULL) OR (\"PerformedByStaffId\" IS NOT NULL) OR (\"DeviceReference\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_IdentificationAttempts_Evidence", "(NOT (\"PatientIdentifierId\" IS NOT NULL) OR (\"Method\" IN (1, 2, 3, 4, 5))) AND (NOT (\"BiometricReferenceId\" IS NOT NULL) OR (\"Method\" IN (6, 7)))");
+
+                            t.HasCheckConstraint("CK_IdentificationAttempts_FailureReason_Enum", "\"FailureReason\" IN (1, 2, 3, 4, 5, 6, 7)");
+
+                            t.HasCheckConstraint("CK_IdentificationAttempts_Method_Enum", "\"Method\" IN (1, 2, 3, 4, 5, 6, 7, 8)");
+
+                            t.HasCheckConstraint("CK_IdentificationAttempts_Outcome", "((\"Outcome\" = 1) AND (\"PatientId\" IS NOT NULL) AND (\"FailureReason\" IS NULL)) OR ((\"Outcome\" = 2) AND (\"PatientId\" IS NULL) AND (\"FailureReason\" IS NOT NULL))");
+
+                            t.HasCheckConstraint("CK_IdentificationAttempts_Outcome_Enum", "\"Outcome\" IN (1, 2)");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.Patient", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -887,12 +1176,8 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.Property<Guid?>("IdentityUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("SexAtBirth")
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)");
+                    b.Property<int>("Sex")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -902,10 +1187,19 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.HasIndex("IdentityUserId")
                         .IsUnique();
 
-                    b.ToTable("Patients", "clinical");
+                    b.HasIndex("FamilyNames", "GivenNames");
+
+                    b.ToTable("Patients", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_Patients_IdentityStatus_Enum", "\"IdentityStatus\" IN (1, 2)");
+
+                            t.HasCheckConstraint("CK_Patients_Names", "(length(btrim(\"GivenNames\")) > 0) AND (length(btrim(\"FamilyNames\")) > 0)");
+
+                            t.HasCheckConstraint("CK_Patients_Sex_Enum", "\"Sex\" IN (1, 2, 3, 4)");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.PatientAllergy", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.PatientAllergy", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -915,8 +1209,8 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                         .HasColumnType("uuid");
 
                     b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
 
                     b.Property<DateOnly?>("OnsetDate")
                         .HasColumnType("date");
@@ -925,9 +1219,8 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<string>("Severity")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
+                    b.Property<int>("Severity")
+                        .HasColumnType("integer");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -941,14 +1234,28 @@ namespace SCI_PH.Persistence.Migrations.Clinical
 
                     b.HasIndex("MedicalHistoryId");
 
-                    b.ToTable("Allergies", "clinical");
+                    b.ToTable("PatientAllergies", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_PatientAllergies_Severity_Enum", "\"Severity\" IN (1, 2, 3, 4)");
+
+                            t.HasCheckConstraint("CK_PatientAllergies_Status_Enum", "\"Status\" IN (1, 2, 3, 4)");
+
+                            t.HasCheckConstraint("CK_PatientAllergies_Substance", "length(btrim(\"Substance\")) > 0");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.PatientBiometricReference", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.PatientBiometricReference", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("AlgorithmVersion")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Modality")
                         .HasColumnType("integer");
@@ -961,14 +1268,14 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
-                    b.Property<DateTimeOffset>("RegisteredAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<Guid?>("RegisteredByStaffId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("RevokedAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
 
                     b.Property<string>("SubjectReference")
                         .IsRequired()
@@ -984,10 +1291,19 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.HasIndex("Provider", "Modality", "SubjectReference")
                         .IsUnique();
 
-                    b.ToTable("PatientBiometricReferences", "clinical");
+                    b.ToTable("PatientBiometricReferences", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_PatientBiometricReferences_Modality_Enum", "\"Modality\" IN (1, 2)");
+
+                            t.HasCheckConstraint("CK_PatientBiometricReferences_References", "(length(btrim(\"Provider\")) > 0) AND (length(btrim(\"SubjectReference\")) > 0)");
+
+                            t.HasCheckConstraint("CK_PatientBiometricReferences_Revocation", "((\"Status\" = 1) AND (\"RevokedAtUtc\" IS NULL)) OR ((\"Status\" = 2) AND (\"RevokedAtUtc\" IS NOT NULL) AND (\"RevokedAtUtc\" >= \"CreatedAtUtc\"))");
+
+                            t.HasCheckConstraint("CK_PatientBiometricReferences_Status_Enum", "\"Status\" IN (1, 2)");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.PatientIdentifier", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.PatientIdentifier", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1018,6 +1334,12 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.Property<DateTimeOffset?>("RevokedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("Source")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
@@ -1029,23 +1351,43 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)");
 
+                    b.Property<DateTimeOffset?>("VerifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("PatientId");
+                    b.HasIndex("PatientId", "Type")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PatientIdentifiers_ActivePrimary")
+                        .HasFilter("(\"IsPrimary\") AND (\"Status\" = 1)");
 
-                    b.HasIndex("Type", "NormalizedValue");
+                    b.HasIndex("Type", "NormalizedValue")
+                        .HasDatabaseName("IX_PatientIdentifiers_Lookup");
 
                     b.HasIndex("Type", "Issuer", "NormalizedValue")
                         .IsUnique()
-                        .HasFilter("\"Type\" IN (0, 1, 2, 3) AND \"RevokedAtUtc\" IS NULL");
+                        .HasDatabaseName("UX_PatientIdentifiers_ActiveValue")
+                        .HasFilter("(\"Type\" IN (1, 2, 3, 4)) AND (\"Status\" = 1)");
 
                     b.ToTable("PatientIdentifiers", "clinical", t =>
                         {
-                            t.HasCheckConstraint("CK_PatientIdentifier_Value", "length(btrim(\"Value\")) > 0 AND length(btrim(\"NormalizedValue\")) > 0");
+                            t.HasCheckConstraint("CK_PatientIdentifiers_Dates", "(\"ValidUntilUtc\" > \"CreatedAtUtc\") AND (\"VerifiedAtUtc\" >= \"CreatedAtUtc\") AND (\"RevokedAtUtc\" >= \"CreatedAtUtc\")");
+
+                            t.HasCheckConstraint("CK_PatientIdentifiers_Revocation", "((\"Status\" = 1) AND (\"RevokedAtUtc\" IS NULL)) OR ((\"Status\" = 2) AND (\"RevokedAtUtc\" IS NOT NULL) AND (NOT \"IsPrimary\"))");
+
+                            t.HasCheckConstraint("CK_PatientIdentifiers_Source_Enum", "\"Source\" IN (1, 2, 3, 4, 5)");
+
+                            t.HasCheckConstraint("CK_PatientIdentifiers_Status_Enum", "\"Status\" IN (1, 2)");
+
+                            t.HasCheckConstraint("CK_PatientIdentifiers_Type_Enum", "\"Type\" IN (1, 2, 3, 4, 5, 6, 7)");
+
+                            t.HasCheckConstraint("CK_PatientIdentifiers_Values", "(length(btrim(\"Value\")) > 0) AND (length(btrim(\"NormalizedValue\")) > 0)");
+
+                            t.HasCheckConstraint("CK_PatientIdentifiers_Verification", "\"IsVerified\" = (\"VerifiedAtUtc\" IS NOT NULL)");
                         });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.PatientMedicalHistory", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.PatientMedicalHistory", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1074,345 +1416,202 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.HasIndex("PatientId", "Version")
                         .IsUnique();
 
-                    b.ToTable("MedicalHistories", "clinical");
+                    b.ToTable("PatientMedicalHistories", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_PatientMedicalHistories_Version", "\"Version\" >= 1");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.PatientSurgicalHistory", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.PatientSurgicalHistory", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<string>("Facility")
-                        .HasMaxLength(180)
-                        .HasColumnType("character varying(180)");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<Guid>("MedicalHistoryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateOnly?>("PerformedOn")
-                        .HasColumnType("date");
-
-                    b.Property<string>("ProcedureName")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MedicalHistoryId");
-
-                    b.ToTable("SurgicalHistories", "clinical");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.Prescription", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ClinicalEncounterId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("IssuedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<Guid>("PatientId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("PrescribedByStaffId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTimeOffset?>("ValidUntilUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClinicalEncounterId");
-
-                    b.HasIndex("PrescribedByStaffId");
-
-                    b.HasIndex("PatientId", "CreatedAtUtc");
-
-                    b.ToTable("Prescriptions", "clinical");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.PrescriptionItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("AuthorizedRefills")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("DoseInstructions")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<int?>("DurationDays")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("FrequencyInstructions")
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
-
-                    b.Property<Guid>("MedicationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("PrescriptionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("QuantityPrescribed")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<string>("QuantityUnit")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("Route")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MedicationId");
-
-                    b.HasIndex("PrescriptionId");
-
-                    b.ToTable("PrescriptionItems", "clinical");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.TriageAssessment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("AssessedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("AssessedByStaffId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ClinicalEncounterId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
-                    b.Property<string>("PriorityLabel")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                    b.Property<DateOnly?>("PerformedOn")
+                        .HasColumnType("date");
 
-                    b.Property<int?>("PriorityLevel")
-                        .HasColumnType("integer");
+                    b.Property<string>("ProcedureName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AssessedByStaffId");
+                    b.HasIndex("MedicalHistoryId");
 
-                    b.HasIndex("ClinicalEncounterId", "AssessedAtUtc");
-
-                    b.ToTable("TriageAssessments", "clinical");
+                    b.ToTable("PatientSurgicalHistories", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_PatientSurgicalHistories_Procedure", "length(btrim(\"ProcedureName\")) > 0");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.VitalSign", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Transport.Ambulance", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("ClinicalEncounterId")
+                    b.Property<Guid?>("BaseClinicId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset>("MeasuredAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<string>("CallSign")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
 
-                    b.Property<Guid?>("RecordedByStaffId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("TriageAssessmentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Unit")
+                    b.Property<string>("Code")
                         .IsRequired()
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)");
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
 
-                    b.Property<decimal>("Value")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
+                    b.Property<string>("PlateNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("RecordedByStaffId");
+                    b.HasIndex("BaseClinicId");
 
-                    b.HasIndex("ClinicalEncounterId", "MeasuredAtUtc");
+                    b.HasIndex("Code")
+                        .IsUnique();
 
-                    b.HasIndex("TriageAssessmentId", "ClinicalEncounterId");
+                    b.ToTable("Ambulances", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_Ambulances_Code", "length(btrim(\"Code\")) > 0");
 
-                    b.ToTable("VitalSigns", "clinical");
+                            t.HasCheckConstraint("CK_Ambulances_Status_Enum", "\"Status\" IN (1, 2, 3)");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.Ambulance", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Transport.ClinicalTransfer", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.Clinic", "Clinic")
-                        .WithMany()
-                        .HasForeignKey("ClinicId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
-                    b.Navigation("Clinic");
+                    b.Property<Guid?>("AmbulanceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ClinicalEncounterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DestinationClinicId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid?>("OriginClinicId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReceivedByStaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RequestedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SentByStaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AmbulanceId");
+
+                    b.HasIndex("OriginClinicId");
+
+                    b.HasIndex("ReceivedByStaffId");
+
+                    b.HasIndex("SentByStaffId");
+
+                    b.HasIndex("ClinicalEncounterId", "RequestedAtUtc");
+
+                    b.HasIndex("DestinationClinicId", "Status");
+
+                    b.HasIndex("Status", "RequestedAtUtc");
+
+                    b.ToTable("ClinicalTransfers", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClinicalTransfers_Dates", "(\"SentAtUtc\" >= \"RequestedAtUtc\") AND (\"ReceivedAtUtc\" >= \"SentAtUtc\") AND (\"CompletedAtUtc\" >= \"ReceivedAtUtc\") AND (\"CancelledAtUtc\" >= \"RequestedAtUtc\")");
+
+                            t.HasCheckConstraint("CK_ClinicalTransfers_DifferentClinics", "(\"OriginClinicId\" IS NULL) OR (\"OriginClinicId\" <> \"DestinationClinicId\")");
+
+                            t.HasCheckConstraint("CK_ClinicalTransfers_Lifecycle", "((\"Status\" = 1) AND (\"SentAtUtc\" IS NULL) AND (\"ReceivedAtUtc\" IS NULL) AND (\"CompletedAtUtc\" IS NULL) AND (\"CancelledAtUtc\" IS NULL)) OR ((\"Status\" = 2) AND (\"SentAtUtc\" IS NOT NULL) AND (\"ReceivedAtUtc\" IS NULL) AND (\"CompletedAtUtc\" IS NULL) AND (\"CancelledAtUtc\" IS NULL)) OR ((\"Status\" = 3) AND (\"SentAtUtc\" IS NOT NULL) AND (\"ReceivedAtUtc\" IS NOT NULL) AND (\"CompletedAtUtc\" IS NULL) AND (\"CancelledAtUtc\" IS NULL)) OR ((\"Status\" = 4) AND (\"SentAtUtc\" IS NOT NULL) AND (\"ReceivedAtUtc\" IS NOT NULL) AND (\"CompletedAtUtc\" IS NOT NULL) AND (\"CancelledAtUtc\" IS NULL)) OR ((\"Status\" = 5) AND (\"CancelledAtUtc\" IS NOT NULL) AND (\"ReceivedAtUtc\" IS NULL) AND (\"CompletedAtUtc\" IS NULL))");
+
+                            t.HasCheckConstraint("CK_ClinicalTransfers_Responsibles", "((\"SentAtUtc\" IS NULL) = (\"SentByStaffId\" IS NULL)) AND ((\"ReceivedAtUtc\" IS NULL) = (\"ReceivedByStaffId\" IS NULL))");
+
+                            t.HasCheckConstraint("CK_ClinicalTransfers_Status_Enum", "\"Status\" IN (1, 2, 3, 4, 5)");
+                        });
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.BiometricIdentificationAttempt", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Documents.ClinicalDocument", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalEncounter", "Encounter")
-                        .WithMany()
-                        .HasForeignKey("ClinicalEncounterId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SCI_PH.Domain.Entities.Patient", "MatchedPatient")
-                        .WithMany()
-                        .HasForeignKey("MatchedPatientId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "PerformedByStaff")
-                        .WithMany()
-                        .HasForeignKey("PerformedByStaffId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SCI_PH.Domain.Entities.PatientBiometricReference", "BiometricReference")
-                        .WithMany()
-                        .HasForeignKey("BiometricReferenceId", "MatchedPatientId")
-                        .HasPrincipalKey("Id", "PatientId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("BiometricReference");
-
-                    b.Navigation("Encounter");
-
-                    b.Navigation("MatchedPatient");
-
-                    b.Navigation("PerformedByStaff");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ChronicCondition", b =>
-                {
-                    b.HasOne("SCI_PH.Domain.Entities.PatientMedicalHistory", "MedicalHistory")
-                        .WithMany("ChronicConditions")
-                        .HasForeignKey("MedicalHistoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("MedicalHistory");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicStaffAffiliation", b =>
-                {
-                    b.HasOne("SCI_PH.Domain.Entities.Clinic", "Clinic")
-                        .WithMany("StaffAffiliations")
-                        .HasForeignKey("ClinicId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "Staff")
-                        .WithMany("ClinicAffiliations")
-                        .HasForeignKey("ClinicalStaffId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Clinic");
-
-                    b.Navigation("Staff");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalAuditEntry", b =>
-                {
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "ActorStaff")
-                        .WithMany()
-                        .HasForeignKey("ActorStaffId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalEncounter", "Encounter")
-                        .WithMany()
-                        .HasForeignKey("ClinicalEncounterId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SCI_PH.Domain.Entities.Patient", "Patient")
-                        .WithMany()
-                        .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("ActorStaff");
-
-                    b.Navigation("Encounter");
-
-                    b.Navigation("Patient");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalDocument", b =>
-                {
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalEncounter", "Encounter")
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", "Encounter")
                         .WithMany("Documents")
                         .HasForeignKey("ClinicalEncounterId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("SCI_PH.Domain.Entities.Patient", "Patient")
-                        .WithMany()
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.Patient", "Patient")
+                        .WithMany("Documents")
                         .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "UploadedByStaff")
-                        .WithMany()
-                        .HasForeignKey("UploadedByStaffId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Encounter");
 
                     b.Navigation("Patient");
-
-                    b.Navigation("UploadedByStaff");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalEncounter", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.Ambulance", "Ambulance")
+                    b.HasOne("SCI_PH.Domain.Entities.Transport.Ambulance", "Ambulance")
                         .WithMany()
                         .HasForeignKey("AmbulanceId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("SCI_PH.Domain.Entities.Clinic", "Clinic")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.Clinic", "Clinic")
                         .WithMany("Encounters")
                         .HasForeignKey("ClinicId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "IdentifiedByStaff")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
                         .WithMany()
                         .HasForeignKey("IdentifiedByStaffId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("SCI_PH.Domain.Entities.Patient", "Patient")
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.Patient", "Patient")
                         .WithMany("Encounters")
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict);
@@ -1421,219 +1620,302 @@ namespace SCI_PH.Persistence.Migrations.Clinical
 
                     b.Navigation("Clinic");
 
-                    b.Navigation("IdentifiedByStaff");
-
                     b.Navigation("Patient");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalNote", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.ClinicalNote", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "AuthorStaff")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
                         .WithMany()
                         .HasForeignKey("AuthorStaffId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalEncounter", "Encounter")
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", "Encounter")
                         .WithMany("Notes")
                         .HasForeignKey("ClinicalEncounterId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("AuthorStaff");
-
                     b.Navigation("Encounter");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalProcedure", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.ClinicalProcedure", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalEncounter", "Encounter")
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", "Encounter")
                         .WithMany("Procedures")
                         .HasForeignKey("ClinicalEncounterId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "PerformedByStaff")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
                         .WithMany()
                         .HasForeignKey("PerformedByStaffId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Encounter");
-
-                    b.Navigation("PerformedByStaff");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalResult", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.ClinicalResult", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalEncounter", "Encounter")
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", "Encounter")
                         .WithMany("Results")
                         .HasForeignKey("ClinicalEncounterId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "RecordedByStaff")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
                         .WithMany()
                         .HasForeignKey("RecordedByStaffId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalProcedure", "Procedure")
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalProcedure", null)
                         .WithMany()
                         .HasForeignKey("ClinicalProcedureId", "ClinicalEncounterId")
                         .HasPrincipalKey("Id", "ClinicalEncounterId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Encounter");
-
-                    b.Navigation("Procedure");
-
-                    b.Navigation("RecordedByStaff");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalTransfer", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.Diagnosis", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.Ambulance", "Ambulance")
-                        .WithMany()
-                        .HasForeignKey("AmbulanceId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalEncounter", "Encounter")
-                        .WithMany("Transfers")
-                        .HasForeignKey("ClinicalEncounterId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SCI_PH.Domain.Entities.Clinic", "FromClinic")
-                        .WithMany()
-                        .HasForeignKey("FromClinicId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SCI_PH.Domain.Entities.Clinic", "ToClinic")
-                        .WithMany()
-                        .HasForeignKey("ToClinicId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Ambulance");
-
-                    b.Navigation("Encounter");
-
-                    b.Navigation("FromClinic");
-
-                    b.Navigation("ToClinic");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.EncounterDiagnosis", b =>
-                {
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalEncounter", "Encounter")
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", "Encounter")
                         .WithMany("Diagnoses")
                         .HasForeignKey("ClinicalEncounterId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "RecordedByStaff")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
                         .WithMany()
                         .HasForeignKey("RecordedByStaffId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Encounter");
-
-                    b.Navigation("RecordedByStaff");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.EncounterStaffAssignment", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.EncounterStaffAssignment", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalEncounter", "Encounter")
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", null)
                         .WithMany("StaffAssignments")
                         .HasForeignKey("ClinicalEncounterId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "Staff")
-                        .WithMany("EncounterAssignments")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
+                        .WithMany()
                         .HasForeignKey("ClinicalStaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.Triage", b =>
+                {
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", "Encounter")
+                        .WithMany("Triages")
+                        .HasForeignKey("ClinicalEncounterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
+                        .WithMany()
+                        .HasForeignKey("PerformedByStaffId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Encounter");
-
-                    b.Navigation("Staff");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.HomeMedication", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.VitalSign", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.PatientMedicalHistory", "MedicalHistory")
-                        .WithMany("HomeMedications")
-                        .HasForeignKey("MedicalHistoryId")
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", "Encounter")
+                        .WithMany("VitalSigns")
+                        .HasForeignKey("ClinicalEncounterId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SCI_PH.Domain.Entities.Medication", "Medication")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
                         .WithMany()
-                        .HasForeignKey("MedicationId")
+                        .HasForeignKey("MeasuredByStaffId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("MedicalHistory");
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.Triage", null)
+                        .WithMany()
+                        .HasForeignKey("TriageId", "ClinicalEncounterId")
+                        .HasPrincipalKey("Id", "ClinicalEncounterId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("Medication");
+                    b.Navigation("Encounter");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.MedicationAdministration", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Medications.MedicationAdministration", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "AdministeredByStaff")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
                         .WithMany()
                         .HasForeignKey("AdministeredByStaffId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalEncounter", "Encounter")
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", null)
                         .WithMany("MedicationAdministrations")
                         .HasForeignKey("ClinicalEncounterId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SCI_PH.Domain.Entities.Medication", "Medication")
-                        .WithMany("Administrations")
+                    b.HasOne("SCI_PH.Domain.Entities.Medications.Medication", "Medication")
+                        .WithMany()
                         .HasForeignKey("MedicationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("AdministeredByStaff");
+                    b.HasOne("SCI_PH.Domain.Entities.Medications.PrescriptionDetail", null)
+                        .WithMany()
+                        .HasForeignKey("PrescriptionDetailId", "PrescriptionId")
+                        .HasPrincipalKey("Id", "PrescriptionId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("Encounter");
+                    b.HasOne("SCI_PH.Domain.Entities.Medications.Prescription", null)
+                        .WithMany()
+                        .HasForeignKey("PrescriptionId", "ClinicalEncounterId")
+                        .HasPrincipalKey("Id", "ClinicalEncounterId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Medication");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.PatientAllergy", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Medications.Prescription", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.PatientMedicalHistory", "MedicalHistory")
-                        .WithMany("Allergies")
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", "Encounter")
+                        .WithMany("Prescriptions")
+                        .HasForeignKey("ClinicalEncounterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
+                        .WithMany()
+                        .HasForeignKey("PrescribedByStaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Encounter");
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Medications.PrescriptionDetail", b =>
+                {
+                    b.HasOne("SCI_PH.Domain.Entities.Medications.Medication", "Medication")
+                        .WithMany()
+                        .HasForeignKey("MedicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SCI_PH.Domain.Entities.Medications.Prescription", null)
+                        .WithMany("Details")
+                        .HasForeignKey("PrescriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Medication");
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Organizations.ClinicStaffAffiliation", b =>
+                {
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.Clinic", null)
+                        .WithMany("StaffAffiliations")
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
+                        .WithMany("ClinicAffiliations")
+                        .HasForeignKey("ClinicalStaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.ChronicCondition", b =>
+                {
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.PatientMedicalHistory", null)
+                        .WithMany("ChronicConditions")
+                        .HasForeignKey("MedicalHistoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.HomeMedication", b =>
+                {
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.PatientMedicalHistory", null)
+                        .WithMany("HomeMedications")
                         .HasForeignKey("MedicalHistoryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("MedicalHistory");
+                    b.HasOne("SCI_PH.Domain.Entities.Medications.Medication", null)
+                        .WithMany()
+                        .HasForeignKey("MedicationId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.PatientBiometricReference", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.IdentificationAttempt", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.Patient", "Patient")
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicalEncounterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
+                        .WithMany()
+                        .HasForeignKey("PerformedByStaffId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.PatientBiometricReference", null)
+                        .WithMany()
+                        .HasForeignKey("BiometricReferenceId", "PatientId")
+                        .HasPrincipalKey("Id", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.PatientIdentifier", null)
+                        .WithMany()
+                        .HasForeignKey("PatientIdentifierId", "PatientId")
+                        .HasPrincipalKey("Id", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Patient");
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.PatientAllergy", b =>
+                {
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.PatientMedicalHistory", null)
+                        .WithMany("Allergies")
+                        .HasForeignKey("MedicalHistoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.PatientBiometricReference", b =>
+                {
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.Patient", "Patient")
                         .WithMany("BiometricReferences")
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "RegisteredByStaff")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
                         .WithMany()
                         .HasForeignKey("RegisteredByStaffId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Patient");
-
-                    b.Navigation("RegisteredByStaff");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.PatientIdentifier", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.PatientIdentifier", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.Patient", "Patient")
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.Patient", "Patient")
                         .WithMany("Identifiers")
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -1642,133 +1924,83 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.Navigation("Patient");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.PatientMedicalHistory", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.PatientMedicalHistory", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.Patient", "Patient")
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.Patient", "Patient")
                         .WithMany("MedicalHistories")
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "RecordedByStaff")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
                         .WithMany()
                         .HasForeignKey("RecordedByStaffId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Patient");
-
-                    b.Navigation("RecordedByStaff");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.PatientSurgicalHistory", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.PatientSurgicalHistory", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.PatientMedicalHistory", "MedicalHistory")
-                        .WithMany("SurgicalHistory")
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.PatientMedicalHistory", null)
+                        .WithMany("SurgicalHistories")
                         .HasForeignKey("MedicalHistoryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("MedicalHistory");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.Prescription", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Transport.Ambulance", b =>
                 {
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalEncounter", "Encounter")
-                        .WithMany("Prescriptions")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("BaseClinicId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Transport.ClinicalTransfer", b =>
+                {
+                    b.HasOne("SCI_PH.Domain.Entities.Transport.Ambulance", "Ambulance")
+                        .WithMany()
+                        .HasForeignKey("AmbulanceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", "Encounter")
+                        .WithMany("Transfers")
                         .HasForeignKey("ClinicalEncounterId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SCI_PH.Domain.Entities.Patient", "Patient")
-                        .WithMany("Prescriptions")
-                        .HasForeignKey("PatientId")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.Clinic", "DestinationClinic")
+                        .WithMany()
+                        .HasForeignKey("DestinationClinicId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "PrescribedByStaff")
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.Clinic", "OriginClinic")
                         .WithMany()
-                        .HasForeignKey("PrescribedByStaffId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .HasForeignKey("OriginClinicId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
+                        .WithMany()
+                        .HasForeignKey("ReceivedByStaffId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
+                        .WithMany()
+                        .HasForeignKey("SentByStaffId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Ambulance");
+
+                    b.Navigation("DestinationClinic");
 
                     b.Navigation("Encounter");
 
-                    b.Navigation("Patient");
-
-                    b.Navigation("PrescribedByStaff");
+                    b.Navigation("OriginClinic");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.PrescriptionItem", b =>
-                {
-                    b.HasOne("SCI_PH.Domain.Entities.Medication", "Medication")
-                        .WithMany("PrescriptionItems")
-                        .HasForeignKey("MedicationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SCI_PH.Domain.Entities.Prescription", "Prescription")
-                        .WithMany("Items")
-                        .HasForeignKey("PrescriptionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Medication");
-
-                    b.Navigation("Prescription");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.TriageAssessment", b =>
-                {
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "AssessedByStaff")
-                        .WithMany()
-                        .HasForeignKey("AssessedByStaffId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalEncounter", "Encounter")
-                        .WithMany("TriageAssessments")
-                        .HasForeignKey("ClinicalEncounterId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("AssessedByStaff");
-
-                    b.Navigation("Encounter");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.VitalSign", b =>
-                {
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalEncounter", "Encounter")
-                        .WithMany("VitalSigns")
-                        .HasForeignKey("ClinicalEncounterId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SCI_PH.Domain.Entities.ClinicalStaff", "RecordedByStaff")
-                        .WithMany()
-                        .HasForeignKey("RecordedByStaffId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SCI_PH.Domain.Entities.TriageAssessment", "TriageAssessment")
-                        .WithMany()
-                        .HasForeignKey("TriageAssessmentId", "ClinicalEncounterId")
-                        .HasPrincipalKey("Id", "ClinicalEncounterId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Encounter");
-
-                    b.Navigation("RecordedByStaff");
-
-                    b.Navigation("TriageAssessment");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.Clinic", b =>
-                {
-                    b.Navigation("Encounters");
-
-                    b.Navigation("StaffAffiliations");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalEncounter", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", b =>
                 {
                     b.Navigation("Diagnoses");
 
@@ -1788,39 +2020,42 @@ namespace SCI_PH.Persistence.Migrations.Clinical
 
                     b.Navigation("Transfers");
 
-                    b.Navigation("TriageAssessments");
+                    b.Navigation("Triages");
 
                     b.Navigation("VitalSigns");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.ClinicalStaff", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Medications.Prescription", b =>
+                {
+                    b.Navigation("Details");
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Organizations.Clinic", b =>
+                {
+                    b.Navigation("Encounters");
+
+                    b.Navigation("StaffAffiliations");
+                });
+
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", b =>
                 {
                     b.Navigation("ClinicAffiliations");
-
-                    b.Navigation("EncounterAssignments");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.Medication", b =>
-                {
-                    b.Navigation("Administrations");
-
-                    b.Navigation("PrescriptionItems");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.Patient", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.Patient", b =>
                 {
                     b.Navigation("BiometricReferences");
+
+                    b.Navigation("Documents");
 
                     b.Navigation("Encounters");
 
                     b.Navigation("Identifiers");
 
                     b.Navigation("MedicalHistories");
-
-                    b.Navigation("Prescriptions");
                 });
 
-            modelBuilder.Entity("SCI_PH.Domain.Entities.PatientMedicalHistory", b =>
+            modelBuilder.Entity("SCI_PH.Domain.Entities.Patients.PatientMedicalHistory", b =>
                 {
                     b.Navigation("Allergies");
 
@@ -1828,12 +2063,7 @@ namespace SCI_PH.Persistence.Migrations.Clinical
 
                     b.Navigation("HomeMedications");
 
-                    b.Navigation("SurgicalHistory");
-                });
-
-            modelBuilder.Entity("SCI_PH.Domain.Entities.Prescription", b =>
-                {
-                    b.Navigation("Items");
+                    b.Navigation("SurgicalHistories");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,62 +1,100 @@
 # Entidades clínicas de SCI-PH
 
-Se mantiene la nomenclatura inglesa del código. Todas las tablas de esta lista
-pertenecen al schema `clinical`. Las cuentas y roles continúan en `identity`.
+El código usa nombres en inglés. Todas las tablas están en el schema `clinical`; cuentas y roles siguen en
+`identity` y no hay claves foráneas entre ambos. Las decisiones están en
+[ADR-005](../adr/ADR-005-clinical-model.md).
 
-| Grupo | Entidad / tabla | Relación principal |
+## Estructura
+
+```
+SCI-PH.Domain/
+├── Common/          Guard, ClinicalCode (internos)
+├── Constants/       FieldLengths, VitalSignLimits
+├── Entities/        Patients, Encounters, Medications, Organizations, Transport, Documents, Auditing
+├── Enums/           misma división que Entities
+├── Exceptions/      DomainException y excepciones específicas
+└── ValueObjects/    TemporaryPatientCode, Sha256Checksum, AuditActor
+
+SCI-PH.Persistence/
+├── Configurations/
+│   ├── Sql.cs                     SQL de una línea para CHECK e índices filtrados
+│   └── Clinical/<Área>/           una IEntityTypeConfiguration<T> por entidad
+├── Contexts/        ClinicalDbContext, IdentityDbContext
+└── Migrations/      Clinical, Identity
+```
+
+## Entidades y relaciones
+
+| Área | Entidad / tabla | Relación principal |
 |---|---|---|
-| Paciente | `Patient` / `Patients` | Persona; cuenta opcional por `Guid`, sin FK a Identity |
-| Identificación | `PatientIdentifier` / `PatientIdentifiers` | Muchos identificadores por paciente |
-| Historial | `PatientMedicalHistory` / `MedicalHistories` | Varias versiones por paciente |
-| Historial | `PatientAllergy` / `Allergies` | Alergias por versión de historial |
-| Historial | `ChronicCondition` / `ChronicConditions` | Enfermedades crónicas por versión |
-| Historial | `HomeMedication` / `HomeMedications` | Medicación habitual por versión; medicamento del catálogo opcional |
-| Historial | `PatientSurgicalHistory` / `SurgicalHistories` | Cirugías previas por versión |
-| Biometría | `PatientBiometricReference` / `PatientBiometricReferences` | Referencias externas de enrolamiento por paciente |
-| Biometría | `BiometricIdentificationAttempt` / `BiometricIdentificationAttempts` | Atención, operador y paciente coincidente opcionales |
-| Auditoría | `ClinicalAuditEntry` / `ClinicalAuditEntries` | Actor, entidad y acción; paciente y atención opcionales |
+| Paciente | `Patient` / `Patients` | Expediente; cuenta opcional por `Guid`, sin FK a Identity |
+| Paciente | `PatientIdentifier` / `PatientIdentifiers` | N por paciente; tipo, origen, emisor, estado, principal |
+| Historial | `PatientMedicalHistory` / `PatientMedicalHistories` | N versiones por paciente |
+| Historial | `PatientAllergy` / `PatientAllergies` | N por versión |
+| Historial | `ChronicCondition` / `ChronicConditions` | N por versión |
+| Historial | `HomeMedication` / `HomeMedications` | N por versión; medicamento del catálogo opcional |
+| Historial | `PatientSurgicalHistory` / `PatientSurgicalHistories` | N por versión |
+| Biometría | `PatientBiometricReference` / `PatientBiometricReferences` | N por paciente; solo referencia externa |
+| Identificación | `IdentificationAttempt` / `IdentificationAttempts` | Paciente, identificador, referencia biométrica y atención opcionales |
 | Institución | `Clinic` / `Clinics` | Centro de salud |
-| Personal | `ClinicalStaff` / `ClinicalStaff` | Personal clínico; cuenta opcional |
-| Afiliación | `ClinicStaffAffiliation` / `ClinicStaffAffiliations` | Une clínica y personal (muchos a muchos) |
-| Atención | `ClinicalEncounter` / `ClinicalEncounters` | Consulta, urgencia o atención prehospitalaria; paciente opcional inicialmente |
-| Equipo | `EncounterStaffAssignment` / `EncounterStaffAssignments` | Personal asignado a una atención |
-| Triaje | `TriageAssessment` / `TriageAssessments` | Evaluaciones por atención; no obligatorio en consultas |
-| Mediciones | `VitalSign` / `VitalSigns` | Atención obligatoria; triaje opcional de esa misma atención |
-| Notas | `ClinicalNote` / `ClinicalNotes` | Texto clínico por atención y autor |
-| Diagnóstico | `EncounterDiagnosis` / `EncounterDiagnoses` | Diagnósticos por atención, con sistema y código opcionales |
-| Procedimiento | `ClinicalProcedure` / `ClinicalProcedures` | Intervenciones por atención, ejecutor, estado y resultado |
-| Resultado | `ClinicalResult` / `ClinicalResults` | Atención; procedimiento opcional de esa misma atención |
-| Documento | `ClinicalDocument` / `ClinicalDocuments` | Paciente, atención o ambos; solo metadata de almacenamiento |
-| Transporte | `Ambulance` / `Ambulances` | Unidad; clínica propietaria opcional |
-| Traslado | `ClinicalTransfer` / `ClinicalTransfers` | Atención, origen, destino y ambulancia |
-| Catálogo | `Medication` / `Medications` | Medicamento asignable a recetas, historial y administraciones |
-| Receta | `Prescription` / `Prescriptions` | Paciente, atención y prescriptor |
-| Receta | `PrescriptionItem` / `PrescriptionItems` | Medicamento, indicaciones y cantidades prescritas por receta |
-| Administración | `MedicationAdministration` / `MedicationAdministrations` | Dosis administrada, atención y personal; funciona en atención NN |
+| Personal | `ClinicalStaff` / `ClinicalStaffMembers` | Personal clínico; cuenta opcional |
+| Personal | `ClinicStaffAffiliation` / `ClinicStaffAffiliations` | Periodos de trabajo clínica ↔ personal |
+| Atención | `ClinicalEncounter` / `ClinicalEncounters` | Paciente opcional (NN), clínica, ambulancia |
+| Atención | `EncounterStaffAssignment` / `EncounterStaffAssignments` | Periodos de participación y función |
+| Atención | `Triage` / `Triages` | N reevaluaciones por atención |
+| Atención | `VitalSign` / `VitalSigns` | N mediciones; triage opcional de la misma atención |
+| Atención | `ClinicalNote` / `ClinicalNotes` | Valoración, evolución, prehospitalaria, alta… |
+| Atención | `Diagnosis` / `Diagnoses` | Presuntivo o definitivo; código opcional |
+| Atención | `ClinicalProcedure` / `ClinicalProcedures` | Planificado → en curso → completado / cancelado |
+| Atención | `ClinicalResult` / `ClinicalResults` | Procedimiento opcional de la misma atención |
+| Medicación | `Medication` / `Medications` | Catálogo |
+| Medicación | `Prescription` / `Prescriptions` | Atención (paciente derivado) y prescriptor |
+| Medicación | `PrescriptionDetail` / `PrescriptionDetails` | Medicamento, dosis, vía, frecuencia, duración |
+| Medicación | `MedicationAdministration` / `MedicationAdministrations` | Dosis real; receta opcional de la misma atención |
+| Transporte | `Ambulance` / `Ambulances` | Unidad; clínica base opcional |
+| Transporte | `ClinicalTransfer` / `ClinicalTransfers` | Atención, origen, destino, ambulancia, responsables |
+| Documentos | `ClinicalDocument` / `ClinicalDocuments` | Exactamente un dueño: paciente **o** atención |
+| Auditoría | `ClinicalAuditEntry` / `ClinicalAuditEntries` | Sin FKs; actor usuario, sistema o dispositivo |
 
-## Flujo NN
+Todas las relaciones usan `ON DELETE RESTRICT`.
 
-1. Crear `ClinicalEncounter` sin paciente. Se genera `NN-<Guid>` y el estado es
-   `Unidentified`. La clínica puede quedar vacía durante atención prehospitalaria.
-2. Registrar la atención usando su `Id`: notas, signos, intervenciones,
-   resultados, documentos y medicamentos administrados.
-3. Resolver la identidad por el mecanismo correspondiente. Un resultado
-   biométrico se registra como intento; no vincula por sí solo a la persona.
-4. Invocar `IdentifyPatient(patientId, staffId, fechaUtc)` y agregar la entrada de
-   auditoría en el mismo `SaveChanges`/transacción. No crear otra atención ni mover
-   sus registros. Resolver cualquier `DbUpdateConcurrencyException` revisando
-   la vinculación existente, sin sobrescribirla automáticamente.
-5. Una ficha provisional puede asociarse con estado `Provisional`; para confirmar
-   la misma persona se usa `IdentifyPatient`. Una corrección de persona equivocada
-   exige un flujo aparte de revisión y auditoría.
+## Flujos principales
 
-## Archivos clínicos
+**Paciente conocido.** `ClinicalEncounter.CreateForPatient(patientId, tipo, inicio, clinicId…)`. No genera
+código NN.
 
-`ClinicalDocument` contiene `FileName`, `BlobPath`, `ContentType`, `SizeBytes`,
-`Type`, `Status`, `ChecksumSha256`, fechas y autor. El backend genera la ruta del
-objeto y calcula su hash. La base no almacena archivos binarios ni URLs públicas
-permanentes. La descarga autorizada y el manejo de cargas fallidas pertenecen
-al servicio de documentos, aún pendiente.
+**Paciente NN.**
+1. `ClinicalEncounter.CreateUnidentified(Emergency | Prehospital, inicio…)` genera `NN-<32 hex>` único.
+2. Se registra todo sobre la atención: triage, signos, notas, procedimientos, resultados, documentos,
+   medicación administrada e incluso recetas.
+3. La identidad se resuelve (QR, cédula, huella, rostro, manual) y cada intento queda en
+   `IdentificationAttempt`. Un intento exitoso no vincula la atención por sí solo.
+4. `IdentifyPatient(patientId, staffId, fechaUtc)` vincula la misma atención y conserva el código NN. Guardar
+   en la misma transacción una `ClinicalAuditEntry`. Si hay `DbUpdateConcurrencyException`, revisar la
+   vinculación existente; nunca sobrescribirla.
 
-Las reglas adoptadas y las comprobaciones que quedan para Application se
-detallan en [ADR-005](../adr/ADR-005-clinical-model.md).
+**Traslado.** `ClinicalTransfer.Request → Dispatch → Receive → Complete` (o `Cancel` antes de recibir).
+Application cambia en la misma transacción el estado de la atención (`Transferred`, `Received`).
+
+## Restricciones principales
+
+| Tipo | Restricción |
+|---|---|
+| Único filtrado | `UX_PatientIdentifiers_ActiveValue`: cédula/pasaporte/QR/código interno activos por tipo + emisor + valor |
+| Único filtrado | `UX_PatientIdentifiers_ActivePrimary`: un principal activo por paciente y tipo |
+| Único filtrado | `UX_ClinicStaffAffiliations_Active`, `UX_EncounterStaffAssignments_Active`: un periodo abierto |
+| Único | `TemporaryPatientCode`, `BlobPath`, `FacilityCode`, licencia, código de ambulancia, código de medicamento, `IdentityUserId` de paciente y personal, `(PatientId, Version)` del historial, referencia biométrica por proveedor |
+| CHECK | Identificación NN, clínica obligatoria salvo prehospital, fin de atención coherente con estado |
+| CHECK | Traslado: origen ≠ destino, fechas ordenadas, responsables y ciclo de vida |
+| CHECK | Documento: un solo dueño, tamaño > 0, checksum SHA-256, ciclo de vida |
+| CHECK | Intento de identificación: resultado/paciente/motivo, evidencia según método, actor obligatorio |
+| CHECK | Auditoría: actor según tipo, motivo solo en fallos |
+| CHECK | Signos vitales: valor plausible y unidad canónica por tipo |
+| CHECK | Un CHECK de valores permitidos por cada columna enum |
+| FK compuesta | Signo vital → triage, resultado → procedimiento, administración → receta / detalle, intento → identificador / referencia biométrica |
+
+## Almacenamiento
+
+- Archivos: solo metadata y `BlobPath` en PostgreSQL; el archivo vive en object storage (ADR-004).
+- Biometría: solo la referencia del proveedor; nunca imágenes, huellas ni plantillas.
+- Auditoría: `ChangesJson` en `jsonb`, con datos sensibles redactados antes de escribir.
