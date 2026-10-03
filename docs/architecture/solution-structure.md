@@ -59,8 +59,10 @@ Acceso a datos con EF Core y PostgreSQL (Npgsql).
 
 - `Contexts/IdentityDbContext.cs`: ASP.NET Core Identity, schema `identity`.
 - `Contexts/ClinicalDbContext.cs`: datos clínicos, schema `clinical`.
+- `Configurations/Clinical/`: una `IEntityTypeConfiguration<T>` por entidad clínica ([detalle](clinical-entities.md)).
 - `Identity/Models/ApplicationUser.cs`: cuenta autenticable (`IdentityUser<Guid>`).
 - `Migrations/Identity/`: migraciones de `IdentityDbContext` (existe `InitialIdentity`).
+- `Migrations/Clinical/`: migraciones de `ClinicalDbContext` (existe `InitialClinical`).
 - Registro de dependencias: `DependencyInjection.AddPersistence(configuration)`. Lee la cadena `ConnectionStrings:SciPhDatabase`.
 
 ### SCI-PH.Infrastructure (`src/Infrastructure`)

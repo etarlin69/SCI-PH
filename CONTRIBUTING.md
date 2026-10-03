@@ -61,11 +61,14 @@ Los cambios que alteren estas reglas, los contratos de API o el modelo de datos 
 - Revisa la migración generada antes de subirla.
 - No edites migraciones que ya estén en `develop`; crea una nueva.
 - Si dos PRs agregan migraciones al mismo contexto, el segundo debe regenerar la suya después de integrar el primero.
+- Escribe el SQL de `HasCheckConstraint` y `HasFilter` en una sola línea (usa `Configurations/Sql.cs`); un texto multilínea cambia entre LF y CRLF y genera cambios pendientes falsos.
+- Antes de subir, el modelo no debe tener cambios pendientes (el test `MigrationSnapshotMatchesTheModel` también lo comprueba).
 
 Ejemplo:
 
 ```bash
 dotnet ef migrations add <Nombre> --context ClinicalDbContext --project src/Infrastructure/SCI-PH.Persistence --startup-project src/Presentation/SCI-PH.Web.BFF --output-dir Migrations/Clinical
+dotnet ef migrations has-pending-model-changes --context ClinicalDbContext --project src/Infrastructure/SCI-PH.Persistence --startup-project src/Presentation/SCI-PH.Web.BFF
 ```
 
 ## Secretos y configuración
