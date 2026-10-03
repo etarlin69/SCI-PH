@@ -17,6 +17,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      DOTNET_NOLOGO: "true"
+      # PostgreSQL 17 tests (Testcontainers) must run in CI: without Docker they fail instead of being skipped.
+      SCIPH_REQUIRE_DOCKER: "true"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,6 +31,9 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Restore tools
+        run: dotnet tool restore
+
       - name: Restore
         run: dotnet restore SCI-PH.sln
 
@@ -34,3 +42,12 @@ jobs:
 
       - name: Test
         run: dotnet test SCI-PH.sln --no-build --configuration Release --verbosity normal
+
+      # Fails when an entity or configuration changed without its migration.
+      # The connection string only lets the startup host build; no database is contacted.
+      - name: Migration consistency
+        env:
+          ConnectionStrings__SciPhDatabase: "Host=localhost;Database=sciph_ci_model_check;Username=ci"
+        run: |
+          dotnet ef migrations has-pending-model-changes --context IdentityDbContext --project src/Infrastructure/SCI-PH.Persistence --startup-project src/Presentation/SCI-PH.Web.BFF --configuration Release --no-build
+          dotnet ef migrations has-pending-model-changes --context ClinicalDbContext --project src/Infrastructure/SCI-PH.Persistence --startup-project src/Presentation/SCI-PH.Web.BFF --configuration Release --no-build

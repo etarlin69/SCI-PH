@@ -8,7 +8,7 @@
 - **Proyecto:** `SCI-PH.Web.BFF`
 - **Prefijo:** `/api/web`
 - **Formato:** JSON. Los errores se devuelven como `application/problem+json` (ProblemDetails).
-- **Autenticación:** pendiente de definir en un ADR. Todos los endpoints requerirán un usuario autenticado; los de `/api/web/admin` requerirán además un rol administrativo.
+- **Autenticación:** JWT Bearer según [ADR-006](../adr/ADR-006-identity-security.md). El refresh token viaja solo en la cookie HttpOnly `__Host-sciph-refresh`; login, `mfa/verify`, refresh y logout exigen la cabecera `X-SCIPH-CSRF: 1`. Todos los endpoints requieren un usuario autenticado salvo los de sesión y recuperación de cuenta; los de `/api/web/admin` requieren además el permiso correspondiente. Endpoints en `/api/web/auth` ([detalle](../architecture/security.md#endpoints)).
 
 ## Web Hospital — contratos iniciales previstos
 
@@ -62,22 +62,28 @@ Registra que el establecimiento del usuario recibió al paciente del traslado `{
 
 ## Web Administration — contratos iniciales previstos
 
-> **ESTOS ENDPOINTS SON CONTRATOS PREVISTOS Y TODAVÍA NO ESTÁN IMPLEMENTADOS.**
-> Pueden evolucionar mediante revisión arquitectónica.
+> Los endpoints marcados **Implementado** existen; el resto son contratos previstos que pueden evolucionar
+> mediante revisión arquitectónica. Detalle de seguridad en [security.md](../architecture/security.md#endpoints).
 
 - **Prefijo:** `/api/web/admin`
-- **Autorización:** usuario autenticado con rol administrativo. El catálogo de roles y permisos lo define el Rol 3.
+- **Autorización:** permiso específico por endpoint (`Users.Manage`, `Accounts.InvitePatient`, `Devices.Manage`, `Audit.Read`).
 - **Paginación (propuesta):** los listados aceptan `page` y `pageSize` y devuelven `{ "items": [...], "page": 1, "pageSize": 20, "total": 0 }`.
 
 | Método | Ruta | Descripción | Estado |
 |---|---|---|---|
-| `GET` | `/api/web/admin/users` | Lista cuentas de usuario | Previsto |
-| `GET` | `/api/web/admin/users/{id}` | Detalle de una cuenta | Previsto |
-| `POST` | `/api/web/admin/users` | Crea una cuenta | Previsto |
-| `PUT` | `/api/web/admin/users/{id}/roles` | Reemplaza los roles de una cuenta | Previsto |
-| `GET` | `/api/web/admin/roles` | Lista los roles disponibles | Previsto |
+| `GET` | `/api/web/admin/users` | Lista cuentas de usuario | Implementado |
+| `GET` | `/api/web/admin/users/{id}` | Detalle de una cuenta | Implementado |
+| `POST` | `/api/web/admin/users/{id}/activate` · `/deactivate` · `/revoke-sessions` | Estado y sesiones de una cuenta | Implementado |
+| `PUT` | `/api/web/admin/users/{id}/roles` | Reemplaza los roles de una cuenta | Implementado |
+| `POST` | `/api/web/admin/invitations/patients` · `/staff` | Invita a un paciente o a personal existente | Implementado |
+| `POST` | `/api/web/admin/invitations/{id}/reissue` · `/revoke` | Reemite o revoca una invitación | Implementado |
+| `GET` | `/api/web/admin/roles` | Lista los roles y sus permisos | Implementado |
 | `GET` | `/api/web/admin/audit` | Consulta el registro de auditoría | Previsto |
-| `GET` | `/api/web/admin/devices` | Lista los dispositivos ESP32 registrados | Previsto |
+| `GET` · `POST` | `/api/web/admin/devices` | Lista o registra dispositivos ESP32 | Implementado |
+| `POST` | `/api/web/admin/devices/{id}/rotate-secret` · `/revoke` | Rota la clave o revoca un dispositivo | Implementado |
+
+No existe `POST /api/web/admin/users`: las cuentas se crean por **invitación** a un `Patient` o `ClinicalStaff`
+existente (ver [ADR-006](../adr/ADR-006-identity-security.md), decisión 3).
 
 Estos endpoints gestionan **cuentas** (`ApplicationUser`, schema `identity`), no pacientes.
 
@@ -85,9 +91,9 @@ Estos endpoints gestionan **cuentas** (`ApplicationUser`, schema `identity`), no
 
 ### `GET /api/web/admin/users`
 
-**Query (propuesta):** `page`, `pageSize`, `search` (nombre o correo), `role`, `isActive`.
+**Query:** `search` (correo o usuario), `page` (desde 1), `pageSize` (1–100, 20 por defecto).
 
-**Respuesta `200 OK` (forma propuesta):**
+**Respuesta `200 OK`:**
 
 ```json
 {
@@ -96,8 +102,13 @@ Estos endpoints gestionan **cuentas** (`ApplicationUser`, schema `identity`), no
       "id": "00000000-0000-0000-0000-000000000000",
       "userName": "…",
       "email": "…",
+      "emailConfirmed": true,
+      "isActive": true,
+      "twoFactorEnabled": false,
+      "lockedOutUntilUtc": null,
       "roles": ["…"],
-      "isActive": true
+      "createdAtUtc": "2026-01-01T00:00:00Z",
+      "lastLoginAtUtc": null
     }
   ],
   "page": 1,
@@ -106,40 +117,13 @@ Estos endpoints gestionan **cuentas** (`ApplicationUser`, schema `identity`), no
 }
 ```
 
-**Errores previstos:** `401`, `403`.
+**Errores:** `401`, `403`.
 
 ---
 
 ### `GET /api/web/admin/users/{id}`
 
-**Respuesta `200 OK`:** mismos campos que un elemento del listado, más datos de auditoría básicos (fecha de creación, último acceso) cuando estén disponibles.
-
-**Errores previstos:** `401`, `403`, `404`.
-
----
-
-### `POST /api/web/admin/users`
-
-Crea una cuenta. La forma de entregar la credencial inicial (invitación, contraseña temporal u otra) la define el ADR de autenticación; **este contrato no incluye contraseñas**.
-
-**Body (forma propuesta):**
-
-```json
-{
-  "userName": "…",
-  "email": "…",
-  "roles": ["…"]
-}
-```
-
-**Respuestas previstas:**
-
-| Código | Cuándo |
-|---|---|
-| `201 Created` | Cuenta creada; cabecera `Location` con `/api/web/admin/users/{id}` |
-| `400` | Datos inválidos (ProblemDetails de validación) |
-| `401` / `403` | No autenticado / sin permiso |
-| `409 Conflict` | Ya existe una cuenta con ese usuario o correo |
+**Respuesta `200 OK`:** un elemento del listado. **Errores:** `401`, `403`, `404`.
 
 ---
 
@@ -155,23 +139,26 @@ Reemplaza el conjunto completo de roles de la cuenta.
 }
 ```
 
-**Respuestas previstas:** `204 No Content`, `400` (rol inexistente), `401`, `403`, `404`.
+**Respuestas:** `204 No Content`, `400` (rol inexistente o `Patient` combinado con otro rol), `401`, `403`, `404`,
+`409` (quitarse el propio rol de administrador o dejar el sistema sin administradores activos).
 
-Cada cambio de roles debe quedar registrado en la auditoría.
+Cada cambio de roles revoca las sesiones de la cuenta y queda en la auditoría (`RoleChanged`, con el actor).
 
 ---
 
 ### `GET /api/web/admin/roles`
 
-**Respuesta `200 OK` (forma propuesta):**
+Requiere el permiso `Users.Manage`.
+
+**Respuesta `200 OK`:**
 
 ```json
 [
-  { "name": "…", "description": "…" }
+  { "name": "Doctor", "permissions": ["Patients.Read", "…"] }
 ]
 ```
 
-**Errores previstos:** `401`, `403`.
+**Errores:** `401` (sin autenticar), `403` (sin permiso).
 
 ---
 
@@ -207,29 +194,29 @@ El registro de auditoría es de solo lectura. Su modelo lo define el Rol 3.
 
 ### `GET /api/web/admin/devices`
 
-Lista los dispositivos ESP32 + R307 que usan el Device API.
+Lista los dispositivos registrados (permiso `Devices.Manage`). Nunca incluye claves.
 
-**Query (propuesta):** `page`, `pageSize`, `isOnline`.
-
-**Respuesta `200 OK` (forma propuesta):**
+**Respuesta `200 OK`:**
 
 ```json
-{
-  "items": [
-    {
-      "deviceId": "…",
-      "location": "…",
-      "firmwareVersion": "0.0.0",
-      "lastHeartbeatAt": "2026-01-01T00:00:00Z",
-      "isOnline": true
-    }
-  ],
-  "page": 1,
-  "pageSize": 20,
-  "total": 0
-}
+[
+  {
+    "id": "…",
+    "deviceCode": "ESP32-001",
+    "name": "…",
+    "scopes": ["Device.Heartbeat"],
+    "status": 1,
+    "firmwareVersion": "0.0.0",
+    "createdAtUtc": "2026-01-01T00:00:00Z",
+    "lastSeenAtUtc": "2026-01-01T00:00:00Z",
+    "rotatedAtUtc": null,
+    "revokedAtUtc": null
+  }
+]
 ```
 
-`lastHeartbeatAt` proviene de `POST /api/device/heartbeat` (ver [device-api-contracts.md](device-api-contracts.md)). El alta y la revocación de dispositivos se documentarán junto con el ADR de autenticación de dispositivos.
+`lastSeenAtUtc` y `firmwareVersion` provienen de `POST /api/device/heartbeat`. `POST /api/web/admin/devices`
+(`deviceCode`, `name`, `scopes`) y `POST /{id}/rotate-secret` devuelven `{ id, deviceCode, secret }`: la clave
+se muestra **una sola vez**. Ver [ADR-007](../adr/ADR-007-device-authentication.md).
 
-**Errores previstos:** `401`, `403`.
+**Errores:** `400` (scopes), `401`, `403`, `404`, `409` (código duplicado).

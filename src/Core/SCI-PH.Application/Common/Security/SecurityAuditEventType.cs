@@ -1,0 +1,40 @@
+namespace SCI_PH.Application.Common.Security
+{
+    public enum SecurityAuditEventType
+    {
+        LoginSucceeded = 1,
+        LoginFailed = 2,
+        AccountLocked = 3,
+        RefreshSucceeded = 4,
+        RefreshFailed = 5,
+        RefreshTokenReuseDetected = 6,
+        Logout = 7,
+        PasswordChanged = 8,
+        PasswordChangeFailed = 9,
+        SessionsRevoked = 10,
+        AccountActivated = 11,
+        AccountDeactivated = 12,
+        RoleChanged = 13,
+        PermissionChanged = 14,
+        AccountInvitationCreated = 15,
+        AccountInvitationAccepted = 16,
+        AccountInvitationRevoked = 17,
+        AccountActivationFailed = 18,
+        EmailConfirmationRequested = 19,
+        EmailConfirmed = 20,
+        PasswordResetRequested = 21,
+        PasswordResetSucceeded = 22,
+        PasswordResetFailed = 23,
+        MfaSetupStarted = 24,
+        MfaEnabled = 25,
+        MfaDisabled = 26,
+        MfaSucceeded = 27,
+        MfaFailed = 28,
+        RecoveryCodeUsed = 29,
+        RecoveryCodesRegenerated = 30,
+        DeviceProvisioned = 31,
+        DeviceSecretRotated = 32,
+        DeviceRevoked = 33,
+        DeviceAuthenticationFailed = 34
+    }
+}

@@ -46,9 +46,9 @@ Las dependencias apuntan siempre **hacia el centro** (Domain). Una capa interna 
 |---|---|
 | Domain | Ninguno |
 | Application | Abstracciones de `Microsoft.Extensions.*`. Librerías de validación o mediación solo mediante ADR. |
-| Persistence | EF Core, Npgsql, Identity.EntityFrameworkCore |
-| Infrastructure | Azure SDK, clientes de OCR/IA/biometría, abstracciones de `Microsoft.Extensions.*` |
-| BFF / Device API | ASP.NET Core, OpenAPI, autenticación |
+| Persistence | EF Core, Npgsql, Identity.EntityFrameworkCore, framework ASP.NET Core (tokens de Identity y Data Protection) |
+| Infrastructure | Azure SDK, clientes de OCR/IA/biometría, abstracciones de `Microsoft.Extensions.*`, framework ASP.NET Core y JwtBearer (JWT, esquema de dispositivo, CORS, rate limiting y OpenAPI compartidos por los hosts, ver [ADR-006](../adr/ADR-006-identity-security.md)), MailKit |
+| BFF / Device API | ASP.NET Core, OpenAPI, composición de la autenticación (`AddJwtSecurity`, `UseAuthentication`) |
 
 ## Identity vs. Patient
 

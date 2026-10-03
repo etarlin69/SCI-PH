@@ -1,5 +1,6 @@
 using SCI_PH.Application;
 using SCI_PH.Infrastructure;
+using SCI_PH.Infrastructure.Web;
 using SCI_PH.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,11 +11,14 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => options.AddBearerSecurity());
 
-builder.Services.AddApplication();
+// La app MAUI no es un navegador: no usa CORS ni cookies; guarda el refresh token en SecureStorage.
+builder.Services.AddApplication().AddAccountSecurity();
 builder.Services.AddPersistence(builder.Configuration);
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration)
+    .AddJwtSecurity(builder.Configuration)
+    .AddSecurityRateLimiting(builder.Configuration);
 
 var app = builder.Build();
 
@@ -26,7 +30,7 @@ app.UseStatusCodePages();
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
-    app.MapOpenApi();
+    app.MapOpenApi().AllowAnonymous();
 }
 else
 {
@@ -35,7 +39,12 @@ else
     app.UseHttpsRedirection();
 }
 
-app.MapControllers();
-app.MapHealthChecks("/health");
+app.UseApiSecurityHeaders();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
 
-app.Run();
+app.MapControllers();
+app.MapHealthChecks("/health").AllowAnonymous();
+
+await app.RunAsync();
