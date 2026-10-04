@@ -1,0 +1,91 @@
+[
+    {
+        "id": "MED001",
+        "nombre": "Ibuprofeno",
+        "codigo": "IBU-001",
+        "categoria": "Analgésico",
+        "disponible": true
+    },
+    {
+        "id": "MED002",
+        "nombre": "Paracetamol",
+        "codigo": "PAR-002",
+        "categoria": "Analgésico",
+        "disponible": true
+    },
+    {
+        "id": "MED003",
+        "nombre": "Amoxicilina",
+        "codigo": "AMX-003",
+        "categoria": "Antibiótico",
+        "disponible": false,
+        "enUso": true
+    },
+    {
+        "id": "MED004",
+        "nombre": "Adrenalina",
+        "codigo": "ADR-004",
+        "categoria": "Vasopresor",
+        "disponible": true,
+        "enUso": true
+    },
+    {
+        "id": "MED005",
+        "nombre": "Salbutamol",
+        "codigo": "SAL-005",
+        "categoria": "Broncodilatador",
+        "disponible": true,
+        "enUso": true
+    },
+    {
+        "id": "MED006",
+        "nombre": "Nitroglicerina",
+        "codigo": "NIT-006",
+        "categoria": "Vasodilatador",
+        "disponible": true
+    },
+    {
+        "id": "MED007",
+        "nombre": "Ácido acetilsalicílico",
+        "codigo": "AAS-007",
+        "categoria": "Antiagregante",
+        "disponible": true,
+        "enUso": true
+    },
+    {
+        "id": "MED008",
+        "nombre": "Diazepam",
+        "codigo": "DZP-008",
+        "categoria": "Anticonvulsivante",
+        "disponible": true
+    },
+    {
+        "id": "MED009",
+        "nombre": "Naloxona",
+        "codigo": "NAL-009",
+        "categoria": "Antídoto",
+        "disponible": true
+    },
+    {
+        "id": "MED010",
+        "nombre": "Solución salina 0.9 %",
+        "codigo": "SSN-010",
+        "categoria": "Solución intravenosa",
+        "disponible": true,
+        "enUso": true
+    },
+    {
+        "id": "MED011",
+        "nombre": "Ketorolaco",
+        "codigo": "KTR-011",
+        "categoria": "Analgésico",
+        "disponible": false
+    },
+    {
+        "id": "MED012",
+        "nombre": "Amiodarona",
+        "codigo": "AMD-012",
+        "categoria": "Antiarrítmico",
+        "disponible": true
+    }
+]
