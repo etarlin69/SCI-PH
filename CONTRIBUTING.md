@@ -61,11 +61,18 @@ Los cambios que alteren estas reglas, los contratos de API o el modelo de datos 
 - Revisa la migración generada antes de subirla.
 - No edites migraciones que ya estén en `develop`; crea una nueva.
 - Si dos PRs agregan migraciones al mismo contexto, el segundo debe regenerar la suya después de integrar el primero.
+- Escribe el SQL de `HasCheckConstraint` y `HasFilter` en una sola línea (usa `Configurations/Sql.cs`); un texto multilínea cambia entre LF y CRLF y genera cambios pendientes falsos.
+- Antes de subir, el modelo no debe tener cambios pendientes (el test `MigrationSnapshotMatchesTheModel` y el CI también lo comprueban).
+- Usa `dotnet tool restore` para obtener `dotnet-ef` 9.0.9 del manifiesto (`.config/dotnet-tools.json`).
+- Las pruebas de migraciones y de seguridad sobre PostgreSQL 17 usan Testcontainers: con Docker activo se ejecutan con `dotnet test`;
+  sin Docker se omiten localmente. En CI son obligatorias (`SCIPH_REQUIRE_DOCKER=true`).
 
 Ejemplo:
 
 ```bash
 dotnet ef migrations add <Nombre> --context ClinicalDbContext --project src/Infrastructure/SCI-PH.Persistence --startup-project src/Presentation/SCI-PH.Web.BFF --output-dir Migrations/Clinical
+dotnet ef migrations has-pending-model-changes --context ClinicalDbContext --project src/Infrastructure/SCI-PH.Persistence --startup-project src/Presentation/SCI-PH.Web.BFF
+dotnet ef migrations has-pending-model-changes --context IdentityDbContext --project src/Infrastructure/SCI-PH.Persistence --startup-project src/Presentation/SCI-PH.Web.BFF
 ```
 
 ## Secretos y configuración

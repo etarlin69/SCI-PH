@@ -83,7 +83,7 @@ Este documento explica qué puede empezar a hacer cada rol **ahora**, sobre la a
 **Puede empezar ahora**
 - Definir el catálogo de roles y permisos (quién puede hacer qué en Web, Mobile y Device).
 - Diseñar el modelo de auditoría (qué se registra, dónde y por cuánto tiempo).
-- Proponer el ADR de autenticación. **JWT no se implementa hasta que el ADR esté aprobado.**
+- Revisar y aprobar [ADR-006](../adr/ADR-006-identity-security.md) (cuentas, sesiones, MFA, invitaciones) y [ADR-007](../adr/ADR-007-device-authentication.md) (dispositivos), propuestos junto con su implementación en `feature/security-foundation`.
 - Extender `ApplicationUser` si hace falta, con migración en `Migrations/Identity`.
 
 **No hace**

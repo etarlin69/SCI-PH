@@ -1,0 +1,4 @@
+# Normaliza los archivos de texto a LF dentro del repositorio; cada copia local usa su propio fin de línea.
+# Aun así, el SQL de los CHECK de EF Core se escribe en una sola línea para que el modelo sea idéntico
+# en checkouts LF y CRLF (ver docs/adr/ADR-005-clinical-model.md).
+* text=auto
