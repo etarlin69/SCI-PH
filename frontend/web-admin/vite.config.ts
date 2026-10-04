@@ -1,7 +1,11 @@
-import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
-})
+    plugins: [react()],
+    build: {
+        // El chunk diferido del Dashboard (React.lazy en App.tsx) incluye Recharts: ~590 kB sin comprimir, ~173 kB gzip.
+        // El chunk inicial queda en ~210 kB.
+        chunkSizeWarningLimit: 600,
+    },
+});
