@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<Shell
-    x:Class="SCI_PH.Mobile.App.AppShell"
-    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:SCI_PH.Mobile.App"
-    Title="SCI_PH.Mobile.App">
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:views="clr-namespace:SCI_PH.Mobile.App.Views"
+       x:Class="SCI_PH.Mobile.App.AppShell"
+       ForegroundColor="White"
+       BackgroundColor="#112336">
 
-    <ShellContent
-        Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
-        Route="MainPage" />
+    <!-- La página inicial con la que arranca la app -->
+    <ShellContent ContentTemplate="{DataTemplate views:LoginPage}"
+                  Route="LoginPage" />
 
 </Shell>

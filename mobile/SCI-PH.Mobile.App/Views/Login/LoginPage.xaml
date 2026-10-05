@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="SCI_PH.Mobile.App.Views.LoginPage"
+             BackgroundColor="{StaticResource AppBackground}"
+             Shell.NavBarIsVisible="False">
+
+    <Grid Padding="20">
+        <!-- Tarjeta Central -->
+        <Border BackgroundColor="{StaticResource SurfaceWhite}"
+                Stroke="{StaticResource BorderLight}"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 12"
+                VerticalOptions="Center"
+                Padding="30">
+            
+            <Border.Shadow>
+                <Shadow Brush="Black" Offset="0,4" Radius="10" Opacity="0.05" />
+            </Border.Shadow>
+
+            <VerticalStackLayout Spacing="25">
+                
+                <!-- Logo Header (Simulando el logo superior izquierdo) -->
+                <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                    <Border BackgroundColor="{StaticResource BrandNavy}" 
+                            StrokeShape="RoundRectangle 8" 
+                            WidthRequest="40" HeightRequest="40" 
+                            Padding="8">
+                        <Label Text="M" FontFamily="MaterialIcons" FontSize="24" TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <!-- Nota: Reemplazar la "M" por tu icono font-icon de pulso médico -->
+                    </Border>
+                    <Label Text="SCI-PH" FontFamily="OpenSansSemibold" FontSize="26" TextColor="{StaticResource BrandNavy}" VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+
+                <Label Text="Acceso Paramédico" FontSize="16" TextColor="{StaticResource TextSecondary}" HorizontalOptions="Center" Margin="0,-15,0,10"/>
+
+                <!-- Controles de Entrada -->
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="Usuario o Cédula" FontSize="14" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold" Margin="0,0,0,-10"/>
+                    <Border Stroke="{StaticResource BorderLight}" StrokeThickness="1" StrokeShape="RoundRectangle 8" BackgroundColor="White" Padding="10,0">
+                        <Entry Placeholder="ej. 00112345678" Text="{Binding Identifier}" TextColor="{StaticResource TextPrimary}" ClearButtonVisibility="WhileEditing" BorderColor="Transparent" />
+                    </Border>
+
+                    <Label Text="Contraseña" FontSize="14" TextColor="{StaticResource TextPrimary}" FontAttributes="Bold" Margin="0,0,0,-10"/>
+                    <Border Stroke="{StaticResource BorderLight}" StrokeThickness="1" StrokeShape="RoundRectangle 8" BackgroundColor="White" Padding="10,0">
+                        <Entry IsPassword="True" Placeholder="••••••••" Text="{Binding Password}" TextColor="{StaticResource TextPrimary}" BorderColor="Transparent"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <Label IsVisible="{Binding ErrorMessage, Converter={IsStringNotNullOrEmptyConverter}}" 
+                       Text="{Binding ErrorMessage}" 
+                       TextColor="{StaticResource ErrorRed}" 
+                       FontSize="13" HorizontalOptions="Center"/>
+
+                <!-- Botón Principal alineado al estilo del dashboard web -->
+                <Button Command="{Binding LoginCommand}" 
+                        IsEnabled="{Binding IsBusy, Converter={InvertedBoolConverter}}" 
+                        Text="Iniciar sesión" 
+                        BackgroundColor="{StaticResource BrandBlue}" 
+                        TextColor="{StaticResource TextInverse}" 
+                        FontFamily="OpenSansSemibold"
+                        CornerRadius="8"
+                        HeightRequest="48"
+                        Margin="0,10,0,0"/>
+
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource BrandBlue}" HorizontalOptions="Center"/>
+                
+            </VerticalStackLayout>
+        </Border>
+    </Grid>
+</ContentPage>

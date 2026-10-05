@@ -27,6 +27,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+  
+  web:
+    build:
+      context: ./web-admin
+      dockerfile: Dockerfile.dev
+    image: web-admin:latest
+    container_name: sci-ph-frotend
+    ports:
+      - "8080:80"
+    environment:
+      - NODE_ENV=development
 
 volumes:
   postgres_data:
