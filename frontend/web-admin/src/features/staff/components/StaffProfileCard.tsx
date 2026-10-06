@@ -1,43 +1,22 @@
 import { Link } from 'react-router-dom';
-import type { StaffMember, User } from '../../../types';
+import type { StaffMember } from '../../../types';
 import { Card, DetailList } from '../../../components/shared';
-import { formatDMY, formatDateTimeText } from '../../../utils/dates';
-
-const ACCOUNT_STATE: Record<User['estado'], string> = {
-  Activo: 'activa',
-  Pendiente: 'pendiente',
-  Suspendido: 'suspendida',
-  Inactivo: 'inactiva',
-};
+import { formatDMY } from '../../../utils/dates';
 
 export interface StaffProfileCardProps {
   member: StaffMember;
   clinicName: string;
-  account?: User | null;
-  canViewUsers: boolean;
 }
 
 /** Tarjeta "Información" + "Cuenta de acceso" del perfil laboral. */
-export function StaffProfileCard({ member: m, clinicName, account, canViewUsers }: StaffProfileCardProps) {
+export function StaffProfileCard({ member: m, clinicName }: StaffProfileCardProps) {
   let accountNode;
   if (m.cuenta.estado === 'vinculada') {
     accountNode = (
       <div className="flex flex-col gap-1">
         <span>
-          <span className="font-mono">{m.cuenta.userId}</span>
-          {account && ` · rol ${account.rol}`}
+          <span className="font-mono">{m.cuenta.userId}</span> <span className="text-xs text-ink-muted">(cuenta ficticia de demostración)</span>
         </span>
-        {account && (
-          <span className="text-xs text-ink-muted">
-            Cuenta {ACCOUNT_STATE[account.estado]} · MFA {account.mfaActivo ? 'activado' : 'pendiente'} · último acceso{' '}
-            {formatDateTimeText(account.ultimoAcceso)}
-          </span>
-        )}
-        {canViewUsers && (
-          <Link to={`/admin/usuarios/${m.cuenta.userId}`} className="w-fit text-[13px] font-semibold text-primary-600 hover:underline">
-            Ver usuario y sesiones
-          </Link>
-        )}
       </div>
     );
   } else if (m.cuenta.estado === 'pendiente') {

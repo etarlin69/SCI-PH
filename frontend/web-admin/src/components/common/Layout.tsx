@@ -9,21 +9,17 @@ import { PageMetaProvider, usePageMeta } from './PageMeta';
 import { Sidebar } from './Sidebar';
 import { findNavEntry } from './navigation';
 
-export interface LayoutProps {
-  mockData?: boolean;
-}
-
 /** Estructura general: Sidebar (rail/completo) o menú desplegable en móvil + Header + `<Outlet />`. */
-export function Layout(props: LayoutProps) {
+export function Layout() {
   return (
     <PageMetaProvider>
-      <LayoutInner {...props} />
+      <LayoutInner />
     </PageMetaProvider>
   );
 }
 
-function LayoutInner({ mockData = true }: LayoutProps) {
-  const { user, can, logout } = useAuth();
+function LayoutInner() {
+  const { user, canAny, logout } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
@@ -48,7 +44,7 @@ function LayoutInner({ mockData = true }: LayoutProps) {
     navigate('/login', { replace: true });
   };
 
-  const sidebarProps = { user, canRead: (m: Parameters<typeof can>[0]) => can(m, 'read'), onLogout: () => void handleLogout() };
+  const sidebarProps = { user, canAny, onLogout: () => void handleLogout() };
 
   return (
     <div className="flex min-h-screen bg-surface-ground">
@@ -65,11 +61,20 @@ function LayoutInner({ mockData = true }: LayoutProps) {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header
           crumbs={crumbs}
-          environmentLabel={mockData ? 'Datos de prueba' : undefined}
+          environmentLabel={entry?.demo ? 'Datos de demostración' : undefined}
           onMenuClick={() => setMenuOpen(true)}
           menuOpen={menuOpen}
         />
         <main id="main" tabIndex={-1} className="flex-1 px-4 pb-8 pt-5 focus:outline-none sm:px-6 sm:pt-6 lg:px-8 lg:pt-7">
+          {entry?.demo && (
+            <p
+              role="note"
+              className="mb-5 rounded-lg border border-warning-500/40 bg-warning-50 px-3.5 py-2.5 text-[13px] text-warning-700"
+            >
+              <strong className="font-semibold">Pantalla de demostración.</strong> Muestra datos ficticios: este módulo aún no
+              tiene API en el backend y nada de lo que hagas aquí se guarda.
+            </p>
+          )}
           <Outlet />
         </main>
       </div>

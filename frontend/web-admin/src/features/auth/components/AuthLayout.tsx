@@ -21,9 +21,9 @@ export function AuthLayout({ children, footer }: AuthLayoutProps) {
           </span>
         </div>
         <div className="flex max-w-md flex-col gap-4">
-          <h2 className="text-3xl font-semibold leading-tight text-white">Portal de Administración y Analítica</h2>
+          <h2 className="text-3xl font-semibold leading-tight text-white">Plataforma web SCI-PH</h2>
           <p className="text-[15px] leading-relaxed text-[#9FB0C3]">
-            Usuarios, roles, catálogos, auditoría y analítica operativa de la red prehospitalaria y hospitalaria.
+            Acceso del personal hospitalario y de administración de la red prehospitalaria y hospitalaria.
           </p>
         </div>
         <p className="flex items-center gap-2 text-[13px] text-[#9FB0C3]">
@@ -39,7 +39,7 @@ export function AuthLayout({ children, footer }: AuthLayoutProps) {
           </span>
           <span className="flex flex-col">
             <span className="text-base font-bold tracking-[0.04em] text-ink">SCI-PH</span>
-            <span className="text-xs text-ink-muted">Administración y Analítica</span>
+            <span className="text-xs text-ink-muted">Sistema Clínico Inteligente</span>
           </span>
         </div>
         <div className="w-full max-w-[420px] rounded-2xl border border-line bg-white px-5 py-7 shadow-[0_8px_24px_rgba(13,31,51,0.06)] sm:px-8 sm:py-9">

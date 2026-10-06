@@ -1,213 +1,169 @@
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Mail, Pencil, PauseCircle, PlayCircle, Trash2, UserX } from 'lucide-react';
-import { useAuth, useCan } from '../../../auth';
-import { useBreadcrumb } from '../../../components/common';
-import { Avatar, Button, ConfirmDialog, EmptyState, ErrorState, LoadingSpinner, useToast } from '../../../components/shared';
+import { useParams } from 'react-router-dom';
+import { KeyRound, LogOut, Power, PowerOff } from 'lucide-react';
+import { useAuth, type SecurityRole } from '../../../auth';
+import { Button, Card, ConfirmDialog, DetailList, ErrorState, LoadingSpinner, PageHeader, useToast } from '../../../components/shared';
 import { useAsync } from '../../../hooks/useAsync';
-import { errorMessage, isServiceError, rolesService, usersService } from '../../../services';
-import type { User } from '../../../types';
-import { DeleteUserDialog } from '../components/DeleteUserDialog';
-import { UserActivityList } from '../components/UserActivityList';
-import { UserFormModal } from '../components/UserFormModal';
-import { UserSecurityPanel } from '../components/UserSecurityPanel';
-import { UserSessionsCard } from '../components/UserSessionsCard';
-import { UserStatusBadge } from '../components/UserStatusBadge';
-import { UserStatusDialog } from '../components/UserStatusDialog';
-import { UserSummaryCard } from '../components/UserSummaryCard';
+import { formatUtcDateTime } from '../../../utils/dates';
+import { MfaBadge, RoleList, UserStatusBadges, describeUserAdminError, isLockedOut } from '../components/UserBadges';
+import { UserRolesModal } from '../components/UserRolesModal';
+import { usersService } from '../services/usersService';
 
-/** Ficha de usuario (`/admin/usuarios/:id`): cuenta, seguridad, sesiones activas y actividad reciente. */
+type Pending = 'activate' | 'deactivate' | 'revoke' | null;
+
+const CONFIRM: Record<Exclude<Pending, null>, { title: string; message: string; label: string; tone: 'danger' | 'primary' }> = {
+  deactivate: {
+    title: 'Desactivar cuenta',
+    message: 'La cuenta no podrá iniciar sesión y se cerrarán sus sesiones abiertas. Podrás reactivarla más tarde.',
+    label: 'Desactivar',
+    tone: 'danger',
+  },
+  activate: { title: 'Reactivar cuenta', message: 'La cuenta podrá volver a iniciar sesión.', label: 'Reactivar', tone: 'primary' },
+  revoke: {
+    title: 'Cerrar todas las sesiones',
+    message: 'Se invalidarán las sesiones abiertas de esta cuenta en todos los dispositivos.',
+    label: 'Cerrar sesiones',
+    tone: 'danger',
+  },
+};
+
+/** Detalle de una cuenta (`/admin/usuarios/:id`): estado, roles y sesiones. */
 export function UserDetailPage() {
   const { id = '' } = useParams();
-  const navigate = useNavigate();
-  const toast = useToast();
   const { user: me } = useAuth();
-  const canUpdate = useCan('users', 'update');
-  const canDelete = useCan('users', 'delete');
-  const canViewStaff = useCan('staff', 'read');
+  const toast = useToast();
+  const q = useAsync(() => usersService.get(id), [id]);
+  const [pending, setPending] = useState<Pending>(null);
+  const [rolesOpen, setRolesOpen] = useState(false);
+  const [savingRoles, setSavingRoles] = useState(false);
+  const [rolesError, setRolesError] = useState<string | null>(null);
 
-  const userQ = useAsync(() => usersService.get(id), [id]);
-  const rolesQ = useAsync(() => rolesService.list());
-  const user = userQ.data;
-  useBreadcrumb(user?.nombre);
+  const user = q.data;
+  const isSelf = !!user && user.id === me?.id;
 
-  const [editOpen, setEditOpen] = useState(false);
-  const [statusTarget, setStatusTarget] = useState<User | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
-  const [resetOpen, setResetOpen] = useState(false);
-  const [securityKey, setSecurityKey] = useState(0);
+  const runAction = async () => {
+    if (!user || !pending) return;
+    try {
+      if (pending === 'activate') await usersService.activate(user.id);
+      else if (pending === 'deactivate') await usersService.deactivate(user.id);
+      else await usersService.revokeSessions(user.id);
+      toast({ title: CONFIRM[pending].title, description: user.userName, tone: 'success' });
+      q.reload();
+    } catch (e) {
+      toast({ title: 'No se pudo completar la acción', description: describeUserAdminError(e), tone: 'error' });
+    } finally {
+      setPending(null);
+    }
+  };
 
-  if (userQ.loading) {
+  const saveRoles = async (roles: SecurityRole[]) => {
+    if (!user) return;
+    setSavingRoles(true);
+    setRolesError(null);
+    try {
+      await usersService.setRoles(user.id, roles);
+      toast({ title: 'Roles actualizados', description: user.userName, tone: 'success' });
+      setRolesOpen(false);
+      q.reload();
+    } catch (e) {
+      setRolesError(describeUserAdminError(e));
+    } finally {
+      setSavingRoles(false);
+    }
+  };
+
+  if (q.loading && !user) {
     return (
-      <div className="flex justify-center py-24">
-        <LoadingSpinner size="lg" label="Cargando usuario…" />
+      <div className="flex justify-center py-16">
+        <LoadingSpinner label="Cargando cuenta…" />
       </div>
     );
   }
-  if (userQ.error || !user) {
-    return userQ.error?.includes('no existe') ? (
-      <EmptyState
-        icon={UserX}
-        titleAs="h1"
-        title="Usuario no encontrado"
-        description="La cuenta no existe o fue eliminada. Su historial sigue disponible en Auditoría."
-        action={
-          <Link to="/admin/usuarios" className="font-semibold text-primary-600 hover:underline">
-            Volver a Usuarios
-          </Link>
-        }
-      />
-    ) : (
-      <ErrorState title="No se pudo cargar el usuario" message={userQ.error ?? ''} onRetry={userQ.reload} />
+  if (q.error || !user) {
+    return (
+      <div className="flex flex-col gap-5">
+        <PageHeader title="Cuenta" back={{ to: '/admin/usuarios', label: 'Usuarios' }} />
+        <ErrorState message={q.error ?? 'La cuenta no existe.'} onRetry={q.reload} />
+      </div>
     );
   }
-
-  const self = user.id === me?.id;
-  const suspended = user.estado === 'Suspendido';
-
-  const toggleStatus = async (u: User) => {
-    try {
-      userQ.setData(await usersService.setStatus(u.id, suspended ? 'Activo' : 'Suspendido'));
-      toast({
-        title: suspended ? 'Usuario reactivado' : 'Usuario suspendido',
-        description: suspended ? undefined : 'Se cerraron sus sesiones activas.',
-        tone: 'success',
-      });
-    } catch (e) {
-      toast({ title: 'No se pudo cambiar el estado', description: errorMessage(e), tone: 'error' });
-    } finally {
-      setStatusTarget(null);
-    }
-  };
-
-  const remove = async (u: User) => {
-    try {
-      await usersService.remove(u.id);
-      toast({ title: 'Cuenta eliminada', description: `${u.nombre}. Su historial de auditoría se conserva.`, tone: 'success' });
-      navigate('/admin/usuarios', { replace: true });
-    } catch (e) {
-      toast({ title: 'No se pudo eliminar', description: errorMessage(e), tone: 'error' });
-      setDeleteTarget(null);
-    }
-  };
-
-  const sendReset = async () => {
-    try {
-      await usersService.sendPasswordReset(user.id);
-      setSecurityKey((k) => k + 1);
-      toast({ title: 'Enlace enviado', description: `Restablecimiento enviado a ${user.email}.`, tone: 'success' });
-    } catch (e) {
-      toast({
-        title: isServiceError(e, 'RATE_LIMITED') ? 'Espera unos minutos' : 'No se pudo enviar el enlace',
-        description: errorMessage(e),
-        tone: 'error',
-      });
-    } finally {
-      setResetOpen(false);
-    }
-  };
 
   return (
     <div className="flex flex-col gap-5">
-      <Link to="/admin/usuarios" className="w-fit text-[13px] font-medium text-primary-600 hover:underline">
-        ← Usuarios
-      </Link>
-
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 items-center gap-4">
-          <Avatar name={user.nombre} size="lg" />
-          <div className="flex min-w-0 flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="truncate text-xl font-semibold text-ink sm:text-2xl">{user.nombre}</h1>
-              <UserStatusBadge estado={user.estado} />
-              {self && <span className="rounded bg-primary-100 px-1.5 text-[11px] font-semibold text-primary-600">Tú</span>}
-            </div>
-            <p className="break-all text-[13px] text-ink-muted">
-              {user.email} · {user.rol} · <span className="font-mono">{user.id}</span>
-            </p>
-          </div>
-        </div>
-        {canUpdate && (
+      <PageHeader
+        title={user.userName}
+        description={user.email ?? undefined}
+        back={{ to: '/admin/usuarios', label: 'Usuarios' }}
+        meta={<UserStatusBadges user={user} />}
+        actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" leftIcon={<Pencil size={16} aria-hidden="true" />} onClick={() => setEditOpen(true)}>
-              Editar
+            <Button variant="secondary" leftIcon={<KeyRound size={16} aria-hidden="true" />} onClick={() => setRolesOpen(true)}>
+              Roles
             </Button>
-            <Button variant="secondary" leftIcon={<Mail size={16} aria-hidden="true" />} onClick={() => setResetOpen(true)}>
-              Restablecer contraseña
+            <Button variant="secondary" leftIcon={<LogOut size={16} aria-hidden="true" />} onClick={() => setPending('revoke')}>
+              Cerrar sesiones
             </Button>
-            <Button
-              variant={suspended ? 'secondary' : 'danger'}
-              leftIcon={suspended ? <PlayCircle size={16} aria-hidden="true" /> : <PauseCircle size={16} aria-hidden="true" />}
-              onClick={() => setStatusTarget(user)}
-              disabled={self}
-              title={self ? 'No puedes suspender tu propia cuenta' : undefined}
-            >
-              {suspended ? 'Reactivar' : 'Suspender'}
-            </Button>
-            {canDelete && (
-              <Button
-                variant="ghost"
-                leftIcon={<Trash2 size={16} aria-hidden="true" />}
-                onClick={() => setDeleteTarget(user)}
-                disabled={self}
-                title={self ? 'No puedes eliminar tu propia cuenta' : undefined}
-              >
-                Eliminar
+            {user.isActive ? (
+              <Button variant="danger" leftIcon={<PowerOff size={16} aria-hidden="true" />} onClick={() => setPending('deactivate')}>
+                Desactivar
+              </Button>
+            ) : (
+              <Button leftIcon={<Power size={16} aria-hidden="true" />} onClick={() => setPending('activate')}>
+                Reactivar
               </Button>
             )}
           </div>
-        )}
-      </header>
+        }
+      />
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <UserSummaryCard user={user} canViewStaff={canViewStaff} />
-        <UserSecurityPanel
-          key={securityKey}
-          user={user}
-          canUpdate={canUpdate}
-          onMfaReset={() => userQ.setData((u) => (u ? { ...u, mfaActivo: false } : u))}
+      {isSelf && (
+        <p role="note" className="rounded-lg border border-warning-500/40 bg-warning-50 px-3.5 py-2.5 text-[13px] text-warning-700">
+          Es tu propia cuenta: cualquier cambio cerrará también tu sesión actual.
+        </p>
+      )}
+
+      <Card title="Cuenta">
+        <DetailList
+          items={[
+            { label: 'Usuario', value: user.userName },
+            { label: 'Email', value: user.email ?? '—' },
+            { label: 'Email confirmado', value: user.emailConfirmed ? 'Sí' : 'No' },
+            { label: 'Verificación en dos pasos', value: <MfaBadge enabled={user.twoFactorEnabled} /> },
+            { label: 'Roles', value: <RoleList roles={user.roles} /> },
+            {
+              label: 'Bloqueo por intentos fallidos',
+              value: isLockedOut(user) ? `Hasta ${formatUtcDateTime(user.lockedOutUntilUtc)}` : 'No',
+            },
+            { label: 'Creada', value: formatUtcDateTime(user.createdAtUtc) },
+            { label: 'Último acceso', value: formatUtcDateTime(user.lastLoginAtUtc) },
+            { label: 'Id', value: user.id, mono: true },
+          ]}
         />
-        <div className="xl:col-span-2">
-          <UserSessionsCard user={user} canUpdate={canUpdate && !suspended} />
-        </div>
-        <div className="xl:col-span-2">
-          <UserActivityList userId={user.id} email={user.email} />
-        </div>
-      </div>
+      </Card>
 
-      <UserFormModal
-        open={editOpen}
-        user={user}
-        roles={rolesQ.data ?? []}
-        emailEditable={false}
-        onClose={() => setEditOpen(false)}
-        onCreate={(input) => usersService.create(input)}
-        onUpdate={(uid, input) => usersService.update(uid, input)}
-        onSaved={(u) => {
-          setEditOpen(false);
-          userQ.setData(u);
-          toast({ title: 'Cambios guardados', description: u.nombre, tone: 'success' });
+      <UserRolesModal
+        open={rolesOpen}
+        userName={user.userName}
+        currentRoles={user.roles}
+        saving={savingRoles}
+        error={rolesError}
+        onSave={(roles) => void saveRoles(roles)}
+        onClose={() => {
+          setRolesOpen(false);
+          setRolesError(null);
         }}
       />
-      <ConfirmDialog
-        open={resetOpen}
-        tone="primary"
-        title="¿Restablecer la contraseña?"
-        message={`Se enviará un enlace de un solo uso a ${user.email}. La contraseña nunca se muestra ni se envía en claro.`}
-        confirmLabel="Enviar enlace"
-        onConfirm={sendReset}
-        onCancel={() => setResetOpen(false)}
-      />
-      <UserStatusDialog user={statusTarget} onConfirm={toggleStatus} onCancel={() => setStatusTarget(null)} />
-      <DeleteUserDialog
-        user={deleteTarget}
-        onConfirm={remove}
-        onCancel={() => setDeleteTarget(null)}
-        onSuspendInstead={(u) => {
-          setDeleteTarget(null);
-          setStatusTarget(u);
-        }}
-      />
+      {pending && (
+        <ConfirmDialog
+          open
+          title={CONFIRM[pending].title}
+          message={CONFIRM[pending].message}
+          confirmLabel={CONFIRM[pending].label}
+          tone={CONFIRM[pending].tone}
+          onConfirm={runAction}
+          onCancel={() => setPending(null)}
+        />
+      )}
     </div>
   );
 }

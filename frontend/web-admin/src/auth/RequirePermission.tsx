@@ -1,32 +1,21 @@
 import type { ReactNode } from 'react';
 import { Outlet } from 'react-router-dom';
 import { ForbiddenPage } from '../features/auth/pages/ForbiddenPage';
-import type { ModuleKey, PermissionAction } from '../types';
 import { useAuth } from './AuthContext';
+import type { Permission } from './permissions';
 
-const MODULE_SLUG: Record<ModuleKey, string> = {
-  auth: 'autenticacion',
-  dashboard: 'dashboard',
-  users: 'usuarios',
-  roles: 'roles',
-  invitations: 'invitaciones',
-  devices: 'dispositivos',
-  clinics: 'clinicas',
-  staff: 'personal',
-  catalogs: 'catalogos',
-  audit: 'auditoria',
-};
-const ACTION_LABEL: Record<PermissionAction, string> = { read: 'leer', create: 'crear', update: 'actualizar', delete: 'eliminar' };
-
-export interface RequirePermissionProps {
-  module: ModuleKey;
-  action?: PermissionAction;
+export type RequirePermissionProps = {
   children?: ReactNode;
-}
+} & ({ permission: Permission; anyOf?: never } | { anyOf: readonly Permission[]; permission?: never });
 
-/** Muestra la pantalla 403 (manteniendo la URL) si el rol no tiene el permiso. */
-export function RequirePermission({ module, action = 'read', children }: RequirePermissionProps) {
-  const { can } = useAuth();
-  if (!can(module, action)) return <ForbiddenPage missingPermission={`${MODULE_SLUG[module]}:${ACTION_LABEL[action]}`} />;
+/**
+ * Muestra el 403 (sin cambiar la URL ni cerrar la sesión) si el usuario no tiene el permiso. Solo es UX:
+ * el backend vuelve a autorizar cada petición.
+ */
+export function RequirePermission({ permission, anyOf, children }: RequirePermissionProps) {
+  const { can, canAny } = useAuth();
+  const required = permission ? [permission] : (anyOf ?? []);
+  const allowed = permission ? can(permission) : canAny(required);
+  if (!allowed) return <ForbiddenPage missingPermissions={required} />;
   return children ? <>{children}</> : <Outlet />;
 }

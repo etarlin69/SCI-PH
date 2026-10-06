@@ -1,3 +1,7 @@
+import { ApiError, NetworkError, describeApiError } from '../../api';
+
+// ServiceError solo lo lanzan los servicios DEMO (mock) que aún no tienen API en el backend.
+// Las llamadas reales al Web BFF lanzan ApiError (src/api) con el ProblemDetails original.
 export type ServiceErrorCode =
   | 'NETWORK'
   | 'SERVER'
@@ -6,12 +10,7 @@ export type ServiceErrorCode =
   | 'CONFLICT'
   | 'VALIDATION'
   | 'RATE_LIMITED'
-  | 'IN_USE'
-  | 'INVALID_CREDENTIALS'
-  | 'ACCOUNT_LOCKED'
-  | 'INVALID_CODE'
-  | 'TOKEN_EXPIRED'
-  | 'PASSWORD_REUSED';
+  | 'IN_USE';
 
 /** Error normalizado de la capa de servicios. */
 export class ServiceError extends Error {
@@ -32,6 +31,7 @@ export function isServiceError(e: unknown, code?: ServiceErrorCode): e is Servic
 
 /** Mensaje legible para mostrar en banners y toasts. */
 export function errorMessage(e: unknown): string {
+  if (e instanceof ApiError || e instanceof NetworkError) return describeApiError(e);
   if (e instanceof ServiceError) return e.message;
   if (e instanceof Error) return e.message;
   return 'Ha ocurrido un error inesperado.';

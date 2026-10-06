@@ -1,5 +1,4 @@
 export * from './components/CapacityBar';
-export * from './components/ClinicDevicesTab';
 export * from './components/ClinicFilters';
 export * from './components/ClinicFormModal';
 export * from './components/ClinicServicesPanel';

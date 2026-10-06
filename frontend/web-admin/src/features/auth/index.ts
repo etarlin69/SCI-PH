@@ -1,6 +1,7 @@
 export * from './components/AuthAlert';
 export * from './components/AuthLayout';
-export * from './components/DemoCredentialsHint';
+export * from './components/LinkStatus';
+export * from './components/NewPasswordForm';
 export * from './components/OtpInput';
 export * from './components/PasswordInput';
 export * from './components/PasswordStrengthMeter';
@@ -13,5 +14,3 @@ export { ForbiddenPage } from './pages/ForbiddenPage';
 export { NotFoundPage } from './pages/NotFoundPage';
 export { ActivateAccountPage } from './pages/ActivateAccountPage';
 export { ConfirmEmailPage } from './pages/ConfirmEmailPage';
-export * from './hooks/useAuth';
-export { authService } from './services/authService';

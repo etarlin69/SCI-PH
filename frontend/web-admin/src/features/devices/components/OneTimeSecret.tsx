@@ -49,7 +49,7 @@ export function OneTimeSecret({ secret, expired = false }: OneTimeSecretProps) {
       )}
       <p className="flex items-start gap-2 rounded-lg bg-warning-50 px-3 py-2 text-xs leading-snug text-warning-700">
         <AlertTriangle size={14} className="mt-px shrink-0" aria-hidden="true" />
-        <span>No volverá a mostrarse. Si se pierde, rota la credencial desde el detalle del dispositivo.</span>
+        <span>No volverá a mostrarse. Guárdalo ahora en el dispositivo. Si se pierde, rota la clave desde la lista de dispositivos.</span>
       </p>
     </div>
   );

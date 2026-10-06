@@ -1,5 +1,5 @@
-import { CLINICS_MOCK, CLINIC_SERVICES_MOCK, DEVICES_MOCK, PROVINCIAS, STAFF_MOCK } from '../../../data/mock';
-import type { Clinic, ClinicInput, ClinicService, ClinicStatus, Device, StaffMember } from '../../../types';
+import { CLINICS_MOCK, CLINIC_SERVICES_MOCK, PROVINCIAS, STAFF_MOCK } from '../../../data/mock';
+import type { Clinic, ClinicInput, ClinicService, ClinicStatus, StaffMember } from '../../../types';
 import { ServiceError } from '../../../services/core/errors';
 import { mockList, mockRead, mockWrite, nextId, notFound } from '../../../services/core/mock';
 import { record } from '../../audit/services/auditService';
@@ -11,7 +11,8 @@ function withCounts(c: Clinic): Clinic {
   return {
     ...c,
     personal: STAFF_MOCK.filter((s) => s.clinicId === c.id).length,
-    dispositivos: DEVICES_MOCK.filter((d) => d.clinicId === c.id && d.estado !== 'Revocado').length,
+    // DEMO: los dispositivos reales (Device API) no se asocian a clínicas en el backend.
+    dispositivos: 0,
   };
 }
 
@@ -124,7 +125,4 @@ export const clinicsService = {
     return mockList(() => STAFF_MOCK.filter((s) => s.clinicId === clinicId));
   },
 
-  listDevices(clinicId: string): Promise<Device[]> {
-    return mockList(() => DEVICES_MOCK.filter((d) => d.clinicId === clinicId));
-  },
 };

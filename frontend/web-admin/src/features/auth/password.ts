@@ -1,6 +1,12 @@
-import type { PasswordRule, PasswordStrength } from '../../types';
+export interface PasswordRule {
+  id: string;
+  label: string;
+  test: (password: string) => boolean;
+}
 
-/** Política de contraseñas del portal (misma que valida el backend). */
+export type PasswordStrength = 0 | 1 | 2 | 3 | 4;
+
+/** Política de contraseñas: espejo de IdentityPolicy (10 caracteres, mayúscula, minúscula, dígito y símbolo). El backend la valida de nuevo. */
 export const PASSWORD_RULES: PasswordRule[] = [
   { id: 'length', label: 'Mínimo 10 caracteres', test: (v) => v.length >= 10 },
   { id: 'upper', label: 'Una mayúscula', test: (v) => /[A-ZÁÉÍÓÚÑ]/.test(v) },

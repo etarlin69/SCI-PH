@@ -189,7 +189,7 @@ export function ClinicFormModal({ open, clinic, takenNames = [], onClose, onSave
           required
           type="email"
           autoComplete="off"
-          placeholder="clinica@scih.com"
+          placeholder="clinica@sci-ph.test"
           error={errors.email?.message}
           {...register('email')}
         />

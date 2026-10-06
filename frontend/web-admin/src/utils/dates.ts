@@ -120,3 +120,10 @@ export function formatRelative(dt: string | null | undefined, now = new Date()):
   if (days < 30) return `Hace ${days} ${days === 1 ? 'día' : 'días'}`;
   return formatDMY(date);
 }
+
+/** Instante ISO-8601 (UTC del backend) en hora local, formato corto. `—` si no hay valor. */
+export function formatUtcDateTime(value: string | null | undefined): string {
+  if (!value) return '—';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat('es-DO', { dateStyle: 'short', timeStyle: 'short' }).format(d);
+}

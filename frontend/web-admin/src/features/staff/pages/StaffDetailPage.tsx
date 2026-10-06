@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AlertTriangle, Pencil, Trash2, UserX } from 'lucide-react';
-import { useCan } from '../../../auth';
+import { INVITABLE_STAFF_ROLES, useCanAny } from '../../../auth';
+import { DEMO_ADMIN_PERMISSIONS } from '../../../components/common/navigation';
 import { useBreadcrumb } from '../../../components/common';
 import { Avatar, Button, Card, EmptyState, ErrorState, LoadingSpinner, Tabs, tabIds, useToast } from '../../../components/shared';
 import { useAsync } from '../../../hooks/useAsync';
-import { clinicsService, errorMessage, licenseStatus, rolesService, staffService, usersService } from '../../../services';
+import { clinicsService, errorMessage, licenseStatus, staffService } from '../../../services';
 import type { License, StaffMember } from '../../../types';
 import { AssignmentModal } from '../components/AssignmentModal';
 import { AssignmentsTab } from '../components/AssignmentsTab';
@@ -24,22 +25,15 @@ const UNITS = ['Unidad AMB-07', 'Unidad AMB-12'];
 export function StaffDetailPage() {
   const { id = '' } = useParams();
   const toast = useToast();
-  const canUpdate = useCan('staff', 'update');
-  const canDelete = useCan('staff', 'delete');
-  const canViewUsers = useCan('users', 'read');
+  const canUpdate = useCanAny(DEMO_ADMIN_PERMISSIONS);
+  const canDelete = useCanAny(DEMO_ADMIN_PERMISSIONS);
 
   const memberQ = useAsync(() => staffService.get(id), [id]);
   const assignQ = useAsync(() => staffService.listAssignments(id), [id]);
   const licQ = useAsync(() => staffService.listLicenses(id), [id]);
   const histQ = useAsync(() => staffService.listHistory(id), [id]);
   const clinicsQ = useAsync(() => clinicsService.options());
-  const rolesQ = useAsync(() => rolesService.list().catch(() => []));
   const member = memberQ.data;
-  const linkedUserId = member?.cuenta.estado === 'vinculada' ? member.cuenta.userId : null;
-  const accountQ = useAsync(
-    () => (linkedUserId && canViewUsers ? usersService.get(linkedUserId).catch(() => null) : Promise.resolve(null)),
-    [linkedUserId],
-  );
   useBreadcrumb(member?.nombre);
 
   const [tab, setTab] = useState<Tab>('asignaciones');
@@ -96,7 +90,7 @@ export function StaffDetailPage() {
   const ids = tabIds('staff-detail', tab);
   const accountText =
     member.cuenta.estado === 'vinculada'
-      ? `Vinculado a la cuenta ${member.cuenta.userId}${accountQ.data ? ` (rol ${accountQ.data.rol})` : ''}. Su acceso se gestiona en Usuarios.`
+      ? `Vinculado a la cuenta ${member.cuenta.userId}. Su acceso se gestiona en Usuarios.`
       : member.cuenta.estado === 'pendiente'
         ? 'Invitación de acceso pendiente. Puedes reenviarla desde Invitaciones.'
         : 'Sin acceso al sistema. Puedes invitarle desde Invitaciones.';
@@ -153,7 +147,7 @@ export function StaffDetailPage() {
       </header>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_2fr]">
-        <StaffProfileCard member={member} clinicName={clinicName} account={accountQ.data} canViewUsers={canViewUsers} />
+        <StaffProfileCard member={member} clinicName={clinicName} />
         <Card padding="none" className="overflow-hidden">
           <div className="border-b border-line px-4 pt-2 sm:px-6">
             <Tabs<Tab>
@@ -201,7 +195,7 @@ export function StaffDetailPage() {
         open={editOpen}
         member={member}
         clinics={clinics}
-        roles={rolesQ.data ?? []}
+        roles={INVITABLE_STAFF_ROLES}
         accountText={accountText}
         onClose={() => setEditOpen(false)}
         onSubmit={(input) => staffService.update(member.id, input)}

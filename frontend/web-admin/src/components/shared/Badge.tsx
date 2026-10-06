@@ -4,12 +4,9 @@ import type {
   AuditResult,
   CatalogStatus,
   ClinicStatus,
-  DeviceStatus,
-  InvitationStatus,
   LicenseStatus,
   StaffStatus,
   TransferStatus,
-  UserStatus,
 } from '../../types';
 import { cn } from '../../utils/cn';
 
@@ -47,26 +44,6 @@ export function Badge({ tone = 'neutral', dot = true, children, className }: Bad
 }
 
 /** Tonos estándar por estado (mismo criterio que el canvas: suspendido/revocado en gris o rojo, pendiente en ámbar). */
-export const USER_STATUS_TONE: Record<UserStatus, BadgeTone> = {
-  Activo: 'success',
-  Pendiente: 'warning',
-  Suspendido: 'neutral',
-  Inactivo: 'neutral',
-};
-
-export const INVITATION_STATUS_TONE: Record<InvitationStatus, BadgeTone> = {
-  Pendiente: 'warning',
-  Aceptada: 'success',
-  Expirada: 'neutral',
-  Revocada: 'danger',
-};
-
-export const DEVICE_STATUS_TONE: Record<DeviceStatus, BadgeTone> = {
-  Activo: 'success',
-  Pendiente: 'warning',
-  Revocado: 'danger',
-};
-
 export const CLINIC_STATUS_TONE: Record<ClinicStatus, BadgeTone> = {
   Activa: 'success',
   Inactiva: 'neutral',

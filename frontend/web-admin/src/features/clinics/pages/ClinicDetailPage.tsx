@@ -3,11 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Ban, Building2, CheckCircle2, Info, MapPin, Pencil, Trash2 } from 'lucide-react';
 import type { Clinic } from '../../../types';
 import { clinicsService, isServiceError } from '../../../services';
-import { useCan } from '../../../auth';
+import { useCanAny } from '../../../auth';
+import { DEMO_ADMIN_PERMISSIONS } from '../../../components/common/navigation';
 import { useBreadcrumb } from '../../../components/common';
 import { Button, Card, DetailList, EmptyState, ErrorState, LoadingSpinner, PageHeader, Tabs, tabIds } from '../../../components/shared';
 import { useAsync } from '../../../hooks/useAsync';
-import { ClinicDevicesTab } from '../components/ClinicDevicesTab';
 import { ClinicFormModal } from '../components/ClinicFormModal';
 import { ClinicServicesPanel } from '../components/ClinicServicesPanel';
 import { ClinicStaffTab } from '../components/ClinicStaffTab';
@@ -15,15 +15,15 @@ import { ClinicStatusBadge } from '../components/ClinicStatusBadge';
 import { ClinicStatusDialog } from '../components/ClinicStatusDialog';
 import { DeleteClinicDialog } from '../components/DeleteClinicDialog';
 
-type TabKey = 'personal' | 'dispositivos' | 'servicios';
+type TabKey = 'personal' | 'servicios';
 const TAB_PREFIX = 'clinic-resources';
 
 /** Ficha de una clínica: datos de contacto, estado y pestañas de Personal, Dispositivos y Servicios. */
 export function ClinicDetailPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const canUpdate = useCan('clinics', 'update');
-  const canDelete = useCan('clinics', 'delete');
+  const canUpdate = useCanAny(DEMO_ADMIN_PERMISSIONS);
+  const canDelete = useCanAny(DEMO_ADMIN_PERMISSIONS);
 
   // NOT_FOUND → `null` (404 con EmptyState); el resto de errores, ErrorState con Reintentar.
   const {
@@ -90,7 +90,6 @@ export function ClinicDetailPage() {
   const active = clinic.estado === 'Activa';
   const tabs = [
     { value: 'personal' as const, label: 'Personal', count: clinic.personal },
-    { value: 'dispositivos' as const, label: 'Dispositivos', count: clinic.dispositivos },
     { value: 'servicios' as const, label: 'Servicios' },
   ];
   const ids = tabIds(TAB_PREFIX, tab);
@@ -208,7 +207,6 @@ export function ClinicDetailPage() {
         </div>
         <div id={ids.panel} role="tabpanel" aria-labelledby={ids.tab} className="p-4 sm:p-5">
           {tab === 'personal' && <ClinicStaffTab clinicId={clinic.id} />}
-          {tab === 'dispositivos' && <ClinicDevicesTab clinicId={clinic.id} />}
           {tab === 'servicios' && <ClinicServicesPanel clinicId={clinic.id} canUpdate={canUpdate} />}
         </div>
       </Card>

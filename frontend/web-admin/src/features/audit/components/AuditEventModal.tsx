@@ -5,6 +5,7 @@ import { formatAuditTimestamp } from '../auditFilters';
 import { AuditActionTag } from './AuditActionTag';
 import { AuditChangesTable } from './AuditChangesTable';
 import { AuditResultBadge } from './AuditResultBadge';
+import { roleLabel } from '../../../auth';
 
 export interface AuditEventModalProps {
   /** Evento a mostrar; `null` cierra el modal. */
@@ -74,7 +75,7 @@ export function AuditEventModal({ event, onClose, mobile = false }: AuditEventMo
                 label: 'Usuario',
                 value: (
                   <>
-                    <strong className="font-semibold">{event.usuario}</strong> · {event.email} · {event.rol}
+                    <strong className="font-semibold">{event.usuario}</strong> · {event.email} · {roleLabel(event.rol)}
                   </>
                 ),
               },

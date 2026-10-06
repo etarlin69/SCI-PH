@@ -6,18 +6,18 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, MailCheck } from 'lucide-react';
 import { Button, Input } from '../../../components/shared';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
-import { authService, isServiceError } from '../../../services';
+import { describeApiError, isApiError } from '../../../api';
+import { authApi } from '../../../auth';
 import { AuthAlert } from '../components/AuthAlert';
 import { AuthLayout } from '../components/AuthLayout';
-import { DemoCredentialsHint } from '../components/DemoCredentialsHint';
 import { EMAIL_PATTERN } from '../password';
 
 const schema = z.object({
-  email: z.string().trim().min(1, 'Escribe tu email.').regex(EMAIL_PATTERN, 'Formato de email inválido. Ejemplo: nombre@scih.com'),
+  email: z.string().trim().min(1, 'Escribe tu email.').regex(EMAIL_PATTERN, 'Formato de email inválido. Ejemplo: nombre@ejemplo.org'),
 });
 type FormValues = z.infer<typeof schema>;
 
-/** Solicitud de enlace de restablecimiento. */
+/** Solicitud de enlace de restablecimiento. El backend responde 202 genérico exista o no la cuenta. */
 export function ForgotPasswordPage() {
   useDocumentTitle('Recuperar contraseña');
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -32,17 +32,18 @@ export function ForgotPasswordPage() {
   const send = async (email: string) => {
     setBanner(null);
     try {
-      await authService.requestPasswordReset(email);
+      await authApi.forgotPassword(email);
       setSentTo(email);
     } catch (e) {
-      if (isServiceError(e, 'RATE_LIMITED'))
-        setBanner({ title: 'Demasiadas solicitudes', body: 'Espera unos minutos antes de pedir otro enlace.' });
-      else setBanner({ title: 'No pudimos enviar el enlace', body: 'Comprueba tu conexión e inténtalo de nuevo.' });
+      setBanner({
+        title: isApiError(e, 429) ? 'Demasiadas solicitudes' : 'No pudimos procesar la solicitud',
+        body: describeApiError(e),
+      });
     }
   };
 
   return (
-    <AuthLayout footer={<DemoCredentialsHint variant="reset" />}>
+    <AuthLayout>
       <div className="flex flex-col gap-5">
         <Link to="/login" className="inline-flex w-fit items-center gap-1.5 text-[13px] font-semibold text-primary-600 hover:underline">
           <ArrowLeft size={14} aria-hidden="true" />
@@ -57,7 +58,7 @@ export function ForgotPasswordPage() {
             <h1 className="text-2xl font-semibold text-ink">Revisa tu correo</h1>
             <p className="text-sm text-ink-3">
               Si existe una cuenta asociada a <strong className="break-all">{sentTo}</strong>, recibirás un enlace para restablecer la
-              contraseña. El enlace caduca en 30 minutos y solo se puede usar una vez.
+              contraseña. El enlace caduca y solo se puede usar una vez.
             </p>
             <p className="text-[13px] text-ink-muted">¿No llega? Revisa la carpeta de spam o solicita otro enlace.</p>
             {banner && (
@@ -77,9 +78,6 @@ export function ForgotPasswordPage() {
             >
               Reenviar enlace
             </Button>
-            <Link to="/reset-password?token=demo" className="text-center text-[13px] font-semibold text-primary-600 hover:underline">
-              Abrir enlace del correo (prototipo)
-            </Link>
           </div>
         ) : (
           <form noValidate onSubmit={handleSubmit((v) => send(v.email.trim()))} className="flex flex-col gap-5">

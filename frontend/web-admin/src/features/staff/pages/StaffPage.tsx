@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, SearchX, UsersRound } from 'lucide-react';
-import { useCan } from '../../../auth';
+import { useCanAny, INVITABLE_STAFF_ROLES } from '../../../auth';
+import { DEMO_ADMIN_PERMISSIONS } from '../../../components/common/navigation';
 import { Button, EmptyState, ErrorState, PageHeader, useToast } from '../../../components/shared';
 import { useAsync } from '../../../hooks/useAsync';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
-import { clinicsService, errorMessage, rolesService, staffService } from '../../../services';
+import { clinicsService, errorMessage, staffService } from '../../../services';
 import type { StaffFilters as Filters, StaffMember } from '../../../types';
 import { DeleteStaffDialog } from '../components/DeleteStaffDialog';
 import { StaffFilters } from '../components/StaffFilters';
@@ -17,13 +18,12 @@ import { EMPTY_STAFF_FILTERS, filterStaff } from '../filters';
 export function StaffPage() {
   const navigate = useNavigate();
   const toast = useToast();
-  const canCreate = useCan('staff', 'create');
-  const canUpdate = useCan('staff', 'update');
-  const canDelete = useCan('staff', 'delete');
+  const canCreate = useCanAny(DEMO_ADMIN_PERMISSIONS);
+  const canUpdate = useCanAny(DEMO_ADMIN_PERMISSIONS);
+  const canDelete = useCanAny(DEMO_ADMIN_PERMISSIONS);
 
   const { data, loading, error, reload, setData } = useAsync(() => staffService.list());
   const clinicsQ = useAsync(() => clinicsService.options());
-  const rolesQ = useAsync(() => rolesService.list().catch(() => []));
   const staff = useMemo(() => data ?? [], [data]);
   const clinics = useMemo(() => clinicsQ.data ?? [], [clinicsQ.data]);
   const clinicName = (id: string) => clinics.find((c) => c.id === id)?.nombre ?? id;
@@ -126,7 +126,7 @@ export function StaffPage() {
         open={form.open}
         member={form.member}
         clinics={clinics}
-        roles={rolesQ.data ?? []}
+        roles={INVITABLE_STAFF_ROLES}
         onClose={() => setForm({ open: false })}
         onSubmit={(input, access) => (form.member ? staffService.update(form.member.id, input) : staffService.create(input, access))}
         onSaved={(m, created, invited) => {

@@ -1,6 +1,5 @@
 export * from './common';
 export * from '../features/dashboard/types/dashboard.types';
-export * from '../features/auth/types/auth.types';
 export * from '../features/roles/types/roles.types';
 export * from '../features/users/types/users.types';
 export * from '../features/invitations/types/invitations.types';

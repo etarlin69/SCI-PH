@@ -1,6 +1,5 @@
 export * from './core/errors';
 export { getMockScenario } from './core/mock';
-export * from '../features/auth/services/authService';
 export * from '../features/users/services/usersService';
 export * from '../features/roles/services/rolesService';
 export * from '../features/invitations/services/invitationsService';

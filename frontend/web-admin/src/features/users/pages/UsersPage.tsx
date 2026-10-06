@@ -1,170 +1,101 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, SearchX, UserPlus } from 'lucide-react';
-import { useAuth, useCan } from '../../../auth';
-import { Button, EmptyState, ErrorState, PageHeader, useToast } from '../../../components/shared';
+import { ChevronLeft, ChevronRight, MailPlus, SearchX } from 'lucide-react';
+import { Button, EmptyState, ErrorState, PageHeader, SearchInput, Table, type Column } from '../../../components/shared';
 import { useAsync } from '../../../hooks/useAsync';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
-import { errorMessage, rolesService, usersService } from '../../../services';
-import type { User, UserFilters as Filters } from '../../../types';
-import { DeleteUserDialog } from '../components/DeleteUserDialog';
-import { UserFilters } from '../components/UserFilters';
-import { UserFormModal } from '../components/UserFormModal';
-import { UserStatusDialog } from '../components/UserStatusDialog';
-import { UsersTable } from '../components/UsersTable';
-import { EMPTY_USER_FILTERS, filterUsers } from '../filters';
+import { formatUtcDateTime } from '../../../utils/dates';
+import { MfaBadge, RoleList, UserStatusBadges } from '../components/UserBadges';
+import { usersService } from '../services/usersService';
+import type { UserSummary } from '../types/users.types';
 
-/** Gestión de cuentas: alta con contraseña temporal, edición, suspensión y baja. */
+const PAGE_SIZE = 20;
+
+const COLUMNS: Column<UserSummary>[] = [
+  {
+    id: 'user',
+    header: 'Cuenta',
+    cell: (u) => (
+      <span className="flex min-w-0 flex-col">
+        <Link to={`/admin/usuarios/${u.id}`} className="truncate font-semibold text-ink hover:underline">
+          {u.userName}
+        </Link>
+        {u.email && u.email !== u.userName && <span className="truncate text-xs text-ink-muted">{u.email}</span>}
+      </span>
+    ),
+  },
+  { id: 'roles', header: 'Roles', cell: (u) => <RoleList roles={u.roles} /> },
+  { id: 'status', header: 'Estado', cell: (u) => <UserStatusBadges user={u} /> },
+  { id: 'mfa', header: 'MFA', cell: (u) => <MfaBadge enabled={u.twoFactorEnabled} /> },
+  { id: 'last', header: 'Último acceso', cell: (u) => <span className="tabular text-ink-3">{formatUtcDateTime(u.lastLoginAtUtc)}</span> },
+];
+
+/**
+ * Cuentas de usuario (GET /api/web/admin/users, búsqueda y paginación en servidor). No hay alta ni borrado:
+ * las cuentas se crean por invitación y se desactivan.
+ */
 export function UsersPage() {
   const navigate = useNavigate();
-  const toast = useToast();
-  const { user: me } = useAuth();
-  const canCreate = useCan('users', 'create');
-  const canUpdate = useCan('users', 'update');
-  const canDelete = useCan('users', 'delete');
+  const [search, setSearch] = useState('');
+  const debounced = useDebouncedValue(search.trim(), 300);
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [debounced]);
 
-  const usersQ = useAsync(() => usersService.list());
-  const rolesQ = useAsync(() => rolesService.list());
-  const users = useMemo(() => usersQ.data ?? [], [usersQ.data]);
-
-  const [filters, setFilters] = useState<Filters>(EMPTY_USER_FILTERS);
-  const debouncedQ = useDebouncedValue(filters.q);
-  const applied = { ...filters, q: debouncedQ };
-  const filtered = useMemo(() => filterUsers(users, applied), [users, applied.q, applied.rol, applied.estado]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const [form, setForm] = useState<{ open: boolean; user?: User }>({ open: false });
-  const [statusTarget, setStatusTarget] = useState<User | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
-
-  const replace = (u: User) => usersQ.setData((prev) => prev?.map((x) => (x.id === u.id ? u : x)));
-
-  const toggleStatus = async (u: User) => {
-    const next = u.estado === 'Suspendido' ? 'Activo' : 'Suspendido';
-    try {
-      replace(await usersService.setStatus(u.id, next));
-      toast({ title: next === 'Suspendido' ? 'Usuario suspendido' : 'Usuario reactivado', description: u.nombre, tone: 'success' });
-    } catch (e) {
-      toast({ title: 'No se pudo cambiar el estado', description: errorMessage(e), tone: 'error' });
-    } finally {
-      setStatusTarget(null);
-    }
-  };
-
-  const remove = async (u: User) => {
-    try {
-      await usersService.remove(u.id);
-      usersQ.setData((prev) => prev?.filter((x) => x.id !== u.id));
-      toast({ title: 'Cuenta eliminada', description: `${u.nombre}. Su historial de auditoría se conserva.`, tone: 'success' });
-    } catch (e) {
-      toast({ title: 'No se pudo eliminar', description: errorMessage(e), tone: 'error' });
-    } finally {
-      setDeleteTarget(null);
-    }
-  };
-
-  const clear = () => setFilters(EMPTY_USER_FILTERS);
-  const loading = usersQ.loading || rolesQ.loading;
+  const q = useAsync(() => usersService.list({ search: debounced, page, pageSize: PAGE_SIZE }), [debounced, page]);
+  const totalPages = q.data ? Math.max(1, Math.ceil(q.data.total / q.data.pageSize)) : 1;
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Usuarios"
-        description={
-          <>
-            Cuentas con acceso al sistema. Cada usuario tiene un rol que define sus permisos (ver{' '}
-            <Link to="/admin/roles" className="font-semibold text-primary-600 hover:underline">
-              Roles y permisos
-            </Link>
-            ).
-          </>
-        }
+        description="Cuentas con acceso a SCI-PH. Las cuentas nuevas se crean mediante invitaciones."
         actions={
-          canCreate && (
-            <Button leftIcon={<Plus size={16} aria-hidden="true" />} onClick={() => setForm({ open: true })}>
-              Nuevo usuario
-            </Button>
-          )
+          <Link
+            to="/admin/invitaciones"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white no-underline hover:bg-primary-700"
+          >
+            <MailPlus size={16} aria-hidden="true" />
+            Invitar
+          </Link>
         }
       />
 
-      <section aria-label="Lista de usuarios" className="flex flex-col gap-4 rounded-[10px] border border-line bg-white p-4 sm:p-5">
-        <UserFilters value={filters} onChange={setFilters} users={users} roles={rolesQ.data ?? []} resultCount={filtered.length} />
-        {usersQ.error ? (
-          <ErrorState
-            title="No se pudieron cargar los usuarios"
-            message={`${usersQ.error} Tus filtros se mantienen; vuelve a intentarlo en unos segundos.`}
-            onRetry={usersQ.reload}
-          />
-        ) : (
-          <UsersTable
-            users={filtered}
-            loading={loading}
-            selfId={me?.id ?? ''}
-            canUpdate={canUpdate}
-            canDelete={canDelete}
-            onOpen={(u) => navigate(`/admin/usuarios/${u.id}`)}
-            onEdit={(u) => setForm({ open: true, user: u })}
-            onToggleStatus={setStatusTarget}
-            onDelete={setDeleteTarget}
-            resetPageKey={`${applied.q}|${applied.rol}|${applied.estado}`}
-            emptyState={
-              users.length === 0 ? (
-                <EmptyState
-                  icon={UserPlus}
-                  title="Todavía no hay usuarios"
-                  description="Crea la primera cuenta y asígnale un rol. Recibirá una contraseña temporal para su primer acceso."
-                  action={canCreate && <Button onClick={() => setForm({ open: true })}>Nuevo usuario</Button>}
-                />
-              ) : (
-                <EmptyState
-                  icon={SearchX}
-                  title="Ningún usuario coincide con los filtros"
-                  description="Prueba con otro nombre o email, o quita el filtro de rol o estado."
-                  action={
-                    <Button variant="secondary" onClick={clear}>
-                      Limpiar filtros
-                    </Button>
-                  }
-                />
-              )
-            }
-          />
-        )}
-      </section>
+      <div className="max-w-md">
+        <SearchInput label="Buscar por usuario o email" value={search} onChange={setSearch} placeholder="Buscar por usuario o email" />
+      </div>
 
-      <UserFormModal
-        open={form.open}
-        user={form.user}
-        roles={rolesQ.data ?? []}
-        onClose={() => setForm({ open: false })}
-        onCreate={(input) => usersService.create(input)}
-        onUpdate={(id, input) => usersService.update(id, input)}
-        onSaved={(u, created, delivery) => {
-          setForm({ open: false });
-          if (created) usersQ.setData((prev) => [u, ...(prev ?? [])]);
-          else replace(u);
-          toast({
-            title: created ? 'Usuario creado' : 'Cambios guardados',
-            description: created
-              ? delivery === 'email'
-                ? `Contraseña temporal enviada a ${u.email}.`
-                : 'Entrega la contraseña copiada por un canal seguro. Caduca en 72 h.'
-              : u.nombre,
-            tone: 'success',
-          });
-        }}
-      />
-
-      <UserStatusDialog user={statusTarget} onConfirm={toggleStatus} onCancel={() => setStatusTarget(null)} />
-      <DeleteUserDialog
-        user={deleteTarget}
-        onConfirm={remove}
-        onCancel={() => setDeleteTarget(null)}
-        onSuspendInstead={(u) => {
-          setDeleteTarget(null);
-          setStatusTarget(u);
-        }}
-      />
+      {q.error ? (
+        <ErrorState message={q.error} onRetry={q.reload} />
+      ) : (
+        <>
+          <Table
+            caption="Cuentas de usuario"
+            columns={COLUMNS}
+            rows={q.data?.items ?? []}
+            getRowId={(u) => u.id}
+            loading={q.loading}
+            onRowClick={(u) => navigate(`/admin/usuarios/${u.id}`)}
+            emptyState={<EmptyState icon={SearchX} title={debounced ? 'Sin coincidencias' : 'No hay cuentas'} />}
+            stickyFirstColumn
+          />
+          {q.data && q.data.total > q.data.pageSize && (
+            <nav aria-label="Paginación" className="flex items-center justify-between gap-3 text-sm text-ink-3">
+              <span className="tabular">
+                Página {q.data.page} de {totalPages} · {q.data.total} cuentas
+              </span>
+              <span className="flex gap-2">
+                <Button variant="secondary" size="sm" disabled={page <= 1 || q.loading} onClick={() => setPage((p) => p - 1)} leftIcon={<ChevronLeft size={16} aria-hidden="true" />}>
+                  Anterior
+                </Button>
+                <Button variant="secondary" size="sm" disabled={page >= totalPages || q.loading} onClick={() => setPage((p) => p + 1)}>
+                  Siguiente
+                  <ChevronRight size={16} aria-hidden="true" />
+                </Button>
+              </span>
+            </nav>
+          )}
+        </>
+      )}
     </div>
   );
 }

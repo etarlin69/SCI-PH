@@ -1,16 +1,18 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { ShieldOff } from 'lucide-react';
-import { useAuth } from '../../../auth';
+import { resolveHomeRoute, roleLabel, useAuth } from '../../../auth';
 import { Button } from '../../../components/shared';
 
 export interface ForbiddenPageProps {
-  missingPermission?: string;
+  missingPermissions?: readonly string[];
 }
 
-/** Error 403 dentro del layout (la URL no cambia). */
-export function ForbiddenPage({ missingPermission }: ForbiddenPageProps) {
-  const { user } = useAuth();
+/** Error 403: el usuario está autenticado pero no tiene permiso. No cierra la sesión ni cambia la URL. */
+export function ForbiddenPage({ missingPermissions }: ForbiddenPageProps) {
+  const { user, permissions } = useAuth();
   const navigate = useNavigate();
+  const home = user ? resolveHomeRoute(permissions) : '/login';
+
   return (
     <div className="flex justify-center px-2 py-10 sm:py-16">
       <div className="flex max-w-lg flex-col items-center gap-4 text-center">
@@ -20,28 +22,40 @@ export function ForbiddenPage({ missingPermission }: ForbiddenPageProps) {
         <p className="font-mono text-xs font-semibold tracking-[0.08em] text-danger-text">ERROR 403</p>
         <h1 className="text-xl font-semibold text-ink sm:text-2xl">No tienes permiso para ver esta página</h1>
         <p className="text-sm text-ink-3">
-          Tu rol <strong>{user?.rol ?? '—'}</strong> no incluye{' '}
-          {missingPermission ? (
+          {user && user.roles.length > 0 && (
             <>
-              el permiso <code className="rounded bg-surface-hover px-1 font-mono text-[13px]">{missingPermission}</code>
+              Tus roles ({user.roles.map(roleLabel).join(', ')}) no incluyen{' '}
+            </>
+          )}
+          {!user || user.roles.length === 0 ? 'Tu cuenta no incluye ' : null}
+          {missingPermissions && missingPermissions.length > 0 ? (
+            <>
+              {missingPermissions.length === 1 ? 'el permiso ' : 'ninguno de los permisos '}
+              {missingPermissions.map((p, i) => (
+                <span key={p}>
+                  {i > 0 && ', '}
+                  <code className="rounded bg-surface-hover px-1 font-mono text-[13px]">{p}</code>
+                </span>
+              ))}
             </>
           ) : (
             'este permiso'
           )}
-          . Si lo necesitas para tu trabajo, pide a un administrador que lo añada a tu rol.
+          . Si lo necesitas para tu trabajo, pide a un administrador que revise tus roles.
         </p>
         <div className="flex flex-wrap justify-center gap-2.5">
           <Button variant="secondary" onClick={() => navigate(-1)}>
             Volver
           </Button>
-          <Link
-            to="/admin/dashboard"
-            className="inline-flex h-10 items-center rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white no-underline hover:bg-primary-700"
-          >
-            Ir al dashboard
-          </Link>
+          {home !== '/403' && (
+            <Link
+              to={home}
+              className="inline-flex h-10 items-center rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white no-underline hover:bg-primary-700"
+            >
+              Ir al inicio
+            </Link>
+          )}
         </div>
-        <p className="text-xs text-ink-muted">El intento de acceso quedó registrado en auditoría.</p>
       </div>
     </div>
   );

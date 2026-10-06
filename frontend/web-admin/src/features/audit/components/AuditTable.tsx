@@ -5,6 +5,7 @@ import { formatDMY } from '../../../utils/dates';
 import { AUDIT_PAGE_SIZES, formatAuditTimestamp } from '../auditFilters';
 import { AuditActionTag } from './AuditActionTag';
 import { AuditResultBadge } from './AuditResultBadge';
+import { roleLabel } from '../../../auth';
 
 export interface AuditTableProps {
   events: AuditEvent[];
@@ -40,7 +41,7 @@ export function AuditTable({ events, loading, onOpen, emptyState, resetPageKey, 
       cell: (e) => (
         <span className="flex min-w-0 flex-col">
           <span className="truncate font-medium text-ink">{e.usuario}</span>
-          <span className="truncate text-xs text-ink-muted">{e.rol}</span>
+          <span className="truncate text-xs text-ink-muted">{roleLabel(e.rol)}</span>
         </span>
       ),
     },

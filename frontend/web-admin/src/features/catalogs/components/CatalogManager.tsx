@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Layers, Plus, SearchX, Upload } from 'lucide-react';
-import { useCan } from '../../../auth';
+import { useCanAny } from '../../../auth';
+import { DEMO_ADMIN_PERMISSIONS } from '../../../components/common/navigation';
 import {
   Button,
   ConfirmDialog,
@@ -31,9 +32,9 @@ export interface CatalogManagerProps<K extends CatalogKind> {
 /** Gestión genérica de un catálogo: búsqueda, filtros, tabla y alta/edición/baja/desactivación. */
 export function CatalogManager<K extends CatalogKind>({ config, onCountChange }: CatalogManagerProps<K>) {
   const toast = useToast();
-  const canCreate = useCan('catalogs', 'create');
-  const canUpdate = useCan('catalogs', 'update');
-  const canDelete = useCan('catalogs', 'delete');
+  const canCreate = useCanAny(DEMO_ADMIN_PERMISSIONS);
+  const canUpdate = useCanAny(DEMO_ADMIN_PERMISSIONS);
+  const canDelete = useCanAny(DEMO_ADMIN_PERMISSIONS);
   const { data, loading, error, reload, setData } = useAsync(() => catalogsService.list(config.kind), [config.kind]);
   const items = useMemo(() => data ?? [], [data]);
 

@@ -1,173 +1,60 @@
-# Integración con el backend (Web.BFF)
+# Integración con SCI-PH.Web.BFF
 
-Notas que antes estaban como `TODO` en el código, agrupadas por archivo. Cada servicio mock mantiene su firma: al conectar el BFF solo cambia el cuerpo de cada método.
+Fuente de verdad: el código del backend (`src/Presentation/SCI-PH.Web.BFF/Controllers`, `SCI-PH.Application/DTOs/Security`)
+y `docs/api/web-bff-contracts.md`. Si este documento y el código difieren, gana el código.
 
-## `src/features/audit/services/auditService.ts`
+## Sesión web (ADR-006)
 
-- `GET /api/audit?from=&to=&usuario=&accion=&resultado=&q=&page=&size=&sort=` con paginación en servidor; el registro real tiene millones de eventos.
-- `GET /api/audit/{id}`
-- `GET /api/audit?email={email}&size={limit}`
-- `GET /api/audit/facets`
-- `POST /api/audit/export { format, filters }` → descarga generada en servidor.
-- eliminar; el backend audita cada operación por sí mismo.
+| Elemento | Dónde vive | Quién lo maneja |
+|---|---|---|
+| Access token (JWT) | Memoria: `src/api/apiClient.ts` y `AuthProvider` | SPA: `Authorization: Bearer` |
+| Refresh token | Cookie `__Host-sciph-refresh` (HttpOnly, Secure, SameSite=Strict) | Navegador; la SPA nunca la lee |
+| Desafío MFA | Memoria del `AuthProvider` mientras dura `/mfa` | SPA |
 
-## `src/features/auth/services/authService.ts`
+- Todas las peticiones usan `credentials: 'include'`.
+- `login`, `mfa/verify`, `refresh` y `logout` llevan `X-SCIPH-CSRF: 1` (CookieCsrfProtection) y van sin Bearer.
+- Al arrancar (F5): `POST /refresh` → `WebSession` → `GET /me`. Mientras tanto `status = initializing` y no se
+  renderiza contenido protegido.
+- 401 en una petición autenticada → un único `POST /refresh` compartido (single-flight) → reintento una vez.
+  Si el refresh falla, la sesión local termina (`unauthenticated`, aviso «sesión caducada»).
+- 403 nunca cierra la sesión: la ruta muestra la página 403.
+- Los errores son ProblemDetails (`src/api/problemDetails.ts`, `ApiError`); 429 lee `Retry-After`.
 
-- el Web.BFF gestiona la sesión con una cookie HttpOnly + SameSite=Strict. La SPA nunca guarda tokens: tras `verifyMfa` el BFF fija la cookie y `getSession()` llama a `GET /api/auth/session`. Aquí la sesión se guarda en `sessionStorage` solo para que el mock sobreviva a recargas.
-- `GET /api/auth/session` (401 → null).
-- `POST /api/auth/login { usuario, password, recordarEquipo }` → `{ challengeId }`.
-- `POST /api/auth/mfa { challengeId, code, method }` → fija la cookie de sesión.
-- `POST /api/auth/logout` (invalida la cookie).
-- `POST /api/auth/password/forgot { email }`.
-- `GET /api/auth/password/reset/{token}` → `{ status }`.
-- `POST /api/auth/password/reset { token, password }`.
-- `GET /api/auth/activation/{token}` → `{ status, email, nombre, rol }`.
-- `POST /api/auth/activation { token, password }`.
-- `POST /api/auth/email/confirm { token }`.
-- `POST /api/auth/email/resend { email }`.
-- `GET /api/me/profile`.
-- `PUT /api/me/profile { nombre, telefono, preferencias }`.
-- `POST /api/me/password { actual, nueva }`.
+## Endpoints integrados
 
-## `src/features/catalogs/services/catalogsService.ts`
+| Método | Ruta | Uso en la SPA |
+|---|---|---|
+| POST | `/api/web/auth/login` `{ identifier, password }` | `AuthProvider.login` → `{ mfaRequired, session, mfaChallenge }` |
+| POST | `/api/web/auth/mfa/verify` `{ challengeToken, code \| recoveryCode }` | `/mfa` |
+| POST | `/api/web/auth/refresh` | Restauración de sesión y refresh automático |
+| POST | `/api/web/auth/logout` | Cerrar sesión |
+| GET | `/api/web/auth/me` | Usuario, roles y permisos (`string[]`) |
+| POST | `/api/web/auth/change-password` `{ currentPassword, newPassword }` | Perfil (cierra la sesión local después) |
+| POST | `/api/web/auth/revoke-sessions` | Perfil · cerrar todas mis sesiones |
+| POST | `/api/web/auth/forgot-password` `{ email }` | `/forgot-password` (202 genérico) |
+| POST | `/api/web/auth/reset-password` `{ userId, token, newPassword }` | `/reset-password?userId=…&token=…` |
+| POST | `/api/web/auth/activate-account` `{ token, password }` | `/activate-account?token=…` |
+| POST | `/api/web/auth/confirm-email` `{ userId, token }` | `/confirm-email?userId=…&token=…` |
+| POST | `/api/web/auth/resend-confirmation` `{ email }` | `/confirm-email` (enlace inválido) |
+| POST | `/api/web/auth/mfa/setup` · `enable` · `disable` · `recovery-codes/regenerate` | Perfil · verificación en dos pasos |
+| GET | `/api/web/admin/users?search&page&pageSize` · `/{id}` | Usuarios (`Users.Manage`) |
+| POST/PUT | `/api/web/admin/users/{id}/activate` · `deactivate` · `revoke-sessions` · `roles` | Detalle de usuario |
+| GET | `/api/web/admin/roles` | Roles y permisos, solo lectura |
+| POST | `/api/web/admin/invitations/patients` `{ patientId }` | Invitaciones (`Accounts.InvitePatient`) |
+| POST | `/api/web/admin/invitations/staff` `{ clinicalStaffId, email, role }` · `/{id}/reissue` · `/{id}/revoke` | Invitaciones (`Users.Manage`) |
+| GET/POST | `/api/web/admin/devices` · `/{id}/rotate-secret` · `/{id}/revoke` | Dispositivos (`Devices.Manage`) |
 
-- `GET /api/catalogs/{kind}?q=&estado=&page=&size=&sort=`
-- `GET /api/catalogs/summary`
-- `POST /api/catalogs/{kind}`
-- `PUT /api/catalogs/{kind}/{id}`
-- `DELETE /api/catalogs/{kind}/{id}`
-- `PATCH /api/catalogs/{kind}/{id}/status`
-- `POST /api/catalogs/diagnosticos/import?dryRun=true` (multipart).
-- `POST /api/catalogs/diagnosticos/import`
+Enums en JSON: el BFF no registra `JsonStringEnumConverter`, así que llegan como número
+(`DeviceCredentialStatus`: 1 Active, 2 Revoked; `InvitationSubjectType`: 1 Patient, 2 ClinicalStaff).
 
-## `src/features/clinics/services/clinicsService.ts`
+## Pendiente de backend (la SPA no inventa estos endpoints)
 
-- `GET /api/clinics?q=&provincia=&estado=&page=&size=&sort=`
-- `GET /api/clinics/{id}`
-- `POST /api/clinics`
-- `PUT /api/clinics/{id}`
-- `PATCH /api/clinics/{id}/status`
-- `DELETE /api/clinics/{id}`
-- `GET /api/clinics/{id}/services`
-- `PATCH /api/clinics/{id}/services/{serviceId} { disponible }`
-- `GET /api/clinics/{id}/staff`
-- `GET /api/clinics/{id}/devices`
-
-## `src/features/devices/services/devicesService.ts`
-
-- lo genera el backend.
-- `GET /api/devices?q=&tipo=&estado=&page=&size=&sort=`
-- `GET /api/devices/{id}`
-- `GET /api/devices/{id}/accesses?resultado=&page=&size=`
-- `POST /api/devices` → `{ device, secret, qrPayload, expiresAt }`
-- `DELETE /api/devices/{id}/enrollment`
-- `POST /api/devices/{id}/rotate`
-- `POST /api/devices/{id}/revoke`
-- `DELETE /api/devices/{id}`
-
-## `src/features/invitations/services/invitationsService.ts`
-
-- `GET /api/invitations?q=&tipo=&estado=&page=&size=&sort=`
-- `GET /api/invitations/{id}`
-- `POST /api/invitations/patients`
-- `POST /api/invitations/staff`
-- `POST /api/invitations/{id}/reissue`
-- `POST /api/invitations/{id}/revoke`
-
-## `src/features/profile/services/profileService.ts`
-
-- `GET/PUT /api/me/profile`, `POST /api/me/password`.
-
-## `src/features/roles/services/rolesService.ts`
-
-- `GET /api/roles`
-- `GET /api/roles/{id}`
-- `GET /api/permissions/modules`
-- `POST /api/roles`
-- `PATCH /api/roles/{id}`
-- `PUT /api/roles/{id}/permissions` (el backend valida que C/U/D impliquen R).
-- `DELETE /api/roles/{id}`
-
-## `src/features/staff/services/staffService.ts`
-
-- `GET /api/staff?q=&puesto=&clinicId=&estado=&page=&size=&sort=`
-- `GET /api/staff/{id}`
-- `POST /api/staff { ...input, access }` (transacción en backend).
-- `PUT /api/staff/{id}`
-- `DELETE /api/staff/{id}?suspendAccount=true`
-- `GET /api/staff/{id}/assignments`
-- `POST /api/staff/{id}/assignments`
-- `GET /api/staff/{id}/licenses`
-- `POST /api/staff/{id}/licenses` · `PUT /api/staff/{id}/licenses/{licenseId}`
-- `GET /api/staff/{id}/history`
-
-## `src/features/users/services/usersService.ts`
-
-- `GET /api/users?q=&rol=&estado=&page=&size=&sort=`
-- `GET /api/users/{id}`
-- `POST /api/users` — el backend genera la contraseña temporal, la envía por email si `entrega === 'email'` y nunca la persiste en claro.
-- `PATCH /api/users/{id}`
-- `POST /api/users/{id}/suspend` · `POST /api/users/{id}/reactivate`
-- `DELETE /api/users/{id}`
-- `GET /api/users/{id}/sessions`
-- `DELETE /api/users/{id}/sessions/{sessionId}`
-- `DELETE /api/users/{id}/sessions?forcePasswordChange=`
-- `GET /api/users/{id}/security`
-- `POST /api/users/{id}/password-reset`
-- `DELETE /api/users/{id}/mfa`
-
-## `src/services/core/actor.ts`
-
-- el backend obtiene el actor de la cookie de sesión; eliminar.
-
-## `src/services/core/errors.ts`
-
-- mapear aquí los Problem Details (RFC 7807) que devuelva el Web.BFF.
-
-## `src/services/core/mock.ts`
-
-- eliminar este archivo cuando todos los servicios llamen al Web.BFF.
-
-## `src/services/index.ts`
-
-- ` el endpoint del Web.BFF que la sustituye.
-
-## `src/auth/AuthContext.tsx`
-
-- `getSession()` pasará a ser asíncrono (`GET /api/auth/session`); mostrar un spinner de arranque hasta resolverlo. La SPA nunca almacena tokens: la sesión vive en una cookie HttpOnly.
-
-## `src/data/mock/mockAuth.ts`
-
-- eliminar; la autenticación la resuelve el Web.BFF (cookie HttpOnly).
-
-## `src/features/auth/components/DemoCredentialsHint.tsx`
-
-- eliminar este componente.
-
-## `src/features/auth/pages/ForbiddenPage.tsx`
-
-- el BFF registra el intento denegado en auditoría y devuelve su referencia.
-
-## `src/features/auth/pages/MfaPage.tsx`
-
-- enviar `trust` para emitir la cookie de "equipo de confianza" (30 días).
-
-## `src/features/devices/qr.ts`
-
-- si el backend devuelve el QR ya renderizado, este módulo puede eliminarse.
-
-## `src/features/devices/types/devices.types.ts`
-
-- el backend genera el secreto y solo guarda su hash.
-
-## `src/features/users/components/TemporaryPasswordField.tsx`
-
-- la genera el backend; en la entrega por email nunca llega al navegador.
-
-## `src/features/users/types/users.types.ts`
-
-- debe generarla el backend y nunca viajar en claro salvo en la respuesta de alta.
-
-## `src/hooks/useAsync.ts`
-
-- si se adopta TanStack Query, sustituir por `useQuery` con la misma forma.
+| Necesidad | Pantalla afectada | Estado en la SPA |
+|---|---|---|
+| `GET /api/web/admin/audit` (previsto) | Auditoría | DEMO con datos ficticios |
+| Listado y detalle de invitaciones | Invitaciones | Solo acciones; tabla de la sesión actual |
+| Búsqueda de `Patient` y `ClinicalStaff` para invitar | Invitaciones | Se introduce el id |
+| Clínicas, personal (ClinicalStaff admin), catálogos | Clínicas, Personal, Catálogos | DEMO |
+| Agregados del dashboard | Dashboard | DEMO |
+| Indicar si la cuenta tiene MFA en `/me` | Perfil | Se deduce con `mfa/setup` (409 = ya activa) |
+| Permisos propios para clínicas/personal/catálogos | Menú y rutas DEMO | Provisionalmente `Users.Manage` |

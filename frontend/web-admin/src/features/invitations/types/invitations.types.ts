@@ -1,36 +1,28 @@
-import type { DateTime } from '../../../types/common';
+// DTOs de /api/web/admin/invitations (SCI-PH.Application/DTOs/Security/InvitationModels.cs).
+// El token de la invitación solo viaja en el email: nunca aparece en una respuesta.
 
-export type InvitationType = 'Paciente' | 'Personal';
-export type InvitationStatus = 'Pendiente' | 'Aceptada' | 'Expirada' | 'Revocada';
+/** InvitationSubjectType (enum numérico en JSON). */
+export const InvitationSubjectType = { Patient: 1, ClinicalStaff: 2 } as const;
+export type InvitationSubjectTypeCode = (typeof InvitationSubjectType)[keyof typeof InvitationSubjectType];
 
-export interface Invitation {
+export interface InvitationSummary {
   id: string;
+  subjectType: InvitationSubjectTypeCode;
+  subjectId: string;
   email: string;
-  tipo: InvitationType;
-  rol?: string;
-  departamento?: string;
-  estado: InvitationStatus;
-  enviadaEl: DateTime;
-  enviadaPor: string;
-  reenvios: number;
-  aceptadaEl?: DateTime;
-  mensaje?: string;
+  intendedRole: string;
+  expiresAtUtc: string;
+  emailSent: boolean;
 }
 
-export interface InvitePatientInput {
-  email: string;
-  mensaje?: string;
+/** Invita a un Patient existente; el email sale de su identificador de email activo. */
+export interface InvitePatientRequest {
+  patientId: string;
 }
 
-export interface InviteStaffInput {
+/** Invita a un ClinicalStaff existente con un rol de personal (nunca Administrator). */
+export interface InviteStaffRequest {
+  clinicalStaffId: string;
   email: string;
-  rol: string;
-  departamento: string;
-  mensaje?: string;
-}
-
-export interface InvitationFilters {
-  q: string;
-  tipo: InvitationType | '';
-  estado: InvitationStatus | '';
+  role: string;
 }

@@ -3,7 +3,8 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { DEPARTAMENTOS, PUESTOS, ROL_SUGERIDO } from '../../../data/mock';
-import type { Clinic, Departamento, Puesto, Role, StaffAccessInput, StaffInput, StaffMember } from '../../../types';
+import { ROLE_LABELS, roleLabel, type SecurityRole } from '../../../auth';
+import type { Clinic, Departamento, Puesto, StaffAccessInput, StaffInput, StaffMember } from '../../../types';
 import { Button, FormError, Input, Modal, Select } from '../../../components/shared';
 import { useSubmit } from '../../../hooks/useSubmit';
 import { cn } from '../../../utils/cn';
@@ -14,7 +15,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const schema = z
   .object({
     nombre: z.string().trim().min(3, 'Escribe el nombre completo (mínimo 3 caracteres).'),
-    email: z.string().trim().regex(EMAIL, 'Formato inválido. Ejemplo: nombre@scih.com'),
+    email: z.string().trim().regex(EMAIL, 'Formato inválido. Ejemplo: nombre@ejemplo.org'),
     telefono: z
       .string()
       .trim()
@@ -33,7 +34,7 @@ export interface StaffFormModalProps {
   open: boolean;
   member?: StaffMember;
   clinics: Pick<Clinic, 'id' | 'nombre' | 'estado'>[];
-  roles: Role[];
+  roles: readonly SecurityRole[];
   accountText?: string;
   onClose: () => void;
   onSubmit: (input: StaffInput, access: StaffAccessInput) => Promise<StaffMember>;
@@ -252,8 +253,8 @@ export function StaffFormModal({ open, member, clinics, roles, accountText, onCl
                   <Select
                     label="Rol"
                     placeholder="Selecciona un rol"
-                    hint={puesto ? `Sugerido para ${puesto}: ${ROL_SUGERIDO[puesto]}.` : undefined}
-                    options={roles.map((r) => ({ value: r.nombre, label: r.nombre }))}
+                    hint={puesto && ROL_SUGERIDO[puesto] ? `Sugerido para ${puesto}: ${roleLabel(ROL_SUGERIDO[puesto])}.` : undefined}
+                    options={roles.map((r) => ({ value: r, label: ROLE_LABELS[r] }))}
                     error={errors.rol?.message}
                     containerClassName="mt-2"
                     {...register('rol')}

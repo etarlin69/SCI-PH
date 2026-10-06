@@ -1,56 +1,43 @@
-import type { DateTime, ISODate } from '../../../types/common';
+// DTOs de /api/web/admin/devices (SCI-PH.Application/DTOs/Security/DeviceModels.cs).
 
-export type DeviceType = 'Tablet' | 'Móvil' | 'Escritorio';
-export type DeviceStatus = 'Activo' | 'Pendiente' | 'Revocado';
+/** DeviceCredentialStatus (enum numérico en JSON). */
+export const DeviceCredentialStatus = { Active: 1, Revoked: 2 } as const;
+export type DeviceCredentialStatusCode = (typeof DeviceCredentialStatus)[keyof typeof DeviceCredentialStatus];
 
-export interface DeviceCredential {
-  huella: string;
-  emitidaEl: ISODate;
-}
+/** DeviceScopes del backend. */
+export const DeviceScopes = { Heartbeat: 'Device.Heartbeat', FingerprintIdentify: 'Device.Fingerprint.Identify' } as const;
+export type DeviceScope = (typeof DeviceScopes)[keyof typeof DeviceScopes];
 
-export interface Device {
+export const DEVICE_SCOPE_LABELS: Record<DeviceScope, string> = {
+  'Device.Heartbeat': 'Latido (heartbeat)',
+  'Device.Fingerprint.Identify': 'Identificación por huella',
+};
+
+export interface DeviceSummary {
   id: string;
-  nombre: string;
-  tipo: DeviceType;
-  estado: DeviceStatus;
-  asignadoA: string;
-  clinicId?: string;
-  ultimoAcceso: DateTime | null;
-  ultimaIp?: string;
-  userAgent?: string;
-  creadoEl: DateTime;
-  creadoPor: string;
-  credencial: DeviceCredential;
-  revocadoEl?: DateTime;
+  deviceCode: string;
+  name: string;
+  scopes: string[];
+  status: DeviceCredentialStatusCode;
+  firmwareVersion: string | null;
+  createdAtUtc: string;
+  lastSeenAtUtc: string | null;
+  rotatedAtUtc: string | null;
+  revokedAtUtc: string | null;
 }
 
-export type DeviceAccessResult = 'Éxito' | 'Fallido';
+export interface ProvisionDeviceRequest {
+  deviceCode: string;
+  name: string;
+  scopes: string[];
+}
 
-export interface DeviceAccess {
+/** Clave en claro del dispositivo: se devuelve UNA vez (alta o rotación) y el backend solo guarda su hash. */
+export interface DeviceSecret {
   id: string;
-  deviceId: string;
-  fecha: DateTime;
-  ip: string;
-  evento: string;
-  resultado: DeviceAccessResult;
-  detalle?: string;
-}
-
-export interface CreateDeviceInput {
-  nombre: string;
-  tipo: DeviceType;
-  asignadoA?: string;
-}
-
-export interface DeviceEnrollment {
-  device: Device;
+  deviceCode: string;
   secret: string;
-  qrPayload: string;
-  expiresAt: number;
 }
 
-export interface DeviceFilters {
-  q: string;
-  tipo: DeviceType | '';
-  estado: DeviceStatus | '';
-}
+/** Misma regla que ProvisionDeviceRequest.DeviceCode. */
+export const DEVICE_CODE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]{2,59}$/;

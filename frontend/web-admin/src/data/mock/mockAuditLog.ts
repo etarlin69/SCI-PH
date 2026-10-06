@@ -2,17 +2,17 @@ import type { AuditAction, AuditChange, AuditEvent } from '../../types';
 import { MOCK_NOW, seededRandom } from './time';
 
 const USERS: [nombre: string, email: string, rol: string, ua: string, ip: string][] = [
-  ['Admin SCIH', 'admin@scih.com', 'Administrador', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) Safari/17.5', '10.10.1.2'],
-  ['Carmen Batista', 'batista@scih.com', 'Administrador', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0', '10.10.1.5'],
-  ['Dr. Luis García', 'garcia@scih.com', 'Médico', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0', '10.10.2.31'],
-  ['Dra. Ana Jiménez', 'jimenez@scih.com', 'Médico', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0', '10.10.2.44'],
-  ['María Santos', 'maria@scih.com', 'Coordinador', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/129.0', '10.10.3.8'],
-  ['Carlos Pérez', 'perez@scih.com', 'Paramédico', 'SCI-PH Móvil 3.2.1 (Android 14; Samsung SM-X200)', '10.20.4.17'],
-  ['José Tavárez', 'tavarez@scih.com', 'Paramédico', 'SCI-PH Móvil 3.2.1 (Android 14; Samsung SM-X200)', '10.20.4.22'],
-  ['Rosa Almonte', 'almonte@scih.com', 'Enfermero', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0', '10.10.5.12'],
-  ['Julio Castillo', 'castillo@scih.com', 'Operador', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0', '10.10.6.3'],
-  ['Elena Cruz', 'cruz@auditores.do', 'Auditor externo', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/131.0', '186.7.40.12'],
-  ['Dr. Ramón Ortiz', 'ortiz@scih.com', 'Médico', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/131.0', '186.7.33.140'],
+  ['Admin SCIH', 'admin.demo@sci-ph.test', 'Administrator', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) Safari/17.5', '10.10.1.2'],
+  ['Carmen Batista', 'batista@sci-ph.test', 'Administrator', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0', '10.10.1.5'],
+  ['Dr. Luis García', 'garcia@sci-ph.test', 'Doctor', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0', '10.10.2.31'],
+  ['Dra. Ana Jiménez', 'jimenez@sci-ph.test', 'Doctor', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0', '10.10.2.44'],
+  ['María Santos', 'maria@sci-ph.test', 'Receptionist', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/129.0', '10.10.3.8'],
+  ['Carlos Pérez', 'perez@sci-ph.test', 'Paramedic', 'SCI-PH Móvil 3.2.1 (Android 14; Samsung SM-X200)', '10.20.4.17'],
+  ['José Tavárez', 'tavarez@sci-ph.test', 'Paramedic', 'SCI-PH Móvil 3.2.1 (Android 14; Samsung SM-X200)', '10.20.4.22'],
+  ['Rosa Almonte', 'almonte@sci-ph.test', 'Nurse', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0', '10.10.5.12'],
+  ['Julio Castillo', 'castillo@sci-ph.test', 'Receptionist', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/129.0', '10.10.6.3'],
+  ['Elena Cruz', 'cruz@auditores.test', 'Administrator', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/131.0', '186.7.40.12'],
+  ['Dr. Ramón Ortiz', 'ortiz@sci-ph.test', 'Doctor', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/131.0', '186.7.33.140'],
 ];
 
 export const AUDIT_USERS = USERS.map(([nombre]) => nombre);
@@ -118,7 +118,7 @@ const TEMPLATES: Template[] = [
     recurso: () => `Usuario USR-0${n2()}`,
     users: ADM,
     descripcion: 'Cambio de rol de un usuario.',
-    cambios: () => [{ campo: 'Rol', antes: 'Coordinador', despues: 'Médico' }],
+    cambios: () => [{ campo: 'Roles', antes: 'Receptionist', despues: 'Doctor' }],
   },
   {
     weight: 2,
@@ -146,10 +146,10 @@ const TEMPLATES: Template[] = [
   {
     weight: 1,
     accion: 'Actualizar',
-    recurso: () => 'Rol Auditor externo',
+    recurso: () => `Usuario USR-0${n2()}`,
     users: ADM,
-    descripcion: 'Cambio en la matriz de permisos.',
-    cambios: () => [{ campo: 'Usuarios · Leer', antes: 'No', despues: 'Sí' }],
+    descripcion: 'Roles de la cuenta reemplazados.',
+    cambios: () => [{ campo: 'Roles', antes: 'Nurse', despues: 'Nurse, Receptionist' }],
   },
   {
     weight: 2,

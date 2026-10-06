@@ -20,7 +20,7 @@ export function clinicSchema(takenNames: string[] = []) {
     direccion: z.string().trim().min(5, 'Escribe la dirección.'),
     provincia: z.string().min(1, 'Selecciona la provincia.'),
     telefono: z.string().trim().min(1, 'El teléfono es obligatorio.').regex(PHONE_PATTERN, 'Formato esperado: 809-555-0100'),
-    email: z.string().trim().min(1, 'El email es obligatorio.').regex(EMAIL_PATTERN, 'Formato inválido. Ejemplo: clinica@scih.com'),
+    email: z.string().trim().min(1, 'El email es obligatorio.').regex(EMAIL_PATTERN, 'Formato inválido. Ejemplo: clinica@sci-ph.test'),
     contacto: z.string().trim().min(3, 'Indica la persona de contacto.'),
   });
 }

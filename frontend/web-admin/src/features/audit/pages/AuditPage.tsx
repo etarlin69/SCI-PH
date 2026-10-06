@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Lock, ScrollText, SearchX } from 'lucide-react';
 import type { AuditEvent, AuditExportFormat, AuditFilters } from '../../../types';
 import { auditService, errorMessage } from '../../../services';
-import { useCan } from '../../../auth';
+import { Permissions, useCan } from '../../../auth';
 import { Badge, Button, EmptyState, ErrorState, PageHeader, useToast } from '../../../components/shared';
 import { useAsync } from '../../../hooks/useAsync';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
@@ -31,7 +31,7 @@ import { ExportMenu } from '../components/ExportMenu';
 export function AuditPage() {
   const isMobile = useIsMobile();
   const toast = useToast();
-  const canExport = useCan('audit', 'read');
+  const canExport = useCan(Permissions.Audit.Read);
 
   const events = useAsync(() => auditService.list(), []);
   const facets = useAsync(() => auditService.facets(), []);

@@ -1,138 +1,256 @@
-import { useMemo, useState } from 'react';
-import { MailPlus, SearchX, Stethoscope, UserPlus } from 'lucide-react';
-import { useCan } from '../../../auth';
-import { Button, EmptyState, ErrorState, PageHeader, useToast } from '../../../components/shared';
-import { useAsync } from '../../../hooks/useAsync';
-import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
-import { errorMessage, invitationsService, rolesService, usersService } from '../../../services';
-import type { Invitation, InvitationFilters as Filters } from '../../../types';
-import { InvitationActionDialog, type InvitationActionKind } from '../components/InvitationActionDialog';
-import { InvitationDetailDrawer } from '../components/InvitationDetailDrawer';
-import { InvitationFilters } from '../components/InvitationFilters';
-import { InvitationsTable } from '../components/InvitationsTable';
-import { InvitePatientModal } from '../components/InvitePatientModal';
-import { InviteStaffModal } from '../components/InviteStaffModal';
-import { EMPTY_INVITATION_FILTERS, filterInvitations } from '../helpers';
+import { useState, type FormEvent } from 'react';
+import { Info } from 'lucide-react';
+import { INVITABLE_STAFF_ROLES, Permissions, ROLE_LABELS, roleLabel, useAuth } from '../../../auth';
+import { Badge, Button, Card, ConfirmDialog, FormError, Input, PageHeader, Select, Table, useToast, type Column } from '../../../components/shared';
+import { formatUtcDateTime } from '../../../utils/dates';
+import { EMAIL_PATTERN } from '../../auth/password';
+import { GUID_PATTERN, describeInvitationError, invitationsService } from '../services/invitationsService';
+import { InvitationSubjectType, type InvitationSummary } from '../types/invitations.types';
 
-/** Invitaciones de un solo uso para pacientes (app) y personal (portal). */
+/**
+ * Invitaciones de cuenta. Solo lo que el backend soporta hoy: invitar a un paciente o a un miembro del personal
+ * ya registrados (por su id), reemitir y revocar. No hay listado en servidor: la tabla muestra solo las
+ * invitaciones emitidas en esta pestaña y se pierde al recargar.
+ */
 export function InvitationsPage() {
+  const { can } = useAuth();
+  const canInvitePatient = can(Permissions.Accounts.InvitePatient);
+  const canManage = can(Permissions.Users.Manage);
   const toast = useToast();
-  const canCreate = useCan('invitations', 'create');
-  const canManage = useCan('invitations', 'update');
-  const { data, loading, error, reload, setData } = useAsync(() => invitationsService.list());
-  const rolesQ = useAsync(() => rolesService.list());
-  const usersQ = useAsync(() => usersService.list().catch(() => []));
-  const invitations = useMemo(() => data ?? [], [data]);
+  const [issued, setIssued] = useState<InvitationSummary[]>([]);
+  const [revokeTarget, setRevokeTarget] = useState<string | null>(null);
 
-  const [filters, setFilters] = useState<Filters>(EMPTY_INVITATION_FILTERS);
-  const q = useDebouncedValue(filters.q);
-  const filtered = useMemo(() => filterInvitations(invitations, { ...filters, q }), [invitations, filters, q]);
-  const [modal, setModal] = useState<'patient' | 'staff' | null>(null);
-  const [detail, setDetail] = useState<Invitation | null>(null);
-  const [action, setAction] = useState<{ kind: InvitationActionKind; invitation: Invitation } | null>(null);
+  const remember = (inv: InvitationSummary) => setIssued((prev) => [inv, ...prev.filter((x) => x.id !== inv.id)]);
 
-  const upsert = (inv: Invitation) =>
-    setData((prev) => (prev?.some((x) => x.id === inv.id) ? prev.map((x) => (x.id === inv.id ? inv : x)) : [inv, ...(prev ?? [])]));
-
-  const runAction = async (kind: InvitationActionKind, inv: Invitation) => {
+  const reissue = async (id: string) => {
     try {
-      const updated = kind === 'resend' ? await invitationsService.reissue(inv.id) : await invitationsService.revoke(inv.id);
-      upsert(updated);
-      if (detail?.id === updated.id) setDetail(updated);
-      toast({
-        title: kind === 'resend' ? 'Invitación reenviada' : 'Invitación revocada',
-        description:
-          kind === 'resend' ? `Enlace nuevo enviado a ${inv.email}. Caduca en 7 días.` : `${inv.email} ya no puede usar el enlace.`,
-        tone: 'success',
-      });
+      const inv = await invitationsService.reissue(id);
+      remember(inv);
+      toast({ title: 'Invitación reemitida', description: inv.emailSent ? `Enviada a ${inv.email}` : 'No se pudo enviar el email.', tone: 'success' });
     } catch (e) {
-      toast({ title: kind === 'resend' ? 'No se pudo reenviar' : 'No se pudo revocar', description: errorMessage(e), tone: 'error' });
-    } finally {
-      setAction(null);
+      toast({ title: 'No se pudo reemitir', description: describeInvitationError(e), tone: 'error' });
     }
   };
 
-  const onSent = (inv: Invitation) => {
-    setModal(null);
-    upsert(inv);
-    toast({
-      title: 'Invitación enviada',
-      description: `${inv.email} recibirá el enlace en unos minutos. Caduca en 7 días.`,
-      tone: 'success',
-    });
+  const revoke = async () => {
+    if (!revokeTarget) return;
+    try {
+      await invitationsService.revoke(revokeTarget);
+      setIssued((prev) => prev.filter((x) => x.id !== revokeTarget));
+      toast({ title: 'Invitación revocada', tone: 'success' });
+    } catch (e) {
+      toast({ title: 'No se pudo revocar', description: describeInvitationError(e), tone: 'error' });
+    } finally {
+      setRevokeTarget(null);
+    }
   };
 
-  const inviteButtons = canCreate && (
-    <>
-      <Button variant="secondary" leftIcon={<UserPlus size={16} aria-hidden="true" />} onClick={() => setModal('patient')}>
-        Invitar paciente
-      </Button>
-      <Button leftIcon={<Stethoscope size={16} aria-hidden="true" />} onClick={() => setModal('staff')}>
-        Invitar personal
-      </Button>
-    </>
-  );
+  const columns: Column<InvitationSummary>[] = [
+    {
+      id: 'subject',
+      header: 'Destinatario',
+      cell: (i) => (
+        <span className="flex flex-col">
+          <span className="font-semibold text-ink">{i.email}</span>
+          <span className="text-xs text-ink-muted">{i.subjectType === InvitationSubjectType.Patient ? 'Paciente' : 'Personal'}</span>
+        </span>
+      ),
+    },
+    { id: 'role', header: 'Rol', cell: (i) => roleLabel(i.intendedRole) },
+    { id: 'expires', header: 'Caduca', cell: (i) => <span className="tabular">{formatUtcDateTime(i.expiresAtUtc)}</span> },
+    {
+      id: 'email',
+      header: 'Email',
+      cell: (i) => <Badge tone={i.emailSent ? 'success' : 'warning'}>{i.emailSent ? 'Enviado' : 'No enviado'}</Badge>,
+    },
+    {
+      id: 'actions',
+      header: <span className="sr-only">Acciones</span>,
+      align: 'right',
+      cell: (i) =>
+        canManage ? (
+          <span className="flex justify-end gap-1.5">
+            <Button size="sm" variant="secondary" onClick={() => void reissue(i.id)}>
+              Reemitir
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(i.id)}>
+              Revocar
+            </Button>
+          </span>
+        ) : null,
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Invitaciones"
-        description="Enlaces de un solo uso para que pacientes y personal creen su cuenta. Caducan a los 7 días."
-        actions={inviteButtons}
+        description="Las cuentas se crean invitando a un paciente o a un miembro del personal ya registrados. La persona recibe un enlace para fijar su contraseña."
       />
-      <section aria-label="Lista de invitaciones" className="flex flex-col gap-4 rounded-[10px] border border-line bg-white p-4 sm:p-5">
-        <InvitationFilters value={filters} onChange={setFilters} invitations={invitations} resultCount={filtered.length} />
-        {error ? (
-          <ErrorState
-            title="No se pudieron cargar las invitaciones"
-            message={`${error} Vuelve a intentarlo en unos segundos.`}
-            onRetry={reload}
-          />
-        ) : (
-          <InvitationsTable
-            invitations={filtered}
-            loading={loading}
-            canManage={canManage}
-            onOpen={setDetail}
-            onResend={(invitation) => setAction({ kind: 'resend', invitation })}
-            onRevoke={(invitation) => setAction({ kind: 'revoke', invitation })}
-            resetPageKey={`${q}|${filters.tipo}|${filters.estado}`}
-            emptyState={
-              invitations.length === 0 ? (
-                <EmptyState
-                  icon={MailPlus}
-                  title="Todavía no has enviado invitaciones"
-                  description="Invita a un paciente para que consulte su historial en la app, o a personal para que acceda al sistema con su rol."
-                  action={inviteButtons}
-                />
-              ) : (
-                <EmptyState
-                  icon={SearchX}
-                  title="Ninguna invitación coincide con los filtros"
-                  action={
-                    <Button variant="secondary" onClick={() => setFilters(EMPTY_INVITATION_FILTERS)}>
-                      Limpiar filtros
-                    </Button>
-                  }
-                />
-              )
-            }
-          />
-        )}
-      </section>
 
-      <InvitePatientModal open={modal === 'patient'} onClose={() => setModal(null)} onSent={onSent} />
-      <InviteStaffModal open={modal === 'staff'} roles={rolesQ.data ?? []} onClose={() => setModal(null)} onSent={onSent} />
-      <InvitationDetailDrawer
-        invitation={detail}
-        canManage={canManage}
-        acceptedUserId={usersQ.data?.find((u) => u.email === detail?.email)?.id}
-        onClose={() => setDetail(null)}
-        onResend={(invitation) => setAction({ kind: 'resend', invitation })}
-        onRevoke={(invitation) => setAction({ kind: 'revoke', invitation })}
+      <p className="flex gap-2 rounded-lg border border-primary-300 bg-primary-50 px-3.5 py-2.5 text-[13px] text-primary-700">
+        <Info size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+        Pendiente de backend: listado de invitaciones y búsqueda de pacientes y personal. Por ahora se indica el identificador
+        del registro.
+      </p>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {canManage && <InviteStaffForm onIssued={remember} />}
+        {canInvitePatient && <InvitePatientForm onIssued={remember} />}
+      </div>
+
+      {canManage && <ManageByIdForm onReissue={reissue} onRevoke={setRevokeTarget} />}
+
+      {issued.length > 0 && (
+        <Card title="Emitidas en esta sesión" subtitle="No es el listado del servidor: desaparece al recargar la página." padding="none">
+          <Table caption="Invitaciones emitidas en esta sesión" columns={columns} rows={issued} getRowId={(i) => i.id} />
+        </Card>
+      )}
+
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        title="Revocar invitación"
+        message="El enlace dejará de funcionar. Podrás emitir una nueva invitación más tarde."
+        confirmLabel="Revocar"
+        onConfirm={revoke}
+        onCancel={() => setRevokeTarget(null)}
       />
-      <InvitationActionDialog action={action} onConfirm={runAction} onCancel={() => setAction(null)} />
     </div>
+  );
+}
+
+function InviteStaffForm({ onIssued }: { onIssued: (inv: InvitationSummary) => void }) {
+  const toast = useToast();
+  const [staffId, setStaffId] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('');
+  const [touched, setTouched] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const idError = touched && !GUID_PATTERN.test(staffId.trim()) ? 'Identificador no válido (GUID).' : undefined;
+  const emailError = touched && !EMAIL_PATTERN.test(email.trim()) ? 'Email no válido.' : undefined;
+  const roleError = touched && !role ? 'Selecciona un rol.' : undefined;
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setTouched(true);
+    if (sending || !GUID_PATTERN.test(staffId.trim()) || !EMAIL_PATTERN.test(email.trim()) || !role) return;
+    setSending(true);
+    setError(null);
+    try {
+      const inv = await invitationsService.inviteStaff({ clinicalStaffId: staffId.trim(), email: email.trim(), role });
+      onIssued(inv);
+      toast({ title: 'Invitación creada', description: inv.emailSent ? `Enviada a ${inv.email}` : 'No se pudo enviar el email; reemítela.', tone: 'success' });
+      setStaffId('');
+      setEmail('');
+      setRole('');
+      setTouched(false);
+    } catch (err) {
+      setError(describeInvitationError(err));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Card title="Invitar a personal" subtitle="Médico, enfermería, paramédico o recepción. El rol de administrador no se concede por invitación.">
+      <form noValidate onSubmit={submit} className="flex flex-col gap-3.5">
+        <Input label="Id del registro de personal (ClinicalStaff)" value={staffId} onChange={(e) => setStaffId(e.target.value)} error={idError} className="font-mono" required />
+        <Input label="Email" type="email" autoComplete="off" value={email} maxLength={256} onChange={(e) => setEmail(e.target.value)} error={emailError} required />
+        <Select
+          label="Rol"
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          placeholder="Selecciona un rol…"
+          options={INVITABLE_STAFF_ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] }))}
+          error={roleError}
+          required
+        />
+        <FormError message={error} />
+        <Button type="submit" loading={sending} loadingText="Enviando…" className="w-full sm:w-fit">
+          Enviar invitación
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+function InvitePatientForm({ onIssued }: { onIssued: (inv: InvitationSummary) => void }) {
+  const toast = useToast();
+  const [patientId, setPatientId] = useState('');
+  const [touched, setTouched] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const idError = touched && !GUID_PATTERN.test(patientId.trim()) ? 'Identificador no válido (GUID).' : undefined;
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setTouched(true);
+    if (sending || !GUID_PATTERN.test(patientId.trim())) return;
+    setSending(true);
+    setError(null);
+    try {
+      const inv = await invitationsService.invitePatient({ patientId: patientId.trim() });
+      onIssued(inv);
+      toast({ title: 'Invitación creada', description: inv.emailSent ? `Enviada a ${inv.email}` : 'No se pudo enviar el email; reemítela.', tone: 'success' });
+      setPatientId('');
+      setTouched(false);
+    } catch (err) {
+      setError(describeInvitationError(err));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Card title="Invitar a un paciente" subtitle="Se usa el email activo registrado del paciente. Una invitación nueva reemplaza la pendiente.">
+      <form noValidate onSubmit={submit} className="flex flex-col gap-3.5">
+        <Input label="Id del paciente (Patient)" value={patientId} onChange={(e) => setPatientId(e.target.value)} error={idError} className="font-mono" required />
+        <FormError message={error} />
+        <Button type="submit" loading={sending} loadingText="Enviando…" className="w-full sm:w-fit">
+          Enviar invitación
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+function ManageByIdForm({ onReissue, onRevoke }: { onReissue: (id: string) => Promise<void>; onRevoke: (id: string) => void }) {
+  const [id, setId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const valid = GUID_PATTERN.test(id.trim());
+
+  return (
+    <Card title="Gestionar una invitación existente" subtitle="Con el identificador de la invitación.">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <Input
+          label="Id de la invitación"
+          value={id}
+          onChange={(e) => setId(e.target.value)}
+          error={id && !valid ? 'Identificador no válido (GUID).' : undefined}
+          className="font-mono"
+          containerClassName="min-w-0 flex-1"
+        />
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            disabled={!valid}
+            loading={busy}
+            onClick={async () => {
+              setBusy(true);
+              await onReissue(id.trim());
+              setBusy(false);
+            }}
+          >
+            Reemitir
+          </Button>
+          <Button variant="danger" disabled={!valid || busy} onClick={() => onRevoke(id.trim())}>
+            Revocar
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 }
 

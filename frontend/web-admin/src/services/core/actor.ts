@@ -4,12 +4,10 @@ export interface Actor {
   rol: string;
 }
 
-let current: Actor = { nombre: 'Admin SCIH', email: 'admin@scih.com', rol: 'Administrador' };
+// DEMO: autor de los eventos que generan las pantallas de demostración en el registro de auditoría ficticio.
+// No es el usuario autenticado (ese llega de /api/web/auth/me) ni concede ningún permiso.
+const current: Actor = { nombre: 'Usuario de demostración', email: 'demo@sci-ph.test', rol: 'Administrator' };
 
 export function getActor(): Actor {
   return current;
-}
-
-export function setActor(actor: Actor): void {
-  current = actor;
 }

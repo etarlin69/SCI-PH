@@ -1,23 +1,23 @@
 import { NavLink } from 'react-router-dom';
 import { Activity, LogOut } from 'lucide-react';
-import type { ModuleKey, SessionUser } from '../../types';
+import { roleLabel, type WebUser } from '../../auth';
 import { cn } from '../../utils/cn';
 import { initials } from '../../utils/formatters';
 import { NAV_SECTIONS } from './navigation';
 
 export interface SidebarProps {
-  user: SessionUser;
-  canRead: (module: ModuleKey) => boolean;
+  user: WebUser;
+  canAny: (permissions: readonly string[]) => boolean;
   onLogout: () => void;
   variant?: 'rail' | 'drawer';
   onNavigate?: () => void;
 }
 
 /** Menú lateral. */
-export function Sidebar({ user, canRead, onLogout, variant = 'rail', onNavigate }: SidebarProps) {
+export function Sidebar({ user, canAny, onLogout, variant = 'rail', onNavigate }: SidebarProps) {
   const drawer = variant === 'drawer';
   const showLabel = drawer ? '' : 'sr-only lg:not-sr-only';
-  const sections = NAV_SECTIONS.map((s) => ({ ...s, items: s.items.filter((i) => !i.module || canRead(i.module)) })).filter(
+  const sections = NAV_SECTIONS.map((s) => ({ ...s, items: s.items.filter((i) => !i.anyOf || canAny(i.anyOf)) })).filter(
     (s) => s.items.length > 0,
   );
 
@@ -85,12 +85,12 @@ export function Sidebar({ user, canRead, onLogout, variant = 'rail', onNavigate 
           )}
           aria-hidden="true"
         >
-          {initials(user.nombre)}
+          {initials(user.userName)}
         </span>
         <span className={cn('min-w-0 flex-1 flex-col gap-0.5', drawer ? 'flex' : 'sr-only lg:not-sr-only lg:flex')}>
-          <span className="truncate text-[13px] font-semibold text-white">{user.nombre}</span>
+          <span className="truncate text-[13px] font-semibold text-white">{user.userName}</span>
           <span className="truncate text-xs text-[#9FB0C3]">
-            {user.rol} · {user.email}
+            {user.roles.map(roleLabel).join(', ') || 'Sin rol'}{user.email ? ` · ${user.email}` : ''}
           </span>
         </span>
         <button

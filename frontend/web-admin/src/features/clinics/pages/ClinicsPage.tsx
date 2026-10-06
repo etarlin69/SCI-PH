@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { Building2, Plus, SearchX } from 'lucide-react';
 import type { Clinic } from '../../../types';
 import { clinicsService } from '../../../services';
-import { useCan } from '../../../auth';
+import { useCanAny } from '../../../auth';
+import { DEMO_ADMIN_PERMISSIONS } from '../../../components/common/navigation';
 import { Button, Card, EmptyState, ErrorState, PageHeader } from '../../../components/shared';
 import { useAsync } from '../../../hooks/useAsync';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
@@ -17,9 +18,9 @@ type FormState = { open: false } | { open: true; clinic: Clinic | null };
 
 /** Clínicas: directorio de hospitales, clínicas y centros que reciben pacientes (sustituye a «Hospitales»). */
 export function ClinicsPage() {
-  const canCreate = useCan('clinics', 'create');
-  const canUpdate = useCan('clinics', 'update');
-  const canDelete = useCan('clinics', 'delete');
+  const canCreate = useCanAny(DEMO_ADMIN_PERMISSIONS);
+  const canUpdate = useCanAny(DEMO_ADMIN_PERMISSIONS);
+  const canDelete = useCanAny(DEMO_ADMIN_PERMISSIONS);
 
   const { data, loading, error, reload, setData } = useAsync(() => clinicsService.list(), []);
   const [filters, setFilters] = useState<ClinicListFilters>(EMPTY_CLINIC_FILTERS);

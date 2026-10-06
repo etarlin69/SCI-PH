@@ -14,8 +14,6 @@ import type {
 import { ServiceError } from '../../../services/core/errors';
 import { mockList, mockRead, mockWrite, nextId, notFound } from '../../../services/core/mock';
 import { record } from '../../audit/services/auditService';
-import { invitationsService } from '../../invitations/services/invitationsService';
-import { usersService } from '../../users/services/usersService';
 
 const staff = STAFF_MOCK;
 const assignments: Assignment[] = [...ASSIGNMENTS_MOCK];
@@ -56,11 +54,9 @@ export const staffService = {
     if (staff.some((s) => s.email.toLowerCase() === input.email.trim().toLowerCase())) {
       throw new ServiceError('CONFLICT', 'Ya hay personal registrado con este email.', { field: 'email' });
     }
-    let invitationId: string | undefined;
-    if (access.invitar && access.rol) {
-      const inv = await invitationsService.inviteStaff({ email: input.email, rol: access.rol, departamento: input.departamento });
-      invitationId = inv.id;
-    }
+    // DEMO: no se emite una invitación real (el registro de personal es ficticio). Las invitaciones reales se
+    // envían desde Invitaciones con el id de un ClinicalStaff del backend.
+    const invitationId = access.invitar && access.rol ? `DEMO-INV-${Date.now().toString(36).toUpperCase()}` : undefined;
     return mockWrite('staff.create', () => {
       const member: StaffMember = {
         ...input,
@@ -96,12 +92,10 @@ export const staffService = {
     });
   },
 
-  /** Elimina el perfil; opcionalmente suspende la cuenta de usuario vinculada. */
+  /** Elimina el perfil (DEMO). `suspendAccount` no toca cuentas reales: solo se registra en el histórico ficticio. */
   async remove(id: string, options: { suspendAccount: boolean }): Promise<void> {
     const member = find(id);
-    if (options.suspendAccount && member.cuenta.estado === 'vinculada') {
-      await usersService.setStatus(member.cuenta.userId, 'Suspendido');
-    }
+    if (options.suspendAccount && member.cuenta.estado === 'vinculada') log(id, 'Suspensión de cuenta solicitada (demo)', 'warning');
     return mockWrite('staff.remove', () => {
       staff.splice(staff.indexOf(member), 1);
       record({ accion: 'Eliminar', recurso: `Personal ${id}`, descripcion: `Perfil de ${member.nombre} eliminado.` });
