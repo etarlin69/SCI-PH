@@ -1,7 +1,7 @@
 import { lazy, Suspense, type ComponentType, type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { ADMIN_PERMISSIONS, Permissions, RequireAuth, RequirePermission, SessionLoading, resolveHomeRoute, useAuth, type Permission } from '../auth';
-import { DEMO_ADMIN_PERMISSIONS, Layout, firstAdminRoute } from '../components/common';
+import { DEMO_ADMIN_PERMISSIONS, HOSPITAL_SCREEN_PERMISSIONS as H, Layout, firstAdminRoute, firstHospitalRoute } from '../components/common';
 import { LoadingSpinner } from '../components/shared';
 import ForbiddenPage from '../features/auth/pages/ForbiddenPage';
 import NotFoundPage from '../features/auth/pages/NotFoundPage';
@@ -31,6 +31,17 @@ const StaffPage = page(() => import('../features/staff/pages/StaffPage'));
 const StaffDetailPage = page(() => import('../features/staff/pages/StaffDetailPage'));
 const CatalogsPage = page(() => import('../features/catalogs/pages/CatalogsPage'));
 const ProfilePage = page(() => import('../features/profile/pages/ProfilePage'));
+// Módulo hospitalario (Rol 4). Exportaciones con nombre: se adaptan a lazy().
+const ReceptionPage = page(() => import('../features/clinical/pages/ReceptionPage').then((m) => ({ default: m.ReceptionPage })));
+const PatientsPage = page(() => import('../features/clinical/pages/PatientsPage').then((m) => ({ default: m.PatientsPage })));
+const EncounterDashboardPage = page(() =>
+  import('../features/clinical/pages/EncounterDashboardPage').then((m) => ({ default: m.EncounterDashboardPage })),
+);
+const TriagePage = page(() => import('../features/clinical/pages/TriagePage').then((m) => ({ default: m.TriagePage })));
+const PharmacyAndDischargePage = page(() =>
+  import('../features/clinical/pages/PharmacyAndDischargePage').then((m) => ({ default: m.PharmacyAndDischargePage })),
+);
+const TransfersPage = page(() => import('../features/clinical/pages/TransfersPage').then((m) => ({ default: m.TransfersPage })));
 
 function PageFallback() {
   return (
@@ -43,6 +54,12 @@ function PageFallback() {
 const s = (node: ReactNode) => <Suspense fallback={<PageFallback />}>{node}</Suspense>;
 
 const guarded = (anyOf: readonly Permission[], node: ReactNode) => <RequirePermission anyOf={anyOf}>{s(node)}</RequirePermission>;
+
+/** `/hospital` → recepción (o la primera pantalla hospitalaria permitida). */
+function HospitalIndex() {
+  const { canAny } = useAuth();
+  return <Navigate to={firstHospitalRoute(canAny)} replace />;
+}
 
 /** `/admin` → primera pantalla del portal que permiten los permisos del usuario. */
 function AdminIndex() {
@@ -96,6 +113,23 @@ export function AppRoutes() {
           <Route path="personal/:id" element={guarded(DEMO_ADMIN_PERMISSIONS, <StaffDetailPage />)} />
           <Route path="catalogos" element={guarded(DEMO_ADMIN_PERMISSIONS, <CatalogsPage />)} />
           <Route path="catalogos/:tipo" element={guarded(DEMO_ADMIN_PERMISSIONS, <CatalogsPage />)} />
+          <Route path="perfil" element={s(<ProfilePage />)} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Route>
+
+      {/* Hospital (Rol 4): misma sesión, guards y layout compartidos; datos clínicos aún simulados (mockClinicalApi). */}
+      <Route path="hospital" element={<RequireAuth />}>
+        <Route element={<Layout />}>
+          <Route index element={<HospitalIndex />} />
+          <Route path="recepcion" element={guarded(H.reception, <ReceptionPage />)} />
+          <Route path="pacientes" element={guarded(H.patients, <PatientsPage />)} />
+          <Route path="atenciones" element={guarded(H.encounters, <EncounterDashboardPage />)} />
+          <Route path="atenciones/:encounterId" element={guarded(H.encounters, <EncounterDashboardPage />)} />
+          <Route path="atenciones/:encounterId/triage" element={guarded(H.triage, <TriagePage />)} />
+          <Route path="atenciones/:encounterId/medicacion" element={guarded(H.medication, <PharmacyAndDischargePage />)} />
+          <Route path="triage" element={guarded(H.triage, <TriagePage />)} />
+          <Route path="transferencias" element={guarded(H.transfers, <TransfersPage />)} />
           <Route path="perfil" element={s(<ProfilePage />)} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

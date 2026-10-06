@@ -1,13 +1,15 @@
 import { useCallback, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth';
+// Solo la bandera (no el adaptador mock), para no cargar datos simulados en el chunk principal.
+import { CLINICAL_API_IS_MOCK } from '../../features/clinical/api/mode';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { useToast } from '../shared';
 import { Header, type Crumb } from './Header';
 import { MobileNav } from './MobileNav';
 import { PageMetaProvider, usePageMeta } from './PageMeta';
 import { Sidebar } from './Sidebar';
-import { findNavEntry } from './navigation';
+import { MODULE_NAV, findNavEntry, moduleForPath } from './navigation';
 
 /** Estructura general: Sidebar (rail/completo) o menú desplegable en móvil + Header + `<Outlet />`. */
 export function Layout() {
@@ -27,11 +29,18 @@ function LayoutInner() {
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
+  const module = moduleForPath(pathname);
+  const nav = MODULE_NAV[module];
   const entry = findNavEntry(pathname);
-  const crumbs: Crumb[] = [{ label: 'Dashboard', to: '/admin/dashboard' }];
-  if (entry && entry.to !== '/admin/dashboard') {
-    crumbs.push({ label: entry.section }, { label: entry.page, to: entry.to });
+  const rootCrumb: Crumb = module === 'hospital' ? { label: 'Hospital', to: nav.home } : { label: 'Dashboard', to: nav.home };
+  const crumbs: Crumb[] = [rootCrumb];
+  if (entry && entry.to !== nav.home) {
+    // La sección se omite si repite la raíz (p. ej. «Hospital › Hospital › Recepción»).
+    if (entry.section !== rootCrumb.label) crumbs.push({ label: entry.section });
+    crumbs.push({ label: entry.page, to: entry.to });
   }
+  // Hospital: el API clínico aún es un adaptador simulado. Admin: pantallas DEMO sin API.
+  const environmentLabel = module === 'hospital' ? (CLINICAL_API_IS_MOCK ? 'Simulación' : undefined) : entry?.demo ? 'Datos de demostración' : undefined;
   if (crumb) crumbs.push({ label: crumb });
   useDocumentTitle(crumb ?? entry?.page ?? 'SCI-PH');
 
@@ -44,7 +53,7 @@ function LayoutInner() {
     navigate('/login', { replace: true });
   };
 
-  const sidebarProps = { user, canAny, onLogout: () => void handleLogout() };
+  const sidebarProps = { module, user, canAny, onLogout: () => void handleLogout() };
 
   return (
     <div className="flex min-h-screen bg-surface-ground">
@@ -61,7 +70,7 @@ function LayoutInner() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header
           crumbs={crumbs}
-          environmentLabel={entry?.demo ? 'Datos de demostración' : undefined}
+          environmentLabel={environmentLabel}
           onMenuClick={() => setMenuOpen(true)}
           menuOpen={menuOpen}
         />

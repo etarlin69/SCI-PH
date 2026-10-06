@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { Activity, LogOut } from 'lucide-react';
-import { roleLabel, type WebUser } from '../../auth';
+import { Activity, ArrowLeftRight, LogOut } from 'lucide-react';
+import { accessibleModules, roleLabel, type WebUser } from '../../auth';
 import { cn } from '../../utils/cn';
 import { initials } from '../../utils/formatters';
-import { NAV_SECTIONS } from './navigation';
+import { MODULE_NAV, type NavModuleKey } from './navigation';
 
 export interface SidebarProps {
+  module: NavModuleKey;
   user: WebUser;
   canAny: (permissions: readonly string[]) => boolean;
   onLogout: () => void;
@@ -13,11 +14,16 @@ export interface SidebarProps {
   onNavigate?: () => void;
 }
 
-/** Menú lateral. */
-export function Sidebar({ user, canAny, onLogout, variant = 'rail', onNavigate }: SidebarProps) {
+/** Menú lateral del módulo actual (Admin u Hospital), filtrado por los permisos reales del usuario. */
+export function Sidebar({ module, user, canAny, onLogout, variant = 'rail', onNavigate }: SidebarProps) {
   const drawer = variant === 'drawer';
   const showLabel = drawer ? '' : 'sr-only lg:not-sr-only';
-  const sections = NAV_SECTIONS.map((s) => ({ ...s, items: s.items.filter((i) => !i.anyOf || canAny(i.anyOf)) })).filter(
+  const current = MODULE_NAV[module];
+  // Cambio de módulo solo hacia los módulos a los que el usuario tiene acceso por permisos.
+  const otherModules = accessibleModules(user.permissions)
+    .filter((m) => m.key !== module && m.key in MODULE_NAV)
+    .map((m) => MODULE_NAV[m.key as NavModuleKey]);
+  const sections = current.sections.map((s) => ({ ...s, items: s.items.filter((i) => !i.anyOf || canAny(i.anyOf)) })).filter(
     (s) => s.items.length > 0,
   );
 
@@ -35,7 +41,7 @@ export function Sidebar({ user, canAny, onLogout, variant = 'rail', onNavigate }
         </span>
         <span className={cn('flex-col gap-0.5', drawer ? 'flex' : 'sr-only lg:not-sr-only lg:flex')}>
           <span className="text-base font-bold tracking-[0.04em] text-white">SCI-PH</span>
-          <span className="text-xs text-[#9FB0C3]">Administración y Analítica</span>
+          <span className="text-xs text-[#9FB0C3]">{current.subtitle}</span>
         </span>
       </div>
 
@@ -72,9 +78,31 @@ export function Sidebar({ user, canAny, onLogout, variant = 'rail', onNavigate }
         </div>
       ))}
 
+      {otherModules.length > 0 && (
+        <div className="mt-auto flex flex-col gap-0.5">
+          {otherModules.map((m) => (
+            <NavLink
+              key={m.key}
+              to={m.home}
+              title={drawer ? undefined : `Ir a ${m.label}`}
+              onClick={onNavigate}
+              className={cn(
+                'flex min-h-10 items-center gap-2.5 rounded-md px-2.5 text-sm text-nav-muted no-underline hover:bg-nav-hover hover:text-white',
+                drawer ? 'justify-start' : 'justify-center lg:justify-start',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-300',
+              )}
+            >
+              <ArrowLeftRight size={18} className="shrink-0" aria-hidden="true" />
+              <span className={showLabel}>Ir a {m.label}</span>
+            </NavLink>
+          ))}
+        </div>
+      )}
+
       <div
         className={cn(
-          'mt-auto flex items-center gap-2.5 border-t border-nav-border pt-3',
+          'flex items-center gap-2.5 border-t border-nav-border pt-3',
+          otherModules.length === 0 && 'mt-auto',
           drawer ? 'px-2.5' : 'flex-col px-1 lg:flex-row lg:px-2.5',
         )}
       >

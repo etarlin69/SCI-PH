@@ -33,6 +33,17 @@ export const ADMIN_PERMISSIONS: readonly Permission[] = [
   Permissions.Audit.Read,
 ];
 
+/**
+ * Permisos que dan acceso al módulo hospitalario (cualquiera de ellos). Cada pantalla exige además el suyo
+ * (ver HOSPITAL_SCREEN_PERMISSIONS en components/common/navigation.ts).
+ */
+export const HOSPITAL_PERMISSIONS: readonly Permission[] = [
+  Permissions.Patients.Read,
+  Permissions.Encounters.Read,
+  Permissions.Encounters.Create,
+  Permissions.Transfers.Read,
+];
+
 export const SecurityRoles = ['Administrator', 'Doctor', 'Nurse', 'Paramedic', 'Receptionist', 'Patient'] as const;
 export type SecurityRole = (typeof SecurityRoles)[number];
 

@@ -67,7 +67,8 @@ describe('resolución del destino tras el login', () => {
   it('elige el módulo por permisos reales y no por rol', () => {
     expect(resolveHomeRoute(ADMIN_USER.permissions)).toBe('/admin');
     expect(resolveHomeRoute(['Accounts.InvitePatient'])).toBe('/admin');
-    expect(resolveHomeRoute(NURSE_USER.permissions)).toBe('/403');
+    // Con el módulo hospitalario registrado, los permisos clínicos llevan a /hospital.
+    expect(resolveHomeRoute(NURSE_USER.permissions)).toBe('/hospital');
     expect(resolveHomeRoute([])).toBe('/403');
   });
 
