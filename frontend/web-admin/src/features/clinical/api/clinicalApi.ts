@@ -1,3 +1,4 @@
+import { ApiError, NetworkError, describeApiError } from '../../../api';
 import type {
     ClinicalEncounterSummary,
     ClinicalNote,
@@ -21,9 +22,9 @@ import type {
 
 /**
  * Puerto de datos del frontend hospitalario. Hoy solo existe el adaptador MOCK (mockClinicalApi.ts) porque los
- * endpoints clínicos del Web BFF no están implementados. El adaptador HTTP se escribirá sobre el cliente común del
- * Rol 5 (token en memoria, refresh por cookie, CSRF): este módulo no maneja tokens ni cookies.
- * Rutas previstas: docs/HOSPITAL_CONTRATOS.md.
+ * endpoints clínicos del Web BFF no están implementados. El adaptador HTTP (`httpClinicalApi`) implementará esta
+ * misma interfaz con `apiRequest` de src/api (Bearer en memoria, refresh single-flight, ProblemDetails): este módulo
+ * no maneja tokens ni cookies. Rutas previstas: docs/HOSPITAL_CONTRATOS.md.
  */
 export interface ClinicalApi {
     searchPatients(request: PatientSearchRequest, signal?: AbortSignal): Promise<PatientSummary[]>;
@@ -63,8 +64,14 @@ export class ClinicalApiError extends Error {
     }
 }
 
-/** Mensaje legible para la UI. No incluye datos clínicos. */
+/**
+ * Mensaje legible para la UI. No incluye datos clínicos. Acepta los errores del mock (ClinicalApiError) y los del
+ * cliente HTTP compartido (ApiError/NetworkError de src/api), que usará el futuro adaptador HTTP.
+ */
 export function describeError(error: unknown): string {
+    if (error instanceof ApiError || error instanceof NetworkError) {
+        return describeApiError(error, { 404: 'El registro no existe o no es visible para tu usuario.' });
+    }
     if (error instanceof ClinicalApiError) {
         switch (error.status) {
             case 401:

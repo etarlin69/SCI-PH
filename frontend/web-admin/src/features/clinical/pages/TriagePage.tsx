@@ -1,13 +1,13 @@
 import { useState, type FormEvent } from 'react';
+import { Permissions, useAuth } from '../../../auth';
 import { Link, useParams } from 'react-router-dom';
-import { Button, Card, Input } from '../../../components/shared';
+import { Button, Card, EmptyState, Input, Textarea } from '../../../components/shared';
 import { cn } from '../../../utils/cn';
 import { clinicalApi } from '../api';
 import { EncounterStatusBadge, TriagePriorityBadge } from '../components/ClinicalBadges';
 import { EncounterShell } from '../components/EncounterShell';
 import { EncounterSubject } from '../components/EncounterSubject';
-import { EmptyState, QueryView } from '../components/QueryView';
-import { TextAreaField } from '../components/TextAreaField';
+import { QueryView } from '../components/QueryView';
 import { useClinicalFeedback } from '../hooks/useClinicalFeedback';
 import { useClinicalQuery } from '../hooks/useClinicalQuery';
 import type { ClinicalEncounterSummary, TriagePriority, VitalSignInput, VitalSignType } from '../types/clinical.types';
@@ -93,6 +93,7 @@ type VitalValues = Partial<Record<VitalSignType, string>>;
 
 function TriageForm({ encounter, onSaved }: { encounter: ClinicalEncounterSummary; onSaved: () => void }) {
     const feedback = useClinicalFeedback();
+    const canWriteVitals = useAuth().can(Permissions.VitalSigns.Write);
     // Sin valores por defecto: solo se envía lo que el usuario introduce.
     const [priority, setPriority] = useState<TriagePriority | null>(null);
     const [vitals, setVitals] = useState<VitalValues>({});
@@ -195,6 +196,7 @@ function TriageForm({ encounter, onSaved }: { encounter: ClinicalEncounterSummar
                     )}
                 </fieldset>
 
+                {canWriteVitals && (
                 <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
                     <legend className="mb-1 text-[13px] font-semibold text-ink-2">Signos vitales (opcionales)</legend>
                     <p className="m-0 text-xs text-ink-muted">Deja vacío lo que no se haya medido. Cada valor se registra por separado.</p>
@@ -223,9 +225,10 @@ function TriageForm({ encounter, onSaved }: { encounter: ClinicalEncounterSummar
                         containerClassName="sm:max-w-xs"
                     />
                 </fieldset>
+                )}
 
-                <TextAreaField label="Motivo (opcional)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
-                <TextAreaField label="Observaciones (opcional)" value={observations} onChange={(e) => setObservations(e.target.value)} rows={3} />
+                <Textarea label="Motivo (opcional)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
+                <Textarea label="Observaciones (opcional)" value={observations} onChange={(e) => setObservations(e.target.value)} rows={3} />
 
                 <Button type="submit" loading={saving} loadingText="Guardando…" className="w-full sm:w-fit">
                     Guardar triage

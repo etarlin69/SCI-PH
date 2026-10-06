@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { Permissions, useAuth } from '../../../auth';
 import { Link } from 'react-router-dom';
-import { Button, Card, ConfirmDialog } from '../../../components/shared';
+import { Button, Card, ConfirmDialog, EmptyState } from '../../../components/shared';
 import { clinicalApi } from '../api';
 import { useClinicalFeedback } from '../hooks/useClinicalFeedback';
 import { useClinicalQuery } from '../hooks/useClinicalQuery';
@@ -8,7 +9,7 @@ import type { ClinicalTransfer } from '../types/clinical.types';
 import { formatDateTimeUtc } from '../utils/clinicalLabels';
 import { TransferStatusBadge, TriagePriorityBadge } from './ClinicalBadges';
 import { EncounterSubject } from './EncounterSubject';
-import { EmptyState, QueryView } from './QueryView';
+import { QueryView } from './QueryView';
 
 /**
  * Traslados con destino a este hospital (lado receptor). El registro y el despacho del traslado los hace la app
@@ -17,6 +18,7 @@ import { EmptyState, QueryView } from './QueryView';
 export function IncomingTransfersPanel() {
     const { state, reload } = useClinicalQuery('incoming-transfers', (signal) => clinicalApi.listIncomingTransfers(signal));
     const feedback = useClinicalFeedback();
+    const canManage = useAuth().can(Permissions.Transfers.Manage);
     const [pending, setPending] = useState<ClinicalTransfer | null>(null);
     const [received, setReceived] = useState<ClinicalTransfer | null>(null);
 
@@ -73,7 +75,7 @@ export function IncomingTransfersPanel() {
                                     variant="secondary"
                                     size="sm"
                                     className="shrink-0"
-                                    disabled={t.status !== 'InTransit'}
+                                    disabled={t.status !== 'InTransit' || !canManage}
                                     title={t.status !== 'InTransit' ? 'Solo se puede recibir un traslado en camino.' : undefined}
                                     onClick={() => setPending(t)}
                                 >

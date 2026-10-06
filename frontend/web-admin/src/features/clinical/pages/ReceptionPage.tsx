@@ -1,12 +1,11 @@
 import { useState, type FormEvent } from 'react';
+import { Permissions, useAuth } from '../../../auth';
 import { useNavigate } from 'react-router-dom';
 import { Search, UserX } from 'lucide-react';
-import { Button, Card, ErrorState, Input, LoadingSpinner, Select } from '../../../components/shared';
+import { Button, Card, EmptyState, ErrorState, Input, LoadingSpinner, Select, Textarea } from '../../../components/shared';
 import { clinicalApi, describeError } from '../api';
 import { EncounterSubject } from '../components/EncounterSubject';
 import { IncomingTransfersPanel } from '../components/IncomingTransfersPanel';
-import { EmptyState } from '../components/QueryView';
-import { TextAreaField } from '../components/TextAreaField';
 import { useClinicalFeedback } from '../hooks/useClinicalFeedback';
 import type { ClinicalEncounterType, PatientIdentifierType, PatientSummary } from '../types/clinical.types';
 import { ENCOUNTER_TYPE_LABELS, IDENTIFIER_TYPE_LABELS } from '../utils/clinicalLabels';
@@ -32,6 +31,9 @@ type SearchState =
 export function ReceptionPage() {
     const navigate = useNavigate();
     const feedback = useClinicalFeedback();
+    const { can } = useAuth();
+    const canSearch = can(Permissions.Patients.Read);
+    const canCreate = can(Permissions.Encounters.Create);
 
     const [searchBy, setSearchBy] = useState<PatientIdentifierType | 'Name'>('NationalId');
     const [term, setTerm] = useState('');
@@ -65,7 +67,13 @@ export function ReceptionPage() {
                 reason: reason.trim() || null,
             });
             feedback.success(patient ? 'atención creada' : 'atención NN creada');
-            navigate(`/hospital/atenciones/${encounter.id}/triage`);
+            // Solo se navega a donde los permisos reales lo permiten (Recepción no tiene Encounters.Read ni Triage.Write).
+            if (can(Permissions.Triage.Write)) navigate(`/hospital/atenciones/${encounter.id}/triage`);
+            else if (can(Permissions.Encounters.Read)) navigate(`/hospital/atenciones/${encounter.id}`);
+            else {
+                setCreating(null);
+                setReason('');
+            }
         } catch (error) {
             feedback.failure('No se pudo crear la atención.', error);
             setCreating(null);
@@ -92,8 +100,9 @@ export function ReceptionPage() {
                                 options={HOSPITAL_ENCOUNTER_TYPES.map((t) => ({ value: t, label: ENCOUNTER_TYPE_LABELS[t] }))}
                             />
                         </div>
-                        <TextAreaField label="Motivo (opcional)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} maxLength={2000} />
+                        <Textarea label="Motivo (opcional)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} maxLength={2000} />
 
+                        {canSearch && (
                         <section aria-labelledby="identified-title" className="flex flex-col gap-3 border-t border-line-soft pt-4">
                             <h3 id="identified-title" className="m-0 text-sm font-semibold text-ink">
                                 Paciente identificado
@@ -120,7 +129,7 @@ export function ReceptionPage() {
                             </form>
 
                             {search.status === 'loading' && <LoadingSpinner label="Buscando…" />}
-                            {search.status === 'error' && <ErrorState variant="inline" title="La búsqueda falló." description={search.error} />}
+                            {search.status === 'error' && <ErrorState variant="banner" title="La búsqueda falló." message={search.error} />}
                             {search.status === 'success' &&
                                 (search.results.length === 0 ? (
                                     <EmptyState
@@ -139,7 +148,7 @@ export function ReceptionPage() {
                                                     size="sm"
                                                     className="shrink-0"
                                                     loading={creating === p.id}
-                                                    disabled={creating !== null}
+                                                    disabled={creating !== null || !canCreate}
                                                     onClick={() => void createEncounter(p)}
                                                 >
                                                     Abrir atención
@@ -149,6 +158,7 @@ export function ReceptionPage() {
                                     </ul>
                                 ))}
                         </section>
+                        )}
 
                         <section aria-labelledby="nn-title" className="flex flex-col gap-2 border-t border-line-soft pt-4">
                             <h3 id="nn-title" className="m-0 text-sm font-semibold text-ink">
@@ -162,7 +172,7 @@ export function ReceptionPage() {
                                 className="w-fit"
                                 leftIcon={<UserX size={16} aria-hidden="true" />}
                                 loading={creating === 'NN'}
-                                disabled={!nnAllowed || creating !== null}
+                                disabled={!nnAllowed || creating !== null || !canCreate}
                                 onClick={() => void createEncounter(null)}
                             >
                                 Abrir atención NN
@@ -174,7 +184,7 @@ export function ReceptionPage() {
                     </div>
                 </Card>
 
-                <IncomingTransfersPanel />
+                {can(Permissions.Transfers.Read) && <IncomingTransfersPanel />}
             </div>
         </div>
     );

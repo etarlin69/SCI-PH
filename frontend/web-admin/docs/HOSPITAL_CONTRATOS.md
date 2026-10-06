@@ -18,6 +18,30 @@ Los tipos de request/response están en `src/features/clinical/types/clinical.ty
   `JsonStringEnumConverter`; hay que decidir si se serializan como texto (propuesto) o como número.
 - **Identificadores sensibles fuera de la URL:** la búsqueda de pacientes va por POST con cuerpo.
 
+## Permisos por pantalla (permisos reales de Permissions.cs)
+
+El módulo usa la autenticación compartida (`src/auth`): `/hospital/*` está detrás de `RequireAuth` y cada pantalla de
+`RequirePermission`. Tras el login, `APP_MODULES` (`src/auth/modules.ts`) envía a `/hospital` a quien tenga permisos
+clínicos y no de administración (p. ej. Receptionist, Doctor, Nurse, Paramedic); el Administrator aterriza en Admin y
+puede cambiar de módulo desde el menú.
+
+| Pantalla | Acceso (cualquiera) | Acciones dentro |
+|---|---|---|
+| Recepción | `Encounters.Create`, `Patients.Read` | Buscar: `Patients.Read` · abrir atención: `Encounters.Create` · traslados: `Transfers.Read` |
+| Pacientes | `Patients.Read` | Pendiente de backend |
+| Atenciones / Expediente | `Encounters.Read` | Diagnóstico: `Diagnoses.Write` · nota: `ClinicalNotes.Write` |
+| Triage | `Triage.Write` | Signos vitales: `VitalSigns.Write` |
+| Medicación y egreso | `Medications.Read`, `Prescriptions.Write`, `MedicationAdministrations.Write` | Prescribir: `Prescriptions.Write` · cerrar atención: `Encounters.Close` |
+| Transferencias | `Transfers.Read` | Registrar llegada: `Transfers.Manage` |
+
+Huecos de permisos (no se inventan; a decidir con el Backend Lead):
+
+- No hay `Triage.Read`, `VitalSigns.Read`, `ClinicalNotes.Read`, `Diagnoses.Read` ni `MedicationAdministrations.Read`:
+  la lectura del expediente se cubre con `Encounters.Read` y la del Kardex con `Medications.Read`.
+- Receptionist tiene `Encounters.Create` pero no `Encounters.Read`: puede abrir una atención (también NN) pero no verla
+  después. La UI se queda en Recepción en ese caso.
+- No hay permiso para identificar a un paciente dentro de una atención NN distinto de `Patients.Identify`.
+
 ## Endpoints
 
 | Área | Método | Ruta | Request | Response | Pantalla | Permiso |

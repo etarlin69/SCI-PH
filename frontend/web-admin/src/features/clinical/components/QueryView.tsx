@@ -1,17 +1,6 @@
 import type { ReactNode } from 'react';
-import { Inbox } from 'lucide-react';
 import { ErrorState, LoadingSpinner } from '../../../components/shared';
 import type { QueryState } from '../hooks/useClinicalQuery';
-
-export function EmptyState({ title, description }: { title: string; description?: string }) {
-    return (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-line px-4 py-8 text-center">
-            <Inbox size={22} className="text-ink-muted" aria-hidden="true" />
-            <p className="m-0 text-sm font-semibold text-ink-2">{title}</p>
-            {description && <p className="m-0 max-w-sm text-[13px] text-ink-muted">{description}</p>}
-        </div>
-    );
-}
 
 export interface QueryViewProps<T> {
     state: QueryState<T>;
@@ -34,7 +23,7 @@ export function QueryView<T>({ state, onRetry, errorTitle, loadingLabel = 'Carga
         );
     }
     if (state.status === 'error') {
-        return <ErrorState variant="inline" title={errorTitle} description={state.error} onRetry={onRetry} />;
+        return <ErrorState variant="banner" title={errorTitle} message={state.error} onRetry={onRetry} />;
     }
     if (isEmpty?.(state.data)) return <>{empty}</>;
     return <>{children(state.data)}</>;

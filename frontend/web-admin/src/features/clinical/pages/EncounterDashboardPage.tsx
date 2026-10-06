@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react';
+import { Permissions, useAuth } from '../../../auth';
 import { Link, useParams } from 'react-router-dom';
-import { Button, Card, Checkbox, Input, Select } from '../../../components/shared';
+import { Button, Card, Checkbox, EmptyState, Input, Select, Textarea } from '../../../components/shared';
 import { clinicalApi } from '../api';
 import { EncounterStatusBadge, TriagePriorityBadge } from '../components/ClinicalBadges';
 import { EncounterShell } from '../components/EncounterShell';
 import { EncounterSubject } from '../components/EncounterSubject';
-import { EmptyState, QueryView } from '../components/QueryView';
-import { TextAreaField } from '../components/TextAreaField';
+import { QueryView } from '../components/QueryView';
 import { useClinicalFeedback } from '../hooks/useClinicalFeedback';
 import { useClinicalQuery } from '../hooks/useClinicalQuery';
 import type { ClinicalEncounterSummary, ClinicalNoteType, DiagnosisType } from '../types/clinical.types';
@@ -97,6 +97,7 @@ const CODE_SYSTEMS = [
 ];
 
 function DiagnosesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
+    const canWrite = useAuth().can(Permissions.Diagnoses.Write);
     const feedback = useClinicalFeedback();
     const { state, reload } = useClinicalQuery(`diagnoses:${encounter.id}`, (signal) => clinicalApi.listDiagnoses(encounter.id, signal));
     const [code, setCode] = useState('');
@@ -159,7 +160,7 @@ function DiagnosesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
                 )}
             </QueryView>
 
-            {open && (
+            {open && canWrite && (
                 <form onSubmit={submit} className="mt-5 flex flex-col gap-3 border-t border-line-soft pt-4">
                     <h3 className="m-0 text-sm font-semibold text-ink">Registrar diagnóstico</h3>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -198,6 +199,7 @@ function DiagnosesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
 const SOAP_TEMPLATE = 'S: \nO: \nA: \nP: ';
 
 function NotesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
+    const canWrite = useAuth().can(Permissions.ClinicalNotes.Write);
     const feedback = useClinicalFeedback();
     const { state, reload } = useClinicalQuery(`notes:${encounter.id}`, (signal) => clinicalApi.listNotes(encounter.id, signal));
     const [type, setType] = useState<ClinicalNoteType | ''>('');
@@ -251,7 +253,7 @@ function NotesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
                 )}
             </QueryView>
 
-            {open && (
+            {open && canWrite && (
                 <form onSubmit={submit} className="mt-5 flex flex-col gap-3 border-t border-line-soft pt-4">
                     <h3 className="m-0 text-sm font-semibold text-ink">Registrar nota</h3>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -265,7 +267,7 @@ function NotesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
                         />
                         <Input label="Fecha y hora" type="datetime-local" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} required />
                     </div>
-                    <TextAreaField label="Contenido" value={content} onChange={(e) => setContent(e.target.value)} rows={6} required />
+                    <Textarea label="Contenido" value={content} onChange={(e) => setContent(e.target.value)} rows={6} required />
                     <div className="flex flex-col gap-2 sm:flex-row">
                         <Button type="submit" loading={saving} loadingText="Guardando…" disabled={!type || !content.trim()}>
                             Guardar nota

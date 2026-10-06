@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { useAuth } from '../../../auth';
+import { HOSPITAL_SCREEN_PERMISSIONS } from '../../../components/common/navigation';
 import { Link, NavLink } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Card } from '../../../components/shared';
@@ -12,9 +14,9 @@ import { EncounterSubject } from './EncounterSubject';
 import { QueryView } from './QueryView';
 
 const TABS = [
-    { to: '', label: 'Expediente', end: true },
-    { to: 'triage', label: 'Triage', end: false },
-    { to: 'medicacion', label: 'Medicación y egreso', end: false },
+    { to: '', label: 'Expediente', end: true, anyOf: HOSPITAL_SCREEN_PERMISSIONS.encounters },
+    { to: 'triage', label: 'Triage', end: false, anyOf: HOSPITAL_SCREEN_PERMISSIONS.triage },
+    { to: 'medicacion', label: 'Medicación y egreso', end: false, anyOf: HOSPITAL_SCREEN_PERMISSIONS.medication },
 ];
 
 export interface EncounterShellProps {
@@ -24,6 +26,7 @@ export interface EncounterShellProps {
 
 /** Cabecera común de una atención (sujeto, estado, prioridad) y pestañas entre sus vistas. */
 export function EncounterShell({ encounterId, children }: EncounterShellProps) {
+    const { canAny } = useAuth();
     const { state, reload } = useClinicalQuery(encounterId, (signal) => clinicalApi.getEncounter(encounterId, signal));
     const base = `/hospital/atenciones/${encounterId}`;
 
@@ -52,7 +55,7 @@ export function EncounterShell({ encounterId, children }: EncounterShellProps) {
                                 {encounter.reason && <> · {encounter.reason}</>}
                             </p>
                             <nav aria-label="Secciones de la atención" className="mt-4 flex flex-wrap gap-1 border-t border-line-soft pt-3">
-                                {TABS.map((tab) => (
+                                {TABS.filter((tab) => canAny(tab.anyOf)).map((tab) => (
                                     <NavLink
                                         key={tab.label}
                                         to={tab.to ? `${base}/${tab.to}` : base}

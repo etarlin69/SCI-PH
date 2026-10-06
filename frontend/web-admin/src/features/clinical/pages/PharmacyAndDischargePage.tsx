@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react';
+import { Permissions, useAuth } from '../../../auth';
 import { useParams } from 'react-router-dom';
-import { Badge, Button, Card, ConfirmDialog, Input, Select } from '../../../components/shared';
+import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Select, Textarea } from '../../../components/shared';
 import { clinicalApi } from '../api';
 import { EncounterShell } from '../components/EncounterShell';
-import { EmptyState, QueryView } from '../components/QueryView';
-import { TextAreaField } from '../components/TextAreaField';
+import { QueryView } from '../components/QueryView';
 import { useClinicalFeedback } from '../hooks/useClinicalFeedback';
 import { useClinicalQuery } from '../hooks/useClinicalQuery';
 import type { ClinicalEncounterSummary, MedicationRoute, PrescriptionStatus } from '../types/clinical.types';
@@ -33,6 +33,7 @@ export function PharmacyAndDischargePage() {
 const PRESCRIPTION_STATUS: Record<PrescriptionStatus, string> = { Draft: 'Borrador', Issued: 'Emitida', Cancelled: 'Anulada' };
 
 function PrescriptionsCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
+    const canPrescribe = useAuth().can(Permissions.Prescriptions.Write);
     const feedback = useClinicalFeedback();
     const prescriptions = useClinicalQuery(`prescriptions:${encounter.id}`, (signal) => clinicalApi.listPrescriptions(encounter.id, signal));
     const catalog = useClinicalQuery('medications', (signal) => clinicalApi.listMedications(signal));
@@ -122,7 +123,7 @@ function PrescriptionsCard({ encounter }: { encounter: ClinicalEncounterSummary 
                 )}
             </QueryView>
 
-            {open && (
+            {open && canPrescribe && (
                 <form onSubmit={submit} className="mt-5 flex flex-col gap-3 border-t border-line-soft pt-4">
                     <h3 className="m-0 text-sm font-semibold text-ink">Nueva prescripción</h3>
                     {catalog.state.status === 'error' ? (
@@ -169,7 +170,7 @@ function PrescriptionsCard({ encounter }: { encounter: ClinicalEncounterSummary 
                             onChange={(e) => setDurationDays(e.target.value)}
                         />
                     </div>
-                    <TextAreaField label="Indicaciones (opcional)" value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={2} />
+                    <Textarea label="Indicaciones (opcional)" value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={2} />
                     <Button type="submit" loading={saving} loadingText="Emitiendo…" disabled={!valid} className="w-full sm:w-fit">
                         Emitir prescripción
                     </Button>
@@ -217,6 +218,7 @@ function DischargeCard({ encounter, onClosed }: { encounter: ClinicalEncounterSu
     const feedback = useClinicalFeedback();
     const [note, setNote] = useState('');
     const [confirming, setConfirming] = useState(false);
+    const canClose = useAuth().can(Permissions.Encounters.Close);
     const closable = CLOSABLE_STATUSES.includes(encounter.status);
 
     const close = async () => {
@@ -245,13 +247,14 @@ function DischargeCard({ encounter, onClosed }: { encounter: ClinicalEncounterSu
     return (
         <Card title="Egreso" subtitle="Cierra la atención. La nota se guarda como nota clínica de egreso.">
             <div className="flex flex-col gap-3">
-                <TextAreaField label="Nota de egreso (opcional)" value={note} onChange={(e) => setNote(e.target.value)} rows={4} />
+                <Textarea label="Nota de egreso (opcional)" value={note} onChange={(e) => setNote(e.target.value)} rows={4} />
                 {!closable && (
                     <p className="m-0 text-xs text-warning-700">
                         Una atención en estado «{ENCOUNTER_STATUS[encounter.status].label}» no puede cerrarse todavía.
                     </p>
                 )}
-                <Button variant="danger" className="w-full sm:w-fit" disabled={!closable} onClick={() => setConfirming(true)}>
+                {!canClose && <p className="m-0 text-xs text-ink-muted">Cerrar la atención requiere el permiso Encounters.Close.</p>}
+                <Button variant="danger" className="w-full sm:w-fit" disabled={!closable || !canClose} onClick={() => setConfirming(true)}>
                     Cerrar atención
                 </Button>
             </div>
