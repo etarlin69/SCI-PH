@@ -1,59 +1,52 @@
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RotateCw } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { Button } from './Button';
 
 export interface ErrorStateProps {
-    title: string;
-    description?: string;
-    onRetry?: () => void;
-    retrying?: boolean;
-    // 'panel' ocupa el área del contenido; 'inline' es un aviso compacto sobre datos que siguen visibles.
-    variant?: 'panel' | 'inline';
-    className?: string;
+  title?: string;
+  message: string;
+  onRetry?: () => void;
+  variant?: 'block' | 'banner';
+  className?: string;
 }
 
-// Mensaje de error para el usuario: nunca muestra detalles técnicos ni trazas.
-export function ErrorState({ title, description, onRetry, retrying = false, variant = 'panel', className }: ErrorStateProps) {
-    const retry = onRetry && (
-        <Button
-            variant="secondary"
-            size="sm"
-            onClick={onRetry}
-            loading={retrying}
-            loadingText="Reintentando…"
-            leftIcon={<RefreshCw size={16} aria-hidden="true" />}
-        >
-            Reintentar
-        </Button>
-    );
-
-    if (variant === 'inline') {
-        return (
-            <div
-                role="alert"
-                className={cn(
-                    'flex flex-wrap items-center gap-3 rounded-[10px] border border-danger-50 bg-danger-50 px-4 py-3 text-sm text-danger-text',
-                    className,
-                )}
-            >
-                <AlertTriangle size={18} className="shrink-0" aria-hidden="true" />
-                <span className="min-w-0 flex-1">
-                    <span className="font-semibold">{title}</span>
-                    {description && <span> {description}</span>}
-                </span>
-                {retry}
-            </div>
-        );
-    }
-
+/** Error de carga con acción "Reintentar". */
+export function ErrorState({ title = 'No se pudieron cargar los datos', message, onRetry, variant = 'block', className }: ErrorStateProps) {
+  if (variant === 'banner') {
     return (
-        <div role="alert" className={cn('flex flex-col items-center gap-3 px-4 py-16 text-center', className)}>
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-danger-50 text-danger-600">
-                <AlertTriangle size={22} aria-hidden="true" />
-            </span>
-            <h2 className="m-0 text-lg font-semibold text-ink">{title}</h2>
-            {description && <p className="m-0 max-w-md text-sm text-ink-muted">{description}</p>}
-            {retry}
-        </div>
+      <div
+        role="alert"
+        className={cn(
+          'flex flex-wrap items-center gap-3 rounded-lg border border-danger-600/30 bg-danger-50 px-4 py-3 text-[13px] text-danger-text',
+          className,
+        )}
+      >
+        <AlertTriangle size={18} className="shrink-0" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <strong className="font-semibold">{title}.</strong> {message}
+        </span>
+        {onRetry && (
+          <Button size="sm" variant="secondary" leftIcon={<RotateCw size={14} aria-hidden="true" />} onClick={onRetry}>
+            Reintentar
+          </Button>
+        )}
+      </div>
     );
+  }
+  return (
+    <div role="alert" className={cn('flex flex-col items-center gap-3 px-4 py-12 text-center', className)}>
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-danger-50 text-danger-600">
+        <AlertTriangle size={22} aria-hidden="true" />
+      </span>
+      <div className="flex max-w-md flex-col gap-1">
+        <p className="text-[15px] font-semibold text-ink">{title}</p>
+        <p className="text-[13px] text-ink-muted">{message}</p>
+      </div>
+      {onRetry && (
+        <Button variant="secondary" leftIcon={<RotateCw size={16} aria-hidden="true" />} onClick={onRetry}>
+          Reintentar
+        </Button>
+      )}
+    </div>
+  );
 }
