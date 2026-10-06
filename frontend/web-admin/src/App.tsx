@@ -1,76 +1,62 @@
-import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom';
+import { Suspense, lazy } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/common/Layout';
-import { LoadingSpinner } from './components/shared';
-
-import { LoginPage } from './features/auth/pages/LoginPage';
-import { ReceptionPage } from './features/clinical/pages/ReceptionPage';
-import { TriagePage } from './features/clinical/pages/TriagePage';
 import { EncounterDashboardPage } from './features/clinical/pages/EncounterDashboardPage';
 import { PharmacyAndDischargePage } from './features/clinical/pages/PharmacyAndDischargePage';
-
+import { ReceptionPage } from './features/clinical/pages/ReceptionPage';
+import { TransfersPage } from './features/clinical/pages/TransfersPage';
+import { TriagePage } from './features/clinical/pages/TriagePage';
 import Forbidden from './pages/Forbidden';
 import NotFound from './pages/NotFound';
 import NotImplemented from './pages/NotImplemented';
+import { LoadingSpinner } from './components/shared';
 
-import './App.css';
-
+// El Dashboard arrastra Recharts: se carga en su propio chunk solo cuando se visita.
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 
 function PageFallback() {
-  return (
-    <div className="flex justify-center py-24">
-      <LoadingSpinner size="lg" label="Cargando…" />
-    </div>
-  );
+    return (
+        <div className="flex justify-center py-24">
+            <LoadingSpinner size="lg" label="Cargando…" />
+        </div>
+    );
 }
 
-const PrivateRoute = ({ children }: { children: React.JSX.Element }) => {
-  const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/login" replace />;
-};
-
+// Sin guards todavía: la sesión (login, MFA, refresh, /me) y RequireAuth/RequirePermission los aporta la
+// implementación compartida del Rol 5. El permiso esperado de cada sección hospitalaria está en navigation.ts.
 export default function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        {/* Ruta pública */}
-        <Route path="/login" element={<LoginPage />} />
+    return (
+        <BrowserRouter>
+            <Routes>
+                <Route element={<Layout />}>
+                    <Route
+                        index
+                        element={
+                            <Suspense fallback={<PageFallback />}>
+                                <Dashboard />
+                            </Suspense>
+                        }
+                    />
+                    <Route path="usuarios" element={<NotImplemented />} />
+                    <Route path="auditoria" element={<NotImplemented />} />
+                    <Route path="catalogos" element={<NotImplemented />} />
 
-        {/* Rutas protegidas dentro del Layout de la aplicación */}
-        <Route
-          element={
-            <PrivateRoute>
-              <Layout />
-            </PrivateRoute>
-          }
-        >
-          {/* Dashboard principal lazy-loaded */}
-          <Route
-            index
-            element={
-              <Suspense fallback={<PageFallback />}>
-                <Dashboard />
-              </Suspense>
-            }
-          />
+                    <Route path="hospital">
+                        <Route index element={<Navigate to="recepcion" replace />} />
+                        <Route path="recepcion" element={<ReceptionPage />} />
+                        <Route path="pacientes" element={<NotImplemented />} />
+                        <Route path="atenciones" element={<EncounterDashboardPage />} />
+                        <Route path="atenciones/:encounterId" element={<EncounterDashboardPage />} />
+                        <Route path="atenciones/:encounterId/triage" element={<TriagePage />} />
+                        <Route path="atenciones/:encounterId/medicacion" element={<PharmacyAndDischargePage />} />
+                        <Route path="triage" element={<TriagePage />} />
+                        <Route path="transferencias" element={<TransfersPage />} />
+                    </Route>
 
-          {/* Rutas Clínicas */}
-          <Route path="reception" element={<ReceptionPage />} />
-          <Route path="triage" element={<TriagePage />} />
-          <Route path="encounter-dashboard" element={<EncounterDashboardPage />} />
-          <Route path="pharmacy-discharge" element={<PharmacyAndDischargePage />} />
-
-          {/* Modulos del sistema / Administración */}
-          <Route path="usuarios" element={<NotImplemented />} />
-          <Route path="auditoria" element={<NotImplemented />} />
-          <Route path="catalogos" element={<NotImplemented />} />
-
-          {/* Páginas de estado y error */}
-          <Route path="403" element={<Forbidden />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
-  );
+                    <Route path="403" element={<Forbidden />} />
+                    <Route path="*" element={<NotFound />} />
+                </Route>
+            </Routes>
+        </BrowserRouter>
+    );
 }

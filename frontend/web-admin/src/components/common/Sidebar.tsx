@@ -1,17 +1,27 @@
 import { NavLink } from 'react-router-dom';
-import { Activity, LogOut } from 'lucide-react';
+import { Activity, ArrowLeftRight, LogOut } from 'lucide-react';
 import type { CurrentUser } from '../../types';
 import { cn } from '../../utils/cn';
 import { initials } from '../../utils/formatters';
 import { ROLE_LABELS } from '../../utils/roles';
-import { NAV_SECTIONS } from './navigation';
+import { MODULES, type AppModule } from './navigation';
 
 export interface SidebarProps {
+    module: AppModule;
     user: CurrentUser;
     onLogout?: () => void;
 }
 
-export function Sidebar({ user, onLogout }: SidebarProps) {
+const NAV_LINK_CLASS = cn(
+    'flex min-h-10 items-center justify-center gap-2.5 rounded-md px-2.5 text-sm no-underline lg:justify-start',
+    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-300',
+);
+
+export function Sidebar({ module, user, onLogout }: SidebarProps) {
+    const current = MODULES[module];
+    // Acceso al otro módulo mientras no existe el filtrado por permisos del AuthProvider compartido (Rol 5).
+    const other = MODULES[module === 'hospital' ? 'admin' : 'hospital'];
+
     return (
         <nav
             aria-label="Navegación principal"
@@ -23,11 +33,11 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                 </span>
                 <span className="sr-only flex-col gap-0.5 lg:not-sr-only lg:flex">
                     <span className="text-base font-bold tracking-[0.04em] text-white">SCI-PH</span>
-                    <span className="text-xs text-[#9FB0C3]">Administración y Analítica</span>
+                    <span className="text-xs text-[#9FB0C3]">{current.subtitle}</span>
                 </span>
             </div>
 
-            {NAV_SECTIONS.map((section) => (
+            {current.sections.map((section) => (
                 <div key={section.title} className="flex flex-col gap-0.5">
                     <span className="hidden px-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-nav-muted lg:block">
                         {section.title}
@@ -40,8 +50,7 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                             title={label}
                             className={({ isActive }) =>
                                 cn(
-                                    'flex min-h-10 items-center justify-center gap-2.5 rounded-md px-2.5 text-sm no-underline lg:justify-start',
-                                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-300',
+                                    NAV_LINK_CLASS,
                                     isActive
                                         ? 'bg-nav-active font-semibold text-white'
                                         : 'text-nav-text hover:bg-nav-hover hover:text-white',
@@ -55,7 +64,17 @@ export function Sidebar({ user, onLogout }: SidebarProps) {
                 </div>
             ))}
 
-            <div className="mt-auto flex items-center gap-2.5 border-t border-nav-border px-1 pt-3 lg:px-2.5">
+            <NavLink
+                to={other.home}
+                end
+                title={`Ir a ${other.label}`}
+                className={cn(NAV_LINK_CLASS, 'mt-auto text-nav-muted hover:bg-nav-hover hover:text-white')}
+            >
+                <ArrowLeftRight size={18} className="shrink-0" aria-hidden="true" />
+                <span className="sr-only lg:not-sr-only">Ir a {other.label}</span>
+            </NavLink>
+
+            <div className="flex items-center gap-2.5 border-t border-nav-border px-1 pt-3 lg:px-2.5">
                 <span className="hidden h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[#2A4A6E] text-[13px] font-semibold text-white lg:flex">
                     {initials(user.nombre)}
                 </span>
