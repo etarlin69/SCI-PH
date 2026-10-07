@@ -1,10 +1,12 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using SCI_PH.Application.Abstractions.Clinical;
 using SCI_PH.Application.Abstractions.Security;
 using SCI_PH.Application.Features.Accounts;
 using SCI_PH.Application.Features.Authentication;
 using SCI_PH.Application.Features.Authorization;
+using SCI_PH.Application.Features.Clinical;
 using SCI_PH.Application.Features.Devices;
 
 namespace SCI_PH.Application
@@ -43,6 +45,19 @@ namespace SCI_PH.Application
             services.AddScoped<AccountRecoveryService>();
             services.AddScoped<MfaManagementService>();
             services.AddScoped<DeviceCredentialService>();
+
+            return services;
+        }
+
+        // Casos de uso clínicos (pacientes, atenciones, admisión, triage y signos vitales). Requiere AddAccountSecurity
+        // (IPatientAccessAuthorizer), AddJwtSecurity (ICurrentUser) y AddPersistence (stores clínicos).
+        public static IServiceCollection AddClinicalWorkflows(this IServiceCollection services)
+        {
+            services.AddScoped<ICurrentClinicalActor, CurrentClinicalActor>();
+            services.AddScoped<PatientService>();
+            services.AddScoped<EncounterService>();
+            services.AddScoped<AdmissionService>();
+            services.AddScoped<EncounterRecordService>();
 
             return services;
         }
