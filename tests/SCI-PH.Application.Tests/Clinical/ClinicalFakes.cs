@@ -54,6 +54,9 @@ namespace SCI_PH.Application.Tests.Clinical
         public List<ClinicalEncounter> Encounters { get; } = [];
         public List<Triage> Triages { get; } = [];
         public List<VitalSign> VitalSigns { get; } = [];
+        public List<ClinicalNote> Notes { get; } = [];
+        public List<Diagnosis> Diagnoses { get; } = [];
+        public HashSet<Guid> GuardedEncounters { get; } = [];
         public List<ClinicalAuditEntry> Audit { get; } = [];
         public int SaveCount { get; private set; }
 
@@ -98,6 +101,17 @@ namespace SCI_PH.Application.Tests.Clinical
                 .Select(v => new VitalSignSummary(v.Id, v.ClinicalEncounterId, v.TriageId, v.Type, v.Value, v.Unit, v.MeasuredAtUtc, v.MeasuredByStaffId))
                 .ToList());
 
+        public Task<IReadOnlyList<ClinicalNoteSummary>> ListNotesAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ClinicalNoteSummary>>(Notes.Where(n => n.ClinicalEncounterId == encounterId)
+                .OrderByDescending(n => n.OccurredAtUtc)
+                .Select(n => new ClinicalNoteSummary(n.Id, n.ClinicalEncounterId, n.Type, n.Content, n.OccurredAtUtc, n.CreatedAtUtc, n.AuthorStaffId, "Staff"))
+                .ToList());
+
+        public Task<IReadOnlyList<DiagnosisSummary>> ListDiagnosesAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<DiagnosisSummary>>(Diagnoses.Where(d => d.ClinicalEncounterId == encounterId)
+                .Select(d => new DiagnosisSummary(d.Id, d.ClinicalEncounterId, d.Description, d.CodeSystem, d.Code, d.Type, d.IsPrimary, d.RecordedAtUtc, d.ConfirmedAtUtc, d.RecordedByStaffId))
+                .ToList());
+
         public Task<ClinicalEncounter?> FindEncounterAsync(Guid encounterId, CancellationToken cancellationToken) =>
             Task.FromResult(Encounters.SingleOrDefault(e => e.Id == encounterId));
 
@@ -105,7 +119,10 @@ namespace SCI_PH.Application.Tests.Clinical
         public void Add(ClinicalEncounter encounter) => _pending.Add(encounter);
         public void Add(Triage triage) => _pending.Add(triage);
         public void Add(VitalSign vitalSign) => _pending.Add(vitalSign);
+        public void Add(ClinicalNote note) => _pending.Add(note);
+        public void Add(Diagnosis diagnosis) => _pending.Add(diagnosis);
         public void Add(ClinicalAuditEntry auditEntry) => _pending.Add(auditEntry);
+        public void EnsureEncounterUnchanged(ClinicalEncounter encounter) => GuardedEncounters.Add(encounter.Id);
 
         public Task SaveChangesAsync(CancellationToken cancellationToken)
         {
@@ -113,6 +130,8 @@ namespace SCI_PH.Application.Tests.Clinical
             Encounters.AddRange(_pending.OfType<ClinicalEncounter>());
             Triages.AddRange(_pending.OfType<Triage>());
             VitalSigns.AddRange(_pending.OfType<VitalSign>());
+            Notes.AddRange(_pending.OfType<ClinicalNote>());
+            Diagnoses.AddRange(_pending.OfType<Diagnosis>());
             Audit.AddRange(_pending.OfType<ClinicalAuditEntry>());
             _pending.Clear();
             SaveCount++;

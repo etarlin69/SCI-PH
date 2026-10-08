@@ -99,6 +99,25 @@ namespace SCI_PH.Persistence.Clinical.Services
                     v.Id, v.ClinicalEncounterId, v.TriageId, v.Type, v.Value, v.Unit, v.MeasuredAtUtc, v.MeasuredByStaffId))
                 .ToListAsync(cancellationToken);
 
+        public async Task<IReadOnlyList<ClinicalNoteSummary>> ListNotesAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            await _clinical.ClinicalNotes.AsNoTracking()
+                .Where(n => n.ClinicalEncounterId == encounterId)
+                .Join(_clinical.ClinicalStaffMembers, n => n.AuthorStaffId, s => s.Id, (n, s) => new { Note = n, Author = s })
+                .OrderByDescending(x => x.Note.OccurredAtUtc).ThenByDescending(x => x.Note.CreatedAtUtc)
+                .Select(x => new ClinicalNoteSummary(
+                    x.Note.Id, x.Note.ClinicalEncounterId, x.Note.Type, x.Note.Content, x.Note.OccurredAtUtc, x.Note.CreatedAtUtc,
+                    x.Note.AuthorStaffId, x.Author.GivenNames + " " + x.Author.FamilyNames))
+                .ToListAsync(cancellationToken);
+
+        public async Task<IReadOnlyList<DiagnosisSummary>> ListDiagnosesAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            await _clinical.Diagnoses.AsNoTracking()
+                .Where(d => d.ClinicalEncounterId == encounterId)
+                .OrderByDescending(d => d.IsPrimary).ThenByDescending(d => d.RecordedAtUtc)
+                .Select(d => new DiagnosisSummary(
+                    d.Id, d.ClinicalEncounterId, d.Description, d.CodeSystem, d.Code, d.Type, d.IsPrimary, d.RecordedAtUtc,
+                    d.ConfirmedAtUtc, d.RecordedByStaffId))
+                .ToListAsync(cancellationToken);
+
         // Encounters first, then their patients in a second query (same patient projection as the searches).
         private async Task<IReadOnlyList<EncounterRow>> ToRowsAsync(
             IQueryable<Domain.Entities.Encounters.ClinicalEncounter> query, int limit, CancellationToken cancellationToken)
