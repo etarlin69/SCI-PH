@@ -1,8 +1,9 @@
 # Contratos del Web BFF
 
-> **Estado: contratos iniciales previstos. NO están implementados todavía.**
+> **Estado:** la vertical clínica 1 (pacientes, atenciones, admisión, triage y signos vitales) está implementada; los
+> endpoints marcados «Previsto» aún no.
 >
-> Estos endpoints describen la intención acordada para empezar a trabajar en paralelo (frontend y backend). Pueden evolucionar mediante **revisión arquitectónica**; cualquier cambio debe reflejarse en este documento dentro del mismo PR.
+> Los endpoints previstos describen la intención acordada para empezar a trabajar en paralelo (frontend y backend). Pueden evolucionar mediante **revisión arquitectónica**; cualquier cambio debe reflejarse en este documento dentro del mismo PR.
 
 - **Cliente:** aplicación web React + TypeScript (áreas **Hospital** y **Administración**)
 - **Proyecto:** `SCI-PH.Web.BFF`
@@ -10,7 +11,45 @@
 - **Formato:** JSON. Los errores se devuelven como `application/problem+json` (ProblemDetails).
 - **Autenticación:** JWT Bearer según [ADR-006](../adr/ADR-006-identity-security.md). El refresh token viaja solo en la cookie HttpOnly `__Host-sciph-refresh`; login, `mfa/verify`, refresh y logout exigen la cabecera `X-SCIPH-CSRF: 1`. Todos los endpoints requieren un usuario autenticado salvo los de sesión y recuperación de cuenta; los de `/api/web/admin` requieren además el permiso correspondiente. Endpoints en `/api/web/auth` ([detalle](../architecture/security.md#endpoints)).
 
-## Web Hospital — contratos iniciales previstos
+## Web Hospital — vertical clínica 1 (implementado)
+
+Reglas comunes:
+
+- **Actor clínico:** `ICurrentUser → ClinicalStaff.IdentityUserId → ClinicStaffAffiliation activa → Clinic`. Las operaciones
+  con contexto de clínica exigen un `ClinicalStaff` activo con afiliación activa (si no, 403). Con una afiliación la clínica
+  se resuelve sola; con varias, `clinicId` es obligatorio (400 si falta) y siempre se valida contra las afiliaciones
+  (403 si es ajena). **Administrator no tiene bypass clínico.** Pacientes no pertenecen a una clínica: registro y
+  búsqueda solo requieren el permiso.
+- **Enums como texto** (`"Emergency"`, `"InProgress"`, `"Immediate"`, `"HeartRate"`) solo en estos contratos; se rechazan
+  números y miembros desconocidos (p. ej. `unit`). Auth/Admin no cambian.
+- **Errores (ProblemDetails):** 400 validación / regla del Domain (fechas futuras o anteriores al inicio, signo vital
+  fuera de rango, NN no permitido, Prehospital desde la web); 403 permiso o acceso clínico; 404 paciente/atención
+  inexistente; 409 concurrencia, identificación repetida, unicidad, atención cerrada o en estado incompatible.
+  Las respuestas 400 de reglas incluyen `field` cuando aplica.
+- El primer triage o signo vital mueve la atención `Created → InProgress` (transición del Domain), en la misma transacción.
+
+| Método | Ruta | Permiso | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/web/clinical/context` | autenticado + ClinicalStaff | — | `{ staffId, clinics: [{ id, name }] }` |
+| `POST` | `/api/web/patients` | `Patients.Create` | `{ givenNames, familyNames, dateOfBirth?, sex, identifier?: { type, value, issuer? } }` | 201 `PatientSummary` + `Location` · 409 identificador duplicado |
+| `GET` | `/api/web/patients/{id}` | `Patients.Read` | — | `PatientSummary` |
+| `POST` | `/api/web/patients/search` | `Patients.Read` | `{ identifierType?, value }` (identificador: match por `NormalizedValue`; sin tipo: nombre, mín. 3) | `PatientSummary[]` (identificador enmascarado `***1234`, salvo `InternalCode`) |
+| `GET` | `/api/web/encounters?clinicId=` | `Encounters.Read` | — | `EncounterSummary[]` abiertas (sin Closed/Cancelled/Transferred) |
+| `GET` | `/api/web/encounters/{id}` | `Encounters.Read` | — | `EncounterSummary` |
+| `POST` | `/api/web/encounters` | `Encounters.Create` | `{ type, patientId?, reason?, clinicId? }` (NN solo `Emergency`; `Prehospital` → 400) | 201 `EncounterSummary` |
+| `POST` | `/api/web/encounters/{id}/identify` | `Patients.Identify` | `{ patientId }` | 204 · 409 ya identificada/concurrencia. Conserva `temporaryPatientCode`; `ClinicalAuditEntry` Identify |
+| `GET` | `/api/web/admissions/encounters?clinicId=&unidentified=` | `Patients.Identify` | — | `AdmissionEncounterSummary[]` |
+| `GET` | `/api/web/admissions/encounters/{id}` | `Patients.Identify` | — | `AdmissionEncounterSummary` |
+| `GET` | `/api/web/encounters/{id}/triages` | `Encounters.Read` | — | `TriageSummary[]` (más reciente primero) |
+| `POST` | `/api/web/encounters/{id}/triages` | `Triage.Write` (+ `VitalSigns.Write` si hay `measurements`) | `{ priority, reason?, observations?, performedAtUtc?, measurements?: [{ type, value, measuredAtUtc }] }` | 201 `TriageSummary` |
+| `GET` | `/api/web/encounters/{id}/vital-signs` | `Encounters.Read` | — | `VitalSignSummary[]` (con `unit` del Domain) |
+| `POST` | `/api/web/encounters/{id}/vital-signs` | `VitalSigns.Write` | `{ type, value, measuredAtUtc }` (sin `unit`) | 201 `VitalSignSummary` |
+
+- `EncounterSummary`: `{ id, patientId, patient: PatientSummary?, temporaryPatientCode, clinicId, type, status, reason, startedAtUtc, endedAtUtc, identifiedAtUtc, latestTriagePriority }`.
+- `AdmissionEncounterSummary` (Recepción, **sin contenido clínico**): `{ encounterId, patientId, patientDisplayName, temporaryPatientCode, type, status, startedAtUtc, clinicId }`.
+  Recepción no recibe `Encounters.Read`: crea con `POST /encounters` (que devuelve el resumen) y localiza/identifica por esta proyección.
+
+## Web Hospital — contratos previstos
 
 | Método | Ruta | Descripción | Estado |
 |---|---|---|---|

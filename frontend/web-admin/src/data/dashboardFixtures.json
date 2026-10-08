@@ -1,0 +1,151 @@
+{
+    "hospitales": [
+        {
+            "id": "central",
+            "nombre": "Hospital Central",
+            "color": "#1B4F8A"
+        },
+        {
+            "id": "norte",
+            "nombre": "Hospital del Norte",
+            "color": "#1C7C7D"
+        },
+        {
+            "id": "sanrafael",
+            "nombre": "Clínica San Rafael",
+            "color": "#6B4FA0"
+        },
+        {
+            "id": "este",
+            "nombre": "Hospital Regional Este",
+            "color": "#7FA9D9"
+        },
+        {
+            "id": "infantil",
+            "nombre": "Hospital Infantil Sur",
+            "color": "#E07B1F"
+        }
+    ],
+    "transferencias": [
+        {
+            "diasAtras": 0,
+            "origen": "Unidad A-07",
+            "destino": "Hospital Central",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 0,
+            "origen": "Unidad B-03",
+            "destino": "Hospital del Norte",
+            "estado": "En tránsito"
+        },
+        {
+            "diasAtras": 0,
+            "origen": "Hospital del Norte",
+            "destino": "Clínica San Rafael",
+            "estado": "Pendiente"
+        },
+        {
+            "diasAtras": 0,
+            "origen": "Unidad A-02",
+            "destino": "Hospital Regional Este",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 0,
+            "origen": "Hospital Central",
+            "destino": "Hospital Infantil Sur",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 0,
+            "origen": "Unidad C-11",
+            "destino": "Hospital Central",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 0,
+            "origen": "Unidad B-05",
+            "destino": "Clínica San Rafael",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 0,
+            "origen": "Hospital Regional Este",
+            "destino": "Hospital Central",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 0,
+            "origen": "Unidad A-07",
+            "destino": "Hospital del Norte",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 0,
+            "origen": "Unidad C-02",
+            "destino": "Hospital Central",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 1,
+            "origen": "Unidad B-05",
+            "destino": "Hospital del Norte",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 1,
+            "origen": "Unidad A-02",
+            "destino": "Hospital Regional Este",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 1,
+            "origen": "Hospital Infantil Sur",
+            "destino": "Hospital Central",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 2,
+            "origen": "Unidad C-02",
+            "destino": "Clínica San Rafael",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 2,
+            "origen": "Unidad A-07",
+            "destino": "Hospital Central",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 3,
+            "origen": "Hospital Central",
+            "destino": "Hospital del Norte",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 4,
+            "origen": "Unidad B-03",
+            "destino": "Hospital Infantil Sur",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 4,
+            "origen": "Unidad C-11",
+            "destino": "Hospital Central",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 5,
+            "origen": "Unidad A-02",
+            "destino": "Hospital Regional Este",
+            "estado": "Recibido"
+        },
+        {
+            "diasAtras": 6,
+            "origen": "Unidad B-05",
+            "destino": "Clínica San Rafael",
+            "estado": "Recibido"
+        }
+    ]
+}

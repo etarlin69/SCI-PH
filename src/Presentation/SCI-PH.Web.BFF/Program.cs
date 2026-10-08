@@ -2,18 +2,20 @@ using SCI_PH.Application;
 using SCI_PH.Infrastructure;
 using SCI_PH.Infrastructure.Web;
 using SCI_PH.Persistence;
+using SCI_PH.Web.BFF.Errors;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+// Errores esperados (validación, acceso, no encontrado, conflicto) como ProblemDetails; el resto sigue a UseExceptionHandler.
+builder.Services.AddControllers(options => options.Filters.Add<RequestExceptionFilter>());
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi(options => options.AddBearerSecurity());
 
-builder.Services.AddApplication().AddAccountSecurity().AddAccountManagement(builder.Configuration);
+builder.Services.AddApplication().AddAccountSecurity().AddAccountManagement(builder.Configuration).AddClinicalWorkflows();
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration)
     .AddJwtSecurity(builder.Configuration)
@@ -52,5 +54,9 @@ app.MapHealthChecks("/health").AllowAnonymous();
 // Roles y permisos (y el administrador inicial si está configurado fuera del repositorio).
 // Solo se ejecuta con IdentityBootstrap:Enabled = true.
 await app.Services.RunIdentityBootstrapAsync();
+
+// Clínica y personal clínico de demostración para cuentas ya existentes. Solo en Development y con
+// ClinicalDevelopmentSeed:Enabled = true (User Secrets); nunca en Production.
+await app.Services.RunClinicalDevelopmentSeedAsync(app.Environment);
 
 await app.RunAsync();
