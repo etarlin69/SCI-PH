@@ -3,10 +3,13 @@ import { Permissions, useAuth } from '../../../auth';
 import { Link, useParams } from 'react-router-dom';
 import { Button, Card, Checkbox, EmptyState, Input, Select, Textarea } from '../../../components/shared';
 import { clinicalApi } from '../api';
+import { ClinicSelector } from '../components/ClinicSelector';
 import { EncounterStatusBadge, TriagePriorityBadge } from '../components/ClinicalBadges';
 import { EncounterShell } from '../components/EncounterShell';
 import { EncounterSubject } from '../components/EncounterSubject';
 import { QueryView } from '../components/QueryView';
+import { SimulatedBadge } from '../components/SimulatedBadge';
+import { useClinicSelection } from '../hooks/useClinicSelection';
 import { useClinicalFeedback } from '../hooks/useClinicalFeedback';
 import { useClinicalQuery } from '../hooks/useClinicalQuery';
 import type { ClinicalEncounterSummary, ClinicalNoteType, DiagnosisType } from '../types/clinical.types';
@@ -38,7 +41,11 @@ export function EncounterDashboardPage() {
 }
 
 function EncounterList() {
-    const { state, reload } = useClinicalQuery('active-encounters', (signal) => clinicalApi.listActiveEncounters(signal));
+    const canCreate = useAuth().can(Permissions.Encounters.Create);
+    const clinic = useClinicSelection();
+    const { state, reload } = useClinicalQuery(clinic.ready ? `active-encounters:${clinic.queryKey}` : null, (signal) =>
+        clinicalApi.listActiveEncounters(signal),
+    );
 
     return (
         <div className="flex flex-col gap-5">
@@ -47,12 +54,16 @@ function EncounterList() {
                     <h1 className="m-0 text-2xl font-bold text-ink">Atenciones</h1>
                     <p className="m-0 mt-1 text-sm text-ink-muted">Atenciones abiertas en este hospital.</p>
                 </div>
-                <Link
-                    to="/hospital/recepcion"
-                    className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white no-underline hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
-                >
-                    Nueva atención
-                </Link>
+                <ClinicSelector />
+                {/* Solo con el permiso real de creación; nunca por rol. */}
+                {canCreate && (
+                    <Link
+                        to="/hospital/recepcion"
+                        className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white no-underline hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+                    >
+                        Nueva atención
+                    </Link>
+                )}
             </div>
             <Card padding="none">
                 <QueryView
@@ -98,7 +109,7 @@ const CODE_SYSTEMS = [
 
 function DiagnosesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
     const canWrite = useAuth().can(Permissions.Diagnoses.Write);
-    const feedback = useClinicalFeedback();
+    const feedback = useClinicalFeedback('diagnoses');
     const { state, reload } = useClinicalQuery(`diagnoses:${encounter.id}`, (signal) => clinicalApi.listDiagnoses(encounter.id, signal));
     const [code, setCode] = useState('');
     const [codeSystem, setCodeSystem] = useState('');
@@ -134,7 +145,7 @@ function DiagnosesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
     };
 
     return (
-        <Card title="Diagnósticos">
+        <Card title="Diagnósticos" actions={<SimulatedBadge feature="diagnoses" />}>
             <QueryView
                 state={state}
                 onRetry={reload}
@@ -200,7 +211,7 @@ const SOAP_TEMPLATE = 'S: \nO: \nA: \nP: ';
 
 function NotesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
     const canWrite = useAuth().can(Permissions.ClinicalNotes.Write);
-    const feedback = useClinicalFeedback();
+    const feedback = useClinicalFeedback('notes');
     const { state, reload } = useClinicalQuery(`notes:${encounter.id}`, (signal) => clinicalApi.listNotes(encounter.id, signal));
     const [type, setType] = useState<ClinicalNoteType | ''>('');
     const [content, setContent] = useState('');
@@ -230,7 +241,7 @@ function NotesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
     };
 
     return (
-        <Card title="Notas clínicas">
+        <Card title="Notas clínicas" actions={<SimulatedBadge feature="notes" />}>
             <QueryView
                 state={state}
                 onRetry={reload}

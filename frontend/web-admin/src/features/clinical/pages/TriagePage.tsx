@@ -1,13 +1,15 @@
 import { useState, type FormEvent } from 'react';
 import { Permissions, useAuth } from '../../../auth';
 import { Link, useParams } from 'react-router-dom';
-import { Button, Card, EmptyState, Input, Textarea } from '../../../components/shared';
+import { Button, Card, EmptyState, Input, Select, Textarea } from '../../../components/shared';
 import { cn } from '../../../utils/cn';
 import { clinicalApi } from '../api';
 import { EncounterStatusBadge, TriagePriorityBadge } from '../components/ClinicalBadges';
+import { ClinicSelector } from '../components/ClinicSelector';
 import { EncounterShell } from '../components/EncounterShell';
 import { EncounterSubject } from '../components/EncounterSubject';
 import { QueryView } from '../components/QueryView';
+import { useClinicSelection } from '../hooks/useClinicSelection';
 import { useClinicalFeedback } from '../hooks/useClinicalFeedback';
 import { useClinicalQuery } from '../hooks/useClinicalQuery';
 import type { ClinicalEncounterSummary, TriagePriority, VitalSignInput, VitalSignType } from '../types/clinical.types';
@@ -31,7 +33,7 @@ export function TriagePage() {
             {(encounter, reloadEncounter) => (
                 <div className="grid gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
                     <TriageForm encounter={encounter} onSaved={reloadEncounter} />
-                    <TriageHistory encounterId={encounter.id} />
+                    <TriageHistory encounter={encounter} onSaved={reloadEncounter} />
                 </div>
             )}
         </EncounterShell>
@@ -41,7 +43,10 @@ export function TriagePage() {
 const PRIORITY_RANK: Record<TriagePriority, number> = { Immediate: 1, VeryUrgent: 2, Urgent: 3, Standard: 4, NonUrgent: 5 };
 
 function TriageQueue() {
-    const { state, reload } = useClinicalQuery('triage-queue', (signal) => clinicalApi.listActiveEncounters(signal));
+    const clinic = useClinicSelection();
+    const { state, reload } = useClinicalQuery(clinic.ready ? `triage-queue:${clinic.queryKey}` : null, (signal) =>
+        clinicalApi.listActiveEncounters(signal),
+    );
 
     // Primero las atenciones sin triage; después por prioridad. Solo ordena la vista, no decide nada clínico.
     const sort = (list: ClinicalEncounterSummary[]) =>
@@ -49,9 +54,12 @@ function TriageQueue() {
 
     return (
         <div className="flex flex-col gap-5">
-            <div>
-                <h1 className="m-0 text-2xl font-bold text-ink">Triage</h1>
-                <p className="m-0 mt-1 text-sm text-ink-muted">Atenciones abiertas; las que aún no tienen triage aparecen primero.</p>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h1 className="m-0 text-2xl font-bold text-ink">Triage</h1>
+                    <p className="m-0 mt-1 text-sm text-ink-muted">Atenciones abiertas; las que aún no tienen triage aparecen primero.</p>
+                </div>
+                <ClinicSelector />
             </div>
             <Card padding="none">
                 <QueryView
@@ -92,12 +100,12 @@ function TriageQueue() {
 type VitalValues = Partial<Record<VitalSignType, string>>;
 
 function TriageForm({ encounter, onSaved }: { encounter: ClinicalEncounterSummary; onSaved: () => void }) {
-    const feedback = useClinicalFeedback();
+    const feedback = useClinicalFeedback('triage');
     const canWriteVitals = useAuth().can(Permissions.VitalSigns.Write);
     // Sin valores por defecto: solo se envía lo que el usuario introduce.
     const [priority, setPriority] = useState<TriagePriority | null>(null);
     const [vitals, setVitals] = useState<VitalValues>({});
-    const [measuredAt, setMeasuredAt] = useState(nowForDateTimeInput);
+    const measuredAt = useMeasurementTime();
     const [reason, setReason] = useState('');
     const [observations, setObservations] = useState('');
     const [priorityError, setPriorityError] = useState<string>();
@@ -123,11 +131,11 @@ function TriageForm({ encounter, onSaved }: { encounter: ClinicalEncounterSummar
         }
         if (VITAL_SIGNS.some((v) => vitalError(v.type))) return;
 
-        const measuredAtUtc = localInputToUtc(measuredAt);
-        const vitalSigns: VitalSignInput[] = VITAL_SIGNS.filter((v) => vitals[v.type]?.trim()).map((v) => ({
+        // Sin unidad: la fija el backend (VitalSignLimits).
+        const measuredAtUtc = measuredAt.toUtc();
+        const measurements: VitalSignInput[] = VITAL_SIGNS.filter((v) => vitals[v.type]?.trim()).map((v) => ({
             type: v.type,
             value: Number(vitals[v.type]),
-            unit: v.unit,
             measuredAtUtc,
         }));
 
@@ -137,7 +145,7 @@ function TriageForm({ encounter, onSaved }: { encounter: ClinicalEncounterSummar
                 priority,
                 reason: reason.trim() || null,
                 observations: observations.trim() || null,
-                vitalSigns,
+                measurements,
             });
             feedback.success('triage registrado');
             onSaved();
@@ -219,8 +227,8 @@ function TriageForm({ encounter, onSaved }: { encounter: ClinicalEncounterSummar
                     <Input
                         label="Hora de la medición"
                         type="datetime-local"
-                        value={measuredAt}
-                        onChange={(e) => setMeasuredAt(e.target.value)}
+                        value={measuredAt.value}
+                        onChange={(e) => measuredAt.change(e.target.value)}
                         required
                         containerClassName="sm:max-w-xs"
                     />
@@ -238,7 +246,103 @@ function TriageForm({ encounter, onSaved }: { encounter: ClinicalEncounterSummar
     );
 }
 
-function TriageHistory({ encounterId }: { encounterId: string }) {
+/**
+ * Hora de una medición en un <input type="datetime-local"> (precisión de minutos). Si el usuario no la cambia se envía
+ * la hora exacta del envío: redondear al minuto podría dejarla antes del inicio de una atención recién abierta.
+ */
+function useMeasurementTime() {
+    const [value, setValue] = useState(nowForDateTimeInput);
+    const [edited, setEdited] = useState(false);
+    return {
+        value,
+        change: (next: string) => {
+            setValue(next);
+            setEdited(true);
+        },
+        toUtc: () => (edited ? localInputToUtc(value) : new Date().toISOString()),
+        reset: () => {
+            setValue(nowForDateTimeInput());
+            setEdited(false);
+        },
+    };
+}
+
+function VitalSignForm({ encounter, onSaved }: { encounter: ClinicalEncounterSummary; onSaved: () => void }) {
+    const feedback = useClinicalFeedback('vitalSigns');
+    const [type, setType] = useState<VitalSignType | ''>('');
+    const [value, setValue] = useState('');
+    const measuredAt = useMeasurementTime();
+    const [saving, setSaving] = useState(false);
+    const meta = type ? vitalSignMeta(type) : null;
+    const numeric = Number(value);
+    const error =
+        meta && value && (Number.isNaN(numeric) || numeric < meta.min || numeric > meta.max)
+            ? `Valor fuera de rango (${meta.min}–${meta.max}).`
+            : undefined;
+
+    const submit = async (e: FormEvent) => {
+        e.preventDefault();
+        if (saving || !type || !value.trim() || error) return;
+        setSaving(true);
+        try {
+            await clinicalApi.createVitalSign(encounter.id, { type, value: numeric, measuredAtUtc: measuredAt.toUtc() });
+            feedback.success('signo vital registrado');
+            setType('');
+            setValue('');
+            measuredAt.reset();
+            onSaved();
+        } catch (failure) {
+            feedback.failure('No se pudo registrar el signo vital.', failure);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <form onSubmit={submit} noValidate className="mt-4 flex flex-col gap-3 border-t border-line-soft pt-4">
+            <h3 className="m-0 text-sm font-semibold text-ink">Registrar signo vital</h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Select
+                    label="Signo"
+                    value={type}
+                    onChange={(e) => setType(e.target.value as VitalSignType)}
+                    options={[
+                        { value: '', label: 'Selecciona…' },
+                        ...VITAL_SIGNS.map((v) => ({ value: v.type, label: `${v.label} (${v.unitLabel})` })),
+                    ]}
+                    required
+                />
+                <Input
+                    label="Valor"
+                    type="number"
+                    inputMode="decimal"
+                    min={meta?.min}
+                    max={meta?.max}
+                    step={meta?.step}
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    error={error}
+                    required
+                />
+            </div>
+            <Input
+                label="Hora de la medición"
+                type="datetime-local"
+                value={measuredAt.value}
+                onChange={(e) => measuredAt.change(e.target.value)}
+                required
+                containerClassName="sm:max-w-xs"
+            />
+            <Button type="submit" variant="secondary" loading={saving} disabled={!type || !value.trim()} className="w-full sm:w-fit">
+                Guardar signo vital
+            </Button>
+        </form>
+    );
+}
+
+function TriageHistory({ encounter, onSaved }: { encounter: ClinicalEncounterSummary; onSaved: () => void }) {
+    const encounterId = encounter.id;
+    const canWriteVitals = useAuth().can(Permissions.VitalSigns.Write);
     const triages = useClinicalQuery(`triages:${encounterId}`, (signal) => clinicalApi.listTriages(encounterId, signal));
     const vitals = useClinicalQuery(`vitals:${encounterId}`, (signal) => clinicalApi.listVitalSigns(encounterId, signal));
 
@@ -307,6 +411,16 @@ function TriageHistory({ encounterId }: { encounterId: string }) {
                         </div>
                     )}
                 </QueryView>
+                {canWriteVitals && isEncounterOpen(encounter.status) && (
+                    <VitalSignForm
+                        encounter={encounter}
+                        onSaved={() => {
+                            vitals.reload();
+                            // Created -> InProgress: refresca la cabecera de la atención.
+                            if (encounter.status === 'Created') onSaved();
+                        }}
+                    />
+                )}
             </Card>
         </div>
     );

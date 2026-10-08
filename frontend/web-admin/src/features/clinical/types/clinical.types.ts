@@ -1,6 +1,5 @@
-// Tipos del frontend hospitalario alineados con SCI-PH.Domain (src/Core/SCI-PH.Domain).
-// Los enums usan el NOMBRE del miembro C#. El Web BFF aún no publica estos contratos ni decide si serializa los enums
-// como texto (JsonStringEnumConverter) o como número: ver docs/HOSPITAL_CONTRATOS.md.
+// Tipos del frontend hospitalario alineados con los contratos clínicos del Web BFF (src/Core/SCI-PH.Application/DTOs/Clinical).
+// Los enums viajan como TEXTO con el nombre del miembro C# ("Emergency", "InProgress"); el BFF rechaza números.
 
 export type Guid = string;
 /** Instante UTC en ISO-8601 (DateTimeOffset en el backend). */
@@ -36,6 +35,28 @@ export interface PatientSearchRequest {
     value: string;
 }
 
+/** Patient.Register + identificador inicial opcional. El backend normaliza el valor; el cliente no. */
+export interface RegisterPatientRequest {
+    givenNames: string;
+    familyNames: string;
+    dateOfBirth: DateOnly | null;
+    sex: BiologicalSex;
+    identifier: { type: PatientIdentifierType; value: string; issuer?: string | null } | null;
+}
+
+// ---------------------------------------------------------------- Contexto clínico
+
+export interface ClinicSummary {
+    id: Guid;
+    name: string;
+}
+
+/** Clínicas donde el usuario actúa como ClinicalStaff (afiliaciones activas). */
+export interface ClinicalContext {
+    staffId: Guid;
+    clinics: ClinicSummary[];
+}
+
 // ---------------------------------------------------------------- Encounters
 
 export type ClinicalEncounterStatus = 'Created' | 'InProgress' | 'Transferred' | 'Received' | 'InEvolution' | 'Closed' | 'Cancelled';
@@ -56,15 +77,34 @@ export interface ClinicalEncounterSummary {
     reason: string | null;
     startedAtUtc: UtcDateTime;
     endedAtUtc: UtcDateTime | null;
+    /** Momento de la identificación de un NN; null si nació identificado o sigue sin identificar. */
+    identifiedAtUtc?: UtcDateTime | null;
     /** Prioridad del triage más reciente, si lo hay (proyección de lectura). */
     latestTriagePriority: TriagePriority | null;
 }
 
-/** Crear atención: con paciente identificado o sin patientId (NN). */
+/** Crear atención: con paciente identificado o sin patientId (NN). La web no crea Prehospital. */
 export interface CreateEncounterRequest {
     type: ClinicalEncounterType;
     patientId: Guid | null;
     reason: string | null;
+    /** Solo si el usuario tiene varias clínicas; el backend lo valida contra sus afiliaciones. */
+    clinicId?: Guid | null;
+}
+
+/**
+ * Proyección administrativa de Recepción (Patients.Identify). Sin contenido clínico: ni motivo, ni triage, ni signos
+ * vitales, notas, diagnósticos, resultados o prescripciones.
+ */
+export interface AdmissionEncounterSummary {
+    encounterId: Guid;
+    patientId: Guid | null;
+    patientDisplayName: string | null;
+    temporaryPatientCode: string | null;
+    type: ClinicalEncounterType;
+    status: ClinicalEncounterStatus;
+    startedAtUtc: UtcDateTime;
+    clinicId: Guid | null;
 }
 
 /** Cierre de la atención (Encounters.Close). La UI lo llama "Egreso". */
@@ -91,17 +131,21 @@ export type VitalSignType =
     | 'PainScore'
     | 'GlasgowComaScale';
 
-/** Una medición. Quién la tomó lo determina el backend a partir de la sesión. */
+/**
+ * Una medición enviada al servidor. Sin `unit`: la unidad la fija el Domain (VitalSignLimits) y el BFF rechaza el campo.
+ * Quién la tomó lo determina el backend a partir de la sesión.
+ */
 export interface VitalSignInput {
     type: VitalSignType;
     value: number;
-    unit: string;
     measuredAtUtc: UtcDateTime;
 }
 
 export interface VitalSign extends VitalSignInput {
     id: Guid;
     triageId: Guid | null;
+    /** Unidad UCUM asignada por el backend. */
+    unit: string;
 }
 
 /** Triage pertenece al ClinicalEncounter, no al Patient. */
@@ -109,8 +153,10 @@ export interface CreateTriageRequest {
     priority: TriagePriority;
     reason: string | null;
     observations: string | null;
-    /** Solo las mediciones que el usuario introdujo; puede ir vacío. */
-    vitalSigns: VitalSignInput[];
+    /** Si se omite, el backend usa la hora actual. */
+    performedAtUtc?: UtcDateTime | null;
+    /** Solo las mediciones que el usuario introdujo; puede ir vacío. Requiere además VitalSigns.Write. */
+    measurements: VitalSignInput[];
 }
 
 export interface Triage {
@@ -239,11 +285,6 @@ export interface MedicationAdministration {
 }
 
 // ---------------------------------------------------------------- Organizaciones y transporte
-
-export interface ClinicSummary {
-    id: Guid;
-    name: string;
-}
 
 export interface AmbulanceSummary {
     id: Guid;

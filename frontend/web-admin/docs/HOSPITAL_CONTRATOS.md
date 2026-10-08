@@ -1,72 +1,68 @@
-# Web Hospital (Rol 4) — contratos que necesita el frontend
+# Web Hospital (Rol 4) — contratos que usa el frontend
 
-Estado: **propuesta del frontend, pendiente de validar por el Backend Lead.** Ninguno de estos endpoints existe todavía
-salvo los de autenticación. Mientras tanto la UI usa el adaptador MOCK `src/features/clinical/api/mockClinicalApi.ts`
-(`CLINICAL_API_IS_MOCK = true`): datos ficticios en memoria, la cabecera muestra «Simulación» y cada confirmación lo
-indica. No se hace `fetch` a rutas inexistentes.
+Estado: **vertical clínica 1 integrada con el Web BFF real** (pacientes, atenciones, admisión/NN, triage y signos
+vitales). Lo demás sigue en el adaptador MOCK y la UI lo marca con «Simulación» en cada sección afectada.
 
-Los tipos de request/response están en `src/features/clinical/types/clinical.types.ts` y siguen el Domain
-(`src/Core/SCI-PH.Domain`). El puerto que implementará el adaptador HTTP es `ClinicalApi` (`src/features/clinical/api/clinicalApi.ts`).
+- Puerto: `ClinicalApi` (`src/features/clinical/api/clinicalApi.ts`).
+- Adaptador real: `httpClinicalApi.ts` (`apiRequest` de `src/api`: Bearer en memoria, refresh single-flight, ProblemDetails).
+- Adaptador simulado: `mockClinicalApi.ts` (datos DEMO en memoria). `VITE_CLINICAL_API_MODE=mock` simula todo el módulo.
+- Funciones reales vs. simuladas: `src/features/clinical/api/mode.ts` (`isSimulated(feature)`).
+- Contrato del backend (fuente de verdad): [`docs/api/web-bff-contracts.md`](../../../docs/api/web-bff-contracts.md).
 
 ## Reglas comunes
 
-- Prefijo `/api/web`, autenticación Bearer con el cliente compartido del Rol 5 (token en memoria, refresh por la cookie
-  `__Host-sciph-refresh`, CSRF según ADR-006). El módulo clínico no maneja tokens.
-- Errores como ProblemDetails. La UI distingue 401, 403, 404, 409 y 5xx; un error nunca se muestra como «sin datos».
-- **Autoría desde la sesión:** el cliente no envía `author`, `performedBy`, `prescribedBy` ni `administeredBy`.
-- **Enums:** la UI usa los nombres de los miembros C# (`"Immediate"`, `"InProgress"`…). Hoy el BFF no registra
-  `JsonStringEnumConverter`; hay que decidir si se serializan como texto (propuesto) o como número.
-- **Identificadores sensibles fuera de la URL:** la búsqueda de pacientes va por POST con cuerpo.
+- Prefijo `/api/web`, autenticación compartida (`src/auth`). El módulo clínico no maneja tokens.
+- Errores como ProblemDetails. La UI distingue 400/401/403/404/409/5xx y traduce los `detail` clínicos conocidos
+  (`describeError`); un error nunca se muestra como «sin datos».
+- **Autoría desde la sesión:** el cliente no envía `performedBy`, `measuredBy` ni `identifiedBy`.
+- **Enums como texto** con el nombre del miembro C# (`"Immediate"`, `"InProgress"`). El BFF rechaza números y campos
+  desconocidos: por eso `VitalSignInput` **no lleva `unit`** (la fija el Domain y llega en la respuesta).
+- **Identificadores fuera de la URL:** la búsqueda de pacientes es `POST` con cuerpo; la respuesta los enmascara.
+- **Clínica activa:** `GET /api/web/clinical/context` al entrar. Con una clínica no se envía `clinicId`; con varias, el
+  selector de clínica (`ClinicSelector`) elige y se envía en listas y creación. El backend lo valida siempre.
+- **Hora de las mediciones:** si el usuario no cambia la hora del formulario se envía la hora exacta del envío (el campo
+  tiene precisión de minutos y podría quedar antes del inicio de una atención recién abierta).
 
 ## Permisos por pantalla (permisos reales de Permissions.cs)
 
-El módulo usa la autenticación compartida (`src/auth`): `/hospital/*` está detrás de `RequireAuth` y cada pantalla de
-`RequirePermission`. Tras el login, `APP_MODULES` (`src/auth/modules.ts`) envía a `/hospital` a quien tenga permisos
-clínicos y no de administración (p. ej. Receptionist, Doctor, Nurse, Paramedic); el Administrator aterriza en Admin y
-puede cambiar de módulo desde el menú.
-
 | Pantalla | Acceso (cualquiera) | Acciones dentro |
 |---|---|---|
-| Recepción | `Encounters.Create`, `Patients.Read` | Buscar: `Patients.Read` · abrir atención: `Encounters.Create` · traslados: `Transfers.Read` |
-| Pacientes | `Patients.Read` | Pendiente de backend |
-| Atenciones / Expediente | `Encounters.Read` | Diagnóstico: `Diagnoses.Write` · nota: `ClinicalNotes.Write` |
-| Triage | `Triage.Write` | Signos vitales: `VitalSigns.Write` |
-| Medicación y egreso | `Medications.Read`, `Prescriptions.Write`, `MedicationAdministrations.Write` | Prescribir: `Prescriptions.Write` · cerrar atención: `Encounters.Close` |
-| Transferencias | `Transfers.Read` | Registrar llegada: `Transfers.Manage` |
+| Recepción | `Encounters.Create`, `Patients.Read` | Buscar: `Patients.Read` · registrar: `Patients.Create` · abrir atención: `Encounters.Create` · admisión e identificar NN: `Patients.Identify` · traslados: `Transfers.Read` (simulado) |
+| Pacientes | `Patients.Read` | Registrar: `Patients.Create` |
+| Atenciones / Expediente | `Encounters.Read` | Diagnóstico: `Diagnoses.Write` · nota: `ClinicalNotes.Write` (ambos simulados) |
+| Triage | `Triage.Write` | Signos vitales en el triage o sueltos: `VitalSigns.Write` |
+| Medicación y egreso | `Medications.Read`, `Prescriptions.Write`, `MedicationAdministrations.Write` | Simulado; el egreso real está deshabilitado hasta tener backend |
+| Transferencias | `Transfers.Read` | Simulado |
 
-Huecos de permisos (no se inventan; a decidir con el Backend Lead):
+Recepción **no** tiene `Encounters.Read`: tras crear una atención se queda en Recepción con el resumen devuelto por el
+`POST` y la ve en «Atenciones en admisión» (proyección sin datos clínicos).
 
-- No hay `Triage.Read`, `VitalSigns.Read`, `ClinicalNotes.Read`, `Diagnoses.Read` ni `MedicationAdministrations.Read`:
-  la lectura del expediente se cubre con `Encounters.Read` y la del Kardex con `Medications.Read`.
-- Receptionist tiene `Encounters.Create` pero no `Encounters.Read`: puede abrir una atención (también NN) pero no verla
-  después. La UI se queda en Recepción en ese caso.
-- No hay permiso para identificar a un paciente dentro de una atención NN distinto de `Patients.Identify`.
+## Endpoints reales (vertical clínica 1)
 
-## Endpoints
+| Área | Método | Ruta | Pantalla |
+|---|---|---|---|
+| Contexto | GET | `/api/web/clinical/context` | Selector de clínica |
+| Patients | POST | `/api/web/patients` | Recepción, Pacientes |
+| Patients | POST | `/api/web/patients/search` | Recepción, Pacientes |
+| Encounters | GET | `/api/web/encounters?clinicId=` | Atenciones, Triage |
+| Encounters | GET | `/api/web/encounters/{id}` | Expediente, Triage |
+| Encounters | POST | `/api/web/encounters` | Recepción |
+| Encounters | POST | `/api/web/encounters/{id}/identify` | Recepción |
+| Admissions | GET | `/api/web/admissions/encounters?clinicId=&unidentified=` | Recepción |
+| Triage | GET · POST | `/api/web/encounters/{id}/triages` | Triage |
+| VitalSigns | GET · POST | `/api/web/encounters/{id}/vital-signs` | Triage |
 
-| Área | Método | Ruta | Request | Response | Pantalla | Permiso |
-|---|---|---|---|---|---|---|
-| Patients | POST | `/api/web/patients/search` | `PatientSearchRequest` `{ identifierType?, value }` | `PatientSummary[]` | Recepción | Patients.Read |
-| Encounters | GET | `/api/web/encounters?status=` | — | `ClinicalEncounterSummary[]` | Atenciones, Triage | Encounters.Read |
-| Encounters | GET | `/api/web/encounters/{id}` | — | `ClinicalEncounterSummary` | Expediente | Encounters.Read |
-| Encounters | POST | `/api/web/encounters` | `CreateEncounterRequest` `{ type, patientId \| null, reason }` | `ClinicalEncounterSummary` (con `temporaryPatientCode` si es NN) | Recepción | Encounters.Create |
-| Encounters | POST | `/api/web/encounters/{id}/close` | `CloseEncounterRequest` `{ dischargeNote \| null }` | 204 · 409 si el estado no lo permite | Medicación y egreso | Encounters.Close |
-| Triage | GET · POST | `/api/web/encounters/{id}/triages` | `CreateTriageRequest` `{ priority, reason, observations, vitalSigns[] }` | `Triage[]` · `Triage` | Triage | Encounters.Read · Triage.Write |
-| VitalSigns | GET | `/api/web/encounters/{id}/vital-signs` | — | `VitalSign[]` `{ type, value, unit, measuredAtUtc, triageId }` | Triage | Encounters.Read |
-| ClinicalNotes | GET · POST | `/api/web/encounters/{id}/notes` | `{ type, content, occurredAtUtc }` | `ClinicalNote[]` · `ClinicalNote` | Expediente | ClinicalNotes.Write |
-| Diagnoses | GET · POST | `/api/web/encounters/{id}/diagnoses` | `{ code, codeSystem, description, type, isPrimary }` | `Diagnosis[]` · `Diagnosis` | Expediente | Diagnoses.Write |
-| Medications | GET | `/api/web/medications` | — | `Medication[]` | Medicación | Medications.Read |
-| Prescriptions | GET · POST | `/api/web/encounters/{id}/prescriptions` | `{ notes, details: [{ medicationId, dose, doseUnit, route, frequency, durationDays, instructions }] }` | `Prescription[]` · `Prescription` | Medicación | Prescriptions.Write |
-| MedicationAdministrations | GET | `/api/web/encounters/{id}/medication-administrations` | — | `MedicationAdministration[]` | Medicación (Kardex) | Medications.Read |
-| Transfers | GET | `/api/web/transfers?direction=incoming` | — | `ClinicalTransfer[]` | Recepción, Transferencias | Transfers.Read |
-| Transfers | POST | `/api/web/transfers/{id}/receive` | — | 204 · 409 si no está `InTransit` | Recepción, Transferencias | Transfers.Manage |
+## Aún simulado (MOCK) — pendiente de backend
 
-`GET /api/web/transfers` y `POST /api/web/transfers/{id}/receive` ya figuran como «Previsto» en
-`docs/api/web-bff-contracts.md`; la forma de `ClinicalTransfer` de este documento completa su respuesta.
+| Función del puerto | Ruta prevista |
+|---|---|
+| `listNotes` / `createNote` | `/api/web/encounters/{id}/notes` |
+| `listDiagnoses` / `createDiagnosis` | `/api/web/encounters/{id}/diagnoses` |
+| `listMedications` | `/api/web/medications` |
+| `listPrescriptions` / `createPrescription` | `/api/web/encounters/{id}/prescriptions` |
+| `listMedicationAdministrations` | `/api/web/encounters/{id}/medication-administrations` |
+| `listIncomingTransfers` / `receiveTransfer` | `/api/web/transfers`, `/api/web/transfers/{id}/receive` |
+| `closeEncounter` | `/api/web/encounters/{id}/close` — en modo HTTP se rechaza (no se simula sobre atenciones reales) |
 
-## Pendiente de definir con el Backend Lead
-
-- Contexto de clínica activa del usuario (qué hospital ve las atenciones y los traslados entrantes).
-- Identificación posterior de un paciente NN (`ClinicalEncounter.IdentifyPatient`) y su pantalla.
-- Registro de administración de medicamentos (`MedicationAdministrations.Write`): el Kardex hoy es de solo lectura.
-- Pacientes (detalle, identificadores, historial), procedimientos, resultados y documentos: sin pantalla en esta iteración.
+Con atenciones reales, las notas, diagnósticos y prescripciones simuladas se guardan en memoria por id de atención y
+se pierden al recargar.

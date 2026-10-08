@@ -10,6 +10,7 @@ import { formatDateTimeUtc } from '../utils/clinicalLabels';
 import { TransferStatusBadge, TriagePriorityBadge } from './ClinicalBadges';
 import { EncounterSubject } from './EncounterSubject';
 import { QueryView } from './QueryView';
+import { SimulatedBadge } from './SimulatedBadge';
 
 /**
  * Traslados con destino a este hospital (lado receptor). El registro y el despacho del traslado los hace la app
@@ -17,7 +18,7 @@ import { QueryView } from './QueryView';
  */
 export function IncomingTransfersPanel() {
     const { state, reload } = useClinicalQuery('incoming-transfers', (signal) => clinicalApi.listIncomingTransfers(signal));
-    const feedback = useClinicalFeedback();
+    const feedback = useClinicalFeedback('transfers');
     const canManage = useAuth().can(Permissions.Transfers.Manage);
     const [pending, setPending] = useState<ClinicalTransfer | null>(null);
     const [received, setReceived] = useState<ClinicalTransfer | null>(null);
@@ -37,7 +38,11 @@ export function IncomingTransfersPanel() {
     };
 
     return (
-        <Card title="Traslados entrantes" subtitle="Ambulancias y traslados con destino a este hospital.">
+        <Card
+            title="Traslados entrantes"
+            subtitle="Ambulancias y traslados con destino a este hospital."
+            actions={<SimulatedBadge feature="transfers" />}
+        >
             {received && (
                 <p role="status" className="m-0 mb-3 rounded-lg bg-success-50 px-3 py-2 text-sm text-success-700">
                     Traslado recibido.{' '}

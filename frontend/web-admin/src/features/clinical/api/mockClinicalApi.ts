@@ -1,4 +1,5 @@
 import type {
+    AdmissionEncounterSummary,
     ClinicalEncounterStatus,
     ClinicalEncounterSummary,
     ClinicalNote,
@@ -12,11 +13,14 @@ import type {
     Triage,
     VitalSign,
 } from '../types/clinical.types';
+import { vitalSignMeta } from '../utils/clinicalLabels';
 import { ClinicalApiError, type ClinicalApi } from './clinicalApi';
 
 // MOCK — adaptador de desarrollo visual. Todos los datos son FICTICIOS ("DEMO") y viven solo en memoria: se pierden al
 // recargar y nunca se escriben en localStorage/sessionStorage. No sustituye ninguna regla clínica: el backend sigue
 // siendo la autoridad; aquí solo se imitan las transiciones de estado del Domain para que la UI sea navegable.
+// En modo HTTP (por defecto) solo se usan las funciones sin backend (notas, diagnósticos, medicación, traslados), que
+// entonces reciben ids de atenciones REALES: por eso sus registros se guardan por id aunque la atención no sea del mock.
 
 const LATENCY_MS = 350;
 const CLINIC: ClinicalTransfer['destinationClinic'] = { id: 'mock-clinic-1', name: 'Hospital DEMO' };
@@ -200,7 +204,80 @@ function withEncounter<T>(id: Guid, run: (encounter: ClinicalEncounterSummary) =
     }
 }
 
+// Registros simulados de una atención que puede ser real (modo HTTP): sin ella, no se imitan estado ni transiciones.
+function withRecords<T>(id: Guid, run: () => T): Promise<T> {
+    try {
+        const encounter = encounters.find((e) => e.id === id);
+        if (encounter) ensureOpen(encounter);
+        const result = run();
+        if (encounter) markStarted(encounter);
+        return delay(result);
+    } catch (error) {
+        return Promise.reject(error);
+    }
+}
+
+const readRecords = <T,>(id: Guid, store: Record<Guid, T[]>, signal?: AbortSignal) => delay(store[id] ?? [], signal);
+
+const toAdmission = (e: ClinicalEncounterSummary): AdmissionEncounterSummary => ({
+    encounterId: e.id,
+    patientId: e.patientId,
+    patientDisplayName: e.patient?.displayName ?? null,
+    temporaryPatientCode: e.temporaryPatientCode,
+    type: e.type,
+    status: e.status,
+    startedAtUtc: e.startedAtUtc,
+    clinicId: e.clinicId,
+});
+
+const maskIdentifier = (value: string) => `***${value.replace(/[^0-9a-z]/gi, '').slice(-4)}`;
+
 export const mockClinicalApi: ClinicalApi = {
+    getClinicalContext(signal) {
+        return delay({ staffId: 'mock-staff-1', clinics: [CLINIC] }, signal);
+    },
+
+    registerPatient(request) {
+        const patient: PatientSummary = {
+            id: newId(),
+            displayName: `${request.givenNames.trim()} ${request.familyNames.trim()}`,
+            birthDate: request.dateOfBirth,
+            biologicalSex: request.sex,
+            identityStatus: 'Unverified',
+            primaryIdentifier: request.identifier ? { type: request.identifier.type, value: maskIdentifier(request.identifier.value) } : null,
+        };
+        patients.push(patient);
+        return delay(patient);
+    },
+
+    identifyEncounterPatient(encounterId, patientId) {
+        return withEncounter(encounterId, (encounter) => {
+            const patient = patients.find((p) => p.id === patientId);
+            if (!patient) throw new ClinicalApiError(404, 'Paciente no encontrado.');
+            if (encounter.patientId) throw new ClinicalApiError(409, 'La atención ya fue identificada.');
+            encounter.patientId = patient.id;
+            encounter.patient = patient;
+            encounter.identifiedAtUtc = new Date().toISOString();
+        });
+    },
+
+    listAdmissionEncounters(options, signal) {
+        return delay(
+            encounters.filter((e) => !NOT_LISTED.includes(e.status) && (!options?.unidentifiedOnly || !e.patientId)).map(toAdmission),
+            signal,
+        );
+    },
+
+    createVitalSign(encounterId, request) {
+        return withEncounter(encounterId, (encounter) => {
+            ensureOpen(encounter);
+            const vital: VitalSign = { ...request, id: newId(), triageId: null, unit: vitalSignMeta(request.type).unit };
+            (vitalSigns[encounterId] ??= []).unshift(vital);
+            markStarted(encounter);
+            return vital;
+        });
+    },
+
     searchPatients({ value }, signal) {
         const term = value.trim().toLowerCase();
         const matches = patients.filter(
@@ -278,10 +355,12 @@ export const mockClinicalApi: ClinicalApi = {
                 priority: request.priority,
                 reason: request.reason,
                 observations: request.observations,
-                performedAtUtc: now,
+                performedAtUtc: request.performedAtUtc ?? now,
             };
             triages.unshift(triage);
-            (vitalSigns[encounterId] ??= []).unshift(...request.vitalSigns.map((v) => ({ ...v, id: newId(), triageId: triage.id })));
+            (vitalSigns[encounterId] ??= []).unshift(
+                ...request.measurements.map((v) => ({ ...v, id: newId(), triageId: triage.id, unit: vitalSignMeta(v.type).unit })),
+            );
             encounter.latestTriagePriority = request.priority;
             markStarted(encounter);
             return triage;
@@ -293,29 +372,25 @@ export const mockClinicalApi: ClinicalApi = {
     },
 
     listNotes(encounterId, signal) {
-        return withEncounter(encounterId, () => notes[encounterId] ?? [], signal);
+        return readRecords(encounterId, notes, signal);
     },
 
     createNote(encounterId, request) {
-        return withEncounter(encounterId, (encounter) => {
-            ensureOpen(encounter);
+        return withRecords(encounterId, () => {
             const note: ClinicalNote = { ...request, id: newId(), createdAtUtc: new Date().toISOString(), authorDisplayName: null };
             (notes[encounterId] ??= []).unshift(note);
-            markStarted(encounter);
             return note;
         });
     },
 
     listDiagnoses(encounterId, signal) {
-        return withEncounter(encounterId, () => diagnoses[encounterId] ?? [], signal);
+        return readRecords(encounterId, diagnoses, signal);
     },
 
     createDiagnosis(encounterId, request) {
-        return withEncounter(encounterId, (encounter) => {
-            ensureOpen(encounter);
+        return withRecords(encounterId, () => {
             const diagnosis: Diagnosis = { ...request, id: newId(), recordedAtUtc: new Date().toISOString() };
             (diagnoses[encounterId] ??= []).unshift(diagnosis);
-            markStarted(encounter);
             return diagnosis;
         });
     },
@@ -325,12 +400,11 @@ export const mockClinicalApi: ClinicalApi = {
     },
 
     listPrescriptions(encounterId, signal) {
-        return withEncounter(encounterId, () => prescriptions[encounterId] ?? [], signal);
+        return readRecords(encounterId, prescriptions, signal);
     },
 
     createPrescription(encounterId, request) {
-        return withEncounter(encounterId, (encounter) => {
-            ensureOpen(encounter);
+        return withRecords(encounterId, () => {
             const details = request.details.map((d) => {
                 const medication = medications.find((m) => m.id === d.medicationId);
                 if (!medication || medication.status !== 'Active') {
@@ -349,13 +423,12 @@ export const mockClinicalApi: ClinicalApi = {
                 details,
             };
             (prescriptions[encounterId] ??= []).unshift(prescription);
-            markStarted(encounter);
             return prescription;
         });
     },
 
     listMedicationAdministrations(encounterId, signal) {
-        return withEncounter(encounterId, () => administrations[encounterId] ?? [], signal);
+        return readRecords(encounterId, administrations, signal);
     },
 
     listIncomingTransfers(signal) {
