@@ -181,6 +181,9 @@ export interface CreateClinicalNoteRequest {
 
 export interface ClinicalNote extends CreateClinicalNoteRequest {
     id: Guid;
+    encounterId?: Guid;
+    /** ClinicalStaff autor, asignado por el backend desde la sesión. */
+    authorStaffId?: Guid;
     authorDisplayName: string | null;
     createdAtUtc: UtcDateTime;
 }
@@ -197,7 +200,11 @@ export interface CreateDiagnosisRequest {
 
 export interface Diagnosis extends CreateDiagnosisRequest {
     id: Guid;
+    encounterId?: Guid;
     recordedAtUtc: UtcDateTime;
+    /** Fecha de confirmación; solo en diagnósticos Definitive. */
+    confirmedAtUtc?: UtcDateTime | null;
+    recordedByStaffId?: Guid;
 }
 
 // ---------------------------------------------------------------- Medicamentos

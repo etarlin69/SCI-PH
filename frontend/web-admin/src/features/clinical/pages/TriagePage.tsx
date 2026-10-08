@@ -11,6 +11,7 @@ import { EncounterSubject } from '../components/EncounterSubject';
 import { QueryView } from '../components/QueryView';
 import { useClinicSelection } from '../hooks/useClinicSelection';
 import { useClinicalFeedback } from '../hooks/useClinicalFeedback';
+import { useClinicalTime } from '../hooks/useClinicalTime';
 import { useClinicalQuery } from '../hooks/useClinicalQuery';
 import type { ClinicalEncounterSummary, TriagePriority, VitalSignInput, VitalSignType } from '../types/clinical.types';
 import {
@@ -18,8 +19,6 @@ import {
     VITAL_SIGNS,
     formatDateTimeUtc,
     isEncounterOpen,
-    localInputToUtc,
-    nowForDateTimeInput,
     vitalSignMeta,
 } from '../utils/clinicalLabels';
 
@@ -105,7 +104,7 @@ function TriageForm({ encounter, onSaved }: { encounter: ClinicalEncounterSummar
     // Sin valores por defecto: solo se envía lo que el usuario introduce.
     const [priority, setPriority] = useState<TriagePriority | null>(null);
     const [vitals, setVitals] = useState<VitalValues>({});
-    const measuredAt = useMeasurementTime();
+    const measuredAt = useClinicalTime();
     const [reason, setReason] = useState('');
     const [observations, setObservations] = useState('');
     const [priorityError, setPriorityError] = useState<string>();
@@ -246,32 +245,11 @@ function TriageForm({ encounter, onSaved }: { encounter: ClinicalEncounterSummar
     );
 }
 
-/**
- * Hora de una medición en un <input type="datetime-local"> (precisión de minutos). Si el usuario no la cambia se envía
- * la hora exacta del envío: redondear al minuto podría dejarla antes del inicio de una atención recién abierta.
- */
-function useMeasurementTime() {
-    const [value, setValue] = useState(nowForDateTimeInput);
-    const [edited, setEdited] = useState(false);
-    return {
-        value,
-        change: (next: string) => {
-            setValue(next);
-            setEdited(true);
-        },
-        toUtc: () => (edited ? localInputToUtc(value) : new Date().toISOString()),
-        reset: () => {
-            setValue(nowForDateTimeInput());
-            setEdited(false);
-        },
-    };
-}
-
 function VitalSignForm({ encounter, onSaved }: { encounter: ClinicalEncounterSummary; onSaved: () => void }) {
     const feedback = useClinicalFeedback('vitalSigns');
     const [type, setType] = useState<VitalSignType | ''>('');
     const [value, setValue] = useState('');
-    const measuredAt = useMeasurementTime();
+    const measuredAt = useClinicalTime();
     const [saving, setSaving] = useState(false);
     const meta = type ? vitalSignMeta(type) : null;
     const numeric = Number(value);

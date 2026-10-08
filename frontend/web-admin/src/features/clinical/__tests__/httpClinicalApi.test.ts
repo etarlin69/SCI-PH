@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ApiError, resetApiClientForTests, setAccessToken } from '../../../api';
 import { createFakeBff, json, problem } from '../../../test/fakeBff';
-import { ClinicalApiError, describeError, isSimulated } from '../api';
+import { describeError, isSimulated } from '../api';
 import { ensureClinicalContext, resetClinicSelectionForTests, selectClinic } from '../api/clinicSelection';
 import { httpClinicalApi } from '../api/httpClinicalApi';
 import type { VitalSignInput } from '../types/clinical.types';
@@ -112,12 +112,37 @@ describe('httpClinicalApi (Web BFF real)', () => {
     expect(describeError(new ApiError(400, { status: 400, title: 'x', detail: 'measuredAtUtc cannot be in the future.' }))).toBe(
       'La fecha y hora no pueden estar en el futuro.',
     );
-    await expect(httpClinicalApi.closeEncounter(ENCOUNTER, { dischargeNote: null })).rejects.toBeInstanceOf(ClinicalApiError);
+  });
+
+  it('notas, diagnósticos y cierre van al BFF real sin enviar autor ni staff', async () => {
+    const bff = createFakeBff({
+      [`GET /api/web/encounters/${ENCOUNTER}/notes`]: () => json(200, [{ id: 'n1', type: 'Evolution', content: 'Nota real', occurredAtUtc: '2026-10-08T10:00:00Z', createdAtUtc: '2026-10-08T10:00:01Z', authorStaffId: 's1', authorDisplayName: 'Dra. Prueba' }]),
+      [`POST /api/web/encounters/${ENCOUNTER}/notes`]: () => json(201, { id: 'n2' }),
+      [`GET /api/web/encounters/${ENCOUNTER}/diagnoses`]: () => json(200, []),
+      [`POST /api/web/encounters/${ENCOUNTER}/diagnoses`]: () => json(201, { id: 'd1' }),
+      [`POST /api/web/encounters/${ENCOUNTER}/close`]: () => new Response(null, { status: 204 }),
+    });
+
+    const notes = await httpClinicalApi.listNotes(ENCOUNTER);
+    await httpClinicalApi.createNote(ENCOUNTER, { type: 'Evolution', content: 'Evolución', occurredAtUtc: '2026-10-08T10:05:00.000Z', authorStaffId: 'x' } as never);
+    await httpClinicalApi.listDiagnoses(ENCOUNTER);
+    await httpClinicalApi.createDiagnosis(ENCOUNTER, { description: 'Cefalea', type: 'Presumptive', isPrimary: true, codeSystem: 'ICD-10', code: 'R51', recordedByStaffId: 'x' } as never);
+    await httpClinicalApi.closeEncounter(ENCOUNTER, { dischargeNote: 'Alta' });
+
+    expect(notes[0].authorDisplayName).toBe('Dra. Prueba');
+    expect(bff.calls(`POST /api/web/encounters/${ENCOUNTER}/notes`)[0].body).toEqual({ type: 'Evolution', content: 'Evolución', occurredAtUtc: '2026-10-08T10:05:00.000Z' });
+    expect(bff.calls(`POST /api/web/encounters/${ENCOUNTER}/diagnoses`)[0].body).toEqual({ description: 'Cefalea', type: 'Presumptive', isPrimary: true, codeSystem: 'ICD-10', code: 'R51' });
+    expect(bff.calls(`POST /api/web/encounters/${ENCOUNTER}/close`)[0].body).toEqual({ dischargeNote: 'Alta' });
+    expect(describeError(new ApiError(409, { status: 409, title: 'x', detail: 'An encounter in status Closed does not accept clinical records.' }))).toBe(
+      'La atención está cerrada o en un estado que no admite registros.',
+    );
   });
 
   it('marca como simulado solo lo que aún no tiene backend', () => {
-    for (const real of ['patients', 'encounters', 'admissions', 'triage', 'vitalSigns'] as const) expect(isSimulated(real)).toBe(false);
-    for (const mock of ['notes', 'diagnoses', 'prescriptions', 'administrations', 'discharge', 'transfers', 'medications'] as const) {
+    for (const real of ['patients', 'encounters', 'admissions', 'triage', 'vitalSigns', 'notes', 'diagnoses', 'discharge'] as const) {
+      expect(isSimulated(real)).toBe(false);
+    }
+    for (const mock of ['prescriptions', 'administrations', 'transfers', 'medications'] as const) {
       expect(isSimulated(mock)).toBe(true);
     }
   });

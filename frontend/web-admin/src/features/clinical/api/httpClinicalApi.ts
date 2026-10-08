@@ -3,18 +3,20 @@ import type {
     AdmissionEncounterSummary,
     ClinicalContext,
     ClinicalEncounterSummary,
+    ClinicalNote,
+    Diagnosis,
     PatientSummary,
     Triage,
     VitalSign,
     VitalSignInput,
 } from '../types/clinical.types';
-import { ClinicalApiError, type ClinicalApi } from './clinicalApi';
+import type { ClinicalApi } from './clinicalApi';
 import { clinicIdForRequest } from './clinicSelection';
 import { mockClinicalApi } from './mockClinicalApi';
 
 // Adaptador HTTP real: React Hospital → apiRequest → Web BFF → Application → ClinicalDbContext → PostgreSQL.
-// Solo las funciones de la vertical clínica 1 van al backend (pacientes, atenciones, admisión, triage y signos vitales).
-// El resto sigue en el MOCK (marcado «Simulación» en la UI) hasta que tenga endpoints.
+// Van al backend: pacientes, atenciones, admisión, triage, signos vitales (vertical 1) y notas clínicas, diagnósticos y
+// cierre de la atención (vertical 2). El resto sigue en el MOCK (marcado «Simulación» en la UI) hasta que tenga endpoints.
 
 const BASE = '/api/web';
 const id = (value: string) => encodeURIComponent(value);
@@ -64,14 +66,25 @@ export const httpClinicalApi: ClinicalApi = {
     createVitalSign: (encounterId, request) =>
         apiRequest<VitalSign>(`${BASE}/encounters/${id(encounterId)}/vital-signs`, { method: 'POST', body: toMeasurement(request) }),
 
-    // ---- Sin backend todavía ------------------------------------------------------------------------------------
-    // Cerrar una atención real no puede simularse sin desincronizar su estado: se rechaza de forma explícita.
-    closeEncounter: () => Promise.reject(new ClinicalApiError(501, 'El egreso todavía no está disponible en el backend.')),
+    // El autor y la fecha de registro los fija el backend desde la sesión: solo se envían los campos del contrato.
+    listNotes: (encounterId, signal) => apiRequest<ClinicalNote[]>(`${BASE}/encounters/${id(encounterId)}/notes`, { signal }),
 
-    listNotes: mockClinicalApi.listNotes,
-    createNote: mockClinicalApi.createNote,
-    listDiagnoses: mockClinicalApi.listDiagnoses,
-    createDiagnosis: mockClinicalApi.createDiagnosis,
+    createNote: (encounterId, { type, content, occurredAtUtc }) =>
+        apiRequest<ClinicalNote>(`${BASE}/encounters/${id(encounterId)}/notes`, { method: 'POST', body: { type, content, occurredAtUtc } }),
+
+    listDiagnoses: (encounterId, signal) => apiRequest<Diagnosis[]>(`${BASE}/encounters/${id(encounterId)}/diagnoses`, { signal }),
+
+    createDiagnosis: (encounterId, { description, type, isPrimary, codeSystem, code }) =>
+        apiRequest<Diagnosis>(`${BASE}/encounters/${id(encounterId)}/diagnoses`, {
+            method: 'POST',
+            body: { description, type, isPrimary, codeSystem, code },
+        }),
+
+    // ClinicalEncounter.ChangeStatus(Closed); la nota de egreso opcional se guarda como ClinicalNote Discharge.
+    closeEncounter: (encounterId, { dischargeNote }) =>
+        apiRequest<void>(`${BASE}/encounters/${id(encounterId)}/close`, { method: 'POST', body: { dischargeNote } }),
+
+    // ---- Sin backend todavía ------------------------------------------------------------------------------------
     listMedications: mockClinicalApi.listMedications,
     listPrescriptions: mockClinicalApi.listPrescriptions,
     createPrescription: mockClinicalApi.createPrescription,
