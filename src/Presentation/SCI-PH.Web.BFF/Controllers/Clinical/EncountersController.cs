@@ -14,6 +14,9 @@ namespace SCI_PH.Web.BFF.Controllers.Clinical
     [Route("api/web/encounters")]
     public sealed class EncountersController : ControllerBase
     {
+        private static readonly ClinicalNoteType[] WebNoteTypes =
+            [ClinicalNoteType.Assessment, ClinicalNoteType.Evolution, ClinicalNoteType.Other];
+
         private readonly EncounterService _encounters;
         private readonly EncounterRecordService _records;
 
@@ -64,6 +67,59 @@ namespace SCI_PH.Web.BFF.Controllers.Clinical
         {
             await _encounters.IdentifyPatientAsync(id, request, cancellationToken);
             return NoContent();
+        }
+
+        // ClinicalEncounter.ChangeStatus(Closed), with an optional discharge note. 409 when the status does not allow it.
+        [HttpPost("{id:guid}/close")]
+        [Authorize(Policy = Permissions.Encounters.Close)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> Close(Guid id, CloseEncounterRequest request, CancellationToken cancellationToken)
+        {
+            await _encounters.CloseAsync(id, request, cancellationToken);
+            return NoContent();
+        }
+
+        [HttpGet("{id:guid}/notes")]
+        [Authorize(Policy = Permissions.Encounters.Read)]
+        [ProducesResponseType<IReadOnlyList<ClinicalNoteSummary>>(StatusCodes.Status200OK)]
+        public async Task<IActionResult> ListNotes(Guid id, CancellationToken cancellationToken) =>
+            Ok(await _records.ListNotesAsync(id, cancellationToken));
+
+        [HttpPost("{id:guid}/notes")]
+        [Authorize(Policy = Permissions.ClinicalNotes.Write)]
+        [ProducesResponseType<ClinicalNoteSummary>(StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> RecordNote(Guid id, RecordClinicalNoteRequest request, CancellationToken cancellationToken)
+        {
+            // The hospital web writes assessment, evolution and other notes. Discharge notes are written by /close;
+            // prehospital and transfer summaries belong to the paramedic and transfer flows.
+            if (!WebNoteTypes.Contains(request.Type))
+            {
+                throw new RequestValidationException($"{request.Type} notes cannot be written from this endpoint.", "type");
+            }
+
+            var note = await _records.RecordNoteAsync(id, request, cancellationToken);
+            return CreatedAtAction(nameof(ListNotes), new { id }, note);
+        }
+
+        [HttpGet("{id:guid}/diagnoses")]
+        [Authorize(Policy = Permissions.Encounters.Read)]
+        [ProducesResponseType<IReadOnlyList<DiagnosisSummary>>(StatusCodes.Status200OK)]
+        public async Task<IActionResult> ListDiagnoses(Guid id, CancellationToken cancellationToken) =>
+            Ok(await _records.ListDiagnosesAsync(id, cancellationToken));
+
+        [HttpPost("{id:guid}/diagnoses")]
+        [Authorize(Policy = Permissions.Diagnoses.Write)]
+        [ProducesResponseType<DiagnosisSummary>(StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> RecordDiagnosis(Guid id, RecordDiagnosisRequest request, CancellationToken cancellationToken)
+        {
+            var diagnosis = await _records.RecordDiagnosisAsync(id, request, cancellationToken);
+            return CreatedAtAction(nameof(ListDiagnoses), new { id }, diagnosis);
         }
 
         [HttpGet("{id:guid}/triages")]
