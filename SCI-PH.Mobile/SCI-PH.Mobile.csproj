@@ -66,8 +66,15 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Features\Paramedic\ViewModels\" />
-	  <Folder Include="Features\Paramedic\Views\" />
+	  <MauiXaml Update="Features\Paramedic\Views\NewEmergencyPage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
+	  <MauiXaml Update="Resources\Splash\SciPhTheme.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
+	  <MauiXaml Update="Resources\Styles\SciPhTheme.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
 	</ItemGroup>
 
 </Project>

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <!-- ===== Colores (aproximados del dashboard; ajustar con Rol 5) ===== -->
+    <Color x:Key="SciNavy">#0F2747</Color>
+    <Color x:Key="SciPrimary">#1B4B8A</Color>
+    <Color x:Key="SciPrimaryDisabled">#A9B8CC</Color>
+    <Color x:Key="SciBackground">#F4F6F9</Color>
+    <Color x:Key="SciSurface">#FFFFFF</Color>
+    <Color x:Key="SciBorder">#E3E8EF</Color>
+    <Color x:Key="SciText">#0F172A</Color>
+    <Color x:Key="SciTextMuted">#5B6B80</Color>
+    <Color x:Key="SciSuccess">#1F7A4D</Color>
+    <Color x:Key="SciSuccessBg">#E3F4EA</Color>
+    <Color x:Key="SciWarning">#C2570C</Color>
+    <Color x:Key="SciWarningBg">#FDEBDD</Color>
+    <Color x:Key="SciDanger">#B42318</Color>
+    <Color x:Key="SciDangerBg">#FDECEA</Color>
+
+    <!-- ===== Páginas ===== -->
+    <Style x:Key="SciPage" TargetType="ContentPage">
+        <Setter Property="BackgroundColor" Value="{StaticResource SciBackground}" />
+    </Style>
+
+    <!-- ===== Texto ===== -->
+    <Style x:Key="SciTitle" TargetType="Label">
+        <Setter Property="FontSize" Value="26" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource SciText}" />
+    </Style>
+
+    <Style x:Key="SciSubtitle" TargetType="Label">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="TextColor" Value="{StaticResource SciTextMuted}" />
+    </Style>
+
+    <Style x:Key="SciFieldLabel" TargetType="Label">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource SciText}" />
+    </Style>
+
+    <!-- ===== Tarjeta ===== -->
+    <Style x:Key="SciCard" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource SciSurface}" />
+        <Setter Property="Stroke" Value="{StaticResource SciBorder}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 14" />
+        <Setter Property="Padding" Value="18" />
+    </Style>
+
+    <!-- ===== Contenedor de campo (Entry/Editor dentro de un Border) ===== -->
+    <Style x:Key="SciField" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource SciSurface}" />
+        <Setter Property="Stroke" Value="{StaticResource SciBorder}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 10" />
+        <Setter Property="Padding" Value="12,2" />
+    </Style>
+
+    <Style x:Key="SciEntry" TargetType="Entry">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="TextColor" Value="{StaticResource SciText}" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource SciTextMuted}" />
+        <Setter Property="FontSize" Value="15" />
+    </Style>
+
+    <Style x:Key="SciEditor" TargetType="Editor">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="TextColor" Value="{StaticResource SciText}" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource SciTextMuted}" />
+        <Setter Property="FontSize" Value="15" />
+    </Style>
+
+    <!-- ===== Botones ===== -->
+    <Style x:Key="SciPrimaryButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource SciPrimary}" />
+        <Setter Property="TextColor" Value="White" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="HeightRequest" Value="50" />
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource SciPrimaryDisabled}" />
+                            <Setter Property="TextColor" Value="White" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SciSecondaryButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource SciSurface}" />
+        <Setter Property="TextColor" Value="{StaticResource SciText}" />
+        <Setter Property="BorderColor" Value="{StaticResource SciBorder}" />
+        <Setter Property="BorderWidth" Value="1" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="HeightRequest" Value="50" />
+    </Style>
+
+    <!-- ===== Badges (pills) ===== -->
+    <Style x:Key="SciBadgeSuccess" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource SciSuccessBg}" />
+        <Setter Property="StrokeThickness" Value="0" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 8" />
+        <Setter Property="Padding" Value="10,4" />
+    </Style>
+
+    <Style x:Key="SciBadgeWarning" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource SciWarningBg}" />
+        <Setter Property="StrokeThickness" Value="0" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 8" />
+        <Setter Property="Padding" Value="10,4" />
+    </Style>
+
+    <!-- ===== Banner de error ===== -->
+    <Style x:Key="SciErrorBanner" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource SciDangerBg}" />
+        <Setter Property="StrokeThickness" Value="0" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 10" />
+        <Setter Property="Padding" Value="12" />
+    </Style>
+
+</ResourceDictionary>

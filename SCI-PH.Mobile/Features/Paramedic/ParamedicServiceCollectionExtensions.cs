@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 using SCI_PH.Mobile.Features.Paramedic.Services.Mocks;
+using SCI_PH.Mobile.Features.Paramedic.ViewModels;
+using SCI_PH.Mobile.Features.Paramedic.Views;
 
 namespace SCI_PH.Mobile.Features.Paramedic
 {
@@ -12,18 +14,14 @@ namespace SCI_PH.Mobile.Features.Paramedic
     {
         public static IServiceCollection AddParamedicFeature(this IServiceCollection services)
         {
-            // Servicios
-            #if DEBUG
-                services.AddSingleton<IParamedicApiService, MockParamedicApiService>();
-            #else
-                services.AddHttpClient<IParamedicApiService, ParamedicApiService>();
-            #endif
+            // Servicios (por ahora siempre el mock)
+            services.AddSingleton<IParamedicApiService, MockParamedicApiService>();
 
-            // ViewModels (los iremos agregando)
-            // services.AddTransient<NewEmergencyViewModel>();
+            // ViewModels
+            services.AddTransient<NewEmergencyViewModel>();
 
-            // Views (los iremos agregando)
-            // services.AddTransient<NewEmergencyPage>();
+            // Views
+            services.AddTransient<NewEmergencyPage>();
 
             return services;
         }
