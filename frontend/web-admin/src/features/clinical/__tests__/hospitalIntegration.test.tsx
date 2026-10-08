@@ -5,6 +5,7 @@ import { AuthProvider, Permissions, resolveHomeRoute, type WebUser } from '../..
 import { ToastProvider } from '../../../components/shared';
 import { AppRoutes } from '../../../routes';
 import { ADMIN_USER, NURSE_USER, createFakeBff, json, session } from '../../../test/fakeBff';
+import { resetClinicSelectionForTests } from '../api/clinicSelection';
 
 // Permisos reales de RolePermissions.Receptionist (backend).
 const RECEPTIONIST: WebUser = {
@@ -60,6 +61,45 @@ describe('módulo Hospital con la autenticación compartida', () => {
     expect(nav.queryByText('Atenciones')).not.toBeInTheDocument();
     // Tiene Accounts.InvitePatient (permiso de Admin): se le ofrece el cambio de módulo.
     expect(nav.getByText('Ir a Administración')).toBeInTheDocument();
+  });
+
+  it('recepción lista la admisión real (sin datos clínicos) y solo marca «Simulación» en lo que aún es mock', async () => {
+    resetClinicSelectionForTests();
+    createFakeBff({
+      'POST /api/web/auth/refresh': () => json(200, session(RECEPTIONIST)),
+      'GET /api/web/auth/me': () => json(200, RECEPTIONIST),
+      'GET /api/web/clinical/context': () => json(200, { staffId: 's1', clinics: [{ id: 'c1', name: 'Hospital Real' }] }),
+      'GET /api/web/admissions/encounters': () =>
+        json(200, [
+          {
+            encounterId: 'e1',
+            patientId: null,
+            patientDisplayName: null,
+            temporaryPatientCode: 'NN-0123456789ABCDEF0123456789ABCDEF',
+            type: 'Emergency',
+            status: 'Created',
+            startedAtUtc: '2026-10-07T10:00:00Z',
+            clinicId: 'c1',
+          },
+        ]),
+    });
+    render(
+      <ToastProvider>
+        <AuthProvider>
+          <MemoryRouter initialEntries={['/hospital/recepcion']}>
+            <AppRoutes />
+          </MemoryRouter>
+        </AuthProvider>
+      </ToastProvider>,
+    );
+
+    expect(await screen.findByText('Hospital Real', {}, WAIT)).toBeInTheDocument();
+    const admissions = (await screen.findByRole('heading', { name: 'Atenciones en admisión' }, WAIT)).closest('section')!;
+    expect(await within(admissions).findByRole('button', { name: 'Identificar' }, WAIT)).toBeInTheDocument();
+    expect(within(admissions).queryByText('Simulación')).not.toBeInTheDocument();
+    const transfers = screen.getByRole('heading', { name: 'Traslados entrantes' }).closest('section')!;
+    expect(within(transfers).getByText('Simulación')).toBeInTheDocument();
+    expect(screen.getAllByText('Simulación')).toHaveLength(1);
   });
 
   it('sin el permiso de la pantalla hospitalaria recibe 403 y conserva la sesión', async () => {

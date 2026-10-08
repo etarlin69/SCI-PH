@@ -1,5 +1,7 @@
 import { ApiError, NetworkError, describeApiError } from '../../../api';
 import type {
+    AdmissionEncounterSummary,
+    ClinicalContext,
     ClinicalEncounterSummary,
     ClinicalNote,
     ClinicalTransfer,
@@ -16,28 +18,39 @@ import type {
     PatientSearchRequest,
     PatientSummary,
     Prescription,
+    RegisterPatientRequest,
     Triage,
     VitalSign,
+    VitalSignInput,
 } from '../types/clinical.types';
 
 /**
- * Puerto de datos del frontend hospitalario. Hoy solo existe el adaptador MOCK (mockClinicalApi.ts) porque los
- * endpoints clínicos del Web BFF no están implementados. El adaptador HTTP (`httpClinicalApi`) implementará esta
- * misma interfaz con `apiRequest` de src/api (Bearer en memoria, refresh single-flight, ProblemDetails): este módulo
- * no maneja tokens ni cookies. Rutas previstas: docs/HOSPITAL_CONTRATOS.md.
+ * Puerto de datos del frontend hospitalario. Dos adaptadores: `httpClinicalApi` (Web BFF real con `apiRequest` de
+ * src/api: Bearer en memoria, refresh single-flight, ProblemDetails) y `mockClinicalApi` (datos DEMO en memoria) para
+ * lo que aún no tiene backend. Este módulo no maneja tokens ni cookies. Rutas: docs/HOSPITAL_CONTRATOS.md.
  */
 export interface ClinicalApi {
-    searchPatients(request: PatientSearchRequest, signal?: AbortSignal): Promise<PatientSummary[]>;
+    /** Clínicas donde el usuario actúa como ClinicalStaff. 403 si no es personal clínico activo. */
+    getClinicalContext(signal?: AbortSignal): Promise<ClinicalContext>;
 
-    /** Atenciones abiertas del establecimiento (ni Closed ni Cancelled, ni en traslado). */
+    searchPatients(request: PatientSearchRequest, signal?: AbortSignal): Promise<PatientSummary[]>;
+    registerPatient(request: RegisterPatientRequest): Promise<PatientSummary>;
+
+    /** Atenciones abiertas de la clínica activa (ni Closed ni Cancelled, ni en traslado). */
     listActiveEncounters(signal?: AbortSignal): Promise<ClinicalEncounterSummary[]>;
     getEncounter(encounterId: Guid, signal?: AbortSignal): Promise<ClinicalEncounterSummary>;
     createEncounter(request: CreateEncounterRequest): Promise<ClinicalEncounterSummary>;
+    /** Vincula una atención NN al paciente real; el código NN se conserva como historial. */
+    identifyEncounterPatient(encounterId: Guid, patientId: Guid): Promise<void>;
     closeEncounter(encounterId: Guid, request: CloseEncounterRequest): Promise<void>;
+
+    /** Proyección administrativa de Recepción (sin datos clínicos). */
+    listAdmissionEncounters(options?: { unidentifiedOnly?: boolean }, signal?: AbortSignal): Promise<AdmissionEncounterSummary[]>;
 
     listTriages(encounterId: Guid, signal?: AbortSignal): Promise<Triage[]>;
     createTriage(encounterId: Guid, request: CreateTriageRequest): Promise<Triage>;
     listVitalSigns(encounterId: Guid, signal?: AbortSignal): Promise<VitalSign[]>;
+    createVitalSign(encounterId: Guid, request: VitalSignInput): Promise<VitalSign>;
 
     listNotes(encounterId: Guid, signal?: AbortSignal): Promise<ClinicalNote[]>;
     createNote(encounterId: Guid, request: CreateClinicalNoteRequest): Promise<ClinicalNote>;
@@ -64,12 +77,33 @@ export class ClinicalApiError extends Error {
     }
 }
 
+// Mensajes de reglas clínicas conocidas del Web BFF (ProblemDetails.detail, en inglés) traducidos para la UI.
+const KNOWN_DETAILS: [RegExp, string][] = [
+    [/not registered as clinical staff/i, 'Tu usuario no está registrado como personal clínico.'],
+    [/clinical staff record .* is inactive/i, 'Tu registro de personal clínico está inactivo.'],
+    [/no active clinic affiliation/i, 'No tienes una afiliación activa a ninguna clínica.'],
+    [/not affiliated with the requested clinic|belongs to a clinic the user is not affiliated/i, 'El registro pertenece a una clínica a la que no estás afiliado.'],
+    [/clinicId is required/i, 'Selecciona la clínica en la que estás trabajando.'],
+    [/cannot be in the future/i, 'La fecha y hora no pueden estar en el futuro.'],
+    [/cannot be earlier than the start of the encounter/i, 'La fecha y hora no pueden ser anteriores al inicio de la atención.'],
+    [/must be between/i, 'El valor está fuera del rango admitido para ese signo vital.'],
+    [/requires an identified patient/i, 'Este tipo de atención requiere un paciente identificado.'],
+    [/already linked to a patient/i, 'La atención ya fue identificada.'],
+    [/does not accept clinical records/i, 'La atención está cerrada o en un estado que no admite registros.'],
+    [/changed by another operation/i, 'Otro usuario modificó este registro. Recarga e inténtalo de nuevo.'],
+    [/identifier with this value already belongs/i, 'Ya existe un paciente con ese identificador.'],
+    [/needs at least 3 characters/i, 'Escribe al menos 3 caracteres para buscar por nombre.'],
+];
+
 /**
  * Mensaje legible para la UI. No incluye datos clínicos. Acepta los errores del mock (ClinicalApiError) y los del
- * cliente HTTP compartido (ApiError/NetworkError de src/api), que usará el futuro adaptador HTTP.
+ * cliente HTTP compartido (ApiError/NetworkError de src/api).
  */
 export function describeError(error: unknown): string {
     if (error instanceof ApiError || error instanceof NetworkError) {
+        const detail = error instanceof ApiError ? error.problem?.detail : undefined;
+        const known = typeof detail === 'string' ? KNOWN_DETAILS.find(([pattern]) => pattern.test(detail)) : undefined;
+        if (known) return known[1];
         return describeApiError(error, { 404: 'El registro no existe o no es visible para tu usuario.' });
     }
     if (error instanceof ClinicalApiError) {

@@ -39,7 +39,7 @@ function LayoutInner() {
     if (entry.section !== rootCrumb.label) crumbs.push({ label: entry.section });
     crumbs.push({ label: entry.page, to: entry.to });
   }
-  // Hospital: el API clínico aún es un adaptador simulado. Admin: pantallas DEMO sin API.
+  // Hospital: «Simulación» global solo si todo el módulo es MOCK; si no, cada sección sin backend lo indica. Admin: pantallas DEMO.
   const environmentLabel = module === 'hospital' ? (CLINICAL_API_IS_MOCK ? 'Simulación' : undefined) : entry?.demo ? 'Datos de demostración' : undefined;
   if (crumb) crumbs.push({ label: crumb });
   useDocumentTitle(crumb ?? entry?.page ?? 'SCI-PH');
