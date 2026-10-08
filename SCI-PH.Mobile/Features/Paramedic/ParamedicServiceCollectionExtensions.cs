@@ -16,10 +16,12 @@ public static class ParamedicServiceCollectionExtensions
         // ViewModels
         services.AddTransient<NewEmergencyViewModel>();
         services.AddTransient<IdentifyPatientViewModel>();
+        services.AddTransient<VitalSignsViewModel>();
 
         // Views
         services.AddTransient<NewEmergencyPage>();
         services.AddTransient<IdentifyPatientPage>();
+        services.AddTransient<VitalSignsPage>();
 
         return services;
     }

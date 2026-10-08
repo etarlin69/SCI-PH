@@ -4,5 +4,6 @@ namespace SCI_PH.Mobile.Features.Paramedic;
 public static class ParamedicRoutes
 {
     public const string IdentifyPatient = "IdentifyPatient";
-    // Próximas: VitalSigns, Procedures, Medications, Transfer
+    public const string VitalSigns = "VitalSigns";
+    // Próximas: Procedures, Medications, Transfer
 }

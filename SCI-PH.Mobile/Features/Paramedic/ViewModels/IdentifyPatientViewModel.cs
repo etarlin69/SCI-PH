@@ -122,13 +122,13 @@ public partial class IdentifyPatientViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRun))]
     private async Task ContinueWithoutIdentifyingAsync()
     {
-        await GoToNextStepAsync("Paciente sin identificar (NN)");
+        await GoToNextStepAsync();
     }
 
     [RelayCommand]
     private async Task ContinueAsync()
     {
-        await GoToNextStepAsync(PatientDisplayName ?? "Paciente identificado");
+        await GoToNextStepAsync();
     }
 
     // ---- Helpers ----
@@ -144,13 +144,11 @@ public partial class IdentifyPatientViewModel : ObservableObject
         ShowDocumentForm = false;
     }
 
-    private static async Task GoToNextStepAsync(string who)
+    private async Task GoToNextStepAsync()
     {
-        // TODO: navegar a Signos vitales pasando EmergencyId (ParamedicRoutes.VitalSigns).
-        await Shell.Current.DisplayAlert(
-            "Identificación completa",
-            $"{who}\nSiguiente paso: signos vitales (pendiente).",
-            "OK");
+        await Shell.Current.GoToAsync(
+            ParamedicRoutes.VitalSigns,
+            new Dictionary<string, object> { ["EmergencyId"] = EmergencyId });
     }
 
     private async Task RunAsync(Func<Task> action, string errorText)
