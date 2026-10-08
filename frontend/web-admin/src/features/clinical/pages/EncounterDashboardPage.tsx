@@ -41,6 +41,7 @@ export function EncounterDashboardPage() {
 }
 
 function EncounterList() {
+    const canCreate = useAuth().can(Permissions.Encounters.Create);
     const clinic = useClinicSelection();
     const { state, reload } = useClinicalQuery(clinic.ready ? `active-encounters:${clinic.queryKey}` : null, (signal) =>
         clinicalApi.listActiveEncounters(signal),
@@ -54,12 +55,15 @@ function EncounterList() {
                     <p className="m-0 mt-1 text-sm text-ink-muted">Atenciones abiertas en este hospital.</p>
                 </div>
                 <ClinicSelector />
-                <Link
-                    to="/hospital/recepcion"
-                    className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white no-underline hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
-                >
-                    Nueva atención
-                </Link>
+                {/* Solo con el permiso real de creación; nunca por rol. */}
+                {canCreate && (
+                    <Link
+                        to="/hospital/recepcion"
+                        className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white no-underline hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+                    >
+                        Nueva atención
+                    </Link>
+                )}
             </div>
             <Card padding="none">
                 <QueryView

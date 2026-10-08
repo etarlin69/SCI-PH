@@ -102,6 +102,35 @@ describe('módulo Hospital con la autenticación compartida', () => {
     expect(screen.getAllByText('Simulación')).toHaveLength(1);
   });
 
+  // Mismo rol en ambos casos: la acción depende solo del permiso real Encounters.Create, nunca del rol.
+  it.each([
+    { label: 'con Encounters.Create ve', permissions: [...NURSE_USER.permissions, 'Encounters.Create'], visible: true },
+    { label: 'sin Encounters.Create no ve', permissions: NURSE_USER.permissions, visible: false },
+  ])('en Atenciones, un usuario $label «Nueva atención»', async ({ permissions, visible }) => {
+    resetClinicSelectionForTests();
+    const user: WebUser = { ...NURSE_USER, permissions };
+    createFakeBff({
+      'POST /api/web/auth/refresh': () => json(200, session(user)),
+      'GET /api/web/auth/me': () => json(200, user),
+      'GET /api/web/clinical/context': () => json(200, { staffId: 's1', clinics: [{ id: 'c1', name: 'Hospital Real' }] }),
+      'GET /api/web/encounters': () => json(200, []),
+    });
+    render(
+      <ToastProvider>
+        <AuthProvider>
+          <MemoryRouter initialEntries={['/hospital/atenciones']}>
+            <AppRoutes />
+          </MemoryRouter>
+        </AuthProvider>
+      </ToastProvider>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Atenciones' }, WAIT)).toBeInTheDocument();
+    expect(await screen.findByText('No hay atenciones abiertas', {}, WAIT)).toBeInTheDocument();
+    if (visible) expect(screen.getByRole('link', { name: 'Nueva atención' })).toHaveAttribute('href', '/hospital/recepcion');
+    else expect(screen.queryByRole('link', { name: 'Nueva atención' })).not.toBeInTheDocument();
+  });
+
   it('sin el permiso de la pantalla hospitalaria recibe 403 y conserva la sesión', async () => {
     renderAppAs(RECEPTIONIST, '/hospital/triage');
     expect(await screen.findByText('ERROR 403', {}, WAIT)).toBeInTheDocument();
