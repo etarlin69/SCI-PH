@@ -44,13 +44,11 @@ public partial class NewEmergencyViewModel : ObservableObject
                 Location = await TryGetLocationAsync()
             });
 
-            // TODO: navegar a Identificación pasando emergency.Id
-            await Shell.Current.DisplayAlert(
-                "Emergencia creada",
-                $"ID: {emergency.Id}\nEstado: {emergency.Status}",
-                "OK");
-
             ChiefComplaint = string.Empty;
+
+            await Shell.Current.GoToAsync(
+                ParamedicRoutes.IdentifyPatient,
+                new Dictionary<string, object> { ["EmergencyId"] = emergency.Id });
         }
         catch (Exception)
         {

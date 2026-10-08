@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Paramedic.ViewModels"
+             x:Class="SCI_PH.Mobile.Features.Paramedic.Views.IdentifyPatientPage"
+             x:DataType="vm:IdentifyPatientViewModel"
+             Style="{StaticResource SciPage}"
+             Title="Identificación">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="18">
+
+            <!-- Encabezado -->
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Identificar paciente" Style="{StaticResource SciTitle}" />
+                <Label Text="Usa el lector de huella o identifica al paciente con su documento."
+                       Style="{StaticResource SciSubtitle}" />
+            </VerticalStackLayout>
+
+            <!-- Error -->
+            <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding HasError}">
+                <Label Text="{Binding ErrorMessage}"
+                       TextColor="{StaticResource SciDanger}" FontSize="13" />
+            </Border>
+
+            <!-- Loading -->
+            <ActivityIndicator IsRunning="{Binding IsBusy}"
+                               IsVisible="{Binding IsBusy}"
+                               Color="{StaticResource SciPrimary}" />
+
+            <!-- Lectura de huella -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding CanIdentify}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Lectura de huella" Style="{StaticResource SciFieldLabel}" />
+                    <Label Text="Pide al paciente colocar el dedo en el lector y presiona el botón."
+                           Style="{StaticResource SciSubtitle}" />
+                    <Button Text="Identificar por huella"
+                            Command="{Binding IdentifyByFingerprintCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Aviso: sin coincidencia -->
+            <Border Style="{StaticResource SciBadgeWarning}" IsVisible="{Binding ShowFallback}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="No se encontró un paciente con esa huella."
+                           TextColor="{StaticResource SciWarning}"
+                           FontAttributes="Bold" />
+                    <Label Text="Puedes reintentar, identificar con documento o continuar sin identificar."
+                           TextColor="{StaticResource SciWarning}" FontSize="13" />
+                    <Button Text="Identificar con documento"
+                            Command="{Binding OpenDocumentFormCommand}"
+                            Style="{StaticResource SciSecondaryButton}" />
+                    <Button Text="Continuar sin identificar"
+                            Command="{Binding ContinueWithoutIdentifyingCommand}"
+                            Style="{StaticResource SciSecondaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Formulario de documento -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding ShowDocumentForm}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Identificación con documento" Style="{StaticResource SciFieldLabel}" />
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Tipo de documento" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Picker ItemsSource="{Binding DocumentTypes}"
+                                    SelectedItem="{Binding SelectedDocumentType}"
+                                    BackgroundColor="Transparent"
+                                    TextColor="{StaticResource SciText}" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Número" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding DocumentNumber}"
+                                   Placeholder="Número del documento"
+                                   Style="{StaticResource SciEntry}"
+                                   MaxLength="30" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <Button Text="Buscar paciente"
+                            Command="{Binding SubmitDocumentCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Resultado: identificado -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding IsIdentified}">
+                <VerticalStackLayout Spacing="14">
+                    <Border Style="{StaticResource SciBadgeSuccess}" HorizontalOptions="Start">
+                        <Label Text="Paciente identificado"
+                               TextColor="{StaticResource SciSuccess}"
+                               FontAttributes="Bold" FontSize="13" />
+                    </Border>
+                    <Label Text="{Binding PatientDisplayName}" Style="{StaticResource SciTitle}" />
+                    <Button Text="Continuar a signos vitales"
+                            Command="{Binding ContinueCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
