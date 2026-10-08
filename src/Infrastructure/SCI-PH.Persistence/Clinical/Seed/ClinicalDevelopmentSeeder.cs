@@ -10,8 +10,8 @@ using SCI_PH.Persistence.Identity.Models;
 
 namespace SCI_PH.Persistence.Clinical.Seed
 {
-    // Idempotent: one demo clinic (by FacilityCode), one ClinicalStaff per configured account and one open
-    // affiliation. Administrators are skipped on purpose: an administrator never becomes clinical staff implicitly.
+    // Idempotent: one demo clinic (by FacilityCode), one ClinicalStaff per license number and one open affiliation.
+    // Administrators are never linked: an administrator does not become clinical staff implicitly.
     public sealed class ClinicalDevelopmentSeeder
     {
         private readonly ClinicalDbContext _clinical;
@@ -44,26 +44,13 @@ namespace SCI_PH.Persistence.Clinical.Seed
                 _clinical.Clinics.Add(clinic);
             }
 
-            foreach (var entry in _options.Staff)
+            foreach (var entry in _options.Staff.Where(s => !string.IsNullOrWhiteSpace(s.LicenseNumber)))
             {
-                var user = string.IsNullOrWhiteSpace(entry.Email) ? null : await _users.FindByEmailAsync(entry.Email.Trim());
-                if (user is null)
-                {
-                    _logger.LogWarning("Clinical development seed: a configured account does not exist and was skipped.");
-                    continue;
-                }
-
-                if (await _users.IsInRoleAsync(user, SecurityRoles.Administrator))
-                {
-                    _logger.LogWarning("Clinical development seed: account {UserId} is an administrator and was skipped.", user.Id);
-                    continue;
-                }
-
-                var staff = await _clinical.ClinicalStaffMembers.SingleOrDefaultAsync(s => s.IdentityUserId == user.Id, cancellationToken);
+                var license = entry.LicenseNumber.Trim().ToUpperInvariant();
+                var staff = await _clinical.ClinicalStaffMembers.SingleOrDefaultAsync(s => s.ProfessionalLicenseNumber == license, cancellationToken);
                 if (staff is null)
                 {
-                    staff = ClinicalStaff.Register(entry.GivenNames ?? user.UserName ?? "Personal", entry.FamilyNames ?? "Desarrollo", entry.Type);
-                    staff.LinkIdentityUser(user.Id);
+                    staff = ClinicalStaff.Register(entry.GivenNames, entry.FamilyNames, entry.Type, license);
                     _clinical.ClinicalStaffMembers.Add(staff);
                 }
 
@@ -73,10 +60,34 @@ namespace SCI_PH.Persistence.Clinical.Seed
                 {
                     _clinical.ClinicStaffAffiliations.Add(ClinicStaffAffiliation.Start(clinic.Id, staff.Id, _time.GetUtcNow()));
                 }
+
+                await LinkExistingAccountAsync(staff, entry.Email, cancellationToken);
+                // Ids are not secrets: the administrator needs them to send the staff invitation.
+                _logger.LogInformation("Clinical development seed: staff {LicenseNumber} is {StaffId}.", license, staff.Id);
             }
 
             await _clinical.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Clinical development seed applied to clinic {ClinicId}.", clinic.Id);
+        }
+
+        private async Task LinkExistingAccountAsync(ClinicalStaff staff, string? email, CancellationToken cancellationToken)
+        {
+            if (staff.IdentityUserId is not null || string.IsNullOrWhiteSpace(email))
+            {
+                return;
+            }
+
+            var user = await _users.FindByEmailAsync(email.Trim());
+            if (user is null || await _users.IsInRoleAsync(user, SecurityRoles.Administrator))
+            {
+                _logger.LogWarning("Clinical development seed: staff {StaffId} was not linked (no such account, or an administrator).", staff.Id);
+                return;
+            }
+
+            if (!await _clinical.ClinicalStaffMembers.AnyAsync(s => s.IdentityUserId == user.Id, cancellationToken))
+            {
+                staff.LinkIdentityUser(user.Id);
+            }
         }
     }
 }

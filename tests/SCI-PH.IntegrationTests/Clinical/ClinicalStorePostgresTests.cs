@@ -171,9 +171,9 @@ namespace SCI_PH.IntegrationTests.Clinical
                 Enabled = true,
                 Staff =
                 [
-                    new ClinicalDevelopmentStaff { Email = nurse.Email, Type = ClinicalStaffType.Nurse },
-                    new ClinicalDevelopmentStaff { Email = admin.Email, Type = ClinicalStaffType.Physician },
-                    new ClinicalDevelopmentStaff { Email = "missing@sci-ph.test" }
+                    new ClinicalDevelopmentStaff { LicenseNumber = "dev-nur-01", Email = nurse.Email, Type = ClinicalStaffType.Nurse },
+                    new ClinicalDevelopmentStaff { LicenseNumber = "DEV-DOC-01", Email = admin.Email, Type = ClinicalStaffType.Physician },
+                    new ClinicalDevelopmentStaff { LicenseNumber = "DEV-REC-01", Email = "missing@sci-ph.test" }
                 ]
             });
 
@@ -189,9 +189,13 @@ namespace SCI_PH.IntegrationTests.Clinical
             }
 
             Assert.Equal(1, await host.DbAsync(db => db.Clinics.CountAsync()));
-            var staff = await host.DbAsync(db => db.ClinicalStaffMembers.SingleAsync());
-            Assert.Equal(nurse.Id, staff.IdentityUserId);
-            Assert.Equal(1, await host.DbAsync(db => db.ClinicStaffAffiliations.CountAsync(a => a.ClinicalStaffId == staff.Id && a.EndedAtUtc == null)));
+            var staff = await host.DbAsync(db => db.ClinicalStaffMembers.OrderBy(s => s.ProfessionalLicenseNumber).ToListAsync());
+            Assert.Equal(["DEV-DOC-01", "DEV-NUR-01", "DEV-REC-01"], staff.Select(s => s.ProfessionalLicenseNumber));
+            Assert.Equal(nurse.Id, staff.Single(s => s.ProfessionalLicenseNumber == "DEV-NUR-01").IdentityUserId);
+            // The administrator is never linked; unknown e-mails leave the record ready for an invitation.
+            Assert.Null(staff.Single(s => s.ProfessionalLicenseNumber == "DEV-DOC-01").IdentityUserId);
+            Assert.Null(staff.Single(s => s.ProfessionalLicenseNumber == "DEV-REC-01").IdentityUserId);
+            Assert.Equal(3, await host.DbAsync(db => db.ClinicStaffAffiliations.CountAsync(a => a.EndedAtUtc == null)));
 
             // Entry point used by Program.cs: with the option enabled it seeds in Development and does nothing elsewhere.
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
