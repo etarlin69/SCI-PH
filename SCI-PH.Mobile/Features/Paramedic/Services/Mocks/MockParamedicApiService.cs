@@ -86,6 +86,42 @@ public class MockParamedicApiService : IParamedicApiService
         });
     }
 
+    public async Task RegisterProcedureAsync(Guid emergencyId, RegisterProcedureDto dto)
+    {
+        await Task.Delay(SimulatedDelayMs);
+
+        var emergency = GetOrThrow(emergencyId);
+
+        if (!_processedRequests.Add(dto.ClientRequestId))
+            return;
+
+        emergency.Procedures.Add(new ProcedureDto
+        {
+            RecordedAt = dto.RecordedAt,
+            ProcedureCode = dto.ProcedureCode,
+            Notes = dto.Notes
+        });
+    }
+
+    public async Task RegisterMedicationAsync(Guid emergencyId, RegisterMedicationDto dto)
+    {
+        await Task.Delay(SimulatedDelayMs);
+
+        var emergency = GetOrThrow(emergencyId);
+
+        if (!_processedRequests.Add(dto.ClientRequestId))
+            return;
+
+        emergency.Medications.Add(new MedicationDto
+        {
+            RecordedAt = dto.RecordedAt,
+            MedicationCode = dto.MedicationCode,
+            Dose = dto.Dose,
+            Route = dto.Route,
+            Notes = dto.Notes
+        });
+    }
+
     private EmergencyDto GetOrThrow(Guid id) =>
         _emergencies.TryGetValue(id, out var e)
             ? e

@@ -8,4 +8,6 @@ public interface IParamedicApiService
     Task<EmergencyDto?> GetEmergencyAsync(Guid id);
     Task<EmergencyDto> IdentifyAsync(Guid emergencyId, IdentifyEmergencyDto dto);
     Task RegisterVitalsAsync(Guid emergencyId, RegisterVitalsDto dto);
+    Task RegisterProcedureAsync(Guid emergencyId, RegisterProcedureDto dto);
+    Task RegisterMedicationAsync(Guid emergencyId, RegisterMedicationDto dto);
 }

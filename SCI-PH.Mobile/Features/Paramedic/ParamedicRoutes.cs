@@ -5,5 +5,7 @@ public static class ParamedicRoutes
 {
     public const string IdentifyPatient = "IdentifyPatient";
     public const string VitalSigns = "VitalSigns";
-    // Próximas: Procedures, Medications, Transfer
+    public const string Procedures = "Procedures";
+    public const string Medications = "Medications";
+    // Próxima: Transfer
 }

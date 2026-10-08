@@ -160,11 +160,9 @@ public partial class VitalSignsViewModel : ObservableObject
     [RelayCommand]
     private async Task ContinueAsync()
     {
-        // TODO: navegar a Procedimientos / Medicamentos (ParamedicRoutes.Procedures).
-        await Shell.Current.DisplayAlert(
-            "Signos vitales",
-            $"Tomas registradas: {SavedCount}\nSiguiente paso: procedimientos y medicamentos (pendiente).",
-            "OK");
+        await Shell.Current.GoToAsync(
+            ParamedicRoutes.Procedures,
+            new Dictionary<string, object> { ["EmergencyId"] = EmergencyId });
     }
 
     // ---- Helpers ----

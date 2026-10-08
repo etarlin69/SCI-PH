@@ -12,5 +12,7 @@ public partial class AppShell : Shell
         // Páginas que no están declaradas en el XAML del Shell.
         Routing.RegisterRoute(ParamedicRoutes.IdentifyPatient, typeof(IdentifyPatientPage));
         Routing.RegisterRoute(ParamedicRoutes.VitalSigns, typeof(VitalSignsPage));
+        Routing.RegisterRoute(ParamedicRoutes.Procedures, typeof(ProceduresPage));
+        Routing.RegisterRoute(ParamedicRoutes.Medications, typeof(MedicationsPage));
     }
 }
