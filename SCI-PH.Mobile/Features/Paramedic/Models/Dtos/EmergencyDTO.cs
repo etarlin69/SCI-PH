@@ -1,19 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using SCI_PH.Mobile.Features.Paramedic.Models.enums;
+using SCI_PH.Mobile.Features.Paramedic.Models.Enums;
 
-namespace SCI_PH.Mobile.Features.Paramedic.Models
+namespace SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
+
+/// <summary>
+/// Respuesta de GET /api/mobile/emergencies/{id}.
+/// Procedimientos, medicamentos y traslado se agregan cuando se construyan esas pantallas.
+/// </summary>
+public class EmergencyDto
 {
-    public class EmergencyDTO
-    {
-        public Guid Id { get; set; }
-        public string Description { get; set; } = string.Empty;
-        public string Location { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-        public EmergencyStatus Status { get; set; }
-        public Guid? PatientId { get; set; }
-    }
+    public Guid Id { get; set; }
+    public EmergencyStatus Status { get; set; }
+    public DateTime StartedAt { get; set; }
+    public PatientSummaryDto? Patient { get; set; }
+    public List<VitalSignDto> Vitals { get; set; } = new();
 }

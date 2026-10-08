@@ -22,24 +22,14 @@
                 <VerticalStackLayout Spacing="14">
 
                     <VerticalStackLayout Spacing="6">
-                        <Label Text="Descripción del evento" Style="{StaticResource SciFieldLabel}" />
+                        <Label Text="Motivo de consulta" Style="{StaticResource SciFieldLabel}" />
                         <Border Style="{StaticResource SciField}">
-                            <Editor Text="{Binding Description}"
+                            <Editor Text="{Binding ChiefComplaint}"
                                     Placeholder="Ej. Accidente de tránsito, paciente consciente"
                                     Style="{StaticResource SciEditor}"
                                     AutoSize="TextChanges"
                                     MinimumHeightRequest="100"
                                     MaxLength="500" />
-                        </Border>
-                    </VerticalStackLayout>
-
-                    <VerticalStackLayout Spacing="6">
-                        <Label Text="Ubicación" Style="{StaticResource SciFieldLabel}" />
-                        <Border Style="{StaticResource SciField}">
-                            <Entry Text="{Binding Location}"
-                                   Placeholder="Dirección o referencia"
-                                   Style="{StaticResource SciEntry}"
-                                   MaxLength="200" />
                         </Border>
                     </VerticalStackLayout>
 

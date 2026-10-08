@@ -2,19 +2,19 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
-    <!-- ===== Colores (aproximados del dashboard; ajustar con Rol 5) ===== -->
-    <Color x:Key="SciNavy">#0F2747</Color>
-    <Color x:Key="SciPrimary">#1B4B8A</Color>
-    <Color x:Key="SciPrimaryDisabled">#A9B8CC</Color>
-    <Color x:Key="SciBackground">#F4F6F9</Color>
+    <!-- ===== Colores: tokens reales de frontend/web-admin/tailwind.config.js ===== -->
+    <Color x:Key="SciNavy">#0D1F33</Color>
+    <Color x:Key="SciPrimary">#1B4F8A</Color>
+    <Color x:Key="SciPrimaryDisabled">#9DB8DA</Color>
+    <Color x:Key="SciBackground">#F3F5F7</Color>
     <Color x:Key="SciSurface">#FFFFFF</Color>
-    <Color x:Key="SciBorder">#E3E8EF</Color>
-    <Color x:Key="SciText">#0F172A</Color>
-    <Color x:Key="SciTextMuted">#5B6B80</Color>
-    <Color x:Key="SciSuccess">#1F7A4D</Color>
-    <Color x:Key="SciSuccessBg">#E3F4EA</Color>
-    <Color x:Key="SciWarning">#C2570C</Color>
-    <Color x:Key="SciWarningBg">#FDEBDD</Color>
+    <Color x:Key="SciBorder">#DCE2E8</Color>
+    <Color x:Key="SciText">#0F1B2A</Color>
+    <Color x:Key="SciTextMuted">#5B6878</Color>
+    <Color x:Key="SciSuccess">#1D7348</Color>
+    <Color x:Key="SciSuccessBg">#E6F4EC</Color>
+    <Color x:Key="SciWarning">#C2610C</Color>
+    <Color x:Key="SciWarningBg">#FDF0E1</Color>
     <Color x:Key="SciDanger">#B42318</Color>
     <Color x:Key="SciDangerBg">#FDECEA</Color>
 

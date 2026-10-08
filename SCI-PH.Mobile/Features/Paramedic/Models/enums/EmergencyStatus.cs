@@ -1,16 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace SCI_PH.Mobile.Features.Paramedic.Models.Enums;
 
-namespace SCI_PH.Mobile.Features.Paramedic.Models.enums
+/// <summary>
+/// Estado de la emergencia según docs/api/mobile-bff-contracts.md (el GET de ejemplo devuelve "Open").
+/// PENDIENTE: confirmar el conjunto final de valores con Rol 1 / Rol 2
+/// (el dominio usa ClinicalEncounterStatus: Created, InProgress, Transferred, ...).
+/// </summary>
+public enum EmergencyStatus
 {
-    public enum EmergencyStatus
-    {
-        Created,
-        PatientIdentified,
-        InCare,
-        Transferred
-    }
+    Open,
+    Transferred,
+    Closed
 }
