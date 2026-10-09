@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="SCI_PH.PatientPrototype.Features.Patient.Auth.FaceVerifyPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Verificación facial"
+    BackgroundColor="#F7F9FC">
+
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="24"
+            Spacing="20">
+
+            <Label
+                Text="Verificación facial"
+                FontSize="28"
+                FontAttributes="Bold"
+                TextColor="#0F2747" />
+
+            <Label
+                Text="Confirma tu identidad para continuar."
+                FontSize="16"
+                TextColor="#526175" />
+
+            <Border
+                Padding="24"
+                BackgroundColor="White"
+                Stroke="#E4E9F0"
+                StrokeThickness="1">
+
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="18" />
+                </Border.StrokeShape>
+
+                <VerticalStackLayout
+                    Spacing="18"
+                    HorizontalOptions="Center">
+
+                    <Border
+                        WidthRequest="120"
+                        HeightRequest="120"
+                        BackgroundColor="#EAF2FB"
+                        Stroke="#1976D2"
+                        StrokeThickness="2">
+
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="60" />
+                        </Border.StrokeShape>
+
+                        <Label
+                            Text="FACE"
+                            FontSize="22"
+                            FontAttributes="Bold"
+                            TextColor="#1976D2"
+                            HorizontalOptions="Center"
+                            VerticalOptions="Center" />
+                    </Border>
+
+                    <Label
+                        Text="Simulación de verificación facial 1:1"
+                        FontSize="16"
+                        TextColor="#243B5A"
+                        HorizontalTextAlignment="Center" />
+
+                    <Label
+                        x:Name="StatusLabel"
+                        Text="Pendiente de verificación"
+                        FontSize="14"
+                        TextColor="#6B7280"
+                        HorizontalTextAlignment="Center" />
+
+                    <Button
+                        Text="Verificar identidad"
+                        Clicked="OnVerifyFaceClicked"
+                        BackgroundColor="#1976D2"
+                        TextColor="White"
+                        CornerRadius="12"
+                        HeightRequest="50"
+                        HorizontalOptions="Fill" />
+
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

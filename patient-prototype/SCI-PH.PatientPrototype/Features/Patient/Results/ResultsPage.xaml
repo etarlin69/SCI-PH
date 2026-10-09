@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<ContentPage
+    x:Class="SCI_PH.PatientPrototype.Features.Patient.Results.ResultsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Resultados"
+    BackgroundColor="#F7F9FC">
+
+    <ScrollView>
+
+        <VerticalStackLayout
+            Padding="20"
+            Spacing="17">
+
+            <Label
+                Text="Resultados clínicos"
+                FontSize="28"
+                FontAttributes="Bold"
+                TextColor="#0F2747" />
+
+            <Label
+                Text="Consulta los resultados publicados para tu expediente."
+                FontSize="14"
+                TextColor="#526175" />
+
+            <Border
+                BackgroundColor="White"
+                Stroke="#E4E9F0"
+                StrokeThickness="1"
+                Padding="18">
+
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="16" />
+                </Border.StrokeShape>
+
+                <VerticalStackLayout Spacing="10">
+
+                    <Grid ColumnDefinitions="*,Auto">
+
+                        <Label
+                            Text="Hemograma completo"
+                            FontSize="18"
+                            FontAttributes="Bold"
+                            TextColor="#172B4D" />
+
+                        <Border
+                            Grid.Column="1"
+                            BackgroundColor="#E7F7EF"
+                            StrokeThickness="0"
+                            Padding="10,5">
+
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="12" />
+                            </Border.StrokeShape>
+
+                            <Label
+                                Text="Publicado"
+                                FontSize="11"
+                                FontAttributes="Bold"
+                                TextColor="#267A50" />
+
+                        </Border>
+
+                    </Grid>
+
+                    <Label
+                        Text="Laboratorio · Hospital Central"
+                        FontSize="14"
+                        TextColor="#526175" />
+
+                    <Label
+                        Text="02 octubre 2026"
+                        FontSize="13"
+                        TextColor="#7A8798" />
+
+                </VerticalStackLayout>
+
+            </Border>
+
+            <Border
+                BackgroundColor="White"
+                Stroke="#E4E9F0"
+                StrokeThickness="1"
+                Padding="18">
+
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="16" />
+                </Border.StrokeShape>
+
+                <VerticalStackLayout Spacing="8">
+
+                    <Label
+                        Text="Glucosa"
+                        FontSize="17"
+                        FontAttributes="Bold"
+                        TextColor="#172B4D" />
+
+                    <Label
+                        Text="92 mg/dL"
+                        FontSize="30"
+                        FontAttributes="Bold"
+                        TextColor="#1976D2" />
+
+                    <Label
+                        Text="Resultado registrado por el laboratorio."
+                        FontSize="13"
+                        TextColor="#69778A" />
+
+                    <Label
+                        Text="Utiliza SCI-PH AI si deseas una explicación educativa de este resultado."
+                        FontSize="13"
+                        TextColor="#0F5EA8" />
+
+                </VerticalStackLayout>
+
+            </Border>
+
+        </VerticalStackLayout>
+
+    </ScrollView>
+
+</ContentPage>

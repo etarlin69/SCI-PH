@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<Shell
+    x:Class="SCI_PH.PatientPrototype.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+
+    xmlns:auth="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Auth"
+    xmlns:home="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Home"
+    xmlns:profile="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Profile"
+    xmlns:history="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.History"
+    xmlns:results="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Results"
+    xmlns:documents="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Documents"
+    xmlns:ai="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Ai"
+
+    FlyoutBehavior="Disabled"
+    FlyoutBackgroundColor="#0F2747"
+    Title="SCI-PH">
+
+    <!-- CABECERA DEL MENU -->
+
+    <Shell.FlyoutHeader>
+
+        <Grid
+            Padding="22,35,22,24"
+            BackgroundColor="#0F2747">
+
+            <VerticalStackLayout
+                Spacing="8"
+                HorizontalOptions="Center">
+
+                <Border
+                    WidthRequest="90"
+                    HeightRequest="90"
+                    BackgroundColor="White"
+                    Stroke="White"
+                    StrokeThickness="3">
+
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="45" />
+                    </Border.StrokeShape>
+
+                    <Image
+                        Source="patient_avatar.png"
+                        Aspect="AspectFill" />
+
+                </Border>
+
+                <Label
+                    Text="Paciente Demo"
+                    FontSize="20"
+                    FontAttributes="Bold"
+                    TextColor="White"
+                    HorizontalTextAlignment="Center" />
+
+                <Label
+                    Text="paciente@sciph.local"
+                    FontSize="13"
+                    TextColor="#B9C7D9"
+                    HorizontalTextAlignment="Center" />
+
+            </VerticalStackLayout>
+
+        </Grid>
+
+    </Shell.FlyoutHeader>
+
+
+    <!-- ACCESO DEL PACIENTE -->
+
+    <ShellContent
+        Route="QrAccess"
+        Title="Acceso"
+        ContentTemplate="{DataTemplate auth:QrScanPage}"
+        Shell.FlyoutItemIsVisible="False" />
+
+
+    <!-- AREA AUTENTICADA -->
+
+    <FlyoutItem
+        Title="Inicio"
+        Route="Home">
+
+        <ShellContent
+            Title="Inicio"
+            ContentTemplate="{DataTemplate home:HomePage}" />
+
+    </FlyoutItem>
+
+
+    <FlyoutItem
+        Title="Mi perfil"
+        Route="Profile">
+
+        <ShellContent
+            Title="Mi perfil"
+            ContentTemplate="{DataTemplate profile:ProfilePage}" />
+
+    </FlyoutItem>
+
+
+    <FlyoutItem
+        Title="Historial clínico"
+        Route="History">
+
+        <ShellContent
+            Title="Historial clínico"
+            ContentTemplate="{DataTemplate history:HistoryPage}" />
+
+    </FlyoutItem>
+
+
+    <FlyoutItem
+        Title="Resultados"
+        Route="Results">
+
+        <ShellContent
+            Title="Resultados"
+            ContentTemplate="{DataTemplate results:ResultsPage}" />
+
+    </FlyoutItem>
+
+
+    <FlyoutItem
+        Title="Documentos"
+        Route="Documents">
+
+        <ShellContent
+            Title="Documentos"
+            ContentTemplate="{DataTemplate documents:DocumentsPage}" />
+
+    </FlyoutItem>
+
+
+    <FlyoutItem
+        Title="Asistente IA"
+        Route="Assistant">
+
+        <ShellContent
+            Title="SCI-PH AI"
+            ContentTemplate="{DataTemplate ai:AiAssistantPage}" />
+
+    </FlyoutItem>
+
+</Shell>

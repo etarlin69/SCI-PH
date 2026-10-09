@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<ContentPage
+    x:Class="SCI_PH.PatientPrototype.Features.Patient.Home.HomePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Inicio"
+    BackgroundColor="#F7F9FC">
+
+    <ScrollView>
+
+        <VerticalStackLayout
+            Padding="20"
+            Spacing="18">
+
+            <!-- SALUDO -->
+
+            <Grid ColumnDefinitions="*,Auto">
+
+                <VerticalStackLayout Spacing="3">
+
+                    <Label
+                        Text="Hola, Paciente Demo"
+                        FontSize="27"
+                        FontAttributes="Bold"
+                        TextColor="#0F2747" />
+
+                    <Label
+                        Text="Este es el resumen de tu información en SCI-PH."
+                        FontSize="14"
+                        TextColor="#5F6F82" />
+
+                </VerticalStackLayout>
+
+                <Border
+                    Grid.Column="1"
+                    BackgroundColor="#E8F2FC"
+                    StrokeThickness="0"
+                    Padding="11,7">
+
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="15" />
+                    </Border.StrokeShape>
+
+                    <Label
+                        Text="Paciente"
+                        FontSize="12"
+                        FontAttributes="Bold"
+                        TextColor="#1976D2" />
+
+                </Border>
+
+            </Grid>
+
+            <!-- TARJETA IDENTIDAD -->
+
+            <Border
+                BackgroundColor="#0F2747"
+                StrokeThickness="0"
+                Padding="20">
+
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="18" />
+                </Border.StrokeShape>
+
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+
+                    <Border
+                        WidthRequest="65"
+                        HeightRequest="65"
+                        BackgroundColor="White"
+                        StrokeThickness="0">
+
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="32" />
+                        </Border.StrokeShape>
+
+                        <Image
+                            Source="patient_avatar.png"
+                            Aspect="AspectFill" />
+
+                    </Border>
+
+                    <VerticalStackLayout
+                        Grid.Column="1"
+                        VerticalOptions="Center"
+                        Spacing="3">
+
+                        <Label
+                            Text="Paciente Demo"
+                            FontSize="20"
+                            FontAttributes="Bold"
+                            TextColor="White" />
+
+                        <Label
+                            Text="Cuenta verificada en SCI-PH"
+                            FontSize="13"
+                            TextColor="#C8D5E4" />
+
+                    </VerticalStackLayout>
+
+                </Grid>
+
+            </Border>
+
+            <!-- ESTADÍSTICAS -->
+
+            <Grid
+                ColumnDefinitions="*,*"
+                ColumnSpacing="12">
+
+                <Border
+                    Grid.Column="0"
+                    BackgroundColor="White"
+                    Stroke="#E4E9F0"
+                    StrokeThickness="1"
+                    Padding="17">
+
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="16" />
+                    </Border.StrokeShape>
+
+                    <VerticalStackLayout Spacing="6">
+
+                        <Label
+                            Text="14"
+                            FontSize="28"
+                            FontAttributes="Bold"
+                            TextColor="#1976D2" />
+
+                        <Label
+                            Text="Resultados disponibles"
+                            FontSize="13"
+                            TextColor="#475569" />
+
+                    </VerticalStackLayout>
+
+                </Border>
+
+                <Border
+                    Grid.Column="1"
+                    BackgroundColor="White"
+                    Stroke="#E4E9F0"
+                    StrokeThickness="1"
+                    Padding="17">
+
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="16" />
+                    </Border.StrokeShape>
+
+                    <VerticalStackLayout Spacing="6">
+
+                        <Label
+                            Text="6"
+                            FontSize="28"
+                            FontAttributes="Bold"
+                            TextColor="#21A8B8" />
+
+                        <Label
+                            Text="Documentos clínicos"
+                            FontSize="13"
+                            TextColor="#475569" />
+
+                    </VerticalStackLayout>
+
+                </Border>
+
+            </Grid>
+
+            <!-- ÚLTIMO EPISODIO -->
+
+            <Label
+                Text="Último episodio"
+                FontSize="20"
+                FontAttributes="Bold"
+                TextColor="#0F2747" />
+
+            <Border
+                BackgroundColor="White"
+                Stroke="#E4E9F0"
+                StrokeThickness="1"
+                Padding="18">
+
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="16" />
+                </Border.StrokeShape>
+
+                <VerticalStackLayout Spacing="8">
+
+                    <Grid ColumnDefinitions="*,Auto">
+
+                        <Label
+                            Text="Atención de emergencia"
+                            FontSize="17"
+                            FontAttributes="Bold"
+                            TextColor="#172B4D" />
+
+                        <Border
+                            Grid.Column="1"
+                            BackgroundColor="#E7F7EF"
+                            StrokeThickness="0"
+                            Padding="10,5">
+
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="12" />
+                            </Border.StrokeShape>
+
+                            <Label
+                                Text="Cerrado"
+                                FontSize="11"
+                                FontAttributes="Bold"
+                                TextColor="#267A50" />
+
+                        </Border>
+
+                    </Grid>
+
+                    <Label
+                        Text="Hospital Central"
+                        FontSize="14"
+                        TextColor="#526175" />
+
+                    <Label
+                        Text="25 septiembre 2026"
+                        FontSize="13"
+                        TextColor="#7A8798" />
+
+                </VerticalStackLayout>
+
+            </Border>
+
+            <!-- RESULTADO RECIENTE -->
+
+            <Label
+                Text="Resultado reciente"
+                FontSize="20"
+                FontAttributes="Bold"
+                TextColor="#0F2747" />
+
+            <Border
+                BackgroundColor="White"
+                Stroke="#E4E9F0"
+                StrokeThickness="1"
+                Padding="18">
+
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="16" />
+                </Border.StrokeShape>
+
+                <Grid ColumnDefinitions="*,Auto">
+
+                    <VerticalStackLayout Spacing="6">
+
+                        <Label
+                            Text="Glucosa"
+                            FontSize="17"
+                            FontAttributes="Bold"
+                            TextColor="#172B4D" />
+
+                        <Label
+                            Text="92 mg/dL"
+                            FontSize="25"
+                            FontAttributes="Bold"
+                            TextColor="#1976D2" />
+
+                        <Label
+                            Text="02 octubre 2026"
+                            FontSize="13"
+                            TextColor="#7A8798" />
+
+                    </VerticalStackLayout>
+
+                    <Border
+                        Grid.Column="1"
+                        BackgroundColor="#E7F7EF"
+                        StrokeThickness="0"
+                        Padding="10,5"
+                        VerticalOptions="Start">
+
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="12" />
+                        </Border.StrokeShape>
+
+                        <Label
+                            Text="Publicado"
+                            FontSize="11"
+                            FontAttributes="Bold"
+                            TextColor="#267A50" />
+
+                    </Border>
+
+                </Grid>
+
+            </Border>
+
+            <!-- DOCUMENTO RECIENTE -->
+
+            <Label
+                Text="Documento reciente"
+                FontSize="20"
+                FontAttributes="Bold"
+                TextColor="#0F2747" />
+
+            <Border
+                BackgroundColor="White"
+                Stroke="#E4E9F0"
+                StrokeThickness="1"
+                Padding="18">
+
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="16" />
+                </Border.StrokeShape>
+
+                <Grid
+                    ColumnDefinitions="Auto,*"
+                    ColumnSpacing="14">
+
+                    <Label
+                        Text="📄"
+                        FontSize="35"
+                        VerticalOptions="Center" />
+
+                    <VerticalStackLayout
+                        Grid.Column="1"
+                        Spacing="4">
+
+                        <Label
+                            Text="Resumen de alta"
+                            FontSize="17"
+                            FontAttributes="Bold"
+                            TextColor="#172B4D" />
+
+                        <Label
+                            Text="PDF · Hospital Central"
+                            FontSize="13"
+                            TextColor="#526175" />
+
+                        <Label
+                            Text="02 octubre 2026"
+                            FontSize="12"
+                            TextColor="#7A8798" />
+
+                    </VerticalStackLayout>
+
+                </Grid>
+
+            </Border>
+
+            <!-- AVISO IA -->
+
+            <Border
+                BackgroundColor="#EAF4FF"
+                Stroke="#C9E2FA"
+                StrokeThickness="1"
+                Padding="17">
+
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="16" />
+                </Border.StrokeShape>
+
+                <VerticalStackLayout Spacing="5">
+
+                    <Label
+                        Text="SCI-PH AI"
+                        FontSize="17"
+                        FontAttributes="Bold"
+                        TextColor="#0F5EA8" />
+
+                    <Label
+                        Text="Puedes usar el asistente educativo para comprender términos y resultados clínicos en lenguaje sencillo."
+                        FontSize="13"
+                        TextColor="#3D536C" />
+
+                </VerticalStackLayout>
+
+            </Border>
+
+        </VerticalStackLayout>
+
+    </ScrollView>
+
+</ContentPage>

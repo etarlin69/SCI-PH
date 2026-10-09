@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <!-- Brand -->
+    <Color x:Key="ColorPrimary">#1976D2</Color>
+    <Color x:Key="ColorPrimaryDark">#0F2747</Color>
+    <Color x:Key="ColorSecondary">#21B6C8</Color>
+    <Color x:Key="ColorDanger">#E53945</Color>
+    <Color x:Key="ColorSuccess">#2E9E6F</Color>
+    <Color x:Key="ColorWarning">#B7791F</Color>
+
+    <!-- Surfaces -->
+    <Color x:Key="PageBackground">#F3F5F7</Color>
+    <Color x:Key="CardBackground">#FFFFFF</Color>
+    <Color x:Key="BorderColor">#E5E7EB</Color>
+
+    <!-- Text -->
+    <Color x:Key="TextPrimary">#1F2937</Color>
+    <Color x:Key="TextSecondary">#6B7280</Color>
+    <Color x:Key="TextOnPrimary">#FFFFFF</Color>
+
+    <!-- Badge -->
+    <Color x:Key="BadgeBackground">#F6EBD9</Color>
+    <Color x:Key="BadgeText">#B7791F</Color>
+</ResourceDictionary>

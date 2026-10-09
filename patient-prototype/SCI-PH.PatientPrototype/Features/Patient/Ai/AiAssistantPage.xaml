@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<ContentPage
+    x:Class="SCI_PH.PatientPrototype.Features.Patient.Ai.AiAssistantPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="SCI-PH AI"
+    BackgroundColor="#F4F7FB">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+        <!-- ============================= -->
+        <!-- ENCABEZADO DEL ASISTENTE -->
+        <!-- ============================= -->
+
+        <Border
+            Grid.Row="0"
+            Margin="16,16,16,10"
+            Padding="18"
+            BackgroundColor="White"
+            Stroke="#DCE4ED"
+            StrokeThickness="1">
+
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="18" />
+            </Border.StrokeShape>
+
+            <Grid
+                ColumnDefinitions="Auto,*"
+                ColumnSpacing="16">
+
+                <!-- CÍRCULO AI -->
+                <Border
+                    WidthRequest="72"
+                    HeightRequest="72"
+                    BackgroundColor="#1976D2"
+                    StrokeThickness="0"
+                    HorizontalOptions="Center"
+                    VerticalOptions="Center">
+
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="36" />
+                    </Border.StrokeShape>
+
+                    <Label
+                        Text="AI"
+                        FontSize="25"
+                        FontAttributes="Bold"
+                        TextColor="White"
+                        HorizontalOptions="Center"
+                        VerticalOptions="Center" />
+
+                </Border>
+
+                <!-- INFORMACIÓN -->
+                <VerticalStackLayout
+                    Grid.Column="1"
+                    VerticalOptions="Center"
+                    Spacing="3">
+
+                    <Label
+                        Text="SCI-PH AI"
+                        FontSize="25"
+                        FontAttributes="Bold"
+                        TextColor="#16345F" />
+
+                    <Label
+                        Text="Asistente educativo"
+                        FontSize="16"
+                        TextColor="#3A9B71" />
+
+                    <Label
+                        Text="Disponible"
+                        FontSize="12"
+                        TextColor="#6B7A90" />
+
+                </VerticalStackLayout>
+
+            </Grid>
+
+        </Border>
+
+        <!-- ============================= -->
+        <!-- AVISO -->
+        <!-- ============================= -->
+
+        <Border
+            Grid.Row="1"
+            Margin="16,0,16,12"
+            Padding="14"
+            BackgroundColor="#FFF8EA"
+            Stroke="#F0DCAE"
+            StrokeThickness="1">
+
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="14" />
+            </Border.StrokeShape>
+
+            <Grid
+                ColumnDefinitions="Auto,*"
+                ColumnSpacing="10">
+
+                <Label
+                    Text="ⓘ"
+                    FontSize="20"
+                    TextColor="#A46A19"
+                    VerticalOptions="Start" />
+
+                <Label
+                    Grid.Column="1"
+                    Text="SCI-PH AI ofrece información educativa. No realiza diagnósticos, no prescribe medicamentos y no sustituye la evaluación de un profesional de salud."
+                    FontSize="12"
+                    TextColor="#745B30"
+                    LineBreakMode="WordWrap" />
+
+            </Grid>
+
+        </Border>
+
+        <!-- ============================= -->
+        <!-- ÁREA DE MENSAJES -->
+        <!-- ============================= -->
+
+        <ScrollView
+            x:Name="MessagesScrollView"
+            Grid.Row="2">
+
+            <VerticalStackLayout
+                x:Name="MessagesContainer"
+                Padding="16,4,16,18"
+                Spacing="14">
+
+                <!-- MENSAJE DEL ASISTENTE -->
+                <Grid
+                    ColumnDefinitions="Auto,*"
+                    ColumnSpacing="9"
+                    HorizontalOptions="Fill">
+
+                    <Border
+                        WidthRequest="38"
+                        HeightRequest="38"
+                        BackgroundColor="#1976D2"
+                        StrokeThickness="0"
+                        VerticalOptions="Start">
+
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="19" />
+                        </Border.StrokeShape>
+
+                        <Label
+                            Text="AI"
+                            FontSize="12"
+                            FontAttributes="Bold"
+                            TextColor="White"
+                            HorizontalOptions="Center"
+                            VerticalOptions="Center" />
+
+                    </Border>
+
+                    <Border
+                        Grid.Column="1"
+                        Padding="16"
+                        BackgroundColor="White"
+                        Stroke="#DCE4ED"
+                        StrokeThickness="1"
+                        HorizontalOptions="Start"
+                        MaximumWidthRequest="650">
+
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="18" />
+                        </Border.StrokeShape>
+
+                        <Label
+                            Text="Hola. Puedo ayudarte a comprender términos médicos y resultados disponibles en tu expediente."
+                            FontSize="16"
+                            TextColor="#243B5A"
+                            LineBreakMode="WordWrap" />
+
+                    </Border>
+
+                </Grid>
+
+                <!-- MENSAJE DEL USUARIO -->
+                <Border
+                    Padding="16"
+                    Margin="50,0,0,0"
+                    BackgroundColor="#1976D2"
+                    Stroke="#1976D2"
+                    StrokeThickness="1"
+                    HorizontalOptions="End"
+                    MaximumWidthRequest="650">
+
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="18" />
+                    </Border.StrokeShape>
+
+                    <Label
+                        Text="¿Qué significa tener glucosa de 92 mg/dL?"
+                        FontSize="16"
+                        TextColor="White"
+                        LineBreakMode="WordWrap" />
+
+                </Border>
+
+                <!-- SEGUNDA RESPUESTA -->
+                <Grid
+                    ColumnDefinitions="Auto,*"
+                    ColumnSpacing="9">
+
+                    <Border
+                        WidthRequest="38"
+                        HeightRequest="38"
+                        BackgroundColor="#1976D2"
+                        StrokeThickness="0"
+                        VerticalOptions="Start">
+
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="19" />
+                        </Border.StrokeShape>
+
+                        <Label
+                            Text="AI"
+                            FontSize="12"
+                            FontAttributes="Bold"
+                            TextColor="White"
+                            HorizontalOptions="Center"
+                            VerticalOptions="Center" />
+
+                    </Border>
+
+                    <Border
+                        Grid.Column="1"
+                        Padding="16"
+                        BackgroundColor="White"
+                        Stroke="#DCE4ED"
+                        StrokeThickness="1"
+                        HorizontalOptions="Start"
+                        MaximumWidthRequest="650">
+
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="18" />
+                        </Border.StrokeShape>
+
+                        <VerticalStackLayout Spacing="8">
+
+                            <Label
+                                Text="Ese número representa la cantidad de glucosa medida en la sangre."
+                                FontSize="16"
+                                TextColor="#243B5A"
+                                LineBreakMode="WordWrap" />
+
+                            <Label
+                                Text="Su interpretación depende del tipo de prueba y del contexto clínico."
+                                FontSize="16"
+                                TextColor="#243B5A"
+                                LineBreakMode="WordWrap" />
+
+                        </VerticalStackLayout>
+
+                    </Border>
+
+                </Grid>
+
+            </VerticalStackLayout>
+
+        </ScrollView>
+
+        <!-- ============================= -->
+        <!-- BARRA DE ESCRITURA -->
+        <!-- ============================= -->
+
+        <Grid
+            Grid.Row="3"
+            BackgroundColor="White"
+            Padding="12,10,12,14">
+
+            <Border
+                BackgroundColor="#F4F7FA"
+                Stroke="#CCD7E3"
+                StrokeThickness="1"
+                Padding="12,6">
+
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="24" />
+                </Border.StrokeShape>
+
+                <Grid
+                    ColumnDefinitions="*,Auto"
+                    ColumnSpacing="8">
+
+                    <!-- TEXTO -->
+                    <Editor
+                        x:Name="QuestionEditor"
+                        Grid.Column="0"
+                        Placeholder="Escribe una pregunta..."
+                        PlaceholderColor="#8A97A8"
+                        TextColor="#1F3552"
+                        BackgroundColor="Transparent"
+                        AutoSize="TextChanges"
+                        MinimumHeightRequest="46"
+                        MaximumHeightRequest="110"
+                        MaxLength="300"
+                        VerticalOptions="Center" />
+
+                    <!-- ENVIAR -->
+                    <Button
+                        Grid.Column="1"
+                        Text="➤"
+                        Clicked="OnSendClicked"
+                        WidthRequest="48"
+                        HeightRequest="48"
+                        CornerRadius="24"
+                        Padding="0"
+                        FontSize="20"
+                        BackgroundColor="#1976D2"
+                        TextColor="White"
+                        VerticalOptions="End" />
+
+                </Grid>
+
+            </Border>
+
+        </Grid>
+
+    </Grid>
+
+</ContentPage>
