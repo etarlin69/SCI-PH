@@ -35,7 +35,17 @@ namespace SCI_PH.Persistence.Clinical.Services
 
         public void Add(VitalSign vitalSign) => _clinical.VitalSigns.Add(vitalSign);
 
+        public void Add(ClinicalNote note) => _clinical.ClinicalNotes.Add(note);
+
+        public void Add(Diagnosis diagnosis) => _clinical.Diagnoses.Add(diagnosis);
+
         public void Add(ClinicalAuditEntry auditEntry) => _clinical.ClinicalAuditEntries.Add(auditEntry);
+
+        // Marks Status as modified (same value) so SaveChanges issues UPDATE ... WHERE "Status" = original AND
+        // "PatientId" = original in the same transaction as the inserted record. PostgreSQL re-evaluates that WHERE
+        // against the latest committed row, so a concurrent close makes it match no row and the whole save rolls back.
+        public void EnsureEncounterUnchanged(ClinicalEncounter encounter) =>
+            _clinical.Entry(encounter).Property(e => e.Status).IsModified = true;
 
         public async Task SaveChangesAsync(CancellationToken cancellationToken)
         {

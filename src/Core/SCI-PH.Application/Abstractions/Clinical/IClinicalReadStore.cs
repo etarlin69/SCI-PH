@@ -35,5 +35,11 @@ namespace SCI_PH.Application.Abstractions.Clinical
 
         // Newest first.
         Task<IReadOnlyList<VitalSignSummary>> ListVitalSignsAsync(Guid encounterId, CancellationToken cancellationToken);
+
+        // Newest first (by clinical time), with the author's name.
+        Task<IReadOnlyList<ClinicalNoteSummary>> ListNotesAsync(Guid encounterId, CancellationToken cancellationToken);
+
+        // Primary first, then newest.
+        Task<IReadOnlyList<DiagnosisSummary>> ListDiagnosesAsync(Guid encounterId, CancellationToken cancellationToken);
     }
 }

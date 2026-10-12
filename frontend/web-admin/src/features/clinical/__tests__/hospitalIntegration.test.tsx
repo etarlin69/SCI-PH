@@ -1,4 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { AuthProvider, Permissions, resolveHomeRoute, type WebUser } from '../../../auth';
@@ -129,6 +130,79 @@ describe('módulo Hospital con la autenticación compartida', () => {
     expect(await screen.findByText('No hay atenciones abiertas', {}, WAIT)).toBeInTheDocument();
     if (visible) expect(screen.getByRole('link', { name: 'Nueva atención' })).toHaveAttribute('href', '/hospital/recepcion');
     else expect(screen.queryByRole('link', { name: 'Nueva atención' })).not.toBeInTheDocument();
+  });
+
+  // Permisos reales de RolePermissions.Doctor.
+  const DOCTOR: WebUser = {
+    id: '55555555-5555-5555-5555-555555555555',
+    userName: 'medico.prueba',
+    email: null,
+    roles: ['Doctor'],
+    permissions: ['Patients.Read', 'Encounters.Read', 'Medications.Read', 'Transfers.Read', 'Documents.Read', 'Patients.Identify', 'Encounters.Create', 'Encounters.Update', 'Encounters.Close', 'Triage.Write', 'VitalSigns.Write', 'ClinicalNotes.Write', 'Diagnoses.Write', 'Procedures.Write', 'Results.Write', 'Prescriptions.Write', 'MedicationAdministrations.Write', 'Transfers.Manage', 'Documents.Upload'],
+  };
+  const ENC = 'e1';
+  const encounterIn = (status: string) => ({
+    id: ENC, patientId: 'p1', temporaryPatientCode: null, clinicId: 'c1', type: 'Emergency', status, reason: null,
+    startedAtUtc: '2026-10-08T10:00:00Z', endedAtUtc: null, latestTriagePriority: null,
+    patient: { id: 'p1', displayName: 'Paciente Real', birthDate: null, biologicalSex: 'Female', identityStatus: 'Unverified', primaryIdentifier: null },
+  });
+  const renderEncounter = (user: WebUser, path: string, status = 'InProgress') => {
+    resetClinicSelectionForTests();
+    const bff = createFakeBff({
+      'POST /api/web/auth/refresh': () => json(200, session(user)),
+      'GET /api/web/auth/me': () => json(200, user),
+      [`GET /api/web/encounters/${ENC}`]: () => json(200, encounterIn(status)),
+      [`GET /api/web/encounters/${ENC}/notes`]: () => json(200, [{ id: 'n1', encounterId: ENC, type: 'Evolution', content: 'Nota guardada en PostgreSQL', occurredAtUtc: '2026-10-08T10:05:00Z', createdAtUtc: '2026-10-08T10:05:01Z', authorStaffId: 's1', authorDisplayName: 'Dra. Prueba' }]),
+      [`GET /api/web/encounters/${ENC}/diagnoses`]: () => json(200, [{ id: 'd1', encounterId: ENC, description: 'Neumonía', codeSystem: 'ICD-10', code: 'J18.9', type: 'Definitive', isPrimary: true, recordedAtUtc: '2026-10-08T10:06:00Z', confirmedAtUtc: '2026-10-08T10:06:00Z', recordedByStaffId: 's1' }]),
+      [`POST /api/web/encounters/${ENC}/notes`]: () => json(201, { id: 'n2' }),
+    });
+    render(
+      <ToastProvider>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <AppRoutes />
+          </MemoryRouter>
+        </AuthProvider>
+      </ToastProvider>,
+    );
+    return bff;
+  };
+
+  it('el expediente muestra notas y diagnósticos reales del BFF, sin «Simulación», y crea una nota real', async () => {
+    const bff = renderEncounter(DOCTOR, `/hospital/atenciones/${ENC}`);
+
+    expect(await screen.findByText('Nota guardada en PostgreSQL', {}, WAIT)).toBeInTheDocument();
+    expect(await screen.findByText('Neumonía', { exact: false }, WAIT)).toBeInTheDocument();
+    const notesCard = screen.getByRole('heading', { name: 'Notas clínicas' }).closest('section')!;
+    expect(within(notesCard).queryByText('Simulación')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('heading', { name: 'Diagnósticos' }).closest('section')!).queryByText('Simulación')).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.selectOptions(within(notesCard).getByLabelText(/Tipo de nota/), 'Evolution');
+    await user.type(within(notesCard).getByLabelText(/Contenido/), 'Evolución favorable');
+    await user.click(within(notesCard).getByRole('button', { name: 'Guardar nota' }));
+
+    await waitFor(() => expect(bff.calls(`POST /api/web/encounters/${ENC}/notes`)).toHaveLength(1));
+    const sent = bff.calls(`POST /api/web/encounters/${ENC}/notes`)[0].body as Record<string, unknown>;
+    expect(sent).toMatchObject({ type: 'Evolution', content: 'Evolución favorable' });
+    expect(Object.keys(sent).sort()).toEqual(['content', 'occurredAtUtc', 'type']);
+  });
+
+  it.each([
+    { label: 'con Encounters.Close puede cerrar una atención en curso', permissions: DOCTOR.permissions, status: 'InProgress', visible: true, enabled: true },
+    { label: 'con Encounters.Close no puede cerrar una atención recién creada', permissions: DOCTOR.permissions, status: 'Created', visible: true, enabled: false },
+    { label: 'sin Encounters.Close no ve la acción', permissions: DOCTOR.permissions.filter((p) => p !== 'Encounters.Close'), status: 'InProgress', visible: false, enabled: false },
+  ])('egreso: un médico $label', async ({ permissions, status, visible, enabled }) => {
+    renderEncounter({ ...DOCTOR, permissions }, `/hospital/atenciones/${ENC}/medicacion`, status);
+
+    const discharge = (await screen.findByRole('heading', { name: 'Egreso' }, WAIT)).closest('section')!;
+    expect(within(discharge).queryByText('Simulación')).not.toBeInTheDocument();
+    const button = within(discharge).queryByRole('button', { name: 'Cerrar atención' });
+    if (!visible) {
+      expect(button).not.toBeInTheDocument();
+      expect(within(discharge).getByText(/requiere el permiso Encounters.Close/)).toBeInTheDocument();
+    } else if (enabled) expect(button).toBeEnabled();
+    else expect(button).toBeDisabled();
   });
 
   it('sin el permiso de la pantalla hospitalaria recibe 403 y conserva la sesión', async () => {

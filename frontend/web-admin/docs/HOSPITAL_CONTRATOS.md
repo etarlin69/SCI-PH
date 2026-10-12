@@ -1,7 +1,8 @@
 # Web Hospital (Rol 4) — contratos que usa el frontend
 
-Estado: **vertical clínica 1 integrada con el Web BFF real** (pacientes, atenciones, admisión/NN, triage y signos
-vitales). Lo demás sigue en el adaptador MOCK y la UI lo marca con «Simulación» en cada sección afectada.
+Estado: **verticales clínicas 1 y 2 integradas con el Web BFF real** (pacientes, atenciones, admisión/NN, triage,
+signos vitales, notas clínicas, diagnósticos y cierre de la atención). Lo demás sigue en el adaptador MOCK y la UI lo
+marca con «Simulación» en cada sección afectada.
 
 - Puerto: `ClinicalApi` (`src/features/clinical/api/clinicalApi.ts`).
 - Adaptador real: `httpClinicalApi.ts` (`apiRequest` de `src/api`: Bearer en memoria, refresh single-flight, ProblemDetails).
@@ -29,15 +30,15 @@ vitales). Lo demás sigue en el adaptador MOCK y la UI lo marca con «Simulació
 |---|---|---|
 | Recepción | `Encounters.Create`, `Patients.Read` | Buscar: `Patients.Read` · registrar: `Patients.Create` · abrir atención: `Encounters.Create` · admisión e identificar NN: `Patients.Identify` · traslados: `Transfers.Read` (simulado) |
 | Pacientes | `Patients.Read` | Registrar: `Patients.Create` |
-| Atenciones / Expediente | `Encounters.Read` | Diagnóstico: `Diagnoses.Write` · nota: `ClinicalNotes.Write` (ambos simulados) |
+| Atenciones / Expediente | `Encounters.Read` | Diagnóstico: `Diagnoses.Write` · nota: `ClinicalNotes.Write` |
 | Triage | `Triage.Write` | Signos vitales en el triage o sueltos: `VitalSigns.Write` |
-| Medicación y egreso | `Medications.Read`, `Prescriptions.Write`, `MedicationAdministrations.Write` | Simulado; el egreso real está deshabilitado hasta tener backend |
+| Medicación y egreso | `Medications.Read`, `Prescriptions.Write`, `MedicationAdministrations.Write` | Cerrar la atención (real): `Encounters.Close`, solo desde `InProgress`/`Received`/`InEvolution` · prescripciones y Kardex: simulados |
 | Transferencias | `Transfers.Read` | Simulado |
 
 Recepción **no** tiene `Encounters.Read`: tras crear una atención se queda en Recepción con el resumen devuelto por el
 `POST` y la ve en «Atenciones en admisión» (proyección sin datos clínicos).
 
-## Endpoints reales (vertical clínica 1)
+## Endpoints reales (verticales clínicas 1 y 2)
 
 | Área | Método | Ruta | Pantalla |
 |---|---|---|---|
@@ -51,18 +52,17 @@ Recepción **no** tiene `Encounters.Read`: tras crear una atención se queda en 
 | Admissions | GET | `/api/web/admissions/encounters?clinicId=&unidentified=` | Recepción |
 | Triage | GET · POST | `/api/web/encounters/{id}/triages` | Triage |
 | VitalSigns | GET · POST | `/api/web/encounters/{id}/vital-signs` | Triage |
+| ClinicalNotes | GET · POST | `/api/web/encounters/{id}/notes` | Expediente |
+| Diagnoses | GET · POST | `/api/web/encounters/{id}/diagnoses` | Expediente |
+| Encounters | POST | `/api/web/encounters/{id}/close` | Medicación y egreso |
 
 ## Aún simulado (MOCK) — pendiente de backend
 
 | Función del puerto | Ruta prevista |
 |---|---|
-| `listNotes` / `createNote` | `/api/web/encounters/{id}/notes` |
-| `listDiagnoses` / `createDiagnosis` | `/api/web/encounters/{id}/diagnoses` |
 | `listMedications` | `/api/web/medications` |
 | `listPrescriptions` / `createPrescription` | `/api/web/encounters/{id}/prescriptions` |
 | `listMedicationAdministrations` | `/api/web/encounters/{id}/medication-administrations` |
 | `listIncomingTransfers` / `receiveTransfer` | `/api/web/transfers`, `/api/web/transfers/{id}/receive` |
-| `closeEncounter` | `/api/web/encounters/{id}/close` — en modo HTTP se rechaza (no se simula sobre atenciones reales) |
 
-Con atenciones reales, las notas, diagnósticos y prescripciones simuladas se guardan en memoria por id de atención y
-se pierden al recargar.
+Con atenciones reales, las prescripciones simuladas se guardan en memoria por id de atención y se pierden al recargar.

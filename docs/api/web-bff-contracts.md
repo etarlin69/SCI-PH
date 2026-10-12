@@ -1,7 +1,7 @@
 # Contratos del Web BFF
 
-> **Estado:** la vertical clínica 1 (pacientes, atenciones, admisión, triage y signos vitales) está implementada; los
-> endpoints marcados «Previsto» aún no.
+> **Estado:** las verticales clínicas 1 (pacientes, atenciones, admisión, triage y signos vitales) y 2 (notas clínicas,
+> diagnósticos y cierre de la atención) están implementadas; los endpoints marcados «Previsto» aún no.
 >
 > Los endpoints previstos describen la intención acordada para empezar a trabajar en paralelo (frontend y backend). Pueden evolucionar mediante **revisión arquitectónica**; cualquier cambio debe reflejarse en este documento dentro del mismo PR.
 
@@ -11,7 +11,7 @@
 - **Formato:** JSON. Los errores se devuelven como `application/problem+json` (ProblemDetails).
 - **Autenticación:** JWT Bearer según [ADR-006](../adr/ADR-006-identity-security.md). El refresh token viaja solo en la cookie HttpOnly `__Host-sciph-refresh`; login, `mfa/verify`, refresh y logout exigen la cabecera `X-SCIPH-CSRF: 1`. Todos los endpoints requieren un usuario autenticado salvo los de sesión y recuperación de cuenta; los de `/api/web/admin` requieren además el permiso correspondiente. Endpoints en `/api/web/auth` ([detalle](../architecture/security.md#endpoints)).
 
-## Web Hospital — vertical clínica 1 (implementado)
+## Web Hospital — verticales clínicas 1 y 2 (implementado)
 
 Reglas comunes:
 
@@ -26,7 +26,10 @@ Reglas comunes:
   fuera de rango, NN no permitido, Prehospital desde la web); 403 permiso o acceso clínico; 404 paciente/atención
   inexistente; 409 concurrencia, identificación repetida, unicidad, atención cerrada o en estado incompatible.
   Las respuestas 400 de reglas incluyen `field` cuando aplica.
-- El primer triage o signo vital mueve la atención `Created → InProgress` (transición del Domain), en la misma transacción.
+- El primer registro clínico (triage, signo vital, nota o diagnóstico) mueve la atención `Created → InProgress`
+  (transición del Domain), en la misma transacción.
+- **Concurrencia:** todo registro clínico vuelve a comprobar los concurrency tokens de la atención (`Status`, `PatientId`)
+  dentro de su misma transacción. Si otra transacción cerró o cambió la atención, el registro no se guarda → 409.
 
 | Método | Ruta | Permiso | Request | Response |
 |---|---|---|---|---|
@@ -44,8 +47,19 @@ Reglas comunes:
 | `POST` | `/api/web/encounters/{id}/triages` | `Triage.Write` (+ `VitalSigns.Write` si hay `measurements`) | `{ priority, reason?, observations?, performedAtUtc?, measurements?: [{ type, value, measuredAtUtc }] }` | 201 `TriageSummary` |
 | `GET` | `/api/web/encounters/{id}/vital-signs` | `Encounters.Read` | — | `VitalSignSummary[]` (con `unit` del Domain) |
 | `POST` | `/api/web/encounters/{id}/vital-signs` | `VitalSigns.Write` | `{ type, value, measuredAtUtc }` (sin `unit`) | 201 `VitalSignSummary` |
+| `GET` | `/api/web/encounters/{id}/notes` | `Encounters.Read` | — | `ClinicalNoteSummary[]` (más reciente primero, con autor) |
+| `POST` | `/api/web/encounters/{id}/notes` | `ClinicalNotes.Write` | `{ type, content, occurredAtUtc }` (`type`: `Assessment`, `Evolution`, `Other`; sin autor) | 201 `ClinicalNoteSummary` |
+| `GET` | `/api/web/encounters/{id}/diagnoses` | `Encounters.Read` | — | `DiagnosisSummary[]` (principal primero) |
+| `POST` | `/api/web/encounters/{id}/diagnoses` | `Diagnoses.Write` | `{ description, type, isPrimary?, codeSystem?, code? }` (un código exige su sistema) | 201 `DiagnosisSummary` |
+| `POST` | `/api/web/encounters/{id}/close` | `Encounters.Close` | `{ dischargeNote? }` | 204 · 409 si el estado no permite cerrar (solo desde `InProgress`, `Received`, `InEvolution`) |
 
 - `EncounterSummary`: `{ id, patientId, patient: PatientSummary?, temporaryPatientCode, clinicId, type, status, reason, startedAtUtc, endedAtUtc, identifiedAtUtc, latestTriagePriority }`.
+- `ClinicalNoteSummary`: `{ id, encounterId, type, content, occurredAtUtc, createdAtUtc, authorStaffId, authorDisplayName }`.
+  Las notas son inmutables. La nota `Discharge` solo la escribe `/close`; `Prehospital` y `TransferSummary` pertenecen
+  a los flujos paramédico y de traslado.
+- `DiagnosisSummary`: `{ id, encounterId, description, codeSystem, code, type, isPrimary, recordedAtUtc, confirmedAtUtc, recordedByStaffId }`.
+- Cerrar (`ClinicalEncounter.ChangeStatus(Closed)`) fija `endedAtUtc`, escribe la nota de egreso opcional y la auditoría
+  en la misma transacción. Una atención cerrada no admite triage, signos, notas ni diagnósticos (409).
 - `AdmissionEncounterSummary` (Recepción, **sin contenido clínico**): `{ encounterId, patientId, patientDisplayName, temporaryPatientCode, type, status, startedAtUtc, clinicId }`.
   Recepción no recibe `Encounters.Read`: crea con `POST /encounters` (que devuelve el resumen) y localiza/identifica por esta proyección.
 

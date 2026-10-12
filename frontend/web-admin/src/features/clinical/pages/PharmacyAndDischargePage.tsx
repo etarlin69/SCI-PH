@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Permissions, useAuth } from '../../../auth';
 import { useParams } from 'react-router-dom';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Select, Textarea } from '../../../components/shared';
-import { CLINICAL_API_IS_MOCK, clinicalApi, isSimulated } from '../api';
+import { clinicalApi } from '../api';
 import { EncounterShell } from '../components/EncounterShell';
 import { QueryView } from '../components/QueryView';
 import { SimulatedBadge } from '../components/SimulatedBadge';
@@ -221,8 +221,6 @@ function AdministrationsCard({ encounterId }: { encounterId: string }) {
 
 function DischargeCard({ encounter, onClosed }: { encounter: ClinicalEncounterSummary; onClosed: () => void }) {
     const feedback = useClinicalFeedback('discharge');
-    // Con atenciones reales, cerrar no puede simularse sin desincronizar su estado: se deshabilita hasta tener backend.
-    const backendMissing = isSimulated('discharge') && !CLINICAL_API_IS_MOCK;
     const [note, setNote] = useState('');
     const [confirming, setConfirming] = useState(false);
     const canClose = useAuth().can(Permissions.Encounters.Close);
@@ -258,21 +256,20 @@ function DischargeCard({ encounter, onClosed }: { encounter: ClinicalEncounterSu
             actions={<SimulatedBadge feature="discharge" />}
         >
             <div className="flex flex-col gap-3">
-                {backendMissing && (
-                    <p role="note" className="m-0 rounded-lg bg-warning-50 px-3 py-2 text-[13px] text-warning-700">
-                        El egreso todavía no está disponible en el backend; la atención no puede cerrarse desde aquí.
-                    </p>
-                )}
                 <Textarea label="Nota de egreso (opcional)" value={note} onChange={(e) => setNote(e.target.value)} rows={4} />
                 {!closable && (
                     <p className="m-0 text-xs text-warning-700">
                         Una atención en estado «{ENCOUNTER_STATUS[encounter.status].label}» no puede cerrarse todavía.
                     </p>
                 )}
-                {!canClose && <p className="m-0 text-xs text-ink-muted">Cerrar la atención requiere el permiso Encounters.Close.</p>}
-                <Button variant="danger" className="w-full sm:w-fit" disabled={!closable || !canClose || backendMissing} onClick={() => setConfirming(true)}>
-                    Cerrar atención
-                </Button>
+                {/* La acción solo existe con el permiso real; el backend sigue siendo la autoridad (403/409). */}
+                {canClose ? (
+                    <Button variant="danger" className="w-full sm:w-fit" disabled={!closable} onClick={() => setConfirming(true)}>
+                        Cerrar atención
+                    </Button>
+                ) : (
+                    <p className="m-0 text-xs text-ink-muted">Cerrar la atención requiere el permiso Encounters.Close.</p>
+                )}
             </div>
             <ConfirmDialog
                 open={confirming}

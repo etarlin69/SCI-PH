@@ -19,7 +19,16 @@ namespace SCI_PH.Application.Abstractions.Clinical
 
         void Add(VitalSign vitalSign);
 
+        void Add(ClinicalNote note);
+
+        void Add(Diagnosis diagnosis);
+
         void Add(ClinicalAuditEntry auditEntry);
+
+        // A clinical record only inserts rows, so the encounter's concurrency tokens (Status, PatientId) would not be
+        // checked. This makes the next SaveChangesAsync re-check them: if another transaction closed or changed the
+        // encounter after it was loaded, the record is rejected (ResourceConflictException) instead of being written.
+        void EnsureEncounterUnchanged(ClinicalEncounter encounter);
 
         // Concurrent changes and known uniqueness violations surface as ResourceConflictException.
         Task SaveChangesAsync(CancellationToken cancellationToken);
