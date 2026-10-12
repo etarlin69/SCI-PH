@@ -1,23 +1,18 @@
-# Entorno de desarrollo local de SCI-PH.
-# Por ahora solo incluye PostgreSQL; las APIs se agregarán más adelante.
-#
-# Uso:
-#   1. Copiar .env.example a .env y definir valores propios.
-#   2. docker compose up -d
-
 name: sci-ph
+
+x-backend-environment: &backend-environment
+  ASPNETCORE_ENVIRONMENT: Development
+  ConnectionStrings__SciPhDatabase: "Host=postgres;Port=5432;Database=${POSTGRES_DB:?Define POSTGRES_DB en .env};Username=${POSTGRES_USER:?Define POSTGRES_USER en .env};Password=${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}"
 
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: sci-ph-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB en .env}
       POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
     ports:
-      # Solo expuesto en localhost.
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -27,6 +22,99 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  migrations:
+    build:
+      context: .
+      dockerfile: src/Presentation/SCI-PH.Web.BFF/Dockerfile
+      target: migrations
+    image: sciph-web-bff-migrations:local
+    environment:
+      <<: *backend-environment
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Define JWT_SIGNING_KEY en .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -c
+      - |
+        dotnet ef database update \
+          --context IdentityDbContext \
+          --project src/Infrastructure/SCI-PH.Persistence \
+          --startup-project src/Presentation/SCI-PH.Web.BFF \
+          --configuration Release &&
+        dotnet ef database update \
+          --context ClinicalDbContext \
+          --project src/Infrastructure/SCI-PH.Persistence \
+          --startup-project src/Presentation/SCI-PH.Web.BFF \
+          --configuration Release
+    restart: "no"
+
+  web-bff:
+    build:
+      context: .
+      dockerfile: src/Presentation/SCI-PH.Web.BFF/Dockerfile
+      target: final
+    image: sciph-web-bff:local
+    environment:
+      <<: *backend-environment
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Define JWT_SIGNING_KEY en .env}
+
+      Security__AllowedOrigins__0: "http://localhost:${WEB_PORT:-5173}"
+      Security__AllowedOrigins__1: "https://localhost:${WEB_PORT:-5173}"
+
+      AccountEmail__ActivationUrl: "http://localhost:${WEB_PORT:-5173}/activate-account"
+      AccountEmail__ConfirmEmailUrl: "http://localhost:${WEB_PORT:-5173}/confirm-email"
+      AccountEmail__ResetPasswordUrl: "http://localhost:${WEB_PORT:-5173}/reset-password"
+    ports:
+      - "127.0.0.1:${WEB_BFF_PORT:-5074}:8080"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+  mobile-bff:
+    build:
+      context: .
+      dockerfile: src/Presentation/SCI-PH.Mobile.BFF/Dockerfile
+      target: final
+    image: sciph-mobile-bff:local
+    environment:
+      <<: *backend-environment
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Define JWT_SIGNING_KEY en .env}
+    ports:
+      - "127.0.0.1:${MOBILE_BFF_PORT:-5191}:8080"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+  device-api:
+    build:
+      context: .
+      dockerfile: src/Presentation/SCI-PH.Device.API/Dockerfile
+      target: final
+    image: sciph-device-api:local
+    environment:
+      <<: *backend-environment
+    ports:
+      - "127.0.0.1:${DEVICE_API_PORT:-5139}:8080"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/web-admin/Dockerfile
+    image: sciph-web:local
+    environment:
+      WEB_BFF_UPSTREAM: "http://web-bff:8080"
+      NGINX_ENVSUBST_FILTER: "WEB_BFF_UPSTREAM"
+    ports:
+      - "127.0.0.1:${WEB_PORT:-5173}:8080"
+    depends_on:
+      web-bff:
+        condition: service_started
 
 volumes:
   postgres_data:
