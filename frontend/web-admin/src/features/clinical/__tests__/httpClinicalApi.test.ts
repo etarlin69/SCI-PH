@@ -167,12 +167,25 @@ describe('httpClinicalApi (Web BFF real)', () => {
     );
   });
 
-  it('marca como simulado solo lo que aún no tiene backend', () => {
-    for (const real of ['patients', 'encounters', 'admissions', 'triage', 'vitalSigns', 'notes', 'diagnoses', 'discharge', 'medications', 'prescriptions', 'administrations'] as const) {
+  it('traslados entrantes y recepción van al BFF real sin receptor ni destino desde el cliente', async () => {
+    const bff = createFakeBff({
+      'GET /api/web/transfers/incoming': () => json(200, [{ id: 't1', status: 'InTransit', encounterStatus: 'Transferred' }]),
+      'POST /api/web/transfers/t1/receive': () => json(200, { id: 't1', status: 'Received' }),
+    });
+
+    const incoming = await httpClinicalApi.listIncomingTransfers();
+    await httpClinicalApi.receiveTransfer('t1');
+
+    expect(incoming[0].status).toBe('InTransit');
+    expect(bff.calls('POST /api/web/transfers/t1/receive')[0].body).toBeUndefined();
+    expect(describeError(new ApiError(409, { status: 409, title: 'x', detail: 'Receive requires a InTransit transfer; current status is Received.' }))).toBe(
+      'El traslado ya fue recibido o todavía no está en camino.',
+    );
+  });
+
+  it('todo el módulo hospitalario usa el backend real (nada simulado fuera del modo mock)', () => {
+    for (const real of ['patients', 'encounters', 'admissions', 'triage', 'vitalSigns', 'notes', 'diagnoses', 'discharge', 'medications', 'prescriptions', 'administrations', 'transfers'] as const) {
       expect(isSimulated(real)).toBe(false);
-    }
-    for (const mock of ['transfers'] as const) {
-      expect(isSimulated(mock)).toBe(true);
     }
   });
 });

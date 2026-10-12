@@ -1,9 +1,9 @@
 # Web Hospital (Rol 4) — contratos que usa el frontend
 
-Estado: **verticales clínicas 1, 2 y 3 integradas con el Web BFF real** (pacientes, atenciones, admisión/NN, triage,
-signos vitales, notas clínicas, diagnósticos, cierre de la atención, catálogo de medicamentos, prescripciones y Kardex).
-Solo los traslados siguen en el adaptador MOCK y la UI lo
-marca con «Simulación» en cada sección afectada.
+Estado: **todo el módulo hospitalario integrado con el Web BFF real** (verticales clínicas 1 a 4: pacientes, atenciones, admisión/NN, triage,
+signos vitales, notas clínicas, diagnósticos, cierre de la atención, catálogo de medicamentos, prescripciones, Kardex y
+traslados entrantes). El adaptador MOCK solo se usa con `VITE_CLINICAL_API_MODE=mock`; la UI ya no marca nada como
+«Simulación» fuera de ese modo.
 
 - Puerto: `ClinicalApi` (`src/features/clinical/api/clinicalApi.ts`).
 - Adaptador real: `httpClinicalApi.ts` (`apiRequest` de `src/api`: Bearer en memoria, refresh single-flight, ProblemDetails).
@@ -29,17 +29,17 @@ marca con «Simulación» en cada sección afectada.
 
 | Pantalla | Acceso (cualquiera) | Acciones dentro |
 |---|---|---|
-| Recepción | `Encounters.Create`, `Patients.Read` | Buscar: `Patients.Read` · registrar: `Patients.Create` · abrir atención: `Encounters.Create` · admisión e identificar NN: `Patients.Identify` · traslados: `Transfers.Read` (simulado) |
+| Recepción | `Encounters.Create`, `Patients.Read` | Buscar: `Patients.Read` · registrar: `Patients.Create` · abrir atención: `Encounters.Create` · admisión e identificar NN: `Patients.Identify` · traslados entrantes: `Transfers.Read` · registrar llegada: `Transfers.Manage` |
 | Pacientes | `Patients.Read` | Registrar: `Patients.Create` |
 | Atenciones / Expediente | `Encounters.Read` | Diagnóstico: `Diagnoses.Write` · nota: `ClinicalNotes.Write` |
 | Triage | `Triage.Write` | Signos vitales en el triage o sueltos: `VitalSigns.Write` |
 | Medicación y egreso | `Medications.Read`, `Prescriptions.Write`, `MedicationAdministrations.Write` | Emitir prescripción: `Prescriptions.Write` · registrar administración: `MedicationAdministrations.Write` · cerrar la atención: `Encounters.Close`, solo desde `InProgress`/`Received`/`InEvolution`. Ninguna escritura en una atención cerrada |
-| Transferencias | `Transfers.Read` | Simulado |
+| Transferencias | `Transfers.Read` | Registrar llegada (solo traslados `InTransit`): `Transfers.Manage`. Abrir la atención recibida: `Encounters.Read` |
 
 Recepción **no** tiene `Encounters.Read`: tras crear una atención se queda en Recepción con el resumen devuelto por el
 `POST` y la ve en «Atenciones en admisión» (proyección sin datos clínicos).
 
-## Endpoints reales (verticales clínicas 1, 2 y 3)
+## Endpoints reales (verticales clínicas 1 a 4)
 
 | Área | Método | Ruta | Pantalla |
 |---|---|---|---|
@@ -59,13 +59,19 @@ Recepción **no** tiene `Encounters.Read`: tras crear una atención se queda en 
 | Medications | GET | `/api/web/medications` | Medicación y egreso |
 | Prescriptions | GET · POST | `/api/web/encounters/{id}/prescriptions` | Medicación y egreso |
 | MedicationAdministrations | GET · POST | `/api/web/encounters/{id}/medication-administrations` | Medicación y egreso (Kardex) |
+| Transfers | GET | `/api/web/transfers/incoming?clinicId=` | Recepción, Transferencias |
+| Transfers | POST | `/api/web/transfers/{id}/receive` | Recepción, Transferencias |
 
 El **Kardex** no es un recurso propio: la pantalla lo compone con las prescripciones emitidas (con sus líneas) y las
 administraciones registradas. Una administración puede vincularse a una línea prescrita (el medicamento debe ser el
 prescrito) o registrarse sin prescripción. Prescriptor y responsable de la administración los fija el backend.
 
-## Aún simulado (MOCK) — pendiente de backend
+**Traslados.** La lista entrante muestra los traslados `Requested` e `InTransit` con destino a la clínica del usuario;
+solo uno `InTransit` admite «Registrar llegada». Al recibirlo, la misma atención pasa a esta clínica (estado
+`Received`) y la clínica de origen deja de tener acceso clínico. Quién recibe y el destino los fija el backend. La
+solicitud y el despacho (`POST /api/web/encounters/{id}/transfers`, `POST /api/web/transfers/{id}/dispatch`) existen
+en el backend para la clínica de origen y la app paramédica; el hospital todavía no tiene pantalla para ellos.
 
-| Función del puerto | Ruta prevista |
-|---|---|
-| `listIncomingTransfers` / `receiveTransfer` | `/api/web/transfers`, `/api/web/transfers/{id}/receive` |
+## Aún simulado (MOCK)
+
+Nada en el módulo hospitalario. `mockClinicalApi.ts` se mantiene solo para `VITE_CLINICAL_API_MODE=mock`.

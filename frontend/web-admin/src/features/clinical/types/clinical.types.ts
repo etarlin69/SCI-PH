@@ -331,7 +331,13 @@ export interface ClinicalTransfer {
     ambulance: AmbulanceSummary | null;
     requestedAtUtc: UtcDateTime;
     sentAtUtc: UtcDateTime | null;
+    sentByStaffId?: Guid | null;
     receivedAtUtc: UtcDateTime | null;
+    receivedByStaffId?: Guid | null;
+    cancelledAtUtc?: UtcDateTime | null;
+    notes?: string | null;
+    /** Estado de la atención trasladada (Transferred mientras va en camino). */
+    encounterStatus?: ClinicalEncounterStatus;
     patient: PatientSummary | null;
     temporaryPatientCode: string | null;
     reason: string | null;
