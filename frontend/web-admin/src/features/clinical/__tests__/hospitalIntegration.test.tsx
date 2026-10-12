@@ -155,6 +155,9 @@ describe('módulo Hospital con la autenticación compartida', () => {
       [`GET /api/web/encounters/${ENC}/notes`]: () => json(200, [{ id: 'n1', encounterId: ENC, type: 'Evolution', content: 'Nota guardada en PostgreSQL', occurredAtUtc: '2026-10-08T10:05:00Z', createdAtUtc: '2026-10-08T10:05:01Z', authorStaffId: 's1', authorDisplayName: 'Dra. Prueba' }]),
       [`GET /api/web/encounters/${ENC}/diagnoses`]: () => json(200, [{ id: 'd1', encounterId: ENC, description: 'Neumonía', codeSystem: 'ICD-10', code: 'J18.9', type: 'Definitive', isPrimary: true, recordedAtUtc: '2026-10-08T10:06:00Z', confirmedAtUtc: '2026-10-08T10:06:00Z', recordedByStaffId: 's1' }]),
       [`POST /api/web/encounters/${ENC}/notes`]: () => json(201, { id: 'n2' }),
+      'GET /api/web/medications': () => json(200, []),
+      [`GET /api/web/encounters/${ENC}/prescriptions`]: () => json(200, []),
+      [`GET /api/web/encounters/${ENC}/medication-administrations`]: () => json(200, []),
     });
     render(
       <ToastProvider>

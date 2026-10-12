@@ -1,7 +1,8 @@
 # Web Hospital (Rol 4) — contratos que usa el frontend
 
-Estado: **verticales clínicas 1 y 2 integradas con el Web BFF real** (pacientes, atenciones, admisión/NN, triage,
-signos vitales, notas clínicas, diagnósticos y cierre de la atención). Lo demás sigue en el adaptador MOCK y la UI lo
+Estado: **verticales clínicas 1, 2 y 3 integradas con el Web BFF real** (pacientes, atenciones, admisión/NN, triage,
+signos vitales, notas clínicas, diagnósticos, cierre de la atención, catálogo de medicamentos, prescripciones y Kardex).
+Solo los traslados siguen en el adaptador MOCK y la UI lo
 marca con «Simulación» en cada sección afectada.
 
 - Puerto: `ClinicalApi` (`src/features/clinical/api/clinicalApi.ts`).
@@ -32,13 +33,13 @@ marca con «Simulación» en cada sección afectada.
 | Pacientes | `Patients.Read` | Registrar: `Patients.Create` |
 | Atenciones / Expediente | `Encounters.Read` | Diagnóstico: `Diagnoses.Write` · nota: `ClinicalNotes.Write` |
 | Triage | `Triage.Write` | Signos vitales en el triage o sueltos: `VitalSigns.Write` |
-| Medicación y egreso | `Medications.Read`, `Prescriptions.Write`, `MedicationAdministrations.Write` | Cerrar la atención (real): `Encounters.Close`, solo desde `InProgress`/`Received`/`InEvolution` · prescripciones y Kardex: simulados |
+| Medicación y egreso | `Medications.Read`, `Prescriptions.Write`, `MedicationAdministrations.Write` | Emitir prescripción: `Prescriptions.Write` · registrar administración: `MedicationAdministrations.Write` · cerrar la atención: `Encounters.Close`, solo desde `InProgress`/`Received`/`InEvolution`. Ninguna escritura en una atención cerrada |
 | Transferencias | `Transfers.Read` | Simulado |
 
 Recepción **no** tiene `Encounters.Read`: tras crear una atención se queda en Recepción con el resumen devuelto por el
 `POST` y la ve en «Atenciones en admisión» (proyección sin datos clínicos).
 
-## Endpoints reales (verticales clínicas 1 y 2)
+## Endpoints reales (verticales clínicas 1, 2 y 3)
 
 | Área | Método | Ruta | Pantalla |
 |---|---|---|---|
@@ -55,14 +56,16 @@ Recepción **no** tiene `Encounters.Read`: tras crear una atención se queda en 
 | ClinicalNotes | GET · POST | `/api/web/encounters/{id}/notes` | Expediente |
 | Diagnoses | GET · POST | `/api/web/encounters/{id}/diagnoses` | Expediente |
 | Encounters | POST | `/api/web/encounters/{id}/close` | Medicación y egreso |
+| Medications | GET | `/api/web/medications` | Medicación y egreso |
+| Prescriptions | GET · POST | `/api/web/encounters/{id}/prescriptions` | Medicación y egreso |
+| MedicationAdministrations | GET · POST | `/api/web/encounters/{id}/medication-administrations` | Medicación y egreso (Kardex) |
+
+El **Kardex** no es un recurso propio: la pantalla lo compone con las prescripciones emitidas (con sus líneas) y las
+administraciones registradas. Una administración puede vincularse a una línea prescrita (el medicamento debe ser el
+prescrito) o registrarse sin prescripción. Prescriptor y responsable de la administración los fija el backend.
 
 ## Aún simulado (MOCK) — pendiente de backend
 
 | Función del puerto | Ruta prevista |
 |---|---|
-| `listMedications` | `/api/web/medications` |
-| `listPrescriptions` / `createPrescription` | `/api/web/encounters/{id}/prescriptions` |
-| `listMedicationAdministrations` | `/api/web/encounters/{id}/medication-administrations` |
 | `listIncomingTransfers` / `receiveTransfer` | `/api/web/transfers`, `/api/web/transfers/{id}/receive` |
-
-Con atenciones reales, las prescripciones simuladas se guardan en memoria por id de atención y se pierden al recargar.
