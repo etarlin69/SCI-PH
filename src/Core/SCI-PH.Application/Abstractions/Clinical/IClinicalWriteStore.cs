@@ -1,5 +1,6 @@
 using SCI_PH.Domain.Entities.Auditing;
 using SCI_PH.Domain.Entities.Encounters;
+using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Patients;
 
 namespace SCI_PH.Application.Abstractions.Clinical
@@ -22,6 +23,11 @@ namespace SCI_PH.Application.Abstractions.Clinical
         void Add(ClinicalNote note);
 
         void Add(Diagnosis diagnosis);
+
+        // With its details (one aggregate).
+        void Add(Prescription prescription);
+
+        void Add(MedicationAdministration administration);
 
         void Add(ClinicalAuditEntry auditEntry);
 

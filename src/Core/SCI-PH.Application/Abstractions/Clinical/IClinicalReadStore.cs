@@ -41,5 +41,19 @@ namespace SCI_PH.Application.Abstractions.Clinical
 
         // Primary first, then newest.
         Task<IReadOnlyList<DiagnosisSummary>> ListDiagnosesAsync(Guid encounterId, CancellationToken cancellationToken);
+
+        // Whole catalog (active and inactive), by name.
+        Task<IReadOnlyList<MedicationSummary>> ListMedicationsAsync(CancellationToken cancellationToken);
+
+        // Only the ids that exist.
+        Task<IReadOnlyList<MedicationSummary>> FindMedicationsAsync(IReadOnlyCollection<Guid> medicationIds, CancellationToken cancellationToken);
+
+        // Newest first, each with its lines.
+        Task<IReadOnlyList<PrescriptionSummary>> ListPrescriptionsAsync(Guid encounterId, CancellationToken cancellationToken);
+
+        Task<PrescriptionSummary?> GetPrescriptionAsync(Guid prescriptionId, CancellationToken cancellationToken);
+
+        // Newest first (by administration time).
+        Task<IReadOnlyList<MedicationAdministrationSummary>> ListMedicationAdministrationsAsync(Guid encounterId, CancellationToken cancellationToken);
     }
 }

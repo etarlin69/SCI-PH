@@ -4,6 +4,7 @@ using SCI_PH.Application.Abstractions.Clinical;
 using SCI_PH.Application.Common.Errors;
 using SCI_PH.Domain.Entities.Auditing;
 using SCI_PH.Domain.Entities.Encounters;
+using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Patients;
 using SCI_PH.Persistence.Contexts;
 
@@ -38,6 +39,11 @@ namespace SCI_PH.Persistence.Clinical.Services
         public void Add(ClinicalNote note) => _clinical.ClinicalNotes.Add(note);
 
         public void Add(Diagnosis diagnosis) => _clinical.Diagnoses.Add(diagnosis);
+
+        // Its details are inserted with it (same graph, same transaction).
+        public void Add(Prescription prescription) => _clinical.Prescriptions.Add(prescription);
+
+        public void Add(MedicationAdministration administration) => _clinical.MedicationAdministrations.Add(administration);
 
         public void Add(ClinicalAuditEntry auditEntry) => _clinical.ClinicalAuditEntries.Add(auditEntry);
 

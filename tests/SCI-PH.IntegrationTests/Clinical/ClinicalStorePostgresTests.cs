@@ -14,8 +14,10 @@ using SCI_PH.Persistence;
 using SCI_PH.Persistence.Clinical.Seed;
 using SCI_PH.Persistence.Identity.Models;
 using SCI_PH.Domain.Entities.Encounters;
+using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Organizations;
 using SCI_PH.Domain.Enums.Encounters;
+using SCI_PH.Domain.Enums.Medications;
 using SCI_PH.Domain.Enums.Patients;
 using SCI_PH.IntegrationTests.Clinical.Support;
 using SCI_PH.IntegrationTests.PostgreSql;
@@ -196,6 +198,11 @@ namespace SCI_PH.IntegrationTests.Clinical
             Assert.Null(staff.Single(s => s.ProfessionalLicenseNumber == "DEV-DOC-01").IdentityUserId);
             Assert.Null(staff.Single(s => s.ProfessionalLicenseNumber == "DEV-REC-01").IdentityUserId);
             Assert.Equal(3, await host.DbAsync(db => db.ClinicStaffAffiliations.CountAsync(a => a.EndedAtUtc == null)));
+            // Demo medication catalog: created once (by code), active, with "DEV-" codes.
+            var catalog = await host.DbAsync(db => db.Medications.ToListAsync());
+            Assert.Equal(6, catalog.Count);
+            Assert.All(catalog, m => Assert.StartsWith("DEV-", m.Code));
+            Assert.All(catalog, m => Assert.Equal(MedicationStatus.Active, m.Status));
 
             // Entry point used by Program.cs: with the option enabled it seeds in Development and does nothing elsewhere.
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -213,6 +220,42 @@ namespace SCI_PH.IntegrationTests.Clinical
             Assert.False(await host.DbAsync(db => db.Clinics.AnyAsync(c => c.FacilityCode == "DEV-ENV-GUARD")));
             await provider.RunClinicalDevelopmentSeedAsync(new TestEnvironment(Environments.Development));
             Assert.True(await host.DbAsync(db => db.Clinics.AnyAsync(c => c.FacilityCode == "DEV-ENV-GUARD")));
+            Assert.Equal(6, await host.DbAsync(db => db.Medications.CountAsync()));
+        }
+
+        // The store writes a prescription with its details in one save; the composite keys reject an administration that
+        // points to a prescription of another encounter, and nothing of that save is stored.
+        [SkippableFact]
+        public async Task PrescriptionDetailsAreSavedTogetherAndCompositeKeysKeepAdministrationsInTheirEncounter()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            await using var host = await ClinicalApiHost.StartAsync(_postgres);
+            var (clinic, staff) = await ClinicWithStaffAsync(host);
+            var encounterA = await AddEncounterAsync(host, clinic.Id);
+            var encounterB = await AddEncounterAsync(host, clinic.Id);
+            var medication = await host.SeedMedicationAsync();
+            var prescription = Prescription.Draft(encounterA.Id, staff.Id);
+            var detail = prescription.AddDetail(medication.Id, 500, "mg", MedicationRoute.Oral, "cada 8 horas", 3);
+            prescription.Issue(DateTimeOffset.UtcNow);
+
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var store = scope.ServiceProvider.GetRequiredService<IClinicalWriteStore>();
+                store.Add(prescription);
+                await store.SaveChangesAsync(None);
+            }
+
+            Assert.Equal(detail.Id, await host.DbAsync(db => db.PrescriptionDetails.Where(d => d.PrescriptionId == prescription.Id).Select(d => d.Id).SingleAsync()));
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var store = scope.ServiceProvider.GetRequiredService<IClinicalWriteStore>();
+                store.Add(MedicationAdministration.Record(
+                    encounterB.Id, medication.Id, 500, "mg", MedicationRoute.Oral, DateTimeOffset.UtcNow, staff.Id, prescription.Id, detail.Id));
+                var exception = await Assert.ThrowsAsync<DbUpdateException>(() => store.SaveChangesAsync(None));
+                Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, Assert.IsType<PostgresException>(exception.InnerException).SqlState);
+            }
+
+            Assert.False(await host.DbAsync(db => db.MedicationAdministrations.AnyAsync()));
         }
 
         private sealed class TestEnvironment(string name) : IHostEnvironment
