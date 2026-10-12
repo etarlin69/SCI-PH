@@ -169,14 +169,26 @@ namespace SCI_PH.Application.Features.Clinical
             return diagnosis.ToSummary();
         }
 
-        private async Task<(ClinicalActor Actor, ClinicalEncounter Encounter, DateTimeOffset Now)> LoadForRecordingAsync(
-            Guid encounterId, string permission, CancellationToken cancellationToken)
+        private Task<(ClinicalActor Actor, ClinicalEncounter Encounter, DateTimeOffset Now)> LoadForRecordingAsync(
+            Guid encounterId, string permission, CancellationToken cancellationToken) =>
+            LoadForRecordingAsync(_actor, _writes, _patientAccess, _time, encounterId, permission, cancellationToken);
+
+        // Shared write check of every clinical record (also MedicationService): the encounter exists, belongs to one of
+        // the actor's clinics, the patient rule allows the permission, and its status accepts records.
+        internal static async Task<(ClinicalActor Actor, ClinicalEncounter Encounter, DateTimeOffset Now)> LoadForRecordingAsync(
+            ICurrentClinicalActor currentActor,
+            IClinicalWriteStore writes,
+            IPatientAccessAuthorizer patientAccess,
+            TimeProvider time,
+            Guid encounterId,
+            string permission,
+            CancellationToken cancellationToken)
         {
-            var actor = await _actor.GetAsync(cancellationToken);
-            var encounter = await _writes.FindEncounterAsync(encounterId, cancellationToken)
+            var actor = await currentActor.GetAsync(cancellationToken);
+            var encounter = await writes.FindEncounterAsync(encounterId, cancellationToken)
                 ?? throw new ResourceNotFoundException(nameof(ClinicalEncounter), encounterId);
             actor.EnsureClinic(encounter.ClinicId);
-            if (encounter.PatientId is { } patientId && !await _patientAccess.CanWriteAsync(patientId, permission, cancellationToken))
+            if (encounter.PatientId is { } patientId && !await patientAccess.CanWriteAsync(patientId, permission, cancellationToken))
             {
                 throw new AccessDeniedException("The current user cannot write this patient's clinical records.");
             }
@@ -187,12 +199,12 @@ namespace SCI_PH.Application.Features.Clinical
             }
 
             // The status check above can be outdated by commit time; the store re-checks it inside the save.
-            _writes.EnsureEncounterUnchanged(encounter);
-            return (actor, encounter, _time.GetUtcNow());
+            writes.EnsureEncounterUnchanged(encounter);
+            return (actor, encounter, time.GetUtcNow());
         }
 
         // Created -> InProgress only through the Domain transition; an encounter already in progress is left as is.
-        private static void StartIfCreated(ClinicalEncounter encounter, DateTimeOffset now)
+        internal static void StartIfCreated(ClinicalEncounter encounter, DateTimeOffset now)
         {
             if (encounter.Status != ClinicalEncounterStatus.Created)
             {

@@ -138,11 +138,40 @@ describe('httpClinicalApi (Web BFF real)', () => {
     );
   });
 
+  it('catálogo, prescripciones y Kardex van al BFF real sin prescriptor ni responsable desde el cliente', async () => {
+    const bff = createFakeBff({
+      'GET /api/web/medications': () => json(200, [{ id: 'm1', code: null, name: 'Paracetamol', presentation: null, concentration: null, defaultRoute: null, status: 'Active' }]),
+      [`GET /api/web/encounters/${ENCOUNTER}/prescriptions`]: () => json(200, []),
+      [`POST /api/web/encounters/${ENCOUNTER}/prescriptions`]: () => json(201, { id: 'rx1', details: [] }),
+      [`GET /api/web/encounters/${ENCOUNTER}/medication-administrations`]: () => json(200, []),
+      [`POST /api/web/encounters/${ENCOUNTER}/medication-administrations`]: () => json(201, { id: 'a1' }),
+    });
+    const line = { medicationId: 'm1', dose: 1, doseUnit: 'g', route: 'Oral', frequency: 'c/8h', durationDays: 3, instructions: null } as const;
+
+    const catalog = await httpClinicalApi.listMedications();
+    await httpClinicalApi.listPrescriptions(ENCOUNTER);
+    await httpClinicalApi.createPrescription(ENCOUNTER, { notes: null, details: [{ ...line, prescribedByStaffId: 'x', medicationName: 'x' } as never] });
+    await httpClinicalApi.listMedicationAdministrations(ENCOUNTER);
+    await httpClinicalApi.createMedicationAdministration(ENCOUNTER, {
+      medicationId: 'm1', dose: 1, doseUnit: 'g', route: 'Oral', administeredAtUtc: '2026-10-08T10:05:00.000Z',
+      prescriptionId: 'rx1', prescriptionDetailId: 'l1', notes: null, administeredByStaffId: 'x',
+    } as never);
+
+    expect(catalog[0].name).toBe('Paracetamol');
+    expect(bff.calls(`POST /api/web/encounters/${ENCOUNTER}/prescriptions`)[0].body).toEqual({ notes: null, details: [line] });
+    expect(bff.calls(`POST /api/web/encounters/${ENCOUNTER}/medication-administrations`)[0].body).toEqual({
+      medicationId: 'm1', dose: 1, doseUnit: 'g', route: 'Oral', administeredAtUtc: '2026-10-08T10:05:00.000Z', prescriptionId: 'rx1', prescriptionDetailId: 'l1', notes: null,
+    });
+    expect(describeError(new ApiError(409, { status: 409, title: 'x', detail: 'Medication 1 is not active in the catalog.' }))).toBe(
+      'El medicamento no está activo en el catálogo.',
+    );
+  });
+
   it('marca como simulado solo lo que aún no tiene backend', () => {
-    for (const real of ['patients', 'encounters', 'admissions', 'triage', 'vitalSigns', 'notes', 'diagnoses', 'discharge'] as const) {
+    for (const real of ['patients', 'encounters', 'admissions', 'triage', 'vitalSigns', 'notes', 'diagnoses', 'discharge', 'medications', 'prescriptions', 'administrations'] as const) {
       expect(isSimulated(real)).toBe(false);
     }
-    for (const mock of ['prescriptions', 'administrations', 'transfers', 'medications'] as const) {
+    for (const mock of ['transfers'] as const) {
       expect(isSimulated(mock)).toBe(true);
     }
   });

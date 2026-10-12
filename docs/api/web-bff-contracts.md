@@ -11,7 +11,7 @@
 - **Formato:** JSON. Los errores se devuelven como `application/problem+json` (ProblemDetails).
 - **Autenticación:** JWT Bearer según [ADR-006](../adr/ADR-006-identity-security.md). El refresh token viaja solo en la cookie HttpOnly `__Host-sciph-refresh`; login, `mfa/verify`, refresh y logout exigen la cabecera `X-SCIPH-CSRF: 1`. Todos los endpoints requieren un usuario autenticado salvo los de sesión y recuperación de cuenta; los de `/api/web/admin` requieren además el permiso correspondiente. Endpoints en `/api/web/auth` ([detalle](../architecture/security.md#endpoints)).
 
-## Web Hospital — verticales clínicas 1 y 2 (implementado)
+## Web Hospital — verticales clínicas 1, 2 y 3 (implementado)
 
 Reglas comunes:
 
@@ -23,11 +23,12 @@ Reglas comunes:
 - **Enums como texto** (`"Emergency"`, `"InProgress"`, `"Immediate"`, `"HeartRate"`) solo en estos contratos; se rechazan
   números y miembros desconocidos (p. ej. `unit`). Auth/Admin no cambian.
 - **Errores (ProblemDetails):** 400 validación / regla del Domain (fechas futuras o anteriores al inicio, signo vital
-  fuera de rango, NN no permitido, Prehospital desde la web); 403 permiso o acceso clínico; 404 paciente/atención
-  inexistente; 409 concurrencia, identificación repetida, unicidad, atención cerrada o en estado incompatible.
-  Las respuestas 400 de reglas incluyen `field` cuando aplica.
-- El primer registro clínico (triage, signo vital, nota o diagnóstico) mueve la atención `Created → InProgress`
-  (transición del Domain), en la misma transacción.
+  fuera de rango, NN no permitido, Prehospital desde la web); 403 permiso o acceso clínico; 404 paciente/atención/
+  medicamento/prescripción inexistente; 409 concurrencia, identificación repetida, unicidad, atención cerrada o en
+  estado incompatible, medicamento inactivo, prescripción no emitida. Las respuestas 400 de reglas incluyen `field`
+  cuando aplica (`details[i].dose` en las líneas de una prescripción).
+- El primer registro clínico (triage, signo vital, nota, diagnóstico, prescripción o administración) mueve la atención
+  `Created → InProgress` (transición del Domain), en la misma transacción.
 - **Concurrencia:** todo registro clínico vuelve a comprobar los concurrency tokens de la atención (`Status`, `PatientId`)
   dentro de su misma transacción. Si otra transacción cerró o cambió la atención, el registro no se guarda → 409.
 
@@ -52,6 +53,11 @@ Reglas comunes:
 | `GET` | `/api/web/encounters/{id}/diagnoses` | `Encounters.Read` | — | `DiagnosisSummary[]` (principal primero) |
 | `POST` | `/api/web/encounters/{id}/diagnoses` | `Diagnoses.Write` | `{ description, type, isPrimary?, codeSystem?, code? }` (un código exige su sistema) | 201 `DiagnosisSummary` |
 | `POST` | `/api/web/encounters/{id}/close` | `Encounters.Close` | `{ dischargeNote? }` | 204 · 409 si el estado no permite cerrar (solo desde `InProgress`, `Received`, `InEvolution`) |
+| `GET` | `/api/web/medications` | `Medications.Read` (+ ClinicalStaff activo) | — | `MedicationSummary[]` (catálogo global, activos e inactivos, por nombre) |
+| `GET` | `/api/web/encounters/{id}/prescriptions` | `Encounters.Read` | — | `PrescriptionSummary[]` (más reciente primero, con líneas) |
+| `POST` | `/api/web/encounters/{id}/prescriptions` | `Prescriptions.Write` | `{ notes?, details: [{ medicationId, dose, doseUnit, route, frequency, durationDays?, instructions? }] }` (1–20 líneas; sin prescriptor) | 201 `PrescriptionSummary` emitida · 404 medicamento · 409 medicamento inactivo |
+| `GET` | `/api/web/encounters/{id}/medication-administrations` | `Encounters.Read` | — | `MedicationAdministrationSummary[]` (más reciente primero) |
+| `POST` | `/api/web/encounters/{id}/medication-administrations` | `MedicationAdministrations.Write` | `{ medicationId, dose, doseUnit, route, administeredAtUtc, prescriptionId?, prescriptionDetailId?, notes? }` (sin responsable) | 201 `MedicationAdministrationSummary` · 404 prescripción/línea de otra atención · 409 prescripción no emitida o vencida |
 
 - `EncounterSummary`: `{ id, patientId, patient: PatientSummary?, temporaryPatientCode, clinicId, type, status, reason, startedAtUtc, endedAtUtc, identifiedAtUtc, latestTriagePriority }`.
 - `ClinicalNoteSummary`: `{ id, encounterId, type, content, occurredAtUtc, createdAtUtc, authorStaffId, authorDisplayName }`.
@@ -59,7 +65,15 @@ Reglas comunes:
   a los flujos paramédico y de traslado.
 - `DiagnosisSummary`: `{ id, encounterId, description, codeSystem, code, type, isPrimary, recordedAtUtc, confirmedAtUtc, recordedByStaffId }`.
 - Cerrar (`ClinicalEncounter.ChangeStatus(Closed)`) fija `endedAtUtc`, escribe la nota de egreso opcional y la auditoría
-  en la misma transacción. Una atención cerrada no admite triage, signos, notas ni diagnósticos (409).
+  en la misma transacción. Una atención cerrada no admite triage, signos, notas, diagnósticos, prescripciones ni
+  administraciones (409); su historial sigue legible.
+- `MedicationSummary`: `{ id, code, name, presentation, concentration, defaultRoute, status }`.
+- `PrescriptionSummary`: `{ id, encounterId, status, notes, createdAtUtc, issuedAtUtc, validUntilUtc, cancelledAtUtc, prescribedByStaffId, details: [{ id, medicationId, medicationName, dose, doseUnit, route, frequency, durationDays, instructions }] }`.
+  El `POST` ejecuta `Prescription.Draft`, `AddDetail` por línea e `Issue` en una transacción: no se guardan prescripciones
+  vacías ni borradores.
+- `MedicationAdministrationSummary`: `{ id, encounterId, medicationId, medicationName, prescriptionId, prescriptionDetailId, dose, doseUnit, route, administeredAtUtc, administeredByStaffId, status, notes }`.
+  Una administración vinculada exige una prescripción emitida y vigente de la misma atención, y el medicamento de la línea.
+- **Kardex:** no hay recurso propio; es la proyección de las prescripciones (con sus líneas) y las administraciones.
 - `AdmissionEncounterSummary` (Recepción, **sin contenido clínico**): `{ encounterId, patientId, patientDisplayName, temporaryPatientCode, type, status, startedAtUtc, clinicId }`.
   Recepción no recibe `Encounters.Read`: crea con `POST /encounters` (que devuelve el resumen) y localiza/identifica por esta proyección.
 

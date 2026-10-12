@@ -9,6 +9,7 @@ import type {
     CreateClinicalNoteRequest,
     CreateDiagnosisRequest,
     CreateEncounterRequest,
+    CreateMedicationAdministrationRequest,
     CreatePrescriptionRequest,
     CreateTriageRequest,
     Diagnosis,
@@ -57,10 +58,14 @@ export interface ClinicalApi {
     listDiagnoses(encounterId: Guid, signal?: AbortSignal): Promise<Diagnosis[]>;
     createDiagnosis(encounterId: Guid, request: CreateDiagnosisRequest): Promise<Diagnosis>;
 
+    /** Catálogo global (activos e inactivos). */
     listMedications(signal?: AbortSignal): Promise<Medication[]>;
     listPrescriptions(encounterId: Guid, signal?: AbortSignal): Promise<Prescription[]>;
+    /** Crea y emite la prescripción con sus líneas en una sola operación. */
     createPrescription(encounterId: Guid, request: CreatePrescriptionRequest): Promise<Prescription>;
+    /** Kardex: administraciones registradas (las prescripciones se leen con listPrescriptions). */
     listMedicationAdministrations(encounterId: Guid, signal?: AbortSignal): Promise<MedicationAdministration[]>;
+    createMedicationAdministration(encounterId: Guid, request: CreateMedicationAdministrationRequest): Promise<MedicationAdministration>;
 
     listIncomingTransfers(signal?: AbortSignal): Promise<ClinicalTransfer[]>;
     receiveTransfer(transferId: Guid): Promise<void>;
@@ -93,6 +98,13 @@ const KNOWN_DETAILS: [RegExp, string][] = [
     [/cannot be closed/i, 'La atención no puede cerrarse en su estado actual.'],
     [/notes cannot be written from this endpoint/i, 'Ese tipo de nota no se registra desde aquí.'],
     [/code requires its code system/i, 'Indica el sistema de codificación del código (p. ej. CIE-10).'],
+    [/is not active in the catalog/i, 'El medicamento no está activo en el catálogo.'],
+    [/needs at least one medication/i, 'Añade al menos un medicamento a la prescripción.'],
+    [/cannot be administered/i, 'La prescripción no está emitida o fue anulada; no admite administraciones.'],
+    [/no longer valid/i, 'La prescripción ya no está vigente.'],
+    [/medication of the prescription detail|is not part of the prescription/i, 'El medicamento no coincide con la línea de la prescripción.'],
+    [/^Medication .* was not found/i, 'El medicamento no existe en el catálogo.'],
+    [/^Prescription(Detail)? .* was not found/i, 'La prescripción no existe en esta atención.'],
     [/changed by another operation/i, 'Otro usuario modificó este registro. Recarga e inténtalo de nuevo.'],
     [/identifier with this value already belongs/i, 'Ya existe un paciente con ese identificador.'],
     [/needs at least 3 characters/i, 'Escribe al menos 3 caracteres para buscar por nombre.'],

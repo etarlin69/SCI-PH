@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using SCI_PH.Application.Common.Security;
 using SCI_PH.Application.DTOs.Clinical;
 using SCI_PH.Domain.Enums.Auditing;
@@ -189,15 +188,9 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             var id = s.Encounter.Id;
             var before = await CountRecordsAsync(s.Host, id);
 
-            await using var connection = new NpgsqlConnection(s.Host.ConnectionString);
-            await connection.OpenAsync();
-            await using var close = await connection.BeginTransactionAsync();
-            await using (var update = new NpgsqlCommand(
-                """UPDATE clinical."ClinicalEncounters" SET "Status" = 6, "EndedAtUtc" = GREATEST(now(), "StartedAtUtc") WHERE "Id" = @id AND "Status" = 2""", connection, close))
-            {
-                update.Parameters.AddWithValue("id", id);
-                Assert.Equal(1, await update.ExecuteNonQueryAsync());
-            }
+            var (connection, close) = await ClinicalRace.BeginCloseAsync(s.Host.ConnectionString, id);
+            await using var __ = connection;
+            await using var ___ = close;
 
             var write = record switch
             {
@@ -208,7 +201,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 _ => s.Doctor.Client.PostAsJsonAsync($"{Encounters}/{id}/diagnoses", new { description = "Sepsis", type = "Presumptive" })
             };
 
-            await WaitUntilBlockedOnLockAsync(s.Host.ConnectionString, write);
+            await ClinicalRace.WaitUntilBlockedOnLockAsync(s.Host.ConnectionString, write);
             await close.CommitAsync();
             var response = await write;
 
@@ -254,30 +247,6 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 Assert.Equal(responses.Skip(1).Count(r => r.StatusCode == HttpStatusCode.Created),
                     await CountRecordsAsync(s.Host, encounter.Id) - 1);
             }
-        }
-
-        private static async Task WaitUntilBlockedOnLockAsync(string connectionString, Task<HttpResponseMessage> request)
-        {
-            await using var monitor = new NpgsqlConnection(connectionString);
-            await monitor.OpenAsync();
-            var database = new NpgsqlConnectionStringBuilder(connectionString).Database;
-            for (var attempt = 0; attempt < 200 && !request.IsCompleted; attempt++)
-            {
-                await using var query = new NpgsqlCommand(
-                    "SELECT count(*) FROM pg_stat_activity WHERE datname = @db AND wait_event_type = 'Lock'", monitor);
-                query.Parameters.AddWithValue("db", database!);
-                if ((long)(await query.ExecuteScalarAsync())! > 0)
-                {
-                    return;
-                }
-
-                await Task.Delay(50);
-            }
-
-            var finishedEarly = request.IsCompleted ? (await request).StatusCode.ToString() : null;
-            Assert.Fail(finishedEarly is not null
-                ? $"The clinical write finished before the close committed ({finishedEarly})."
-                : "The clinical write never waited on the encounter row.");
         }
 
         private static Task<int> CountRecordsAsync(ClinicalApiHost host, Guid encounterId) =>

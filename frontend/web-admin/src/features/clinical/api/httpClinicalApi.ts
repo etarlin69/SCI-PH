@@ -5,7 +5,11 @@ import type {
     ClinicalEncounterSummary,
     ClinicalNote,
     Diagnosis,
+    Medication,
+    MedicationAdministration,
     PatientSummary,
+    Prescription,
+    PrescriptionDetailInput,
     Triage,
     VitalSign,
     VitalSignInput,
@@ -15,14 +19,24 @@ import { clinicIdForRequest } from './clinicSelection';
 import { mockClinicalApi } from './mockClinicalApi';
 
 // Adaptador HTTP real: React Hospital → apiRequest → Web BFF → Application → ClinicalDbContext → PostgreSQL.
-// Van al backend: pacientes, atenciones, admisión, triage, signos vitales (vertical 1) y notas clínicas, diagnósticos y
-// cierre de la atención (vertical 2). El resto sigue en el MOCK (marcado «Simulación» en la UI) hasta que tenga endpoints.
+// Van al backend: pacientes, atenciones, admisión, triage, signos vitales (vertical 1); notas clínicas, diagnósticos y
+// cierre de la atención (vertical 2); catálogo de medicamentos, prescripciones y Kardex (vertical 3). Los traslados
+// siguen en el MOCK (marcado «Simulación» en la UI) hasta que tengan endpoints.
 
 const BASE = '/api/web';
 const id = (value: string) => encodeURIComponent(value);
 
 // Solo los campos del contrato: el BFF rechaza miembros desconocidos (p. ej. `unit`, que fija el Domain).
 const toMeasurement = ({ type, value, measuredAtUtc }: VitalSignInput): VitalSignInput => ({ type, value, measuredAtUtc });
+const toPrescriptionLine = ({ medicationId, dose, doseUnit, route, frequency, durationDays, instructions }: PrescriptionDetailInput): PrescriptionDetailInput => ({
+    medicationId,
+    dose,
+    doseUnit,
+    route,
+    frequency,
+    durationDays,
+    instructions,
+});
 
 export const httpClinicalApi: ClinicalApi = {
     getClinicalContext: (signal) => apiRequest<ClinicalContext>(`${BASE}/clinical/context`, { signal }),
@@ -84,11 +98,32 @@ export const httpClinicalApi: ClinicalApi = {
     closeEncounter: (encounterId, { dischargeNote }) =>
         apiRequest<void>(`${BASE}/encounters/${id(encounterId)}/close`, { method: 'POST', body: { dischargeNote } }),
 
+    // Catálogo global de medicamentos (Medications.Read).
+    listMedications: (signal) => apiRequest<Medication[]>(`${BASE}/medications`, { signal }),
+
+    listPrescriptions: (encounterId, signal) => apiRequest<Prescription[]>(`${BASE}/encounters/${id(encounterId)}/prescriptions`, { signal }),
+
+    // Prescription.Draft + AddDetail + Issue en una transacción del backend; el prescriptor sale de la sesión.
+    createPrescription: (encounterId, { notes, details }) =>
+        apiRequest<Prescription>(`${BASE}/encounters/${id(encounterId)}/prescriptions`, {
+            method: 'POST',
+            body: { notes, details: details.map(toPrescriptionLine) },
+        }),
+
+    // Kardex: las administraciones reales; quién administró lo fija el backend.
+    listMedicationAdministrations: (encounterId, signal) =>
+        apiRequest<MedicationAdministration[]>(`${BASE}/encounters/${id(encounterId)}/medication-administrations`, { signal }),
+
+    createMedicationAdministration: (
+        encounterId,
+        { medicationId, dose, doseUnit, route, administeredAtUtc, prescriptionId, prescriptionDetailId, notes },
+    ) =>
+        apiRequest<MedicationAdministration>(`${BASE}/encounters/${id(encounterId)}/medication-administrations`, {
+            method: 'POST',
+            body: { medicationId, dose, doseUnit, route, administeredAtUtc, prescriptionId, prescriptionDetailId, notes },
+        }),
+
     // ---- Sin backend todavía ------------------------------------------------------------------------------------
-    listMedications: mockClinicalApi.listMedications,
-    listPrescriptions: mockClinicalApi.listPrescriptions,
-    createPrescription: mockClinicalApi.createPrescription,
-    listMedicationAdministrations: mockClinicalApi.listMedicationAdministrations,
     listIncomingTransfers: mockClinicalApi.listIncomingTransfers,
     receiveTransfer: mockClinicalApi.receiveTransfer,
 };

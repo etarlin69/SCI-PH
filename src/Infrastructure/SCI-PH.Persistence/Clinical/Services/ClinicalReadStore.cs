@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using SCI_PH.Application.Abstractions.Clinical;
 using SCI_PH.Application.DTOs.Clinical;
+using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Patients;
 using SCI_PH.Domain.Enums.Encounters;
 using SCI_PH.Domain.Enums.Patients;
@@ -25,6 +26,26 @@ namespace SCI_PH.Persistence.Clinical.Services
                 .ThenBy(i => i.CreatedAtUtc)
                 .Select(i => new PatientIdentifierRow(i.Type, i.NormalizedValue))
                 .FirstOrDefault());
+
+        private static readonly Expression<Func<Medication, MedicationSummary>> _medication = m => new MedicationSummary(
+            m.Id, m.Code, m.Name, m.Presentation, m.Concentration, m.DefaultRoute, m.Status);
+
+        // Details have no entry order of their own: they are listed by medication name.
+        private static readonly Expression<Func<Prescription, PrescriptionSummary>> _prescription = p => new PrescriptionSummary(
+            p.Id,
+            p.ClinicalEncounterId,
+            p.Status,
+            p.Notes,
+            p.CreatedAtUtc,
+            p.IssuedAtUtc,
+            p.ValidUntilUtc,
+            p.CancelledAtUtc,
+            p.PrescribedByStaffId,
+            p.Details
+                .OrderBy(d => d.Medication.Name)
+                .Select(d => new PrescriptionDetailSummary(
+                    d.Id, d.MedicationId, d.Medication.Name, d.Dose, d.DoseUnit, d.Route, d.Frequency, d.DurationDays, d.Instructions))
+                .ToList());
 
         private readonly ClinicalDbContext _clinical;
 
@@ -116,6 +137,42 @@ namespace SCI_PH.Persistence.Clinical.Services
                 .Select(d => new DiagnosisSummary(
                     d.Id, d.ClinicalEncounterId, d.Description, d.CodeSystem, d.Code, d.Type, d.IsPrimary, d.RecordedAtUtc,
                     d.ConfirmedAtUtc, d.RecordedByStaffId))
+                .ToListAsync(cancellationToken);
+
+        public async Task<IReadOnlyList<MedicationSummary>> ListMedicationsAsync(CancellationToken cancellationToken) =>
+            await _clinical.Medications.AsNoTracking()
+                .OrderBy(m => m.Name).ThenBy(m => m.Concentration)
+                .Select(_medication)
+                .ToListAsync(cancellationToken);
+
+        public async Task<IReadOnlyList<MedicationSummary>> FindMedicationsAsync(
+            IReadOnlyCollection<Guid> medicationIds, CancellationToken cancellationToken) =>
+            await _clinical.Medications.AsNoTracking()
+                .Where(m => medicationIds.Contains(m.Id))
+                .Select(_medication)
+                .ToListAsync(cancellationToken);
+
+        public async Task<IReadOnlyList<PrescriptionSummary>> ListPrescriptionsAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            await _clinical.Prescriptions.AsNoTracking()
+                .Where(p => p.ClinicalEncounterId == encounterId)
+                .OrderByDescending(p => p.IssuedAtUtc ?? p.CreatedAtUtc).ThenByDescending(p => p.CreatedAtUtc)
+                .Select(_prescription)
+                .ToListAsync(cancellationToken);
+
+        public Task<PrescriptionSummary?> GetPrescriptionAsync(Guid prescriptionId, CancellationToken cancellationToken) =>
+            _clinical.Prescriptions.AsNoTracking()
+                .Where(p => p.Id == prescriptionId)
+                .Select(_prescription)
+                .SingleOrDefaultAsync(cancellationToken);
+
+        public async Task<IReadOnlyList<MedicationAdministrationSummary>> ListMedicationAdministrationsAsync(
+            Guid encounterId, CancellationToken cancellationToken) =>
+            await _clinical.MedicationAdministrations.AsNoTracking()
+                .Where(a => a.ClinicalEncounterId == encounterId)
+                .OrderByDescending(a => a.AdministeredAtUtc)
+                .Select(a => new MedicationAdministrationSummary(
+                    a.Id, a.ClinicalEncounterId, a.MedicationId, a.Medication.Name, a.PrescriptionId, a.PrescriptionDetailId, a.Dose,
+                    a.DoseUnit, a.Route, a.AdministeredAtUtc, a.AdministeredByStaffId, a.Status, a.Notes))
                 .ToListAsync(cancellationToken);
 
         // Encounters first, then their patients in a second query (same patient projection as the searches).
