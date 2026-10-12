@@ -77,53 +77,33 @@ Reglas comunes:
 - `AdmissionEncounterSummary` (Recepción, **sin contenido clínico**): `{ encounterId, patientId, patientDisplayName, temporaryPatientCode, type, status, startedAtUtc, clinicId }`.
   Recepción no recibe `Encounters.Read`: crea con `POST /encounters` (que devuelve el resumen) y localiza/identifica por esta proyección.
 
-## Web Hospital — contratos previstos
+## Web Hospital — vertical clínica 4: traslados (implementado)
 
-| Método | Ruta | Descripción | Estado |
-|---|---|---|---|
-| `GET` | `/api/web/transfers` | Lista los traslados de pacientes visibles para el usuario | Previsto |
-| `POST` | `/api/web/transfers/{id}/receive` | Marca un traslado como recibido | Previsto |
+`ClinicalTransfer`: `Requested → InTransit → Received` (o `Cancelled` antes de recibir). El acto clínico siempre lo
+firma el `ClinicalStaff` de la sesión; nunca se aceptan `sentByStaffId`, `receivedByStaffId`, origen ni destino de
+recepción desde el cliente.
 
----
+| Método | Ruta | Permiso | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/web/transfers/incoming?clinicId=` | `Transfers.Read` | — | `ClinicalTransferSummary[]` en `Requested`/`InTransit` con destino a las clínicas del usuario (o a `clinicId`, validada) |
+| `GET` | `/api/web/transfers/{id}` | `Transfers.Read` | — | `ClinicalTransferSummary` (solo clínica origen o destino; si no, 403) |
+| `POST` | `/api/web/encounters/{id}/transfers` | `Transfers.Manage` | `{ destinationClinicId, reason?, notes? }` (el origen es la clínica de la atención) | 201 `ClinicalTransferSummary` · 404 atención/clínica · 409 clínica inactiva, atención no trasladable o traslado activo · 400 mismo origen y destino |
+| `POST` | `/api/web/transfers/{id}/dispatch` | `Transfers.Manage` (clínica origen) | — | 200 `ClinicalTransferSummary` · 409 si no está `Requested` o la atención cambió |
+| `POST` | `/api/web/transfers/{id}/receive` | `Transfers.Manage` (clínica destino) | — | 200 `ClinicalTransferSummary` · 409 si no está `InTransit` (p. ej. ya recibido) |
 
-### `GET /api/web/transfers`
-
-Devuelve los traslados de pacientes que el usuario autenticado puede ver.
-
-**Query (propuesta, opcional):** filtros por estado y paginación. Se definirán al implementar.
-
-**Respuesta `200 OK` (forma propuesta):**
-
-```json
-[
-  {
-    "id": "00000000-0000-0000-0000-000000000000",
-    "status": "InTransit",
-    "createdAt": "2026-01-01T00:00:00Z"
-  }
-]
-```
-
-Los campos exactos del traslado y del paciente se definirán junto con el modelo del dominio clínico.
-
-**Errores previstos:** `401`, `403`.
-
----
-
-### `POST /api/web/transfers/{id}/receive`
-
-Registra que el establecimiento del usuario recibió al paciente del traslado `{id}`.
-
-**Parámetros de ruta:** `id` (`Guid`)
-
-**Respuestas previstas:**
-
-| Código | Cuándo |
-|---|---|
-| `200 OK` / `204 No Content` | Traslado marcado como recibido |
-| `401` / `403` | No autenticado / sin permiso |
-| `404` | El traslado no existe o no es visible para el usuario |
-| `409 Conflict` | El traslado no está en un estado que permita recibirlo |
+- **Solicitar** no cambia la atención (el paciente aún no salió). Una sola transferencia activa (`Requested`/`InTransit`)
+  por atención.
+- **Despachar**: traslado `InTransit` y atención `Transferred` en una transacción. Mientras va en camino la atención sigue
+  en la clínica de origen (y sale de su lista de abiertas).
+- **Recibir**: traslado `Received` y `ClinicalEncounter.ReceiveAtClinic` en una transacción: la **misma** atención pasa a
+  `Received` y a la clínica destino (también una prehospitalaria sin clínica). Conserva paciente, código NN e historial.
+  La clínica destino la continúa con las reglas clínicas normales (`Received → InProgress/InEvolution/Closed`); la de
+  origen conserva la traza (traslado y auditoría `Transfer`) pero pierde el acceso clínico.
+- `Complete` no se expone: el Domain no define cuándo se completa un traslado recibido.
+- **Concurrencia:** despachar y recibir cambian el `Status` de la atención (concurrency token): dos recepciones, dos
+  despachos o un cierre simultáneo terminan con una sola operación aplicada y 409 para la otra.
+- `ClinicalTransferSummary`: `{ id, encounterId, status, originClinic: { id, name }?, destinationClinic: { id, name }, ambulance: { id, code, callSign }?, requestedAtUtc, sentAtUtc, sentByStaffId, receivedAtUtc, receivedByStaffId, cancelledAtUtc, patient: PatientSummary?, temporaryPatientCode, reason, notes, latestTriagePriority, encounterStatus }`
+  (identificador del paciente enmascarado).
 
 ---
 
