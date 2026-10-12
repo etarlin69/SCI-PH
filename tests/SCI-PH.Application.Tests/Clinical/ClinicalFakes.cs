@@ -9,9 +9,12 @@ using SCI_PH.Domain.Entities.Auditing;
 using SCI_PH.Domain.Entities.Encounters;
 using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Patients;
+using SCI_PH.Domain.Entities.Transport;
 using SCI_PH.Domain.Enums.Encounters;
 using SCI_PH.Domain.Enums.Medications;
+using SCI_PH.Domain.Enums.Organizations;
 using SCI_PH.Domain.Enums.Patients;
+using SCI_PH.Domain.Enums.Transport;
 
 namespace SCI_PH.Application.Tests.Clinical
 {
@@ -61,6 +64,9 @@ namespace SCI_PH.Application.Tests.Clinical
         public List<Medication> Medications { get; } = [];
         public List<Prescription> Prescriptions { get; } = [];
         public List<MedicationAdministration> Administrations { get; } = [];
+        public List<ClinicalTransfer> Transfers { get; } = [];
+        // Clinics that exist, with their status. Unknown ids do not exist.
+        public Dictionary<Guid, ClinicStatus> Clinics { get; } = [];
         public HashSet<Guid> GuardedEncounters { get; } = [];
         public List<ClinicalAuditEntry> Audit { get; } = [];
         public int SaveCount { get; private set; }
@@ -138,6 +144,27 @@ namespace SCI_PH.Application.Tests.Clinical
                     a.Dose, a.DoseUnit, a.Route, a.AdministeredAtUtc, a.AdministeredByStaffId, a.Status, a.Notes))
                 .ToList());
 
+        public Task<ClinicStatus?> GetClinicStatusAsync(Guid clinicId, CancellationToken cancellationToken) =>
+            Task.FromResult(Clinics.TryGetValue(clinicId, out var status) ? status : (ClinicStatus?)null);
+
+        public Task<bool> HasActiveTransferAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            Task.FromResult(Transfers.Any(t => t.ClinicalEncounterId == encounterId
+                && t.Status is ClinicalTransferStatus.Requested or ClinicalTransferStatus.InTransit));
+
+        public Task<TransferRow?> GetTransferAsync(Guid transferId, CancellationToken cancellationToken) =>
+            Task.FromResult(Transfers.SingleOrDefault(t => t.Id == transferId) is { } t ? ToRow(t) : null);
+
+        public Task<IReadOnlyList<TransferRow>> ListTransfersToAsync(
+            IReadOnlyCollection<Guid> destinationClinicIds, IReadOnlyCollection<ClinicalTransferStatus> statuses, int limit, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<TransferRow>>(Transfers
+                .Where(t => destinationClinicIds.Contains(t.DestinationClinicId) && statuses.Contains(t.Status))
+                .OrderByDescending(t => t.RequestedAtUtc).Take(limit).Select(ToRow).ToList());
+
+        public Task<ClinicalTransfer?> FindTransferAsync(Guid transferId, CancellationToken cancellationToken) =>
+            Task.FromResult(Transfers.SingleOrDefault(t => t.Id == transferId));
+
+        public void Add(ClinicalTransfer transfer) => _pending.Add(transfer);
+
         public Task<ClinicalEncounter?> FindEncounterAsync(Guid encounterId, CancellationToken cancellationToken) =>
             Task.FromResult(Encounters.SingleOrDefault(e => e.Id == encounterId));
 
@@ -162,10 +189,23 @@ namespace SCI_PH.Application.Tests.Clinical
             Diagnoses.AddRange(_pending.OfType<Diagnosis>());
             Prescriptions.AddRange(_pending.OfType<Prescription>());
             Administrations.AddRange(_pending.OfType<MedicationAdministration>());
+            Transfers.AddRange(_pending.OfType<ClinicalTransfer>());
             Audit.AddRange(_pending.OfType<ClinicalAuditEntry>());
             _pending.Clear();
             SaveCount++;
             return Task.CompletedTask;
+        }
+
+        private TransferRow ToRow(ClinicalTransfer t)
+        {
+            var encounter = Encounters.Single(e => e.Id == t.ClinicalEncounterId);
+            return new TransferRow(
+                t.Id, t.ClinicalEncounterId, t.Status,
+                t.OriginClinicId is { } origin ? new ClinicSummary(origin, $"Clinic {origin:N}") : null,
+                new ClinicSummary(t.DestinationClinicId, $"Clinic {t.DestinationClinicId:N}"),
+                null, t.RequestedAtUtc, t.SentAtUtc, t.SentByStaffId, t.ReceivedAtUtc, t.ReceivedByStaffId, t.CancelledAtUtc,
+                Patients.SingleOrDefault(p => p.Id == encounter.PatientId)?.ToTestRow(), encounter.TemporaryPatientCode?.Value,
+                t.Reason, t.Notes, null, encounter.Status);
         }
 
         private static MedicationSummary ToSummary(Medication m) =>
@@ -220,6 +260,7 @@ namespace SCI_PH.Application.Tests.Clinical
             Admissions = new AdmissionService(Actor, Store);
             Records = new EncounterRecordService(Actor, user, Store, Store, access, Time);
             Medications = new MedicationService(Actor, Store, Store, access, Time);
+            Transfers = new TransferService(Actor, Store, Store, access, Time);
         }
 
         public FakeCurrentUser User { get; }
@@ -232,6 +273,7 @@ namespace SCI_PH.Application.Tests.Clinical
         public AdmissionService Admissions { get; }
         public EncounterRecordService Records { get; }
         public MedicationService Medications { get; }
+        public TransferService Transfers { get; }
 
         public static ClinicalHarness ForRole(string role, int clinics = 1)
         {

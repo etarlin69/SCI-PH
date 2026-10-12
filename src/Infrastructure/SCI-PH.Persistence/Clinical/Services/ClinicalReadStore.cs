@@ -5,7 +5,9 @@ using SCI_PH.Application.DTOs.Clinical;
 using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Patients;
 using SCI_PH.Domain.Enums.Encounters;
+using SCI_PH.Domain.Enums.Organizations;
 using SCI_PH.Domain.Enums.Patients;
+using SCI_PH.Domain.Enums.Transport;
 using SCI_PH.Persistence.Contexts;
 
 namespace SCI_PH.Persistence.Clinical.Services
@@ -174,6 +176,81 @@ namespace SCI_PH.Persistence.Clinical.Services
                     a.Id, a.ClinicalEncounterId, a.MedicationId, a.Medication.Name, a.PrescriptionId, a.PrescriptionDetailId, a.Dose,
                     a.DoseUnit, a.Route, a.AdministeredAtUtc, a.AdministeredByStaffId, a.Status, a.Notes))
                 .ToListAsync(cancellationToken);
+
+        public async Task<ClinicStatus?> GetClinicStatusAsync(Guid clinicId, CancellationToken cancellationToken) =>
+            await _clinical.Clinics.AsNoTracking()
+                .Where(c => c.Id == clinicId)
+                .Select(c => (ClinicStatus?)c.Status)
+                .SingleOrDefaultAsync(cancellationToken);
+
+        public Task<bool> HasActiveTransferAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            _clinical.ClinicalTransfers.AnyAsync(
+                t => t.ClinicalEncounterId == encounterId
+                    && (t.Status == ClinicalTransferStatus.Requested || t.Status == ClinicalTransferStatus.InTransit),
+                cancellationToken);
+
+        public async Task<TransferRow?> GetTransferAsync(Guid transferId, CancellationToken cancellationToken) =>
+            (await ToTransferRowsAsync(_clinical.ClinicalTransfers.Where(t => t.Id == transferId), 1, cancellationToken)).SingleOrDefault();
+
+        public Task<IReadOnlyList<TransferRow>> ListTransfersToAsync(
+            IReadOnlyCollection<Guid> destinationClinicIds,
+            IReadOnlyCollection<ClinicalTransferStatus> statuses,
+            int limit,
+            CancellationToken cancellationToken) =>
+            ToTransferRowsAsync(
+                _clinical.ClinicalTransfers.Where(t => destinationClinicIds.Contains(t.DestinationClinicId) && statuses.Contains(t.Status)),
+                limit,
+                cancellationToken);
+
+        // Transfers with their clinics, ambulance and encounter first, then the patients in a second query.
+        private async Task<IReadOnlyList<TransferRow>> ToTransferRowsAsync(
+            IQueryable<Domain.Entities.Transport.ClinicalTransfer> query, int limit, CancellationToken cancellationToken)
+        {
+            var transfers = await query.AsNoTracking()
+                .OrderByDescending(t => t.RequestedAtUtc)
+                .Take(limit)
+                .Select(t => new
+                {
+                    t.Id,
+                    t.ClinicalEncounterId,
+                    t.Status,
+                    Origin = t.OriginClinic == null ? null : new ClinicSummary(t.OriginClinic.Id, t.OriginClinic.Name),
+                    Destination = new ClinicSummary(t.DestinationClinic.Id, t.DestinationClinic.Name),
+                    Ambulance = t.Ambulance == null ? null : new AmbulanceSummary(t.Ambulance.Id, t.Ambulance.Code, t.Ambulance.CallSign),
+                    t.RequestedAtUtc,
+                    t.SentAtUtc,
+                    t.SentByStaffId,
+                    t.ReceivedAtUtc,
+                    t.ReceivedByStaffId,
+                    t.CancelledAtUtc,
+                    t.Reason,
+                    t.Notes,
+                    t.Encounter.PatientId,
+                    t.Encounter.TemporaryPatientCode,
+                    EncounterStatus = t.Encounter.Status,
+                    LatestTriagePriority = t.Encounter.Triages
+                        .OrderByDescending(x => x.PerformedAtUtc)
+                        .Select(x => (TriagePriority?)x.Priority)
+                        .FirstOrDefault()
+                })
+                .ToListAsync(cancellationToken);
+
+            var patientIds = transfers.Where(t => t.PatientId.HasValue).Select(t => t.PatientId!.Value).Distinct().ToList();
+            var patients = patientIds.Count == 0
+                ? []
+                : await _clinical.Patients.AsNoTracking()
+                    .Where(p => patientIds.Contains(p.Id))
+                    .Select(_patientRow)
+                    .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+            return transfers
+                .Select(t => new TransferRow(
+                    t.Id, t.ClinicalEncounterId, t.Status, t.Origin, t.Destination, t.Ambulance, t.RequestedAtUtc, t.SentAtUtc,
+                    t.SentByStaffId, t.ReceivedAtUtc, t.ReceivedByStaffId, t.CancelledAtUtc,
+                    t.PatientId is { } id ? patients.GetValueOrDefault(id) : null,
+                    t.TemporaryPatientCode?.Value, t.Reason, t.Notes, t.LatestTriagePriority, t.EncounterStatus))
+                .ToList();
+        }
 
         // Encounters first, then their patients in a second query (same patient projection as the searches).
         private async Task<IReadOnlyList<EncounterRow>> ToRowsAsync(
