@@ -8,17 +8,26 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
     internal static class ClinicalRace
     {
         // Closes an InProgress encounter in a transaction that the caller commits.
-        public static async Task<(NpgsqlConnection Connection, NpgsqlTransaction Close)> BeginCloseAsync(string connectionString, Guid encounterId)
+        public static Task<(NpgsqlConnection Connection, NpgsqlTransaction Close)> BeginCloseAsync(string connectionString, Guid encounterId) =>
+            BeginAsync(connectionString, encounterId,
+                """UPDATE clinical."ClinicalEncounters" SET "Status" = 6, "EndedAtUtc" = GREATEST(now(), "StartedAtUtc") WHERE "Id" = @id AND "Status" = 2""");
+
+        // Another writer moves the encounter from one status to another (e.g. a cancelled transfer: Transferred -> InProgress)
+        // in a transaction that the caller commits.
+        public static Task<(NpgsqlConnection Connection, NpgsqlTransaction Change)> BeginStatusChangeAsync(
+            string connectionString, Guid encounterId, int from, int to) =>
+            BeginAsync(connectionString, encounterId,
+                $"""UPDATE clinical."ClinicalEncounters" SET "Status" = {to} WHERE "Id" = @id AND "Status" = {from}""");
+
+        private static async Task<(NpgsqlConnection, NpgsqlTransaction)> BeginAsync(string connectionString, Guid encounterId, string sql)
         {
             var connection = new NpgsqlConnection(connectionString);
             await connection.OpenAsync();
-            var close = await connection.BeginTransactionAsync();
-            await using var update = new NpgsqlCommand(
-                """UPDATE clinical."ClinicalEncounters" SET "Status" = 6, "EndedAtUtc" = GREATEST(now(), "StartedAtUtc") WHERE "Id" = @id AND "Status" = 2""",
-                connection, close);
+            var transaction = await connection.BeginTransactionAsync();
+            await using var update = new NpgsqlCommand(sql, connection, transaction);
             update.Parameters.AddWithValue("id", encounterId);
             Assert.Equal(1, await update.ExecuteNonQueryAsync());
-            return (connection, close);
+            return (connection, transaction);
         }
 
         public static async Task WaitUntilBlockedOnLockAsync(string connectionString, Task<HttpResponseMessage> request)
