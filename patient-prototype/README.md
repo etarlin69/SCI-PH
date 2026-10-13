@@ -60,7 +60,7 @@ SCI-PH.PatientPrototype/
 │       │
 │       ├── Auth/        QrScanPage, FaceVerifyPage
 │       ├── Home/        HomePage
-│       ├── Profile/     ProfilePage, patient_avatar.png
+│       ├── Profile/     ProfilePage
 │       ├── History/     HistoryPage
 │       ├── Results/     ResultsPage
 │       ├── Documents/   DocumentsPage
@@ -81,7 +81,7 @@ SCI-PH.PatientPrototype/
 │           └── ShellPatientNavigator, ShellPatientDialogService
 │
 ├── Platforms/
-├── Resources/
+├── Resources/       Images/patient_avatar.png (avatar por defecto), Styles, Fonts
 └── Properties/
 ```
 
