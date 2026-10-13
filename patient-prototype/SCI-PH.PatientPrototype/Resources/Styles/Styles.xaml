@@ -71,4 +71,68 @@
         </Setter>
         <Setter Property="Padding" Value="18" />
     </Style>
+
+    <!-- Patient screens -->
+    <Style x:Key="PatientCardStyle" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}" />
+        <Setter Property="Stroke" Value="{StaticResource CardStroke}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape">
+            <Setter.Value>
+                <RoundRectangle CornerRadius="16" />
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Padding" Value="18" />
+    </Style>
+
+    <Style x:Key="PatientPageTitleStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="28" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource ColorPrimaryDark}" />
+    </Style>
+
+    <Style x:Key="PatientSectionTitleStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource ColorPrimaryDark}" />
+    </Style>
+
+    <Style x:Key="CardTitleStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource TitleText}" />
+    </Style>
+
+    <Style x:Key="CardBodyStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="TextColor" Value="{StaticResource BodyText}" />
+    </Style>
+
+    <Style x:Key="CardMetaStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="TextColor" Value="{StaticResource MutedText}" />
+    </Style>
+
+    <Style x:Key="StatusBadgeStyle" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource SuccessBackground}" />
+        <Setter Property="StrokeThickness" Value="0" />
+        <Setter Property="Padding" Value="10,5" />
+        <Setter Property="VerticalOptions" Value="Start" />
+        <Setter Property="StrokeShape">
+            <Setter.Value>
+                <RoundRectangle CornerRadius="12" />
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="StatusBadgeTextStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource SuccessText}" />
+    </Style>
+
+    <Style x:Key="ErrorTextStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="TextColor" Value="{StaticResource ColorDanger}" />
+    </Style>
 </ResourceDictionary>

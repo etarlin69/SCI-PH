@@ -1,6 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
-using SCI_PH.PatientPrototype.Features.Patient.Services.Interfaces;
-using SCI_PH.PatientPrototype.Features.Patient.Services.Mocks;
+using Microsoft.Extensions.Logging;
+using SCI_PH.PatientPrototype.Features.Patient;
 
 namespace SCI_PH.PatientPrototype;
 
@@ -18,7 +17,7 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
-        builder.Services.AddSingleton<IPatientSessionService, MockPatientSessionService>();
+        builder.Services.AddPatientFeature();
 
 #if DEBUG
         builder.Logging.AddDebug();

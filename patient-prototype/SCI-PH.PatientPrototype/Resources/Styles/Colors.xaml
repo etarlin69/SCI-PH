@@ -24,4 +24,17 @@
     <!-- Badge -->
     <Color x:Key="BadgeBackground">#F6EBD9</Color>
     <Color x:Key="BadgeText">#B7791F</Color>
+
+    <!-- Patient screens -->
+    <Color x:Key="PatientPageBackground">#F7F9FC</Color>
+    <Color x:Key="CardStroke">#E4E9F0</Color>
+    <Color x:Key="TitleText">#172B4D</Color>
+    <Color x:Key="BodyText">#526175</Color>
+    <Color x:Key="MutedText">#7A8798</Color>
+    <Color x:Key="OnDarkMutedText">#DCE8F8</Color>
+    <Color x:Key="SuccessBackground">#E7F7EF</Color>
+    <Color x:Key="SuccessText">#267A50</Color>
+    <Color x:Key="InfoBackground">#EAF4FF</Color>
+    <Color x:Key="InfoStroke">#C9E2FA</Color>
+    <Color x:Key="InfoText">#0F5EA8</Color>
 </ResourceDictionary>

@@ -4,6 +4,8 @@
     x:Class="SCI_PH.PatientPrototype.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:SCI_PH.PatientPrototype"
+    xmlns:patient="clr-namespace:SCI_PH.PatientPrototype.Features.Patient"
 
     xmlns:auth="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Auth"
     xmlns:home="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Home"
@@ -13,17 +15,18 @@
     xmlns:documents="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Documents"
     xmlns:ai="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Ai"
 
+    x:DataType="local:AppShell"
     FlyoutBehavior="Disabled"
-    FlyoutBackgroundColor="#0F2747"
+    FlyoutBackgroundColor="{StaticResource ColorPrimaryDark}"
     Title="SCI-PH">
 
-    <!-- CABECERA DEL MENU -->
+    <!-- CABECERA DEL MENU: nombre tomado de la sesión del paciente -->
 
     <Shell.FlyoutHeader>
 
         <Grid
             Padding="22,35,22,24"
-            BackgroundColor="#0F2747">
+            BackgroundColor="{StaticResource ColorPrimaryDark}">
 
             <VerticalStackLayout
                 Spacing="8"
@@ -47,16 +50,10 @@
                 </Border>
 
                 <Label
-                    Text="Paciente Demo"
+                    Text="{Binding PatientDisplayName}"
                     FontSize="20"
                     FontAttributes="Bold"
                     TextColor="White"
-                    HorizontalTextAlignment="Center" />
-
-                <Label
-                    Text="paciente@sciph.local"
-                    FontSize="13"
-                    TextColor="#B9C7D9"
                     HorizontalTextAlignment="Center" />
 
             </VerticalStackLayout>
@@ -69,7 +66,7 @@
     <!-- ACCESO DEL PACIENTE -->
 
     <ShellContent
-        Route="QrAccess"
+        Route="{x:Static patient:PatientRoutes.QrAccess}"
         Title="Acceso"
         ContentTemplate="{DataTemplate auth:QrScanPage}"
         Shell.FlyoutItemIsVisible="False" />
@@ -79,7 +76,7 @@
 
     <FlyoutItem
         Title="Inicio"
-        Route="Home">
+        Route="{x:Static patient:PatientRoutes.Home}">
 
         <ShellContent
             Title="Inicio"
@@ -90,7 +87,7 @@
 
     <FlyoutItem
         Title="Mi perfil"
-        Route="Profile">
+        Route="{x:Static patient:PatientRoutes.Profile}">
 
         <ShellContent
             Title="Mi perfil"
@@ -101,7 +98,7 @@
 
     <FlyoutItem
         Title="Historial clínico"
-        Route="History">
+        Route="{x:Static patient:PatientRoutes.History}">
 
         <ShellContent
             Title="Historial clínico"
@@ -112,7 +109,7 @@
 
     <FlyoutItem
         Title="Resultados"
-        Route="Results">
+        Route="{x:Static patient:PatientRoutes.Results}">
 
         <ShellContent
             Title="Resultados"
@@ -123,7 +120,7 @@
 
     <FlyoutItem
         Title="Documentos"
-        Route="Documents">
+        Route="{x:Static patient:PatientRoutes.Documents}">
 
         <ShellContent
             Title="Documentos"
@@ -134,12 +131,19 @@
 
     <FlyoutItem
         Title="Asistente IA"
-        Route="Assistant">
+        Route="{x:Static patient:PatientRoutes.Assistant}">
 
         <ShellContent
             Title="SCI-PH AI"
             ContentTemplate="{DataTemplate ai:AiAssistantPage}" />
 
     </FlyoutItem>
+
+
+    <!-- CERRAR SESIÓN -->
+
+    <MenuItem
+        Text="Cerrar sesión"
+        Command="{Binding LogoutCommand}" />
 
 </Shell>

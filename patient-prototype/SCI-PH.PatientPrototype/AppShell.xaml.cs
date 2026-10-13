@@ -1,20 +1,44 @@
-﻿using SCI_PH.PatientPrototype.Features.Patient.Auth;
-using SCI_PH.PatientPrototype.Features.Patient.Ai;
+using System.Windows.Input;
+using SCI_PH.PatientPrototype.Features.Patient;
+using SCI_PH.PatientPrototype.Features.Patient.Services.Interfaces;
 
 namespace SCI_PH.PatientPrototype;
 
+/// <summary>
+/// Shell de la app. El menú solo se habilita con sesión iniciada; al cerrar sesión se borra la sesión y se vuelve al
+/// acceso por QR.
+/// </summary>
 public partial class AppShell : Shell
 {
-    public AppShell()
+    private readonly IPatientSessionService _session;
+
+    public AppShell(IPatientSessionService session)
     {
+        _session = session;
+        LogoutCommand = new Command(async () => await LogoutAsync());
+
         InitializeComponent();
+        PatientServiceCollectionExtensions.RegisterPatientRoutes();
 
-        Routing.RegisterRoute(
-            nameof(FaceVerifyPage),
-            typeof(FaceVerifyPage));
+        BindingContext = this;
+        _session.SessionChanged += (_, _) => MainThread.BeginInvokeOnMainThread(ApplySession);
+        ApplySession();
+    }
 
-        Routing.RegisterRoute(
-            nameof(AiAssistantPage),
-            typeof(AiAssistantPage));
+    public string PatientDisplayName => _session.CurrentSession?.PatientName ?? string.Empty;
+
+    public ICommand LogoutCommand { get; }
+
+    private void ApplySession()
+    {
+        FlyoutBehavior = _session.IsAuthenticated ? FlyoutBehavior.Flyout : FlyoutBehavior.Disabled;
+        OnPropertyChanged(nameof(PatientDisplayName));
+    }
+
+    private async Task LogoutAsync()
+    {
+        FlyoutIsPresented = false;
+        await _session.ClearSessionAsync();
+        await GoToAsync(PatientRoutes.Root(PatientRoutes.QrAccess));
     }
 }

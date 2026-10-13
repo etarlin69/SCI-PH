@@ -3,15 +3,25 @@ using SCI_PH.PatientPrototype.Features.Patient.Services.Interfaces;
 
 namespace SCI_PH.PatientPrototype.Features.Patient.Services.Mocks;
 
-public class MockPatientSessionService : IPatientSessionService
+/// <summary>Sesión simulada en memoria. El token es un valor de prueba, no un JWT, y nunca se persiste.</summary>
+public sealed class MockPatientSessionService : IPatientSessionService
 {
+    private readonly TimeProvider _timeProvider;
+
+    public MockPatientSessionService(TimeProvider timeProvider)
+    {
+        _timeProvider = timeProvider;
+    }
+
     public PatientSessionDto? CurrentSession { get; private set; }
 
     public bool IsAuthenticated =>
         CurrentSession is not null &&
-        !CurrentSession.IsExpired;
+        !CurrentSession.IsExpiredAt(_timeProvider.GetUtcNow().UtcDateTime);
 
-    public Task<PatientSessionDto> CreateMockSessionAsync()
+    public event EventHandler? SessionChanged;
+
+    public Task<PatientSessionDto> CreateSessionAsync(CancellationToken cancellationToken = default)
     {
         CurrentSession = new PatientSessionDto
         {
@@ -19,15 +29,17 @@ public class MockPatientSessionService : IPatientSessionService
             PatientId = "PAT-0001",
             PatientName = "Paciente Demo",
             AccessToken = $"mock-token-{Guid.NewGuid():N}",
-            ExpiresAt = DateTime.UtcNow.AddHours(1)
+            ExpiresAt = _timeProvider.GetUtcNow().UtcDateTime.AddHours(1)
         };
 
+        SessionChanged?.Invoke(this, EventArgs.Empty);
         return Task.FromResult(CurrentSession);
     }
 
-    public Task ClearSessionAsync()
+    public Task ClearSessionAsync(CancellationToken cancellationToken = default)
     {
         CurrentSession = null;
+        SessionChanged?.Invoke(this, EventArgs.Empty);
         return Task.CompletedTask;
     }
 }

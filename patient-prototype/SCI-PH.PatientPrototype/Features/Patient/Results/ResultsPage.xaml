@@ -4,120 +4,111 @@
     x:Class="SCI_PH.PatientPrototype.Features.Patient.Results.ResultsPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.ViewModels"
+    xmlns:dtos="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Models.Dtos"
+    x:DataType="vm:ResultsViewModel"
     Title="Resultados"
-    BackgroundColor="#F7F9FC">
+    BackgroundColor="{StaticResource PatientPageBackground}">
 
-    <ScrollView>
+    <CollectionView
+        ItemsSource="{Binding Results}"
+        SelectionMode="None"
+        Margin="20,0">
 
-        <VerticalStackLayout
-            Padding="20"
-            Spacing="17">
+        <CollectionView.ItemsLayout>
+            <LinearItemsLayout Orientation="Vertical" ItemSpacing="17" />
+        </CollectionView.ItemsLayout>
 
+        <CollectionView.Header>
+            <VerticalStackLayout Padding="0,20,0,17" Spacing="17">
+
+                <Label
+                    Text="Resultados clínicos"
+                    Style="{StaticResource PatientPageTitleStyle}" />
+
+                <Label
+                    Text="Consulta los resultados publicados para tu expediente."
+                    Style="{StaticResource CardBodyStyle}" />
+
+                <ActivityIndicator
+                    IsRunning="{Binding IsBusy}"
+                    IsVisible="{Binding IsBusy}"
+                    Color="{StaticResource ColorPrimary}" />
+
+                <Label
+                    Text="{Binding ErrorMessage}"
+                    IsVisible="{Binding HasError}"
+                    Style="{StaticResource ErrorTextStyle}" />
+
+            </VerticalStackLayout>
+        </CollectionView.Header>
+
+        <CollectionView.EmptyView>
             <Label
-                Text="Resultados clínicos"
-                FontSize="28"
-                FontAttributes="Bold"
-                TextColor="#0F2747" />
+                Text="Todavía no hay resultados publicados."
+                IsVisible="{Binding IsNotBusy}"
+                Style="{StaticResource CardMetaStyle}" />
+        </CollectionView.EmptyView>
 
-            <Label
-                Text="Consulta los resultados publicados para tu expediente."
-                FontSize="14"
-                TextColor="#526175" />
+        <CollectionView.ItemTemplate>
+            <DataTemplate x:DataType="dtos:ResultItemDto">
 
-            <Border
-                BackgroundColor="White"
-                Stroke="#E4E9F0"
-                StrokeThickness="1"
-                Padding="18">
+                <Border Style="{StaticResource PatientCardStyle}">
 
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="16" />
-                </Border.StrokeShape>
+                    <VerticalStackLayout Spacing="8">
 
-                <VerticalStackLayout Spacing="10">
-
-                    <Grid ColumnDefinitions="*,Auto">
-
-                        <Label
-                            Text="Hemograma completo"
-                            FontSize="18"
-                            FontAttributes="Bold"
-                            TextColor="#172B4D" />
-
-                        <Border
-                            Grid.Column="1"
-                            BackgroundColor="#E7F7EF"
-                            StrokeThickness="0"
-                            Padding="10,5">
-
-                            <Border.StrokeShape>
-                                <RoundRectangle CornerRadius="12" />
-                            </Border.StrokeShape>
+                        <Grid ColumnDefinitions="*,Auto">
 
                             <Label
-                                Text="Publicado"
-                                FontSize="11"
+                                Text="{Binding Name}"
+                                FontSize="18"
                                 FontAttributes="Bold"
-                                TextColor="#267A50" />
+                                TextColor="{StaticResource TitleText}" />
 
-                        </Border>
+                            <Border Grid.Column="1" Style="{StaticResource StatusBadgeStyle}">
+                                <Label
+                                    Text="{Binding Status}"
+                                    Style="{StaticResource StatusBadgeTextStyle}" />
+                            </Border>
 
-                    </Grid>
+                        </Grid>
 
-                    <Label
-                        Text="Laboratorio · Hospital Central"
-                        FontSize="14"
-                        TextColor="#526175" />
+                        <Label
+                            Text="{Binding Value}"
+                            IsVisible="{Binding Value, Converter={StaticResource IsNotNullConverter}}"
+                            FontSize="30"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource ColorPrimary}" />
 
-                    <Label
-                        Text="02 octubre 2026"
-                        FontSize="13"
-                        TextColor="#7A8798" />
+                        <Label
+                            Text="{Binding Source}"
+                            IsVisible="{Binding Source, Converter={StaticResource IsNotNullConverter}}"
+                            Style="{StaticResource CardBodyStyle}" />
 
-                </VerticalStackLayout>
+                        <Label
+                            Text="{Binding DateLabel}"
+                            Style="{StaticResource CardMetaStyle}" />
 
-            </Border>
+                        <Label
+                            Text="{Binding Note}"
+                            IsVisible="{Binding Note, Converter={StaticResource IsNotNullConverter}}"
+                            Style="{StaticResource CardMetaStyle}" />
 
-            <Border
-                BackgroundColor="White"
-                Stroke="#E4E9F0"
-                StrokeThickness="1"
-                Padding="18">
+                    </VerticalStackLayout>
 
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="16" />
-                </Border.StrokeShape>
+                </Border>
 
-                <VerticalStackLayout Spacing="8">
+            </DataTemplate>
+        </CollectionView.ItemTemplate>
 
-                    <Label
-                        Text="Glucosa"
-                        FontSize="17"
-                        FontAttributes="Bold"
-                        TextColor="#172B4D" />
+        <CollectionView.Footer>
+            <Label
+                Padding="0,17,0,20"
+                Text="Utiliza SCI-PH AI si deseas una explicación educativa de tus resultados."
+                FontSize="13"
+                TextColor="{StaticResource InfoText}" />
+        </CollectionView.Footer>
 
-                    <Label
-                        Text="92 mg/dL"
-                        FontSize="30"
-                        FontAttributes="Bold"
-                        TextColor="#1976D2" />
-
-                    <Label
-                        Text="Resultado registrado por el laboratorio."
-                        FontSize="13"
-                        TextColor="#69778A" />
-
-                    <Label
-                        Text="Utiliza SCI-PH AI si deseas una explicación educativa de este resultado."
-                        FontSize="13"
-                        TextColor="#0F5EA8" />
-
-                </VerticalStackLayout>
-
-            </Border>
-
-        </VerticalStackLayout>
-
-    </ScrollView>
+    </CollectionView>
 
 </ContentPage>

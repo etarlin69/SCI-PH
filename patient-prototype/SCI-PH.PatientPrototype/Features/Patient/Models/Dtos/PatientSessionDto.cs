@@ -12,6 +12,6 @@ public class PatientSessionDto
 
     public DateTime ExpiresAt { get; set; }
 
-    public bool IsExpired =>
-        !IsAuthenticated || DateTime.UtcNow >= ExpiresAt;
+    public bool IsExpiredAt(DateTime utcNow) =>
+        !IsAuthenticated || utcNow >= ExpiresAt;
 }

@@ -4,8 +4,29 @@
     x:Class="SCI_PH.PatientPrototype.Features.Patient.History.HistoryPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.ViewModels"
+    xmlns:dtos="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Models.Dtos"
+    x:DataType="vm:HistoryViewModel"
     Title="Historial clínico"
-    BackgroundColor="#F7F9FC">
+    BackgroundColor="{StaticResource PatientPageBackground}">
+
+    <ContentPage.Resources>
+        <DataTemplate x:Key="HistoryItemTemplate" x:DataType="dtos:ClinicalHistoryItemDto">
+            <VerticalStackLayout Spacing="3">
+                <Label
+                    Text="{Binding Title}"
+                    FontSize="16"
+                    FontAttributes="Bold"
+                    TextColor="#24364F" />
+                <Label
+                    Text="{Binding Detail}"
+                    FontSize="13"
+                    TextColor="#69778A" />
+            </VerticalStackLayout>
+        </DataTemplate>
+    </ContentPage.Resources>
+
+    <!-- Listas cortas dentro de un ScrollView: BindableLayout evita anidar CollectionView con scroll propio. -->
 
     <ScrollView>
 
@@ -15,26 +36,25 @@
 
             <Label
                 Text="Historial clínico"
-                FontSize="28"
-                FontAttributes="Bold"
-                TextColor="#0F2747" />
+                Style="{StaticResource PatientPageTitleStyle}" />
 
             <Label
                 Text="Información clínica disponible en tu expediente SCI-PH."
-                FontSize="14"
-                TextColor="#526175" />
+                Style="{StaticResource CardBodyStyle}" />
+
+            <ActivityIndicator
+                IsRunning="{Binding IsBusy}"
+                IsVisible="{Binding IsBusy}"
+                Color="{StaticResource ColorPrimary}" />
+
+            <Label
+                Text="{Binding ErrorMessage}"
+                IsVisible="{Binding HasError}"
+                Style="{StaticResource ErrorTextStyle}" />
 
             <!-- ALERGIAS -->
 
-            <Border
-                BackgroundColor="White"
-                Stroke="#E4E9F0"
-                StrokeThickness="1"
-                Padding="18">
-
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="16" />
-                </Border.StrokeShape>
+            <Border Style="{StaticResource PatientCardStyle}">
 
                 <VerticalStackLayout Spacing="10">
 
@@ -42,33 +62,49 @@
                         Text="Alergias"
                         FontSize="19"
                         FontAttributes="Bold"
-                        TextColor="#172B4D" />
+                        TextColor="{StaticResource TitleText}" />
 
-                    <Border
-                        BackgroundColor="#FFF5F5"
-                        StrokeThickness="0"
-                        Padding="12">
+                    <VerticalStackLayout
+                        Spacing="8"
+                        BindableLayout.ItemsSource="{Binding History.Allergies}">
 
-                        <Border.StrokeShape>
-                            <RoundRectangle CornerRadius="10" />
-                        </Border.StrokeShape>
+                        <BindableLayout.EmptyView>
+                            <Label Text="Sin alergias registradas." Style="{StaticResource CardMetaStyle}" />
+                        </BindableLayout.EmptyView>
 
-                        <VerticalStackLayout Spacing="3">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="dtos:ClinicalHistoryItemDto">
 
-                            <Label
-                                Text="Penicilina"
-                                FontSize="16"
-                                FontAttributes="Bold"
-                                TextColor="#9F3030" />
+                                <Border
+                                    BackgroundColor="#FFF5F5"
+                                    StrokeThickness="0"
+                                    Padding="12">
 
-                            <Label
-                                Text="Severidad moderada"
-                                FontSize="13"
-                                TextColor="#6E4444" />
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="10" />
+                                    </Border.StrokeShape>
 
-                        </VerticalStackLayout>
+                                    <VerticalStackLayout Spacing="3">
 
-                    </Border>
+                                        <Label
+                                            Text="{Binding Title}"
+                                            FontSize="16"
+                                            FontAttributes="Bold"
+                                            TextColor="#9F3030" />
+
+                                        <Label
+                                            Text="{Binding Detail}"
+                                            FontSize="13"
+                                            TextColor="#6E4444" />
+
+                                    </VerticalStackLayout>
+
+                                </Border>
+
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+
+                    </VerticalStackLayout>
 
                 </VerticalStackLayout>
 
@@ -76,15 +112,7 @@
 
             <!-- CONDICIONES -->
 
-            <Border
-                BackgroundColor="White"
-                Stroke="#E4E9F0"
-                StrokeThickness="1"
-                Padding="18">
-
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="16" />
-                </Border.StrokeShape>
+            <Border Style="{StaticResource PatientCardStyle}">
 
                 <VerticalStackLayout Spacing="9">
 
@@ -92,18 +120,18 @@
                         Text="Condiciones médicas"
                         FontSize="19"
                         FontAttributes="Bold"
-                        TextColor="#172B4D" />
+                        TextColor="{StaticResource TitleText}" />
 
-                    <Label
-                        Text="Hipertensión arterial"
-                        FontSize="16"
-                        FontAttributes="Bold"
-                        TextColor="#24364F" />
+                    <VerticalStackLayout
+                        Spacing="9"
+                        BindableLayout.ItemsSource="{Binding History.Conditions}"
+                        BindableLayout.ItemTemplate="{StaticResource HistoryItemTemplate}">
 
-                    <Label
-                        Text="Registrada en 2024"
-                        FontSize="13"
-                        TextColor="#69778A" />
+                        <BindableLayout.EmptyView>
+                            <Label Text="Sin condiciones registradas." Style="{StaticResource CardMetaStyle}" />
+                        </BindableLayout.EmptyView>
+
+                    </VerticalStackLayout>
 
                 </VerticalStackLayout>
 
@@ -111,15 +139,7 @@
 
             <!-- MEDICACIÓN -->
 
-            <Border
-                BackgroundColor="White"
-                Stroke="#E4E9F0"
-                StrokeThickness="1"
-                Padding="18">
-
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="16" />
-                </Border.StrokeShape>
+            <Border Style="{StaticResource PatientCardStyle}">
 
                 <VerticalStackLayout Spacing="9">
 
@@ -127,18 +147,18 @@
                         Text="Medicamentos habituales"
                         FontSize="19"
                         FontAttributes="Bold"
-                        TextColor="#172B4D" />
+                        TextColor="{StaticResource TitleText}" />
 
-                    <Label
-                        Text="Losartán 50 mg"
-                        FontSize="16"
-                        FontAttributes="Bold"
-                        TextColor="#24364F" />
+                    <VerticalStackLayout
+                        Spacing="9"
+                        BindableLayout.ItemsSource="{Binding History.Medications}"
+                        BindableLayout.ItemTemplate="{StaticResource HistoryItemTemplate}">
 
-                    <Label
-                        Text="1 tableta cada 24 horas"
-                        FontSize="13"
-                        TextColor="#69778A" />
+                        <BindableLayout.EmptyView>
+                            <Label Text="Sin medicamentos registrados." Style="{StaticResource CardMetaStyle}" />
+                        </BindableLayout.EmptyView>
+
+                    </VerticalStackLayout>
 
                 </VerticalStackLayout>
 
@@ -148,41 +168,43 @@
 
             <Label
                 Text="Episodios"
-                FontSize="20"
-                FontAttributes="Bold"
-                TextColor="#0F2747" />
+                Style="{StaticResource PatientSectionTitleStyle}" />
 
-            <Border
-                BackgroundColor="White"
-                Stroke="#E4E9F0"
-                StrokeThickness="1"
-                Padding="18">
+            <VerticalStackLayout
+                Spacing="12"
+                BindableLayout.ItemsSource="{Binding History.Episodes}">
 
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="16" />
-                </Border.StrokeShape>
+                <BindableLayout.EmptyView>
+                    <Label Text="Sin episodios registrados." Style="{StaticResource CardMetaStyle}" />
+                </BindableLayout.EmptyView>
 
-                <VerticalStackLayout Spacing="7">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="dtos:EpisodeItemDto">
 
-                    <Label
-                        Text="Emergencia prehospitalaria"
-                        FontSize="17"
-                        FontAttributes="Bold"
-                        TextColor="#172B4D" />
+                        <Border Style="{StaticResource PatientCardStyle}">
 
-                    <Label
-                        Text="Hospital Central"
-                        FontSize="14"
-                        TextColor="#526175" />
+                            <VerticalStackLayout Spacing="7">
 
-                    <Label
-                        Text="25 septiembre 2026"
-                        FontSize="13"
-                        TextColor="#7A8798" />
+                                <Label
+                                    Text="{Binding Title}"
+                                    Style="{StaticResource CardTitleStyle}" />
 
-                </VerticalStackLayout>
+                                <Label
+                                    Text="{Binding Facility}"
+                                    Style="{StaticResource CardBodyStyle}" />
 
-            </Border>
+                                <Label
+                                    Text="{Binding DateLabel}"
+                                    Style="{StaticResource CardMetaStyle}" />
+
+                            </VerticalStackLayout>
+
+                        </Border>
+
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+
+            </VerticalStackLayout>
 
         </VerticalStackLayout>
 

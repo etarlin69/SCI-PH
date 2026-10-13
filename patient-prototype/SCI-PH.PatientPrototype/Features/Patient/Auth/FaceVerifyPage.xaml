@@ -3,8 +3,10 @@
     x:Class="SCI_PH.PatientPrototype.Features.Patient.Auth.FaceVerifyPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.ViewModels"
+    x:DataType="vm:FaceVerifyViewModel"
     Title="Verificación facial"
-    BackgroundColor="#F7F9FC">
+    BackgroundColor="{StaticResource PatientPageBackground}">
 
     <ScrollView>
         <VerticalStackLayout
@@ -13,24 +15,16 @@
 
             <Label
                 Text="Verificación facial"
-                FontSize="28"
-                FontAttributes="Bold"
-                TextColor="#0F2747" />
+                Style="{StaticResource PatientPageTitleStyle}" />
 
             <Label
                 Text="Confirma tu identidad para continuar."
                 FontSize="16"
-                TextColor="#526175" />
+                TextColor="{StaticResource BodyText}" />
 
             <Border
-                Padding="24"
-                BackgroundColor="White"
-                Stroke="#E4E9F0"
-                StrokeThickness="1">
-
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="18" />
-                </Border.StrokeShape>
+                Style="{StaticResource PatientCardStyle}"
+                Padding="24">
 
                 <VerticalStackLayout
                     Spacing="18"
@@ -40,7 +34,7 @@
                         WidthRequest="120"
                         HeightRequest="120"
                         BackgroundColor="#EAF2FB"
-                        Stroke="#1976D2"
+                        Stroke="{StaticResource ColorPrimary}"
                         StrokeThickness="2">
 
                         <Border.StrokeShape>
@@ -51,7 +45,7 @@
                             Text="FACE"
                             FontSize="22"
                             FontAttributes="Bold"
-                            TextColor="#1976D2"
+                            TextColor="{StaticResource ColorPrimary}"
                             HorizontalOptions="Center"
                             VerticalOptions="Center" />
                     </Border>
@@ -63,16 +57,15 @@
                         HorizontalTextAlignment="Center" />
 
                     <Label
-                        x:Name="StatusLabel"
-                        Text="Pendiente de verificación"
+                        Text="{Binding StatusMessage}"
                         FontSize="14"
-                        TextColor="#6B7280"
+                        TextColor="{StaticResource TextSecondary}"
                         HorizontalTextAlignment="Center" />
 
                     <Button
                         Text="Verificar identidad"
-                        Clicked="OnVerifyFaceClicked"
-                        BackgroundColor="#1976D2"
+                        Command="{Binding VerifyCommand}"
+                        BackgroundColor="{StaticResource ColorPrimary}"
                         TextColor="White"
                         CornerRadius="12"
                         HeightRequest="50"

@@ -3,6 +3,8 @@
     x:Class="SCI_PH.PatientPrototype.Features.Patient.Auth.QrScanPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.ViewModels"
+    x:DataType="vm:QrAccessViewModel"
     Title="Acceso del paciente">
 
     <ScrollView>
@@ -69,12 +71,18 @@
                     <Button
                         Text="Simular QR válido"
                         Style="{StaticResource PrimaryButtonStyle}"
-                        Clicked="OnSimulateQrClicked" />
+                        Command="{Binding SimulateQrCommand}" />
 
                     <Label
-                        x:Name="StatusLabel"
+                        Text="{Binding StatusMessage}"
                         HorizontalTextAlignment="Center"
                         TextColor="{StaticResource TextSecondary}" />
+
+                    <Label
+                        Text="{Binding ErrorMessage}"
+                        IsVisible="{Binding HasError}"
+                        HorizontalTextAlignment="Center"
+                        Style="{StaticResource ErrorTextStyle}" />
                 </VerticalStackLayout>
             </Border>
 
