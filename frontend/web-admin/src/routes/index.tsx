@@ -107,10 +107,10 @@ export function AppRoutes() {
           <Route path="roles" element={guarded([Permissions.Users.Manage], <RolesPage />)} />
           <Route path="dispositivos" element={guarded([Permissions.Devices.Manage], <DevicesPage />)} />
           <Route path="auditoria" element={guarded([Permissions.Audit.Read], <AuditPage />)} />
-          <Route path="clinicas" element={guarded(DEMO_ADMIN_PERMISSIONS, <ClinicsPage />)} />
-          <Route path="clinicas/:id" element={guarded(DEMO_ADMIN_PERMISSIONS, <ClinicDetailPage />)} />
-          <Route path="personal" element={guarded(DEMO_ADMIN_PERMISSIONS, <StaffPage />)} />
-          <Route path="personal/:id" element={guarded(DEMO_ADMIN_PERMISSIONS, <StaffDetailPage />)} />
+          <Route path="clinicas" element={guarded([Permissions.Clinics.Manage], <ClinicsPage />)} />
+          <Route path="clinicas/:id" element={guarded([Permissions.Clinics.Manage], <ClinicDetailPage />)} />
+          <Route path="personal" element={guarded([Permissions.ClinicalStaff.Manage], <StaffPage />)} />
+          <Route path="personal/:id" element={guarded([Permissions.ClinicalStaff.Manage], <StaffDetailPage />)} />
           <Route path="catalogos" element={guarded(DEMO_ADMIN_PERMISSIONS, <CatalogsPage />)} />
           <Route path="catalogos/:tipo" element={guarded(DEMO_ADMIN_PERMISSIONS, <CatalogsPage />)} />
           <Route path="perfil" element={s(<ProfilePage />)} />
