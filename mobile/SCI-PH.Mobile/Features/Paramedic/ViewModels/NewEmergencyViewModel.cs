@@ -12,6 +12,11 @@ public partial class NewEmergencyViewModel : BaseViewModel
     private readonly IParamedicApiService _api;
     private readonly IAppNavigator _navigator;
 
+    // Se conservan entre reintentos del mismo envío para que el servidor no cree dos emergencias;
+    // se renuevan cuando la emergencia se crea correctamente.
+    private Guid? _clientRequestId;
+    private DateTime? _startedAt;
+
     public NewEmergencyViewModel(IParamedicApiService api, IAppNavigator navigator)
     {
         _api = api;
@@ -31,12 +36,19 @@ public partial class NewEmergencyViewModel : BaseViewModel
     {
         await RunAsync(async () =>
         {
+            _clientRequestId ??= Guid.NewGuid();
+            _startedAt ??= DateTime.UtcNow;
+
             var emergency = await _api.CreateEmergencyAsync(new CreateEmergencyDto
             {
+                ClientRequestId = _clientRequestId.Value,
+                StartedAt = _startedAt.Value,
                 ChiefComplaint = ChiefComplaint.Trim(),
                 Location = await TryGetLocationAsync()
             });
 
+            _clientRequestId = null;
+            _startedAt = null;
             ChiefComplaint = string.Empty;
 
             await _navigator.GoToAsync(
