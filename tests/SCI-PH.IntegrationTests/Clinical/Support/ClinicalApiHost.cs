@@ -95,6 +95,15 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
             return new StaffSession(_factory.CreateHttpsClient().WithBearer(session.Session!.AccessToken), account.Id, staffId);
         }
 
+        // Real web login of an existing account (e.g. one created through an invitation).
+        public async Task<HttpClient> LoginAsync(string email, string password)
+        {
+            var login = await _factory.CreateHttpsClient().PostAsJsonAsync("/api/web/auth/login", new LoginRequest(email, password));
+            login.EnsureSuccessStatusCode();
+            var session = await login.ReadAsAsync<WebLoginResponse>();
+            return _factory.CreateHttpsClient().WithBearer(session.Session!.AccessToken);
+        }
+
         public async Task<Patient> SeedPatientAsync(string givenNames = "Ana", string familyNames = "Pérez", string? nationalId = null)
         {
             var patient = Patient.Register(givenNames, familyNames, new DateOnly(1985, 3, 14), BiologicalSex.Female);
