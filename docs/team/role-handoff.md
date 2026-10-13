@@ -19,6 +19,8 @@ Este documento explica qué puede empezar a hacer cada rol **ahora**, sobre la a
 | 9 | Hardware / QA / DevOps | Firmware ESP32, `tests/`, `docker-compose.yml`, `.github/workflows/` |
 
 > La ubicación de los proyectos React y .NET MAUI (este repositorio en una carpeta nueva, o repositorios separados) la decide el Rol 1 antes de crearlos.
+>
+> **Mobile (decidido):** una sola app MAUI en `mobile/SCI-PH.Mobile/`, con su propia solución `mobile/SCI-PH.Mobile.sln`; el Rol 6 trabaja en `Features/Paramedic` y el Rol 7 en `Features/Patient` (ver [mobile/README.md](../../mobile/README.md)).
 
 ## Reglas comunes
 

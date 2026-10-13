@@ -37,6 +37,7 @@ tests/
   SCI-PH.Domain.Tests
   SCI-PH.Application.Tests
   SCI-PH.IntegrationTests
+mobile/                      App .NET MAUI (solución propia: mobile/SCI-PH.Mobile.sln). Ver mobile/README.md.
 docs/
 ```
 

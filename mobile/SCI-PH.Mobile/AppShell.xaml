@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="SCI_PH.Mobile.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:paramedic="clr-namespace:SCI_PH.Mobile.Features.Paramedic"
+    xmlns:paramedicViews="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Views"
+    Shell.BackgroundColor="{StaticResource SciNavy}"
+    Shell.ForegroundColor="White"
+    Shell.TitleColor="White"
+    Title="SCI-PH">
+
+    <!--
+        Una sola app para dos tipos de usuario (ver mobile/README.md):
+          - Personal clínico (Paramedic): login con usuario y contraseña (futuro).
+          - Paciente (Patient): acceso con QR + verificación facial (futuro).
+        Cada feature añade aquí su raíz y sus elementos de menú; las rutas internas las registra su extensión.
+    -->
+
+    <!-- Paramedic (Rol 6) -->
+    <ShellContent
+        Title="Nueva emergencia"
+        ContentTemplate="{DataTemplate paramedicViews:NewEmergencyPage}"
+        Route="{x:Static paramedic:ParamedicRoutes.NewEmergency}" />
+
+    <!-- Patient (Rol 7): se integrará desde el PR #18. -->
+
+</Shell>
