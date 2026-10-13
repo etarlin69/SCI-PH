@@ -2,6 +2,7 @@ using SCI_PH.Domain.Entities.Auditing;
 using SCI_PH.Domain.Entities.Encounters;
 using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Patients;
+using SCI_PH.Domain.Entities.Transport;
 
 namespace SCI_PH.Application.Abstractions.Clinical
 {
@@ -28,6 +29,10 @@ namespace SCI_PH.Application.Abstractions.Clinical
         void Add(Prescription prescription);
 
         void Add(MedicationAdministration administration);
+
+        Task<ClinicalTransfer?> FindTransferAsync(Guid transferId, CancellationToken cancellationToken);
+
+        void Add(ClinicalTransfer transfer);
 
         void Add(ClinicalAuditEntry auditEntry);
 

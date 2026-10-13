@@ -4,6 +4,7 @@ import type {
     ClinicalContext,
     ClinicalEncounterSummary,
     ClinicalNote,
+    ClinicalTransfer,
     Diagnosis,
     Medication,
     MedicationAdministration,
@@ -16,12 +17,11 @@ import type {
 } from '../types/clinical.types';
 import type { ClinicalApi } from './clinicalApi';
 import { clinicIdForRequest } from './clinicSelection';
-import { mockClinicalApi } from './mockClinicalApi';
 
 // Adaptador HTTP real: React Hospital → apiRequest → Web BFF → Application → ClinicalDbContext → PostgreSQL.
 // Van al backend: pacientes, atenciones, admisión, triage, signos vitales (vertical 1); notas clínicas, diagnósticos y
-// cierre de la atención (vertical 2); catálogo de medicamentos, prescripciones y Kardex (vertical 3). Los traslados
-// siguen en el MOCK (marcado «Simulación» en la UI) hasta que tengan endpoints.
+// cierre de la atención (vertical 2); catálogo de medicamentos, prescripciones y Kardex (vertical 3); traslados entrantes
+// y su recepción (vertical 4). El adaptador MOCK solo se usa con VITE_CLINICAL_API_MODE=mock.
 
 const BASE = '/api/web';
 const id = (value: string) => encodeURIComponent(value);
@@ -123,7 +123,12 @@ export const httpClinicalApi: ClinicalApi = {
             body: { medicationId, dose, doseUnit, route, administeredAtUtc, prescriptionId, prescriptionDetailId, notes },
         }),
 
-    // ---- Sin backend todavía ------------------------------------------------------------------------------------
-    listIncomingTransfers: mockClinicalApi.listIncomingTransfers,
-    receiveTransfer: mockClinicalApi.receiveTransfer,
+    // Traslados con destino a las clínicas del usuario (Requested / InTransit).
+    listIncomingTransfers: (signal) =>
+        apiRequest<ClinicalTransfer[]>(`${BASE}/transfers/incoming`, { query: { clinicId: clinicIdForRequest() }, signal }),
+
+    // ClinicalTransfer.Receive + la atención pasa a la clínica destino; quién recibe lo fija el backend desde la sesión.
+    receiveTransfer: async (transferId) => {
+        await apiRequest<ClinicalTransfer>(`${BASE}/transfers/${id(transferId)}/receive`, { method: 'POST' });
+    },
 };

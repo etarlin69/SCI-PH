@@ -64,7 +64,7 @@ describe('módulo Hospital con la autenticación compartida', () => {
     expect(nav.getByText('Ir a Administración')).toBeInTheDocument();
   });
 
-  it('recepción lista la admisión real (sin datos clínicos) y solo marca «Simulación» en lo que aún es mock', async () => {
+  it('recepción lista la admisión y los traslados reales (sin datos clínicos) y no queda nada marcado «Simulación»', async () => {
     resetClinicSelectionForTests();
     createFakeBff({
       'POST /api/web/auth/refresh': () => json(200, session(RECEPTIONIST)),
@@ -83,6 +83,7 @@ describe('módulo Hospital con la autenticación compartida', () => {
             clinicId: 'c1',
           },
         ]),
+      'GET /api/web/transfers/incoming': () => json(200, []),
     });
     render(
       <ToastProvider>
@@ -99,8 +100,9 @@ describe('módulo Hospital con la autenticación compartida', () => {
     expect(await within(admissions).findByRole('button', { name: 'Identificar' }, WAIT)).toBeInTheDocument();
     expect(within(admissions).queryByText('Simulación')).not.toBeInTheDocument();
     const transfers = screen.getByRole('heading', { name: 'Traslados entrantes' }).closest('section')!;
-    expect(within(transfers).getByText('Simulación')).toBeInTheDocument();
-    expect(screen.getAllByText('Simulación')).toHaveLength(1);
+    expect(await within(transfers).findByText('No hay traslados en camino', {}, WAIT)).toBeInTheDocument();
+    expect(within(transfers).queryByText('Simulación')).not.toBeInTheDocument();
+    expect(screen.queryAllByText('Simulación')).toHaveLength(0);
   });
 
   // Mismo rol en ambos casos: la acción depende solo del permiso real Encounters.Create, nunca del rol.
