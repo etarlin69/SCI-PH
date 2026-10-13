@@ -149,7 +149,7 @@ namespace SCI_PH.Application.Tests.Clinical
 
         public Task<bool> HasActiveTransferAsync(Guid encounterId, CancellationToken cancellationToken) =>
             Task.FromResult(Transfers.Any(t => t.ClinicalEncounterId == encounterId
-                && t.Status is ClinicalTransferStatus.Requested or ClinicalTransferStatus.InTransit));
+                && ClinicalTransfer.ActiveStatuses.Contains(t.Status)));
 
         public Task<TransferRow?> GetTransferAsync(Guid transferId, CancellationToken cancellationToken) =>
             Task.FromResult(Transfers.SingleOrDefault(t => t.Id == transferId) is { } t ? ToRow(t) : null);

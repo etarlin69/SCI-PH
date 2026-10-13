@@ -36,7 +36,8 @@ namespace SCI_PH.IntegrationTests.PostgreSql
                 where c.contype = 'f' and ns.nspname <> nr.nspname
                 """));
             Assert.Equal(4, await ScalarAsync<long>(connection, "select count(*) from identity.\"__EFMigrationsHistory\""));
-            Assert.Equal(1, await ScalarAsync<long>(connection, "select count(*) from clinical.\"__EFMigrationsHistory\""));
+            // InitialClinical + EnforceSingleActiveTransferPerEncounter.
+            Assert.Equal(2, await ScalarAsync<long>(connection, "select count(*) from clinical.\"__EFMigrationsHistory\""));
             Assert.Equal(0, await ScalarAsync<long>(connection,
                 "select count(*) from pg_index i join pg_class c on c.oid = i.indexrelid join pg_namespace n on n.oid = c.relnamespace where n.nspname in ('identity', 'clinical') and not i.indisvalid"));
 

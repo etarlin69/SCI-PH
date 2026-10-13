@@ -19,7 +19,8 @@ namespace SCI_PH.Persistence.Clinical.Services
         private static readonly IReadOnlyDictionary<string, string> _knownUniqueViolations = new Dictionary<string, string>
         {
             ["UX_PatientIdentifiers_ActiveValue"] = "An active identifier with this value already belongs to another patient.",
-            ["IX_ClinicalEncounters_TemporaryPatientCode"] = "The temporary patient code is already in use; retry the operation."
+            ["IX_ClinicalEncounters_TemporaryPatientCode"] = "The temporary patient code is already in use; retry the operation.",
+            ["UX_ClinicalTransfers_ActivePerEncounter"] = "The encounter already has an active transfer."
         };
 
         private readonly ClinicalDbContext _clinical;

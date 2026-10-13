@@ -223,6 +223,44 @@ namespace SCI_PH.IntegrationTests.Clinical
             Assert.Equal(6, await host.DbAsync(db => db.Medications.CountAsync()));
         }
 
+        // Last line of defence of "one active transfer per encounter": two writers that both passed the Application check
+        // (both read "no active transfer") reach PostgreSQL; the filtered unique index lets only one active transfer in and
+        // the store reports the other as a conflict (409), not a server error. Finished transfers do not block.
+        [SkippableFact]
+        public async Task TheDatabaseAllowsOnlyOneActiveTransferPerEncounter()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            await using var host = await ClinicalApiHost.StartAsync(_postgres);
+            var (origin, _) = await ClinicWithStaffAsync(host);
+            var destination = await host.CreateClinicAsync("Hospital destino");
+            var encounter = await AddEncounterAsync(host, origin.Id);
+
+            await using var scopeA = host.Services.CreateAsyncScope();
+            await using var scopeB = host.Services.CreateAsyncScope();
+            var storeA = scopeA.ServiceProvider.GetRequiredService<IClinicalWriteStore>();
+            var storeB = scopeB.ServiceProvider.GetRequiredService<IClinicalWriteStore>();
+            var first = Domain.Entities.Transport.ClinicalTransfer.Request(encounter.Id, destination.Id, DateTimeOffset.UtcNow, origin.Id);
+            var second = Domain.Entities.Transport.ClinicalTransfer.Request(encounter.Id, destination.Id, DateTimeOffset.UtcNow, origin.Id);
+            storeA.Add(first);
+            storeB.Add(second);
+
+            await storeA.SaveChangesAsync(None);
+            var conflict = await Assert.ThrowsAsync<ResourceConflictException>(() => storeB.SaveChangesAsync(None));
+
+            Assert.Equal("The encounter already has an active transfer.", conflict.Message);
+            Assert.Equal(1, await host.DbAsync(db => db.ClinicalTransfers.CountAsync(t => t.ClinicalEncounterId == encounter.Id)));
+
+            // A cancelled transfer no longer blocks a new one.
+            await host.DbAsync(async db =>
+            {
+                (await db.ClinicalTransfers.SingleAsync(t => t.Id == first.Id)).Cancel(DateTimeOffset.UtcNow);
+                await db.SaveChangesAsync();
+                db.ClinicalTransfers.Add(Domain.Entities.Transport.ClinicalTransfer.Request(encounter.Id, destination.Id, DateTimeOffset.UtcNow, origin.Id));
+                await db.SaveChangesAsync();
+            });
+            Assert.Equal(2, await host.DbAsync(db => db.ClinicalTransfers.CountAsync(t => t.ClinicalEncounterId == encounter.Id)));
+        }
+
         // The store writes a prescription with its details in one save; the composite keys reject an administration that
         // points to a prescription of another encounter, and nothing of that save is stored.
         [SkippableFact]

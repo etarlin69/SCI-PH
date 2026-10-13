@@ -185,8 +185,7 @@ namespace SCI_PH.Persistence.Clinical.Services
 
         public Task<bool> HasActiveTransferAsync(Guid encounterId, CancellationToken cancellationToken) =>
             _clinical.ClinicalTransfers.AnyAsync(
-                t => t.ClinicalEncounterId == encounterId
-                    && (t.Status == ClinicalTransferStatus.Requested || t.Status == ClinicalTransferStatus.InTransit),
+                t => t.ClinicalEncounterId == encounterId && Domain.Entities.Transport.ClinicalTransfer.ActiveStatuses.Contains(t.Status),
                 cancellationToken);
 
         public async Task<TransferRow?> GetTransferAsync(Guid transferId, CancellationToken cancellationToken) =>
