@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="SCI_PH.Mobile.Features.Patient.Auth.QrScanPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Patient.ViewModels"
+    x:DataType="vm:QrAccessViewModel"
+    Title="Acceso del paciente"
+    BackgroundColor="{StaticResource PageBackground}">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="18">
+
+            <Grid ColumnDefinitions="*,Auto">
+                <VerticalStackLayout Spacing="2">
+                    <Label Text="SCI-PH" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource ColorPrimaryDark}" />
+                    <Label Text="Acceso del paciente" Style="{StaticResource BodyTextStyle}" />
+                </VerticalStackLayout>
+
+                <Border
+                    BackgroundColor="{StaticResource BadgeBackground}"
+                    Padding="12,6"
+                    StrokeThickness="0"
+                    HorizontalOptions="End"
+                    VerticalOptions="Start">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="16" />
+                    </Border.StrokeShape>
+                    <Label
+                        Text="Datos de prueba"
+                        TextColor="{StaticResource BadgeText}"
+                        FontAttributes="Bold"
+                        FontSize="12" />
+                </Border>
+            </Grid>
+
+            <Border Style="{StaticResource FrameCardStyle}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Identificación por QR" Style="{StaticResource SectionTitleStyle}" />
+                    <Label
+                        Text="Escanea tu código QR SCI-PH para comenzar la validación de identidad."
+                        Style="{StaticResource BodyTextStyle}" />
+
+                    <Border
+                        BackgroundColor="#F9FAFB"
+                        Stroke="{StaticResource BorderColor}"
+                        StrokeThickness="1"
+                        Padding="24">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="12" />
+                        </Border.StrokeShape>
+
+                        <VerticalStackLayout Spacing="12">
+                            <Label
+                                Text="▦"
+                                FontSize="96"
+                                HorizontalOptions="Center"
+                                TextColor="{StaticResource ColorPrimary}" />
+                            <Label
+                                Text="Área de escaneo QR"
+                                HorizontalOptions="Center"
+                                FontAttributes="Bold"
+                                FontSize="18"
+                                TextColor="{StaticResource TextPrimary}" />
+                            <Label
+                                Text="En la versión final aquí se utilizará la cámara del dispositivo."
+                                HorizontalTextAlignment="Center"
+                                Style="{StaticResource BodyTextStyle}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Button
+                        Text="Simular QR válido"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Command="{Binding SimulateQrCommand}" />
+
+                    <Label
+                        Text="{Binding StatusMessage}"
+                        HorizontalTextAlignment="Center"
+                        TextColor="{StaticResource TextSecondary}" />
+
+                    <Label
+                        Text="{Binding ErrorMessage}"
+                        IsVisible="{Binding HasError}"
+                        HorizontalTextAlignment="Center"
+                        Style="{StaticResource ErrorTextStyle}" />
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

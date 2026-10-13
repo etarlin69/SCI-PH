@@ -181,6 +181,9 @@ export interface CreateClinicalNoteRequest {
 
 export interface ClinicalNote extends CreateClinicalNoteRequest {
     id: Guid;
+    encounterId?: Guid;
+    /** ClinicalStaff autor, asignado por el backend desde la sesión. */
+    authorStaffId?: Guid;
     authorDisplayName: string | null;
     createdAtUtc: UtcDateTime;
 }
@@ -197,7 +200,11 @@ export interface CreateDiagnosisRequest {
 
 export interface Diagnosis extends CreateDiagnosisRequest {
     id: Guid;
+    encounterId?: Guid;
     recordedAtUtc: UtcDateTime;
+    /** Fecha de confirmación; solo en diagnósticos Definitive. */
+    confirmedAtUtc?: UtcDateTime | null;
+    recordedByStaffId?: Guid;
 }
 
 // ---------------------------------------------------------------- Medicamentos
@@ -248,6 +255,7 @@ export interface PrescriptionDetail extends PrescriptionDetailInput {
     medicationName: string;
 }
 
+/** El backend crea, añade las líneas y emite la prescripción en una sola transacción; el prescriptor sale de la sesión. */
 export interface CreatePrescriptionRequest {
     notes: string | null;
     details: PrescriptionDetailInput[];
@@ -260,6 +268,9 @@ export interface Prescription {
     notes: string | null;
     createdAtUtc: UtcDateTime;
     issuedAtUtc: UtcDateTime | null;
+    validUntilUtc?: UtcDateTime | null;
+    cancelledAtUtc?: UtcDateTime | null;
+    prescribedByStaffId?: Guid;
     details: PrescriptionDetail[];
 }
 
@@ -280,7 +291,23 @@ export interface MedicationAdministration {
     doseUnit: string;
     route: MedicationRoute;
     administeredAtUtc: UtcDateTime;
+    administeredByStaffId?: Guid;
     status: MedicationAdministrationStatus;
+    notes: string | null;
+}
+
+/**
+ * Registro de una dosis administrada. Si se vincula a una línea de prescripción (prescriptionId + prescriptionDetailId),
+ * el medicamento debe ser el prescrito. Quién la administró lo fija el backend desde la sesión.
+ */
+export interface CreateMedicationAdministrationRequest {
+    medicationId: Guid;
+    dose: number;
+    doseUnit: string;
+    route: MedicationRoute;
+    administeredAtUtc: UtcDateTime;
+    prescriptionId: Guid | null;
+    prescriptionDetailId: Guid | null;
     notes: string | null;
 }
 
@@ -304,7 +331,13 @@ export interface ClinicalTransfer {
     ambulance: AmbulanceSummary | null;
     requestedAtUtc: UtcDateTime;
     sentAtUtc: UtcDateTime | null;
+    sentByStaffId?: Guid | null;
     receivedAtUtc: UtcDateTime | null;
+    receivedByStaffId?: Guid | null;
+    cancelledAtUtc?: UtcDateTime | null;
+    notes?: string | null;
+    /** Estado de la atención trasladada (Transferred mientras va en camino). */
+    encounterStatus?: ClinicalEncounterStatus;
     patient: PatientSummary | null;
     temporaryPatientCode: string | null;
     reason: string | null;

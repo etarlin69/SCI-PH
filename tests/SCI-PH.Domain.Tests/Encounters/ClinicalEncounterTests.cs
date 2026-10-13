@@ -144,5 +144,74 @@ namespace SCI_PH.Domain.Tests.Encounters
 
             Assert.Throws<InvalidClinicalEncounterStateException>(() => encounter.ChangeStatus(ClinicalEncounterStatus.InProgress, Start.AddHours(2)));
         }
+
+        [Fact]
+        public void ReceivingATransferredEncounterMovesItToTheDestinationClinic()
+        {
+            var destination = Guid.NewGuid();
+            var encounter = ClinicalEncounter.CreateUnidentified(ClinicalEncounterType.Emergency, Start, ClinicId);
+            var code = encounter.TemporaryPatientCode;
+            encounter.ChangeStatus(ClinicalEncounterStatus.InProgress, Start);
+            encounter.ChangeStatus(ClinicalEncounterStatus.Transferred, Start.AddMinutes(10));
+
+            encounter.ReceiveAtClinic(destination, Start.AddMinutes(40));
+
+            Assert.Equal(ClinicalEncounterStatus.Received, encounter.Status);
+            Assert.Equal(destination, encounter.ClinicId);
+            Assert.Equal(code, encounter.TemporaryPatientCode);
+            Assert.Null(encounter.EndedAtUtc);
+            Assert.NotNull(encounter.UpdatedAtUtc);
+            // The same encounter continues at the destination with the existing transitions.
+            Assert.True(encounter.CanChangeStatusTo(ClinicalEncounterStatus.Closed));
+        }
+
+        [Fact]
+        public void PrehospitalCareWithoutClinicGetsTheDestinationClinicOnArrival()
+        {
+            var destination = Guid.NewGuid();
+            var encounter = ClinicalEncounter.CreateUnidentified(ClinicalEncounterType.Prehospital, Start);
+            encounter.ChangeStatus(ClinicalEncounterStatus.InProgress, Start);
+            encounter.ChangeStatus(ClinicalEncounterStatus.Transferred, Start.AddMinutes(5));
+
+            encounter.ReceiveAtClinic(destination, Start.AddMinutes(25));
+
+            Assert.Equal(destination, encounter.ClinicId);
+            Assert.Equal(ClinicalEncounterStatus.Received, encounter.Status);
+        }
+
+        [Theory]
+        [InlineData(ClinicalEncounterStatus.Created)]
+        [InlineData(ClinicalEncounterStatus.InProgress)]
+        [InlineData(ClinicalEncounterStatus.Closed)]
+        public void OnlyATransferredEncounterCanBeReceivedAndARejectedReceptionChangesNothing(ClinicalEncounterStatus status)
+        {
+            var encounter = ClinicalEncounter.CreateForPatient(Guid.NewGuid(), ClinicalEncounterType.Emergency, Start, ClinicId);
+            if (status != ClinicalEncounterStatus.Created)
+            {
+                encounter.ChangeStatus(ClinicalEncounterStatus.InProgress, Start);
+            }
+
+            if (status == ClinicalEncounterStatus.Closed)
+            {
+                encounter.ChangeStatus(ClinicalEncounterStatus.Closed, Start.AddMinutes(5));
+            }
+
+            Assert.Throws<InvalidClinicalEncounterStateException>(() => encounter.ReceiveAtClinic(Guid.NewGuid(), Start.AddMinutes(10)));
+            Assert.Equal(status, encounter.Status);
+            Assert.Equal(ClinicId, encounter.ClinicId);
+        }
+
+        [Fact]
+        public void ReceptionRequiresADestinationAndATimeWithinTheEncounter()
+        {
+            var encounter = ClinicalEncounter.CreateForPatient(Guid.NewGuid(), ClinicalEncounterType.Emergency, Start, ClinicId);
+            encounter.ChangeStatus(ClinicalEncounterStatus.InProgress, Start);
+            encounter.ChangeStatus(ClinicalEncounterStatus.Transferred, Start.AddMinutes(5));
+
+            Assert.Throws<ArgumentException>(() => encounter.ReceiveAtClinic(Guid.Empty, Start.AddMinutes(10)));
+            Assert.ThrowsAny<ArgumentException>(() => encounter.ReceiveAtClinic(Guid.NewGuid(), Start.AddMinutes(-1)));
+            Assert.Equal(ClinicalEncounterStatus.Transferred, encounter.Status);
+            Assert.Equal(ClinicId, encounter.ClinicId);
+        }
     }
 }

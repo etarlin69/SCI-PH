@@ -431,6 +431,31 @@ export const mockClinicalApi: ClinicalApi = {
         return readRecords(encounterId, administrations, signal);
     },
 
+    createMedicationAdministration(encounterId, request) {
+        return withRecords(encounterId, () => {
+            const medication = medications.find((m) => m.id === request.medicationId);
+            if (!medication || medication.status !== 'Active') {
+                throw new ClinicalApiError(409, 'El medicamento no está activo en el catálogo.');
+            }
+            const administration: MedicationAdministration = {
+                id: newId(),
+                encounterId,
+                medicationId: medication.id,
+                medicationName: medication.name,
+                prescriptionId: request.prescriptionId,
+                prescriptionDetailId: request.prescriptionDetailId,
+                dose: request.dose,
+                doseUnit: request.doseUnit,
+                route: request.route,
+                administeredAtUtc: request.administeredAtUtc,
+                status: 'Completed',
+                notes: request.notes,
+            };
+            (administrations[encounterId] ??= []).unshift(administration);
+            return administration;
+        });
+    },
+
     listIncomingTransfers(signal) {
         return delay(
             transfers.filter((t) => t.status === 'Requested' || t.status === 'InTransit'),

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Paramedic.ViewModels"
+             xmlns:dto="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Models.Dtos"
+             x:Class="SCI_PH.Mobile.Features.Paramedic.Views.MedicationsPage"
+             x:DataType="vm:MedicationsViewModel"
+             Style="{StaticResource SciPage}"
+             Title="Medicamentos">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="18">
+
+            <!-- Encabezado -->
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Medicamentos administrados" Style="{StaticResource SciTitle}" />
+                <Label Text="Registra lo que ya se administró al paciente. SCI-PH no prescribe ni sugiere dosis."
+                       Style="{StaticResource SciSubtitle}" />
+            </VerticalStackLayout>
+
+            <!-- Formulario -->
+            <Border Style="{StaticResource SciCard}">
+                <VerticalStackLayout Spacing="14">
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Medicamento" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Picker Title="Selecciona un medicamento"
+                                    ItemsSource="{Binding CatalogItems}"
+                                    ItemDisplayBinding="{Binding Name, x:DataType=dto:CatalogItemDto}"
+                                    SelectedItem="{Binding SelectedMedication}"
+                                    BackgroundColor="Transparent"
+                                    TextColor="{StaticResource SciText}" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Dosis administrada" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding Dose}"
+                                   Placeholder="Ej. 500 mg"
+                                   Style="{StaticResource SciEntry}"
+                                   MaxLength="50" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Vía de administración" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Picker Title="Selecciona la vía"
+                                    ItemsSource="{Binding Routes}"
+                                    SelectedItem="{Binding SelectedRoute}"
+                                    BackgroundColor="Transparent"
+                                    TextColor="{StaticResource SciText}" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Notas (opcional)" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Editor Text="{Binding Notes}"
+                                    Placeholder="Detalles relevantes de la administración"
+                                    Style="{StaticResource SciEditor}"
+                                    AutoSize="TextChanges"
+                                    MinimumHeightRequest="80"
+                                    MaxLength="500" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <!-- Error -->
+                    <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding HasError}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="{Binding ErrorMessage}"
+                                   TextColor="{StaticResource SciDanger}" FontSize="13" />
+                            <Button Text="Reintentar carga"
+                                    Command="{Binding LoadCatalogCommand}"
+                                    IsVisible="{Binding CatalogLoadFailed}"
+                                    Style="{StaticResource SciSecondaryButton}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Loading -->
+                    <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                       IsVisible="{Binding IsBusy}"
+                                       Color="{StaticResource SciPrimary}" />
+
+                    <Button Text="Guardar medicamento"
+                            Command="{Binding SaveCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Registrados -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding HasSaved}">
+                <VerticalStackLayout Spacing="10">
+                    <Border Style="{StaticResource SciBadgeSuccess}" HorizontalOptions="Start">
+                        <Label Text="Administraciones registradas"
+                               TextColor="{StaticResource SciSuccess}"
+                               FontAttributes="Bold" FontSize="13" />
+                    </Border>
+
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding SavedSummaries}" Spacing="6">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <Label Text="{Binding .}"
+                                       TextColor="{StaticResource SciText}"
+                                       FontSize="14" />
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Button Text="Continuar a transferencia"
+                    Command="{Binding ContinueCommand}"
+                    Style="{StaticResource SciSecondaryButton}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

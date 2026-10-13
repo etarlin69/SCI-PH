@@ -1,7 +1,7 @@
 # SCI-PH · Frontend web (Administración; base compartida con Hospital)
 
 SPA en React que se autentica contra **SCI-PH.Web.BFF**. La autenticación, la sesión, los permisos y los módulos
-Usuarios, Roles, Invitaciones y Dispositivos usan la API real. Dashboard, Auditoría, Clínicas, Personal y Catálogos
+Usuarios, Roles, Invitaciones, Dispositivos, Clínicas y Personal usan la API real. Dashboard, Auditoría y Catálogos
 son **pantallas de demostración** con datos ficticios hasta que el backend publique sus endpoints (se indican con un
 aviso en pantalla y la etiqueta «Datos de demostración»).
 
@@ -63,8 +63,8 @@ src/
 ├── auth/       AuthProvider, guards, permisos y roles, authApi, módulos
 ├── routes/     Mapa de rutas (públicas, /admin protegidas)
 ├── components/ common (Layout, Sidebar, navegación) · shared (design system) · security (QR)
-├── features/   auth · users · roles · invitations · devices · profile (reales)
-│               dashboard · audit · clinics · staff · catalogs (DEMO)
+├── features/   auth · users · roles · invitations · devices · profile · clinics · staff · clinical (reales)
+│               dashboard · audit · catalogs (DEMO)
 ├── data/mock/  Datos ficticios de los módulos DEMO (sin cuentas ni credenciales)
 ├── services/   Barrel de servicios + core (errores y utilidades de los mocks DEMO)
 └── test/       Setup de Vitest y BFF simulado para los tests

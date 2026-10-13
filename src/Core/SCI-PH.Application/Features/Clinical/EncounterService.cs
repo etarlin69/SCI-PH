@@ -136,6 +136,54 @@ namespace SCI_PH.Application.Features.Clinical
             await _writes.SaveChangesAsync(cancellationToken);
         }
 
+        // Ends the encounter through ClinicalEncounter.ChangeStatus(Closed): allowed only from the statuses the Domain
+        // permits (InProgress, Received, InEvolution). The optional discharge note, the status change and the audit entry
+        // are one transaction; the Status concurrency token makes a concurrent close or clinical write lose with a 409.
+        public async Task CloseAsync(Guid encounterId, CloseEncounterRequest request, CancellationToken cancellationToken)
+        {
+            var actor = await _actor.GetAsync(cancellationToken);
+            var encounter = await _writes.FindEncounterAsync(encounterId, cancellationToken)
+                ?? throw new ResourceNotFoundException(nameof(ClinicalEncounter), encounterId);
+            actor.EnsureClinic(encounter.ClinicId);
+            if (encounter.PatientId is { } patientId
+                && !await _patientAccess.CanWriteAsync(patientId, Permissions.Encounters.Close, cancellationToken))
+            {
+                throw new AccessDeniedException("The current user cannot close this patient's encounters.");
+            }
+
+            if (!encounter.CanChangeStatusTo(ClinicalEncounterStatus.Closed))
+            {
+                throw new ResourceConflictException($"An encounter in status {encounter.Status} cannot be closed.");
+            }
+
+            var now = _time.GetUtcNow();
+            if (!string.IsNullOrWhiteSpace(request.DischargeNote))
+            {
+                var note = ClinicalInput.Apply(() => ClinicalNote.Write(
+                    encounter.Id, actor.StaffId, ClinicalNoteType.Discharge, request.DischargeNote, now));
+                _writes.Add(note);
+                _writes.Add(ClinicalAuditEntry.Success(
+                    actor.AuditActor, AuditActionType.Create, nameof(ClinicalNote), note.Id.ToString(), now,
+                    new AuditContext(encounter.PatientId, encounter.Id)));
+            }
+
+            var previousStatus = encounter.Status;
+            try
+            {
+                ClinicalInput.Apply(() => encounter.ChangeStatus(ClinicalEncounterStatus.Closed, now));
+            }
+            catch (InvalidClinicalEncounterStateException exception)
+            {
+                throw new ResourceConflictException(exception.Message, exception);
+            }
+
+            _writes.Add(ClinicalAuditEntry.Success(
+                actor.AuditActor, AuditActionType.Update, nameof(ClinicalEncounter), encounter.Id.ToString(), now,
+                new AuditContext(encounter.PatientId, encounter.Id,
+                    ChangesJson: JsonSerializer.Serialize(new { status = new[] { previousStatus.ToString(), encounter.Status.ToString() } }))));
+            await _writes.SaveChangesAsync(cancellationToken);
+        }
+
         // Shared read check: the encounter exists, belongs to one of the actor's clinics and, when it has a patient,
         // the resource-based patient rule (IPatientAccessAuthorizer) allows reading it.
         internal static async Task<EncounterRow> GetReadableAsync(

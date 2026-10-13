@@ -2,8 +2,10 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using SCI_PH.Application.DTOs.Security;
+using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Organizations;
 using SCI_PH.Domain.Entities.Patients;
+using SCI_PH.Domain.Enums.Medications;
 using SCI_PH.Domain.Enums.Organizations;
 using SCI_PH.Domain.Enums.Patients;
 using SCI_PH.IntegrationTests.PostgreSql;
@@ -93,6 +95,15 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
             return new StaffSession(_factory.CreateHttpsClient().WithBearer(session.Session!.AccessToken), account.Id, staffId);
         }
 
+        // Real web login of an existing account (e.g. one created through an invitation).
+        public async Task<HttpClient> LoginAsync(string email, string password)
+        {
+            var login = await _factory.CreateHttpsClient().PostAsJsonAsync("/api/web/auth/login", new LoginRequest(email, password));
+            login.EnsureSuccessStatusCode();
+            var session = await login.ReadAsAsync<WebLoginResponse>();
+            return _factory.CreateHttpsClient().WithBearer(session.Session!.AccessToken);
+        }
+
         public async Task<Patient> SeedPatientAsync(string givenNames = "Ana", string familyNames = "Pérez", string? nationalId = null)
         {
             var patient = Patient.Register(givenNames, familyNames, new DateOnly(1985, 3, 14), BiologicalSex.Female);
@@ -103,6 +114,22 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
                 await db.SaveChangesAsync();
             });
             return patient;
+        }
+
+        public async Task<Medication> SeedMedicationAsync(string name = "Paracetamol", bool active = true, MedicationRoute? defaultRoute = MedicationRoute.Oral)
+        {
+            var medication = Medication.Register(name, "Tableta", "500 mg", $"TEST-{Guid.NewGuid():N}"[..24], defaultRoute);
+            if (!active)
+            {
+                medication.Deactivate();
+            }
+
+            await DbAsync(async db =>
+            {
+                db.Medications.Add(medication);
+                await db.SaveChangesAsync();
+            });
+            return medication;
         }
 
         public static string RandomNationalId() => $"{Random.Shared.Next(100, 999)}-{Random.Shared.Next(1000000, 9999999)}-{Random.Shared.Next(0, 9)}";

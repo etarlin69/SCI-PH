@@ -71,6 +71,26 @@ namespace SCI_PH.Domain.Tests.Transport
         }
 
         [Fact]
+        public void OnlyRequestedAndInTransitTransfersAreActive()
+        {
+            Assert.Equal([ClinicalTransferStatus.Requested, ClinicalTransferStatus.InTransit], ClinicalTransfer.ActiveStatuses.Order());
+        }
+
+        [Fact]
+        public void InTransitTransferCanBeCancelledButACancelledOneCannotMove()
+        {
+            var transfer = NewTransfer();
+            transfer.Dispatch(Guid.NewGuid(), At.AddMinutes(5));
+
+            transfer.Cancel(At.AddMinutes(10));
+
+            Assert.Equal(ClinicalTransferStatus.Cancelled, transfer.Status);
+            Assert.Throws<InvalidClinicalTransferException>(() => transfer.Cancel(At.AddMinutes(11)));
+            Assert.Throws<InvalidClinicalTransferException>(() => transfer.Receive(Guid.NewGuid(), At.AddMinutes(12)));
+            Assert.Throws<InvalidClinicalTransferException>(() => transfer.Dispatch(Guid.NewGuid(), At.AddMinutes(12)));
+        }
+
+        [Fact]
         public void RequestedTransferCanBeCancelled()
         {
             var transfer = NewTransfer();

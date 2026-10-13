@@ -161,6 +161,16 @@ namespace SCI_PH.Domain.Entities.Encounters
             Touch();
         }
 
+        // Arrival of a transferred encounter at the destination clinic (Transferred -> Received). The same encounter
+        // continues there: its clinic becomes the destination, also for prehospital care that had no clinic yet.
+        // Save it together with the ClinicalTransfer.Receive of that transfer.
+        public void ReceiveAtClinic(Guid destinationClinicId, DateTimeOffset receivedAtUtc)
+        {
+            var destination = Guard.Id(destinationClinicId, nameof(destinationClinicId));
+            ChangeStatus(ClinicalEncounterStatus.Received, receivedAtUtc);
+            ClinicId = destination;
+        }
+
         private static ClinicalEncounter Create(
             ClinicalEncounterType type,
             DateTimeOffset startedAtUtc,

@@ -74,6 +74,14 @@ namespace SCI_PH.Application.Features.Clinical
             new(vitalSign.Id, vitalSign.ClinicalEncounterId, vitalSign.TriageId, vitalSign.Type, vitalSign.Value,
                 vitalSign.Unit, vitalSign.MeasuredAtUtc, vitalSign.MeasuredByStaffId);
 
+        public static ClinicalNoteSummary ToSummary(this ClinicalNote note, string? authorDisplayName) =>
+            new(note.Id, note.ClinicalEncounterId, note.Type, note.Content, note.OccurredAtUtc, note.CreatedAtUtc,
+                note.AuthorStaffId, authorDisplayName);
+
+        public static DiagnosisSummary ToSummary(this Diagnosis diagnosis) =>
+            new(diagnosis.Id, diagnosis.ClinicalEncounterId, diagnosis.Description, diagnosis.CodeSystem, diagnosis.Code,
+                diagnosis.Type, diagnosis.IsPrimary, diagnosis.RecordedAtUtc, diagnosis.ConfirmedAtUtc, diagnosis.RecordedByStaffId);
+
         // Personal identifiers leave the API showing only their last characters, with a fixed prefix so the
         // original length is not revealed. Internal SCI-PH codes are not personal data and are shown in full.
         public static string Mask(PatientIdentifierType type, string value)

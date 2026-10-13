@@ -2,44 +2,135 @@ import { useState, type FormEvent } from 'react';
 import { Permissions, useAuth } from '../../../auth';
 import { useParams } from 'react-router-dom';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Select, Textarea } from '../../../components/shared';
-import { CLINICAL_API_IS_MOCK, clinicalApi, isSimulated } from '../api';
+import { clinicalApi } from '../api';
 import { EncounterShell } from '../components/EncounterShell';
 import { QueryView } from '../components/QueryView';
 import { SimulatedBadge } from '../components/SimulatedBadge';
 import { useClinicalFeedback } from '../hooks/useClinicalFeedback';
-import { useClinicalQuery } from '../hooks/useClinicalQuery';
-import type { ClinicalEncounterSummary, MedicationRoute, PrescriptionStatus } from '../types/clinical.types';
-import { CLOSABLE_STATUSES, ENCOUNTER_STATUS, ROUTE_LABELS, formatDateTimeUtc, isEncounterOpen } from '../utils/clinicalLabels';
+import { useClinicalQuery, type QueryState } from '../hooks/useClinicalQuery';
+import { useClinicalTime } from '../hooks/useClinicalTime';
+import type {
+    ClinicalEncounterSummary,
+    Medication,
+    MedicationAdministration,
+    MedicationRoute,
+    Prescription,
+    PrescriptionDetail,
+    PrescriptionStatus,
+} from '../types/clinical.types';
+import {
+    CLOSABLE_STATUSES,
+    ENCOUNTER_STATUS,
+    ROUTE_LABELS,
+    acceptsClinicalRecords,
+    formatDateTimeUtc,
+    isEncounterOpen,
+} from '../utils/clinicalLabels';
 
-/** /hospital/atenciones/:id/medicacion: prescripción, administración (Kardex) y egreso de la atención. */
+type Query<T> = { state: QueryState<T>; reload: () => void };
+
+/**
+ * /hospital/atenciones/:id/medicacion: prescripción, Kardex y egreso de la atención. El Kardex no es un dato propio:
+ * es la vista de las prescripciones emitidas (con sus líneas) y de las administraciones registradas en el backend.
+ */
 export function PharmacyAndDischargePage() {
     const { encounterId } = useParams();
     if (!encounterId) return null;
 
     return (
         <EncounterShell encounterId={encounterId}>
-            {(encounter, reloadEncounter) => (
-                <div className="grid gap-5 xl:grid-cols-2">
-                    <PrescriptionsCard encounter={encounter} />
-                    <div className="flex flex-col gap-5">
-                        <AdministrationsCard encounterId={encounter.id} />
-                        <DischargeCard encounter={encounter} onClosed={reloadEncounter} />
-                    </div>
-                </div>
-            )}
+            {(encounter, reloadEncounter) => <EncounterMedication encounter={encounter} onClosed={reloadEncounter} />}
         </EncounterShell>
+    );
+}
+
+function EncounterMedication({ encounter, onClosed }: { encounter: ClinicalEncounterSummary; onClosed: () => void }) {
+    const { can } = useAuth();
+    const writable = acceptsClinicalRecords(encounter.status);
+    const canPrescribe = can(Permissions.Prescriptions.Write);
+    const canAdminister = can(Permissions.MedicationAdministrations.Write);
+    // Una sola consulta por recurso, compartida por las tarjetas: lo que se emite aparece también en el Kardex.
+    const prescriptions = useClinicalQuery(`prescriptions:${encounter.id}`, (signal) => clinicalApi.listPrescriptions(encounter.id, signal));
+    const administrations = useClinicalQuery(`administrations:${encounter.id}`, (signal) =>
+        clinicalApi.listMedicationAdministrations(encounter.id, signal),
+    );
+    // El catálogo solo hace falta para escribir.
+    const catalog = useClinicalQuery(
+        writable && can(Permissions.Medications.Read) && (canPrescribe || canAdminister) ? 'medications' : null,
+        (signal) => clinicalApi.listMedications(signal),
+    );
+
+    return (
+        <div className="grid gap-5 xl:grid-cols-2">
+            <PrescriptionsCard encounterId={encounter.id} prescriptions={prescriptions} catalog={catalog} canWrite={writable && canPrescribe} />
+            <div className="flex flex-col gap-5">
+                <KardexCard
+                    encounterId={encounter.id}
+                    prescriptions={prescriptions}
+                    administrations={administrations}
+                    catalog={catalog}
+                    canWrite={writable && canAdminister}
+                />
+                <DischargeCard encounter={encounter} onClosed={onClosed} />
+            </div>
+        </div>
     );
 }
 
 const PRESCRIPTION_STATUS: Record<PrescriptionStatus, string> = { Draft: 'Borrador', Issued: 'Emitida', Cancelled: 'Anulada' };
 
-function PrescriptionsCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
-    const canPrescribe = useAuth().can(Permissions.Prescriptions.Write);
-    const feedback = useClinicalFeedback('prescriptions');
-    const prescriptions = useClinicalQuery(`prescriptions:${encounter.id}`, (signal) => clinicalApi.listPrescriptions(encounter.id, signal));
-    const catalog = useClinicalQuery('medications', (signal) => clinicalApi.listMedications(signal));
-    const open = isEncounterOpen(encounter.status);
+const ROUTE_OPTIONS = (Object.keys(ROUTE_LABELS) as MedicationRoute[]).map((r) => ({ value: r, label: ROUTE_LABELS[r] }));
 
+const medicationLabel = (m: Medication) =>
+    [m.name, m.concentration, m.presentation].filter(Boolean).join(' · ') + (m.status === 'Inactive' ? ' (inactivo)' : '');
+
+const describeLine = (d: PrescriptionDetail) =>
+    `${d.dose} ${d.doseUnit}, ${ROUTE_LABELS[d.route]}, ${d.frequency}${d.durationDays !== null ? `, ${d.durationDays} días` : ''}`;
+
+function CatalogSelect({
+    catalog,
+    value,
+    onChange,
+}: {
+    catalog: Query<Medication[]>;
+    value: string;
+    onChange: (medication: Medication | undefined) => void;
+}) {
+    if (catalog.state.status === 'error') {
+        return (
+            <QueryView state={catalog.state} onRetry={catalog.reload} errorTitle="No se pudo cargar el catálogo de medicamentos.">
+                {() => null}
+            </QueryView>
+        );
+    }
+    const medications = catalog.state.status === 'success' ? catalog.state.data : [];
+    const selected = medications.find((m) => m.id === value);
+    return (
+        <Select
+            label="Medicamento"
+            value={value}
+            onChange={(e) => onChange(medications.find((m) => m.id === e.target.value))}
+            options={medications.map((m) => ({ value: m.id, label: medicationLabel(m), disabled: m.status !== 'Active' }))}
+            placeholder={catalog.state.status === 'loading' ? 'Cargando catálogo…' : 'Selecciona del catálogo…'}
+            disabled={catalog.state.status !== 'success'}
+            hint={selected?.defaultRoute ? `Vía habitual: ${ROUTE_LABELS[selected.defaultRoute]}` : undefined}
+            required
+        />
+    );
+}
+
+function PrescriptionsCard({
+    encounterId,
+    prescriptions,
+    catalog,
+    canWrite,
+}: {
+    encounterId: string;
+    prescriptions: Query<Prescription[]>;
+    catalog: Query<Medication[]>;
+    canWrite: boolean;
+}) {
+    const feedback = useClinicalFeedback('prescriptions');
     const [medicationId, setMedicationId] = useState('');
     const [dose, setDose] = useState('');
     const [doseUnit, setDoseUnit] = useState('');
@@ -49,8 +140,6 @@ function PrescriptionsCard({ encounter }: { encounter: ClinicalEncounterSummary 
     const [instructions, setInstructions] = useState('');
     const [saving, setSaving] = useState(false);
 
-    const medications = catalog.state.status === 'success' ? catalog.state.data : [];
-    const selected = medications.find((m) => m.id === medicationId);
     const doseValue = Number(dose);
     const valid = Boolean(medicationId && route && doseUnit.trim() && frequency.trim() && dose && doseValue > 0);
 
@@ -69,7 +158,7 @@ function PrescriptionsCard({ encounter }: { encounter: ClinicalEncounterSummary 
         if (saving || !valid || !route) return;
         setSaving(true);
         try {
-            await clinicalApi.createPrescription(encounter.id, {
+            await clinicalApi.createPrescription(encounterId, {
                 notes: null,
                 details: [
                     {
@@ -112,41 +201,28 @@ function PrescriptionsCard({ encounter }: { encounter: ClinicalEncounterSummary 
                                 </span>
                                 {p.details.map((d) => (
                                     <span key={d.id} className="text-sm text-ink">
-                                        <span className="font-semibold">{d.medicationName}</span> — {d.dose} {d.doseUnit}, {ROUTE_LABELS[d.route]},{' '}
-                                        {d.frequency}
-                                        {d.durationDays !== null && `, ${d.durationDays} días`}
+                                        <span className="font-semibold">{d.medicationName}</span> — {describeLine(d)}
                                         {d.instructions && <span className="block text-xs text-ink-muted">{d.instructions}</span>}
                                     </span>
                                 ))}
+                                {p.notes && <span className="text-xs text-ink-muted">{p.notes}</span>}
                             </li>
                         ))}
                     </ul>
                 )}
             </QueryView>
 
-            {open && canPrescribe && (
+            {canWrite && (
                 <form onSubmit={submit} className="mt-5 flex flex-col gap-3 border-t border-line-soft pt-4">
                     <h3 className="m-0 text-sm font-semibold text-ink">Nueva prescripción</h3>
-                    {catalog.state.status === 'error' ? (
-                        <QueryView state={catalog.state} onRetry={catalog.reload} errorTitle="No se pudo cargar el catálogo de medicamentos.">
-                            {() => null}
-                        </QueryView>
-                    ) : (
-                        <Select
-                            label="Medicamento"
-                            value={medicationId}
-                            onChange={(e) => setMedicationId(e.target.value)}
-                            options={medications.map((m) => ({
-                                value: m.id,
-                                label: [m.name, m.concentration, m.presentation].filter(Boolean).join(' · ') + (m.status === 'Inactive' ? ' (inactivo)' : ''),
-                                disabled: m.status !== 'Active',
-                            }))}
-                            placeholder={catalog.state.status === 'loading' ? 'Cargando catálogo…' : 'Selecciona del catálogo…'}
-                            disabled={catalog.state.status !== 'success'}
-                            hint={selected?.defaultRoute ? `Vía habitual: ${ROUTE_LABELS[selected.defaultRoute]}` : undefined}
-                            required
-                        />
-                    )}
+                    <CatalogSelect
+                        catalog={catalog}
+                        value={medicationId}
+                        onChange={(m) => {
+                            setMedicationId(m?.id ?? '');
+                            if (m?.defaultRoute && !route) setRoute(m.defaultRoute);
+                        }}
+                    />
                     <div className="grid gap-3 sm:grid-cols-3">
                         <Input label="Dosis" type="number" inputMode="decimal" min={0} step="any" value={dose} onChange={(e) => setDose(e.target.value)} required />
                         <Input label="Unidad" value={doseUnit} onChange={(e) => setDoseUnit(e.target.value)} placeholder="mg, mL, UI…" required maxLength={20} />
@@ -154,7 +230,7 @@ function PrescriptionsCard({ encounter }: { encounter: ClinicalEncounterSummary 
                             label="Vía"
                             value={route}
                             onChange={(e) => setRoute(e.target.value as MedicationRoute | '')}
-                            options={(Object.keys(ROUTE_LABELS) as MedicationRoute[]).map((r) => ({ value: r, label: ROUTE_LABELS[r] }))}
+                            options={ROUTE_OPTIONS}
                             placeholder="Selecciona…"
                             required
                         />
@@ -181,23 +257,64 @@ function PrescriptionsCard({ encounter }: { encounter: ClinicalEncounterSummary 
     );
 }
 
-function AdministrationsCard({ encounterId }: { encounterId: string }) {
-    const { state, reload } = useClinicalQuery(`administrations:${encounterId}`, (signal) =>
-        clinicalApi.listMedicationAdministrations(encounterId, signal),
-    );
+// Valor del selector de línea para una dosis fuera de prescripción.
+const UNPRESCRIBED = 'none';
+
+function KardexCard({
+    encounterId,
+    prescriptions,
+    administrations,
+    catalog,
+    canWrite,
+}: {
+    encounterId: string;
+    prescriptions: Query<Prescription[]>;
+    administrations: Query<MedicationAdministration[]>;
+    catalog: Query<Medication[]>;
+    canWrite: boolean;
+}) {
+    // Líneas de prescripciones emitidas: son las que admiten administraciones.
+    const lines =
+        prescriptions.state.status === 'success'
+            ? prescriptions.state.data.filter((p) => p.status === 'Issued').flatMap((p) => p.details.map((d) => ({ prescription: p, detail: d })))
+            : [];
+    const given = administrations.state.status === 'success' ? administrations.state.data : [];
 
     return (
         <Card
             title="Administración de medicamentos (Kardex)"
-            subtitle="Registro independiente de la prescripción."
+            subtitle="Tratamiento prescrito y dosis administradas, tal como están registrados."
             actions={<SimulatedBadge feature="administrations" />}
         >
+            {lines.length > 0 && (
+                <section aria-label="Tratamiento prescrito" className="mb-4 flex flex-col gap-2">
+                    <h3 className="m-0 text-sm font-semibold text-ink">Tratamiento prescrito</h3>
+                    <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                        {lines.map(({ detail }) => {
+                            const doses = given.filter((a) => a.prescriptionDetailId === detail.id && a.status === 'Completed');
+                            return (
+                                <li key={detail.id} className="flex flex-col gap-0.5 rounded-lg bg-surface-subtle px-3 py-2 text-sm">
+                                    <span className="text-ink">
+                                        <span className="font-semibold">{detail.medicationName}</span> — {describeLine(detail)}
+                                    </span>
+                                    <span className="text-xs text-ink-muted">
+                                        {doses.length === 0
+                                            ? 'Sin dosis administradas'
+                                            : `${doses.length} ${doses.length === 1 ? 'dosis administrada' : 'dosis administradas'} · última ${formatDateTimeUtc(doses[0].administeredAtUtc)}`}
+                                    </span>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </section>
+            )}
+
             <QueryView
-                state={state}
-                onRetry={reload}
+                state={administrations.state}
+                onRetry={administrations.reload}
                 errorTitle="No se pudo cargar el Kardex."
                 isEmpty={(list) => list.length === 0}
-                empty={<EmptyState title="Sin administraciones registradas" description="El registro de administraciones llegará con su contrato en el backend." />}
+                empty={<EmptyState title="Sin administraciones registradas" />}
             >
                 {(list) => (
                     <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -208,21 +325,145 @@ function AdministrationsCard({ encounterId }: { encounterId: string }) {
                                 </span>
                                 <span className="text-xs text-ink-muted">
                                     {formatDateTimeUtc(a.administeredAtUtc)}
+                                    {a.prescriptionId === null && ' · Sin prescripción'}
                                     {a.status === 'EnteredInError' && ' · Registrado por error'}
                                 </span>
+                                {a.notes && <span className="text-xs text-ink-muted">{a.notes}</span>}
                             </li>
                         ))}
                     </ul>
                 )}
             </QueryView>
+
+            {canWrite && (
+                <AdministrationForm
+                    encounterId={encounterId}
+                    lines={lines}
+                    catalog={catalog}
+                    onSaved={() => {
+                        administrations.reload();
+                    }}
+                />
+            )}
         </Card>
+    );
+}
+
+function AdministrationForm({
+    encounterId,
+    lines,
+    catalog,
+    onSaved,
+}: {
+    encounterId: string;
+    lines: { prescription: Prescription; detail: PrescriptionDetail }[];
+    catalog: Query<Medication[]>;
+    onSaved: () => void;
+}) {
+    const feedback = useClinicalFeedback('administrations');
+    const [lineId, setLineId] = useState('');
+    const [medicationId, setMedicationId] = useState('');
+    const [dose, setDose] = useState('');
+    const [doseUnit, setDoseUnit] = useState('');
+    const [route, setRoute] = useState<MedicationRoute | ''>('');
+    const [notes, setNotes] = useState('');
+    const administeredAt = useClinicalTime();
+    const [saving, setSaving] = useState(false);
+
+    const line = lines.find((l) => l.detail.id === lineId);
+    const doseValue = Number(dose);
+    const valid = Boolean(lineId && (line || medicationId) && route && doseUnit.trim() && dose && doseValue > 0);
+
+    // Una línea prescrita fija el medicamento y propone su dosis, unidad y vía.
+    const chooseLine = (value: string) => {
+        setLineId(value);
+        const chosen = lines.find((l) => l.detail.id === value);
+        setMedicationId(chosen?.detail.medicationId ?? '');
+        setDose(chosen ? String(chosen.detail.dose) : '');
+        setDoseUnit(chosen?.detail.doseUnit ?? '');
+        setRoute(chosen?.detail.route ?? '');
+    };
+
+    const submit = async (e: FormEvent) => {
+        e.preventDefault();
+        if (saving || !valid || !route) return;
+        setSaving(true);
+        try {
+            await clinicalApi.createMedicationAdministration(encounterId, {
+                medicationId: line ? line.detail.medicationId : medicationId,
+                dose: doseValue,
+                doseUnit: doseUnit.trim(),
+                route,
+                administeredAtUtc: administeredAt.toUtc(),
+                prescriptionId: line?.prescription.id ?? null,
+                prescriptionDetailId: line?.detail.id ?? null,
+                notes: notes.trim() || null,
+            });
+            feedback.success('administración registrada');
+            chooseLine('');
+            setNotes('');
+            administeredAt.reset();
+            onSaved();
+        } catch (error) {
+            feedback.failure('No se pudo registrar la administración.', error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <form onSubmit={submit} className="mt-5 flex flex-col gap-3 border-t border-line-soft pt-4">
+            <h3 className="m-0 text-sm font-semibold text-ink">Registrar administración</h3>
+            <Select
+                label="Línea de tratamiento"
+                value={lineId}
+                onChange={(e) => chooseLine(e.target.value)}
+                options={[
+                    ...lines.map(({ detail }) => ({ value: detail.id, label: `${detail.medicationName} — ${describeLine(detail)}` })),
+                    { value: UNPRESCRIBED, label: 'Sin prescripción (medicamento del catálogo)' },
+                ]}
+                placeholder="Selecciona…"
+                required
+            />
+            {lineId === UNPRESCRIBED && (
+                <CatalogSelect
+                    catalog={catalog}
+                    value={medicationId}
+                    onChange={(m) => {
+                        setMedicationId(m?.id ?? '');
+                        if (m?.defaultRoute && !route) setRoute(m.defaultRoute);
+                    }}
+                />
+            )}
+            <div className="grid gap-3 sm:grid-cols-3">
+                <Input label="Dosis administrada" type="number" inputMode="decimal" min={0} step="any" value={dose} onChange={(e) => setDose(e.target.value)} required />
+                <Input label="Unidad" value={doseUnit} onChange={(e) => setDoseUnit(e.target.value)} placeholder="mg, mL, UI…" required maxLength={20} />
+                <Select
+                    label="Vía"
+                    value={route}
+                    onChange={(e) => setRoute(e.target.value as MedicationRoute | '')}
+                    options={ROUTE_OPTIONS}
+                    placeholder="Selecciona…"
+                    required
+                />
+            </div>
+            <Input
+                label="Fecha y hora de administración"
+                type="datetime-local"
+                value={administeredAt.value}
+                onChange={(e) => administeredAt.change(e.target.value)}
+                required
+            />
+            <Textarea label="Observaciones (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+            <Button type="submit" loading={saving} loadingText="Registrando…" disabled={!valid} className="w-full sm:w-fit">
+                Registrar administración
+            </Button>
+        </form>
     );
 }
 
 function DischargeCard({ encounter, onClosed }: { encounter: ClinicalEncounterSummary; onClosed: () => void }) {
     const feedback = useClinicalFeedback('discharge');
-    // Con atenciones reales, cerrar no puede simularse sin desincronizar su estado: se deshabilita hasta tener backend.
-    const backendMissing = isSimulated('discharge') && !CLINICAL_API_IS_MOCK;
     const [note, setNote] = useState('');
     const [confirming, setConfirming] = useState(false);
     const canClose = useAuth().can(Permissions.Encounters.Close);
@@ -258,21 +499,20 @@ function DischargeCard({ encounter, onClosed }: { encounter: ClinicalEncounterSu
             actions={<SimulatedBadge feature="discharge" />}
         >
             <div className="flex flex-col gap-3">
-                {backendMissing && (
-                    <p role="note" className="m-0 rounded-lg bg-warning-50 px-3 py-2 text-[13px] text-warning-700">
-                        El egreso todavía no está disponible en el backend; la atención no puede cerrarse desde aquí.
-                    </p>
-                )}
                 <Textarea label="Nota de egreso (opcional)" value={note} onChange={(e) => setNote(e.target.value)} rows={4} />
                 {!closable && (
                     <p className="m-0 text-xs text-warning-700">
                         Una atención en estado «{ENCOUNTER_STATUS[encounter.status].label}» no puede cerrarse todavía.
                     </p>
                 )}
-                {!canClose && <p className="m-0 text-xs text-ink-muted">Cerrar la atención requiere el permiso Encounters.Close.</p>}
-                <Button variant="danger" className="w-full sm:w-fit" disabled={!closable || !canClose || backendMissing} onClick={() => setConfirming(true)}>
-                    Cerrar atención
-                </Button>
+                {/* La acción solo existe con el permiso real; el backend sigue siendo la autoridad (403/409). */}
+                {canClose ? (
+                    <Button variant="danger" className="w-full sm:w-fit" disabled={!closable} onClick={() => setConfirming(true)}>
+                        Cerrar atención
+                    </Button>
+                ) : (
+                    <p className="m-0 text-xs text-ink-muted">Cerrar la atención requiere el permiso Encounters.Close.</p>
+                )}
             </div>
             <ConfirmDialog
                 open={confirming}

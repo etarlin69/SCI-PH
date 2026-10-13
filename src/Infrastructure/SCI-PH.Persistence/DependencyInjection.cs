@@ -65,6 +65,7 @@ namespace SCI_PH.Persistence
             services.AddScoped<IClinicalIdentityLinkService, ClinicalIdentityLinkService>();
             services.AddScoped<IClinicalStaffDirectory, ClinicalStaffDirectory>();
             services.AddScoped<IClinicalReadStore, ClinicalReadStore>();
+            services.AddScoped<IClinicalOrganizationStore, ClinicalOrganizationStore>();
             services.AddScoped<IClinicalWriteStore, ClinicalWriteStore>();
             services.AddScoped<IdentitySeeder>();
             services.AddOptions<IdentityBootstrapOptions>().Bind(configuration.GetSection(IdentityBootstrapOptions.SectionName));
