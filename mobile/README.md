@@ -6,7 +6,7 @@ solución, separada del backend:
 | Solución | Contenido |
 |---|---|
 | `SCI-PH.sln` (raíz) | Backend: Domain, Application, Persistence, Infrastructure, BFFs, Device API y tests |
-| `mobile/SCI-PH.Mobile.sln` | App MAUI `mobile/SCI-PH.Mobile/SCI-PH.Mobile.csproj` |
+| `mobile/SCI-PH.Mobile.sln` | App MAUI `mobile/SCI-PH.Mobile/SCI-PH.Mobile.csproj` y sus tests `mobile/tests/SCI-PH.Mobile.Tests` |
 
 La app no referencia proyectos del backend: se comunicará con `SCI-PH.Mobile.BFF` (`/api/mobile`) por HTTP, según
 [docs/api/mobile-bff-contracts.md](../docs/api/mobile-bff-contracts.md).
@@ -31,6 +31,8 @@ mobile/
       Patient/                    Rol 7: pendiente de integrar desde el PR #18
     Resources/                    Fuentes, iconos, splash y estilos (SciPhTheme)
     Platforms/                    Android, iOS, Mac Catalyst, Windows, Tizen
+  tests/
+    SCI-PH.Mobile.Tests/          xUnit (net9.0): ViewModels y servicios con fakes, sin UI
 ```
 
 Reglas de cada feature:
@@ -82,15 +84,25 @@ dotnet build mobile/SCI-PH.Mobile/SCI-PH.Mobile.csproj -f net9.0-android
 dotnet build mobile/SCI-PH.Mobile/SCI-PH.Mobile.csproj -f net9.0-windows10.0.19041.0
 ```
 
-iOS y Mac Catalyst requieren macOS. En Windows, el target Windows muestra el aviso MVVMTK0045 de
+iOS y Mac Catalyst se compilan en Windows, pero ejecutarlos y publicarlos requiere macOS. En Windows, el target Windows muestra el aviso MVVMTK0045 de
 CommunityToolkit.Mvvm (`[ObservableProperty]` sobre campos); pasar a propiedades parciales exige
 `LangVersion=preview` y se decidirá para toda la app.
+
+## Tests
+
+```powershell
+dotnet test mobile/tests/SCI-PH.Mobile.Tests/SCI-PH.Mobile.Tests.csproj
+```
+
+La app tiene además el target `net9.0` (sin `OutputType=Exe`): no es una app ni se publica, solo compila la lógica
+sin interfaz para que el proyecto de tests la referencie. Los tests usan fakes de `IAppNavigator`,
+`IAppDialogService` y de los servicios de cada feature, sin Shell, ventanas ni handlers. Sin tests de render XAML,
+de dispositivo ni de integración con el Mobile BFF por ahora.
 
 ## Pendiente
 
 - Integrar `Features/Patient` desde el PR #18.
 - Cliente HTTP del Mobile BFF, sesión con SecureStorage, refresh y manejo de 401.
 - Huella real (Device API), catálogos reales, pantalla de transferencia, modo sin conexión.
-- Proyecto de tests de ViewModels (requiere decidir cómo compilar la lógica fuera de los TFM de plataforma).
 - CI móvil (pendiente con el Rol 9).
 - Identidad de la app (`ApplicationId`) definitiva.
