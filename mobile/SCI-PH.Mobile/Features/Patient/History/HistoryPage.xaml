@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<ContentPage
+    x:Class="SCI_PH.Mobile.Features.Patient.History.HistoryPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Patient.ViewModels"
+    xmlns:dtos="clr-namespace:SCI_PH.Mobile.Features.Patient.Models.Dtos"
+    x:DataType="vm:HistoryViewModel"
+    Title="Historial clínico"
+    BackgroundColor="{StaticResource PatientPageBackground}">
+
+    <ContentPage.Resources>
+        <DataTemplate x:Key="HistoryItemTemplate" x:DataType="dtos:ClinicalHistoryItemDto">
+            <VerticalStackLayout Spacing="3">
+                <Label
+                    Text="{Binding Title}"
+                    FontSize="16"
+                    FontAttributes="Bold"
+                    TextColor="#24364F" />
+                <Label
+                    Text="{Binding Detail}"
+                    FontSize="13"
+                    TextColor="#69778A" />
+            </VerticalStackLayout>
+        </DataTemplate>
+    </ContentPage.Resources>
+
+    <!-- Listas cortas dentro de un ScrollView: BindableLayout evita anidar CollectionView con scroll propio. -->
+
+    <ScrollView>
+
+        <VerticalStackLayout
+            Padding="20"
+            Spacing="17">
+
+            <Label
+                Text="Historial clínico"
+                Style="{StaticResource PatientPageTitleStyle}" />
+
+            <Label
+                Text="Información clínica disponible en tu expediente SCI-PH."
+                Style="{StaticResource CardBodyStyle}" />
+
+            <ActivityIndicator
+                IsRunning="{Binding IsBusy}"
+                IsVisible="{Binding IsBusy}"
+                Color="{StaticResource ColorPrimary}" />
+
+            <Label
+                Text="{Binding ErrorMessage}"
+                IsVisible="{Binding HasError}"
+                Style="{StaticResource ErrorTextStyle}" />
+
+            <!-- ALERGIAS -->
+
+            <Border Style="{StaticResource PatientCardStyle}">
+
+                <VerticalStackLayout Spacing="10">
+
+                    <Label
+                        Text="Alergias"
+                        FontSize="19"
+                        FontAttributes="Bold"
+                        TextColor="{StaticResource TitleText}" />
+
+                    <VerticalStackLayout
+                        Spacing="8"
+                        BindableLayout.ItemsSource="{Binding History.Allergies}">
+
+                        <BindableLayout.EmptyView>
+                            <Label Text="Sin alergias registradas." Style="{StaticResource CardMetaStyle}" />
+                        </BindableLayout.EmptyView>
+
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="dtos:ClinicalHistoryItemDto">
+
+                                <Border
+                                    BackgroundColor="#FFF5F5"
+                                    StrokeThickness="0"
+                                    Padding="12">
+
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="10" />
+                                    </Border.StrokeShape>
+
+                                    <VerticalStackLayout Spacing="3">
+
+                                        <Label
+                                            Text="{Binding Title}"
+                                            FontSize="16"
+                                            FontAttributes="Bold"
+                                            TextColor="#9F3030" />
+
+                                        <Label
+                                            Text="{Binding Detail}"
+                                            FontSize="13"
+                                            TextColor="#6E4444" />
+
+                                    </VerticalStackLayout>
+
+                                </Border>
+
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+
+                    </VerticalStackLayout>
+
+                </VerticalStackLayout>
+
+            </Border>
+
+            <!-- CONDICIONES -->
+
+            <Border Style="{StaticResource PatientCardStyle}">
+
+                <VerticalStackLayout Spacing="9">
+
+                    <Label
+                        Text="Condiciones médicas"
+                        FontSize="19"
+                        FontAttributes="Bold"
+                        TextColor="{StaticResource TitleText}" />
+
+                    <VerticalStackLayout
+                        Spacing="9"
+                        BindableLayout.ItemsSource="{Binding History.Conditions}"
+                        BindableLayout.ItemTemplate="{StaticResource HistoryItemTemplate}">
+
+                        <BindableLayout.EmptyView>
+                            <Label Text="Sin condiciones registradas." Style="{StaticResource CardMetaStyle}" />
+                        </BindableLayout.EmptyView>
+
+                    </VerticalStackLayout>
+
+                </VerticalStackLayout>
+
+            </Border>
+
+            <!-- MEDICACIÓN -->
+
+            <Border Style="{StaticResource PatientCardStyle}">
+
+                <VerticalStackLayout Spacing="9">
+
+                    <Label
+                        Text="Medicamentos habituales"
+                        FontSize="19"
+                        FontAttributes="Bold"
+                        TextColor="{StaticResource TitleText}" />
+
+                    <VerticalStackLayout
+                        Spacing="9"
+                        BindableLayout.ItemsSource="{Binding History.Medications}"
+                        BindableLayout.ItemTemplate="{StaticResource HistoryItemTemplate}">
+
+                        <BindableLayout.EmptyView>
+                            <Label Text="Sin medicamentos registrados." Style="{StaticResource CardMetaStyle}" />
+                        </BindableLayout.EmptyView>
+
+                    </VerticalStackLayout>
+
+                </VerticalStackLayout>
+
+            </Border>
+
+            <!-- EPISODIOS -->
+
+            <Label
+                Text="Episodios"
+                Style="{StaticResource PatientSectionTitleStyle}" />
+
+            <VerticalStackLayout
+                Spacing="12"
+                BindableLayout.ItemsSource="{Binding History.Episodes}">
+
+                <BindableLayout.EmptyView>
+                    <Label Text="Sin episodios registrados." Style="{StaticResource CardMetaStyle}" />
+                </BindableLayout.EmptyView>
+
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="dtos:EpisodeItemDto">
+
+                        <Border Style="{StaticResource PatientCardStyle}">
+
+                            <VerticalStackLayout Spacing="7">
+
+                                <Label
+                                    Text="{Binding Title}"
+                                    Style="{StaticResource CardTitleStyle}" />
+
+                                <Label
+                                    Text="{Binding Facility}"
+                                    Style="{StaticResource CardBodyStyle}" />
+
+                                <Label
+                                    Text="{Binding DateLabel}"
+                                    Style="{StaticResource CardMetaStyle}" />
+
+                            </VerticalStackLayout>
+
+                        </Border>
+
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+
+    </ScrollView>
+
+</ContentPage>

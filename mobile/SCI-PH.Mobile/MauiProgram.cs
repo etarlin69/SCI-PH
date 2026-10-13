@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using SCI_PH.Mobile.Extensions;
 using SCI_PH.Mobile.Features.Paramedic;
+using SCI_PH.Mobile.Features.Patient;
 
 namespace SCI_PH.Mobile
 {
@@ -21,8 +22,9 @@ namespace SCI_PH.Mobile
     		builder.Logging.AddDebug();
 #endif
             builder.Services
-                .AddCoreServices() // // compartido para el compa del rol 7
-                .AddParamedicFeature();
+                .AddCoreServices()
+                .AddParamedicFeature()
+                .AddPatientFeature();
 
             return builder.Build();
         }

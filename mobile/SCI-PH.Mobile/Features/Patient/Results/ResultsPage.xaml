@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<ContentPage
+    x:Class="SCI_PH.Mobile.Features.Patient.Results.ResultsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Patient.ViewModels"
+    xmlns:dtos="clr-namespace:SCI_PH.Mobile.Features.Patient.Models.Dtos"
+    x:DataType="vm:ResultsViewModel"
+    Title="Resultados"
+    BackgroundColor="{StaticResource PatientPageBackground}">
+
+    <CollectionView
+        ItemsSource="{Binding Results}"
+        SelectionMode="None"
+        Margin="20,0">
+
+        <CollectionView.ItemsLayout>
+            <LinearItemsLayout Orientation="Vertical" ItemSpacing="17" />
+        </CollectionView.ItemsLayout>
+
+        <CollectionView.Header>
+            <VerticalStackLayout Padding="0,20,0,17" Spacing="17">
+
+                <Label
+                    Text="Resultados clínicos"
+                    Style="{StaticResource PatientPageTitleStyle}" />
+
+                <Label
+                    Text="Consulta los resultados publicados para tu expediente."
+                    Style="{StaticResource CardBodyStyle}" />
+
+                <ActivityIndicator
+                    IsRunning="{Binding IsBusy}"
+                    IsVisible="{Binding IsBusy}"
+                    Color="{StaticResource ColorPrimary}" />
+
+                <Label
+                    Text="{Binding ErrorMessage}"
+                    IsVisible="{Binding HasError}"
+                    Style="{StaticResource ErrorTextStyle}" />
+
+            </VerticalStackLayout>
+        </CollectionView.Header>
+
+        <CollectionView.EmptyView>
+            <Label
+                Text="Todavía no hay resultados publicados."
+                IsVisible="{Binding IsNotBusy}"
+                Style="{StaticResource CardMetaStyle}" />
+        </CollectionView.EmptyView>
+
+        <CollectionView.ItemTemplate>
+            <DataTemplate x:DataType="dtos:ResultItemDto">
+
+                <Border Style="{StaticResource PatientCardStyle}">
+
+                    <VerticalStackLayout Spacing="8">
+
+                        <Grid ColumnDefinitions="*,Auto">
+
+                            <Label
+                                Text="{Binding Name}"
+                                FontSize="18"
+                                FontAttributes="Bold"
+                                TextColor="{StaticResource TitleText}" />
+
+                            <Border Grid.Column="1" Style="{StaticResource StatusBadgeStyle}">
+                                <Label
+                                    Text="{Binding Status}"
+                                    Style="{StaticResource StatusBadgeTextStyle}" />
+                            </Border>
+
+                        </Grid>
+
+                        <Label
+                            Text="{Binding Value}"
+                            IsVisible="{Binding Value, Converter={StaticResource IsNotNullConverter}}"
+                            FontSize="30"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource ColorPrimary}" />
+
+                        <Label
+                            Text="{Binding Source}"
+                            IsVisible="{Binding Source, Converter={StaticResource IsNotNullConverter}}"
+                            Style="{StaticResource CardBodyStyle}" />
+
+                        <Label
+                            Text="{Binding DateLabel}"
+                            Style="{StaticResource CardMetaStyle}" />
+
+                        <Label
+                            Text="{Binding Note}"
+                            IsVisible="{Binding Note, Converter={StaticResource IsNotNullConverter}}"
+                            Style="{StaticResource CardMetaStyle}" />
+
+                    </VerticalStackLayout>
+
+                </Border>
+
+            </DataTemplate>
+        </CollectionView.ItemTemplate>
+
+        <CollectionView.Footer>
+            <Label
+                Padding="0,17,0,20"
+                Text="Utiliza SCI-PH AI si deseas una explicación educativa de tus resultados."
+                FontSize="13"
+                TextColor="{StaticResource InfoText}" />
+        </CollectionView.Footer>
+
+    </CollectionView>
+
+</ContentPage>

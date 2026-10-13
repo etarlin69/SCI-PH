@@ -20,6 +20,8 @@
 		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<!-- Compila también los bindings con Source (p. ej. RelativeSource en las plantillas de CollectionView). -->
+		<MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
 
 		<!-- Display name -->
 		<ApplicationTitle>SCI-PH.Mobile</ApplicationTitle>
@@ -51,6 +53,8 @@
 
 		<!-- Images -->
 		<MauiImage Include="Resources\Images\*" />
+		<!-- Avatar por defecto del paciente: se muestra como máximo a 132 x 132. -->
+		<MauiImage Update="Resources\Images\patient_avatar.png" BaseSize="132,132" />
 		
 		<!-- Custom Fonts -->
 		<MauiFont Include="Resources\Fonts\*" />
