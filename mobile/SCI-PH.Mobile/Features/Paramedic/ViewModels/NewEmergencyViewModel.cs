@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SCI_PH.Mobile.Common.Location;
 using SCI_PH.Mobile.Common.Navigation;
 using SCI_PH.Mobile.Common.ViewModels;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
@@ -11,16 +12,18 @@ public partial class NewEmergencyViewModel : BaseViewModel
 {
     private readonly IParamedicApiService _api;
     private readonly IAppNavigator _navigator;
+    private readonly IDeviceLocationService _location;
 
     // Se conservan entre reintentos del mismo envío para que el servidor no cree dos emergencias;
     // se renuevan cuando la emergencia se crea correctamente.
     private Guid? _clientRequestId;
     private DateTime? _startedAt;
 
-    public NewEmergencyViewModel(IParamedicApiService api, IAppNavigator navigator)
+    public NewEmergencyViewModel(IParamedicApiService api, IAppNavigator navigator, IDeviceLocationService location)
     {
         _api = api;
         _navigator = navigator;
+        _location = location;
     }
 
     [ObservableProperty]
@@ -57,21 +60,12 @@ public partial class NewEmergencyViewModel : BaseViewModel
         }, "No se pudo crear la emergencia. Intenta nuevamente.");
     }
 
-    // Mejor esfuerzo: si no hay permiso o GPS, la emergencia se crea sin coordenadas.
-    // Para que funcione hay que declarar ACCESS_FINE_LOCATION en AndroidManifest.xml
-    // y solicitar el permiso en tiempo de ejecución (pendiente).
-    private static async Task<LocationDto?> TryGetLocationAsync()
+    // Mejor esfuerzo: si no hay permiso, GPS o posición conocida, la emergencia se crea sin coordenadas.
+    private async Task<LocationDto?> TryGetLocationAsync()
     {
-        try
-        {
-            var loc = await Geolocation.Default.GetLastKnownLocationAsync();
-            return loc is null
-                ? null
-                : new LocationDto { Latitude = loc.Latitude, Longitude = loc.Longitude };
-        }
-        catch (Exception)
-        {
-            return null;
-        }
+        var location = await _location.TryGetLocationAsync();
+        return location is null
+            ? null
+            : new LocationDto { Latitude = location.Latitude, Longitude = location.Longitude };
     }
 }

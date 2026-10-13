@@ -1,4 +1,5 @@
 using SCI_PH.Mobile.Common.Dialogs;
+using SCI_PH.Mobile.Common.Location;
 using SCI_PH.Mobile.Common.Navigation;
 
 namespace SCI_PH.Mobile.Extensions
@@ -13,6 +14,8 @@ namespace SCI_PH.Mobile.Extensions
         {
             services.AddSingleton<IAppNavigator, ShellAppNavigator>();
             services.AddSingleton<IAppDialogService, ShellAppDialogService>();
+            services.AddSingleton(Geolocation.Default);
+            services.AddSingleton<IDeviceLocationService, MauiDeviceLocationService>();
             return services;
         }
     }
