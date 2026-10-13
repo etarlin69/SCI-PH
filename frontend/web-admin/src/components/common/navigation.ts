@@ -33,7 +33,7 @@ export interface NavSection {
 }
 
 /**
- * Permiso provisional de las pantallas DEMO (clínicas, personal, catálogos): el backend aún no define permisos
+ * Permiso provisional de las pantallas DEMO que quedan (catálogos): el backend aún no define permisos
  * ni endpoints para ellas, así que se limitan a quien administra cuentas.
  */
 export const DEMO_ADMIN_PERMISSIONS: readonly Permission[] = [Permissions.Users.Manage];
@@ -57,8 +57,8 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Operación',
     items: [
-      { to: '/admin/clinicas', label: 'Clínicas', icon: Building2, anyOf: DEMO_ADMIN_PERMISSIONS, demo: true },
-      { to: '/admin/personal', label: 'Personal', icon: ClipboardList, anyOf: DEMO_ADMIN_PERMISSIONS, demo: true },
+      { to: '/admin/clinicas', label: 'Clínicas', icon: Building2, anyOf: [Permissions.Clinics.Manage] },
+      { to: '/admin/personal', label: 'Personal', icon: ClipboardList, anyOf: [Permissions.ClinicalStaff.Manage] },
       { to: '/admin/dispositivos', label: 'Dispositivos', icon: Tablet, anyOf: [Permissions.Devices.Manage] },
       { to: '/admin/catalogos', label: 'Catálogos', icon: Layers, anyOf: DEMO_ADMIN_PERMISSIONS, demo: true },
     ],

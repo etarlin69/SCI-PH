@@ -5,7 +5,8 @@ namespace SCI_PH.Persistence.Clinical.Seed
     // Development only (the host must be in the Development environment AND Enabled must be true). Creates a demo
     // clinic and ClinicalStaff records affiliated with it, so an administrator can invite them
     // (POST /api/web/admin/invitations/staff links the account on activation). It never creates accounts and holds no
-    // credentials. Optional e-mails (User Secrets, not the repository) link accounts that already exist.
+    // credentials. Optional e-mails (User Secrets, not the repository) link accounts that already exist. It also adds a
+    // small demo medication catalog ("DEV-" codes) so prescriptions and the Kardex can be exercised.
     public sealed class ClinicalDevelopmentSeedOptions
     {
         public const string SectionName = "ClinicalDevelopmentSeed";

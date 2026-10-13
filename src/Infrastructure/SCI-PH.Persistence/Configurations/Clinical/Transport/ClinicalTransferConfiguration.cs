@@ -21,6 +21,9 @@ namespace SCI_PH.Persistence.Configurations.Clinical.Transport
             const string cancelledAt = nameof(ClinicalTransfer.CancelledAtUtc);
 
             builder.HasKey(x => x.Id);
+            // Concurrent dispatch, cancel or receive of the same transfer: the second writer fails instead of overwriting
+            // (a cancel of a Requested transfer does not touch the encounter, so the encounter token alone is not enough).
+            builder.Property(x => x.Status).IsConcurrencyToken();
             builder.Property(x => x.Reason).HasMaxLength(FieldLengths.ShortText);
             builder.Property(x => x.Notes).HasMaxLength(FieldLengths.LongText);
 
@@ -32,6 +35,11 @@ namespace SCI_PH.Persistence.Configurations.Clinical.Transport
             builder.HasOne<ClinicalStaff>().WithMany().HasForeignKey(x => x.ReceivedByStaffId);
 
             builder.HasIndex(x => new { x.ClinicalEncounterId, x.RequestedAtUtc });
+            // One active (Requested or InTransit) transfer per encounter, also under concurrent requests.
+            builder.HasIndex(x => x.ClinicalEncounterId)
+                .IsUnique()
+                .HasDatabaseName("UX_ClinicalTransfers_ActivePerEncounter")
+                .HasFilter(In(status, ClinicalTransfer.ActiveStatuses));
             builder.HasIndex(x => new { x.DestinationClinicId, x.Status });
             builder.HasIndex(x => new { x.Status, x.RequestedAtUtc });
 

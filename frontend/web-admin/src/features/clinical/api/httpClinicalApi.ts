@@ -3,24 +3,40 @@ import type {
     AdmissionEncounterSummary,
     ClinicalContext,
     ClinicalEncounterSummary,
+    ClinicalNote,
+    ClinicalTransfer,
+    Diagnosis,
+    Medication,
+    MedicationAdministration,
     PatientSummary,
+    Prescription,
+    PrescriptionDetailInput,
     Triage,
     VitalSign,
     VitalSignInput,
 } from '../types/clinical.types';
-import { ClinicalApiError, type ClinicalApi } from './clinicalApi';
+import type { ClinicalApi } from './clinicalApi';
 import { clinicIdForRequest } from './clinicSelection';
-import { mockClinicalApi } from './mockClinicalApi';
 
 // Adaptador HTTP real: React Hospital → apiRequest → Web BFF → Application → ClinicalDbContext → PostgreSQL.
-// Solo las funciones de la vertical clínica 1 van al backend (pacientes, atenciones, admisión, triage y signos vitales).
-// El resto sigue en el MOCK (marcado «Simulación» en la UI) hasta que tenga endpoints.
+// Van al backend: pacientes, atenciones, admisión, triage, signos vitales (vertical 1); notas clínicas, diagnósticos y
+// cierre de la atención (vertical 2); catálogo de medicamentos, prescripciones y Kardex (vertical 3); traslados entrantes
+// y su recepción (vertical 4). El adaptador MOCK solo se usa con VITE_CLINICAL_API_MODE=mock.
 
 const BASE = '/api/web';
 const id = (value: string) => encodeURIComponent(value);
 
 // Solo los campos del contrato: el BFF rechaza miembros desconocidos (p. ej. `unit`, que fija el Domain).
 const toMeasurement = ({ type, value, measuredAtUtc }: VitalSignInput): VitalSignInput => ({ type, value, measuredAtUtc });
+const toPrescriptionLine = ({ medicationId, dose, doseUnit, route, frequency, durationDays, instructions }: PrescriptionDetailInput): PrescriptionDetailInput => ({
+    medicationId,
+    dose,
+    doseUnit,
+    route,
+    frequency,
+    durationDays,
+    instructions,
+});
 
 export const httpClinicalApi: ClinicalApi = {
     getClinicalContext: (signal) => apiRequest<ClinicalContext>(`${BASE}/clinical/context`, { signal }),
@@ -64,18 +80,55 @@ export const httpClinicalApi: ClinicalApi = {
     createVitalSign: (encounterId, request) =>
         apiRequest<VitalSign>(`${BASE}/encounters/${id(encounterId)}/vital-signs`, { method: 'POST', body: toMeasurement(request) }),
 
-    // ---- Sin backend todavía ------------------------------------------------------------------------------------
-    // Cerrar una atención real no puede simularse sin desincronizar su estado: se rechaza de forma explícita.
-    closeEncounter: () => Promise.reject(new ClinicalApiError(501, 'El egreso todavía no está disponible en el backend.')),
+    // El autor y la fecha de registro los fija el backend desde la sesión: solo se envían los campos del contrato.
+    listNotes: (encounterId, signal) => apiRequest<ClinicalNote[]>(`${BASE}/encounters/${id(encounterId)}/notes`, { signal }),
 
-    listNotes: mockClinicalApi.listNotes,
-    createNote: mockClinicalApi.createNote,
-    listDiagnoses: mockClinicalApi.listDiagnoses,
-    createDiagnosis: mockClinicalApi.createDiagnosis,
-    listMedications: mockClinicalApi.listMedications,
-    listPrescriptions: mockClinicalApi.listPrescriptions,
-    createPrescription: mockClinicalApi.createPrescription,
-    listMedicationAdministrations: mockClinicalApi.listMedicationAdministrations,
-    listIncomingTransfers: mockClinicalApi.listIncomingTransfers,
-    receiveTransfer: mockClinicalApi.receiveTransfer,
+    createNote: (encounterId, { type, content, occurredAtUtc }) =>
+        apiRequest<ClinicalNote>(`${BASE}/encounters/${id(encounterId)}/notes`, { method: 'POST', body: { type, content, occurredAtUtc } }),
+
+    listDiagnoses: (encounterId, signal) => apiRequest<Diagnosis[]>(`${BASE}/encounters/${id(encounterId)}/diagnoses`, { signal }),
+
+    createDiagnosis: (encounterId, { description, type, isPrimary, codeSystem, code }) =>
+        apiRequest<Diagnosis>(`${BASE}/encounters/${id(encounterId)}/diagnoses`, {
+            method: 'POST',
+            body: { description, type, isPrimary, codeSystem, code },
+        }),
+
+    // ClinicalEncounter.ChangeStatus(Closed); la nota de egreso opcional se guarda como ClinicalNote Discharge.
+    closeEncounter: (encounterId, { dischargeNote }) =>
+        apiRequest<void>(`${BASE}/encounters/${id(encounterId)}/close`, { method: 'POST', body: { dischargeNote } }),
+
+    // Catálogo global de medicamentos (Medications.Read).
+    listMedications: (signal) => apiRequest<Medication[]>(`${BASE}/medications`, { signal }),
+
+    listPrescriptions: (encounterId, signal) => apiRequest<Prescription[]>(`${BASE}/encounters/${id(encounterId)}/prescriptions`, { signal }),
+
+    // Prescription.Draft + AddDetail + Issue en una transacción del backend; el prescriptor sale de la sesión.
+    createPrescription: (encounterId, { notes, details }) =>
+        apiRequest<Prescription>(`${BASE}/encounters/${id(encounterId)}/prescriptions`, {
+            method: 'POST',
+            body: { notes, details: details.map(toPrescriptionLine) },
+        }),
+
+    // Kardex: las administraciones reales; quién administró lo fija el backend.
+    listMedicationAdministrations: (encounterId, signal) =>
+        apiRequest<MedicationAdministration[]>(`${BASE}/encounters/${id(encounterId)}/medication-administrations`, { signal }),
+
+    createMedicationAdministration: (
+        encounterId,
+        { medicationId, dose, doseUnit, route, administeredAtUtc, prescriptionId, prescriptionDetailId, notes },
+    ) =>
+        apiRequest<MedicationAdministration>(`${BASE}/encounters/${id(encounterId)}/medication-administrations`, {
+            method: 'POST',
+            body: { medicationId, dose, doseUnit, route, administeredAtUtc, prescriptionId, prescriptionDetailId, notes },
+        }),
+
+    // Traslados con destino a las clínicas del usuario (Requested / InTransit).
+    listIncomingTransfers: (signal) =>
+        apiRequest<ClinicalTransfer[]>(`${BASE}/transfers/incoming`, { query: { clinicId: clinicIdForRequest() }, signal }),
+
+    // ClinicalTransfer.Receive + la atención pasa a la clínica destino; quién recibe lo fija el backend desde la sesión.
+    receiveTransfer: async (transferId) => {
+        await apiRequest<ClinicalTransfer>(`${BASE}/transfers/${id(transferId)}/receive`, { method: 'POST' });
+    },
 };

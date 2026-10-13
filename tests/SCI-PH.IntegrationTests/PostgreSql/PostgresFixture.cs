@@ -23,7 +23,9 @@ namespace SCI_PH.IntegrationTests.PostgreSql
         {
             try
             {
-                _container = new PostgreSqlBuilder(Image).Build();
+                // Every test gets its own database and Web BFF host; the idle pooled connections of finished tests stay open
+                // for a while, so the shared test server needs more than the default 100 connections.
+                _container = new PostgreSqlBuilder(Image).WithCommand("-c", "max_connections=400").Build();
                 await _container.StartAsync();
                 Available = true;
             }

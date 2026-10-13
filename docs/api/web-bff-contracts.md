@@ -1,7 +1,7 @@
 # Contratos del Web BFF
 
-> **Estado:** la vertical clínica 1 (pacientes, atenciones, admisión, triage y signos vitales) está implementada; los
-> endpoints marcados «Previsto» aún no.
+> **Estado:** las verticales clínicas 1 (pacientes, atenciones, admisión, triage y signos vitales) y 2 (notas clínicas,
+> diagnósticos y cierre de la atención) están implementadas; los endpoints marcados «Previsto» aún no.
 >
 > Los endpoints previstos describen la intención acordada para empezar a trabajar en paralelo (frontend y backend). Pueden evolucionar mediante **revisión arquitectónica**; cualquier cambio debe reflejarse en este documento dentro del mismo PR.
 
@@ -11,7 +11,7 @@
 - **Formato:** JSON. Los errores se devuelven como `application/problem+json` (ProblemDetails).
 - **Autenticación:** JWT Bearer según [ADR-006](../adr/ADR-006-identity-security.md). El refresh token viaja solo en la cookie HttpOnly `__Host-sciph-refresh`; login, `mfa/verify`, refresh y logout exigen la cabecera `X-SCIPH-CSRF: 1`. Todos los endpoints requieren un usuario autenticado salvo los de sesión y recuperación de cuenta; los de `/api/web/admin` requieren además el permiso correspondiente. Endpoints en `/api/web/auth` ([detalle](../architecture/security.md#endpoints)).
 
-## Web Hospital — vertical clínica 1 (implementado)
+## Web Hospital — verticales clínicas 1, 2 y 3 (implementado)
 
 Reglas comunes:
 
@@ -23,10 +23,14 @@ Reglas comunes:
 - **Enums como texto** (`"Emergency"`, `"InProgress"`, `"Immediate"`, `"HeartRate"`) solo en estos contratos; se rechazan
   números y miembros desconocidos (p. ej. `unit`). Auth/Admin no cambian.
 - **Errores (ProblemDetails):** 400 validación / regla del Domain (fechas futuras o anteriores al inicio, signo vital
-  fuera de rango, NN no permitido, Prehospital desde la web); 403 permiso o acceso clínico; 404 paciente/atención
-  inexistente; 409 concurrencia, identificación repetida, unicidad, atención cerrada o en estado incompatible.
-  Las respuestas 400 de reglas incluyen `field` cuando aplica.
-- El primer triage o signo vital mueve la atención `Created → InProgress` (transición del Domain), en la misma transacción.
+  fuera de rango, NN no permitido, Prehospital desde la web); 403 permiso o acceso clínico; 404 paciente/atención/
+  medicamento/prescripción inexistente; 409 concurrencia, identificación repetida, unicidad, atención cerrada o en
+  estado incompatible, medicamento inactivo, prescripción no emitida. Las respuestas 400 de reglas incluyen `field`
+  cuando aplica (`details[i].dose` en las líneas de una prescripción).
+- El primer registro clínico (triage, signo vital, nota, diagnóstico, prescripción o administración) mueve la atención
+  `Created → InProgress` (transición del Domain), en la misma transacción.
+- **Concurrencia:** todo registro clínico vuelve a comprobar los concurrency tokens de la atención (`Status`, `PatientId`)
+  dentro de su misma transacción. Si otra transacción cerró o cambió la atención, el registro no se guarda → 409.
 
 | Método | Ruta | Permiso | Request | Response |
 |---|---|---|---|---|
@@ -44,58 +48,70 @@ Reglas comunes:
 | `POST` | `/api/web/encounters/{id}/triages` | `Triage.Write` (+ `VitalSigns.Write` si hay `measurements`) | `{ priority, reason?, observations?, performedAtUtc?, measurements?: [{ type, value, measuredAtUtc }] }` | 201 `TriageSummary` |
 | `GET` | `/api/web/encounters/{id}/vital-signs` | `Encounters.Read` | — | `VitalSignSummary[]` (con `unit` del Domain) |
 | `POST` | `/api/web/encounters/{id}/vital-signs` | `VitalSigns.Write` | `{ type, value, measuredAtUtc }` (sin `unit`) | 201 `VitalSignSummary` |
+| `GET` | `/api/web/encounters/{id}/notes` | `Encounters.Read` | — | `ClinicalNoteSummary[]` (más reciente primero, con autor) |
+| `POST` | `/api/web/encounters/{id}/notes` | `ClinicalNotes.Write` | `{ type, content, occurredAtUtc }` (`type`: `Assessment`, `Evolution`, `Other`; sin autor) | 201 `ClinicalNoteSummary` |
+| `GET` | `/api/web/encounters/{id}/diagnoses` | `Encounters.Read` | — | `DiagnosisSummary[]` (principal primero) |
+| `POST` | `/api/web/encounters/{id}/diagnoses` | `Diagnoses.Write` | `{ description, type, isPrimary?, codeSystem?, code? }` (un código exige su sistema) | 201 `DiagnosisSummary` |
+| `POST` | `/api/web/encounters/{id}/close` | `Encounters.Close` | `{ dischargeNote? }` | 204 · 409 si el estado no permite cerrar (solo desde `InProgress`, `Received`, `InEvolution`) |
+| `GET` | `/api/web/medications` | `Medications.Read` (+ ClinicalStaff activo) | — | `MedicationSummary[]` (catálogo global, activos e inactivos, por nombre) |
+| `GET` | `/api/web/encounters/{id}/prescriptions` | `Encounters.Read` | — | `PrescriptionSummary[]` (más reciente primero, con líneas) |
+| `POST` | `/api/web/encounters/{id}/prescriptions` | `Prescriptions.Write` | `{ notes?, details: [{ medicationId, dose, doseUnit, route, frequency, durationDays?, instructions? }] }` (1–20 líneas; sin prescriptor) | 201 `PrescriptionSummary` emitida · 404 medicamento · 409 medicamento inactivo |
+| `GET` | `/api/web/encounters/{id}/medication-administrations` | `Encounters.Read` | — | `MedicationAdministrationSummary[]` (más reciente primero) |
+| `POST` | `/api/web/encounters/{id}/medication-administrations` | `MedicationAdministrations.Write` | `{ medicationId, dose, doseUnit, route, administeredAtUtc, prescriptionId?, prescriptionDetailId?, notes? }` (sin responsable) | 201 `MedicationAdministrationSummary` · 404 prescripción/línea de otra atención · 409 prescripción no emitida o vencida |
 
 - `EncounterSummary`: `{ id, patientId, patient: PatientSummary?, temporaryPatientCode, clinicId, type, status, reason, startedAtUtc, endedAtUtc, identifiedAtUtc, latestTriagePriority }`.
+- `ClinicalNoteSummary`: `{ id, encounterId, type, content, occurredAtUtc, createdAtUtc, authorStaffId, authorDisplayName }`.
+  Las notas son inmutables. La nota `Discharge` solo la escribe `/close`; `Prehospital` y `TransferSummary` pertenecen
+  a los flujos paramédico y de traslado.
+- `DiagnosisSummary`: `{ id, encounterId, description, codeSystem, code, type, isPrimary, recordedAtUtc, confirmedAtUtc, recordedByStaffId }`.
+- Cerrar (`ClinicalEncounter.ChangeStatus(Closed)`) fija `endedAtUtc`, escribe la nota de egreso opcional y la auditoría
+  en la misma transacción. Una atención cerrada no admite triage, signos, notas, diagnósticos, prescripciones ni
+  administraciones (409); su historial sigue legible.
+- `MedicationSummary`: `{ id, code, name, presentation, concentration, defaultRoute, status }`.
+- `PrescriptionSummary`: `{ id, encounterId, status, notes, createdAtUtc, issuedAtUtc, validUntilUtc, cancelledAtUtc, prescribedByStaffId, details: [{ id, medicationId, medicationName, dose, doseUnit, route, frequency, durationDays, instructions }] }`.
+  El `POST` ejecuta `Prescription.Draft`, `AddDetail` por línea e `Issue` en una transacción: no se guardan prescripciones
+  vacías ni borradores.
+- `MedicationAdministrationSummary`: `{ id, encounterId, medicationId, medicationName, prescriptionId, prescriptionDetailId, dose, doseUnit, route, administeredAtUtc, administeredByStaffId, status, notes }`.
+  Una administración vinculada exige una prescripción emitida y vigente de la misma atención, y el medicamento de la línea.
+- **Kardex:** no hay recurso propio; es la proyección de las prescripciones (con sus líneas) y las administraciones.
 - `AdmissionEncounterSummary` (Recepción, **sin contenido clínico**): `{ encounterId, patientId, patientDisplayName, temporaryPatientCode, type, status, startedAtUtc, clinicId }`.
   Recepción no recibe `Encounters.Read`: crea con `POST /encounters` (que devuelve el resumen) y localiza/identifica por esta proyección.
 
-## Web Hospital — contratos previstos
+## Web Hospital — vertical clínica 4: traslados (implementado)
 
-| Método | Ruta | Descripción | Estado |
-|---|---|---|---|
-| `GET` | `/api/web/transfers` | Lista los traslados de pacientes visibles para el usuario | Previsto |
-| `POST` | `/api/web/transfers/{id}/receive` | Marca un traslado como recibido | Previsto |
+`ClinicalTransfer`: `Requested → InTransit → Received` (o `Cancelled` antes de recibir). El acto clínico siempre lo
+firma el `ClinicalStaff` de la sesión; nunca se aceptan `sentByStaffId`, `receivedByStaffId`, origen ni destino de
+recepción desde el cliente.
 
----
+| Método | Ruta | Permiso | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/web/transfers/incoming?clinicId=` | `Transfers.Read` | — | `ClinicalTransferSummary[]` en `Requested`/`InTransit` con destino a las clínicas del usuario (o a `clinicId`, validada) |
+| `GET` | `/api/web/transfers/{id}` | `Transfers.Read` | — | `ClinicalTransferSummary` (solo clínica origen o destino; si no, 403) |
+| `POST` | `/api/web/encounters/{id}/transfers` | `Transfers.Manage` | `{ destinationClinicId, reason?, notes? }` (el origen es la clínica de la atención) | 201 `ClinicalTransferSummary` · 404 atención/clínica · 409 clínica inactiva, atención no trasladable o traslado activo · 400 mismo origen y destino |
+| `POST` | `/api/web/transfers/{id}/dispatch` | `Transfers.Manage` (clínica origen) | — | 200 `ClinicalTransferSummary` · 409 si no está `Requested` o la atención cambió |
+| `POST` | `/api/web/transfers/{id}/cancel` | `Transfers.Manage` (clínica origen) | — | 200 `ClinicalTransferSummary` · 409 si ya no está `Requested`/`InTransit` |
+| `POST` | `/api/web/transfers/{id}/receive` | `Transfers.Manage` (clínica destino) | — | 200 `ClinicalTransferSummary` · 409 si no está `InTransit` (p. ej. ya recibido) |
 
-### `GET /api/web/transfers`
-
-Devuelve los traslados de pacientes que el usuario autenticado puede ver.
-
-**Query (propuesta, opcional):** filtros por estado y paginación. Se definirán al implementar.
-
-**Respuesta `200 OK` (forma propuesta):**
-
-```json
-[
-  {
-    "id": "00000000-0000-0000-0000-000000000000",
-    "status": "InTransit",
-    "createdAt": "2026-01-01T00:00:00Z"
-  }
-]
-```
-
-Los campos exactos del traslado y del paciente se definirán junto con el modelo del dominio clínico.
-
-**Errores previstos:** `401`, `403`.
-
----
-
-### `POST /api/web/transfers/{id}/receive`
-
-Registra que el establecimiento del usuario recibió al paciente del traslado `{id}`.
-
-**Parámetros de ruta:** `id` (`Guid`)
-
-**Respuestas previstas:**
-
-| Código | Cuándo |
-|---|---|
-| `200 OK` / `204 No Content` | Traslado marcado como recibido |
-| `401` / `403` | No autenticado / sin permiso |
-| `404` | El traslado no existe o no es visible para el usuario |
-| `409 Conflict` | El traslado no está en un estado que permita recibirlo |
+- **Solicitar** no cambia la atención (el paciente aún no salió). Una sola transferencia activa (`Requested`/`InTransit`,
+  `ClinicalTransfer.ActiveStatuses`) por atención: Application lo rechaza con 409 y PostgreSQL lo garantiza ante
+  solicitudes simultáneas con el índice único filtrado `UX_ClinicalTransfers_ActivePerEncounter` (la violación se
+  traduce a 409). `Received`, `Completed` y `Cancelled` no bloquean un traslado posterior.
+- **Cancelar** (clínica origen; el Domain no registra motivo): un traslado `Requested` solo pasa a `Cancelled` (la
+  atención no había cambiado); uno `InTransit` pasa a `Cancelled` y la atención vuelve `Transferred → InProgress` en la
+  clínica de origen. Recibidos, completados o ya cancelados → 409. Queda auditado como `Transfer`.
+- **Despachar**: traslado `InTransit` y atención `Transferred` en una transacción. Mientras va en camino la atención sigue
+  en la clínica de origen (y sale de su lista de abiertas).
+- **Recibir**: traslado `Received` y `ClinicalEncounter.ReceiveAtClinic` en una transacción: la **misma** atención pasa a
+  `Received` y a la clínica destino (también una prehospitalaria sin clínica). Conserva paciente, código NN e historial.
+  La clínica destino la continúa con las reglas clínicas normales (`Received → InProgress/InEvolution/Closed`); la de
+  origen conserva la traza (traslado y auditoría `Transfer`) pero pierde el acceso clínico.
+- `Complete` no se expone: el Domain no define cuándo se completa un traslado recibido.
+- **Concurrencia:** el `Status` del traslado y el de la atención son concurrency tokens. Dos recepciones, dos despachos,
+  dos cancelaciones, cancelar contra recibir o despachar, o un cierre simultáneo nunca se mezclan: se aplica una
+  operación y la otra recibe 409 (o se aplica después, en orden, si sigue siendo válida; p. ej. cancelar un traslado
+  que se acaba de despachar). Cancelar un traslado `Requested` no toca la atención y no compite con cerrarla.
+- `ClinicalTransferSummary`: `{ id, encounterId, status, originClinic: { id, name }?, destinationClinic: { id, name }, ambulance: { id, code, callSign }?, requestedAtUtc, sentAtUtc, sentByStaffId, receivedAtUtc, receivedByStaffId, cancelledAtUtc, patient: PatientSummary?, temporaryPatientCode, reason, notes, latestTriagePriority, encounterStatus }`
+  (identificador del paciente enmascarado).
 
 ---
 
@@ -105,7 +121,8 @@ Registra que el establecimiento del usuario recibió al paciente del traslado `{
 > mediante revisión arquitectónica. Detalle de seguridad en [security.md](../architecture/security.md#endpoints).
 
 - **Prefijo:** `/api/web/admin`
-- **Autorización:** permiso específico por endpoint (`Users.Manage`, `Accounts.InvitePatient`, `Devices.Manage`, `Audit.Read`).
+- **Autorización:** permiso específico por endpoint (`Users.Manage`, `Accounts.InvitePatient`, `Devices.Manage`, `Audit.Read`,
+  `Clinics.Manage`, `ClinicalStaff.Manage`).
 - **Paginación (propuesta):** los listados aceptan `page` y `pageSize` y devuelven `{ "items": [...], "page": 1, "pageSize": 20, "total": 0 }`.
 
 | Método | Ruta | Descripción | Estado |
@@ -125,6 +142,38 @@ No existe `POST /api/web/admin/users`: las cuentas se crean por **invitación** 
 existente (ver [ADR-006](../adr/ADR-006-identity-security.md), decisión 3).
 
 Estos endpoints gestionan **cuentas** (`ApplicationUser`, schema `identity`), no pacientes.
+
+### Administración clínica: clínicas, personal y afiliaciones (implementado)
+
+Datos clínico-organizativos (schema `clinical`), separados de Identity. Solo lo que admite el Domain: **no hay edición
+(PUT/PATCH) ni borrado**; el historial se conserva. Enums como texto; miembros desconocidos → 400.
+
+| Método | Ruta | Permiso | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/web/admin/clinics?search=&status=` | `Clinics.Manage` | — | `ClinicAdminSummary[]` por nombre |
+| `GET` | `/api/web/admin/clinics/{id}` | `Clinics.Manage` | — | `ClinicAdminSummary` · 404 |
+| `POST` | `/api/web/admin/clinics` | `Clinics.Manage` | `{ name, type, province, municipality, facilityCode?, address?, phoneNumber? }` (`Clinic.Register`) | 201 · 409 código de establecimiento duplicado |
+| `POST` | `/api/web/admin/clinics/{id}/activate` · `/deactivate` | `Clinics.Manage` | — | 204 (idempotente) · 404 |
+| `GET` | `/api/web/admin/staff?search=&status=` | `ClinicalStaff.Manage` | — | `ClinicalStaffAdminSummary[]` |
+| `GET` | `/api/web/admin/staff/{id}` | `ClinicalStaff.Manage` | — | `ClinicalStaffAdminSummary` · 404 |
+| `POST` | `/api/web/admin/staff` | `ClinicalStaff.Manage` | `{ givenNames, familyNames, type, professionalLicenseNumber?, specialty?, phoneNumber? }` (`ClinicalStaff.Register`; sin cuenta y sin email) | 201 · 409 licencia duplicada |
+| `POST` | `/api/web/admin/staff/{id}/activate` · `/deactivate` | `ClinicalStaff.Manage` | — | 204 (idempotente; la cuenta no se toca) · 404 |
+| `GET` | `/api/web/admin/staff/{id}/affiliations` | `ClinicalStaff.Manage` | — | `ClinicStaffAffiliationSummary[]` (abiertas primero) · 404 |
+| `POST` | `/api/web/admin/staff/{id}/affiliations` | `ClinicalStaff.Manage` | `{ clinicId }` (empieza ahora) | 201 · 404 personal/clínica · 409 inactivos o afiliación abierta ya existente |
+| `POST` | `/api/web/admin/staff/{id}/affiliations/{affiliationId}/end` | `ClinicalStaff.Manage` | — | 200 (termina ahora; queda como historial) · 404 · 409 ya finalizada |
+
+- `ClinicAdminSummary`: `{ id, name, type, facilityCode, province, municipality, address, phoneNumber, status, activeStaffCount }`.
+- `ClinicalStaffAdminSummary`: `{ id, givenNames, familyNames, type, status, professionalLicenseNumber, specialty, phoneNumber, accountLinked, identityUserId, activeClinics: [{ id, name }] }`.
+  Solo indica si hay cuenta vinculada; los datos de la cuenta siguen en `/api/web/admin/users` (`Users.Manage`).
+- `ClinicStaffAffiliationSummary`: `{ id, clinicId, clinicName, clinicStatus, startedAtUtc, endedAtUtc, isActive }`.
+- **Cuenta del personal:** se crea con `POST /api/web/admin/invitations/staff` (`Users.Manage`, roles de
+  `SecurityRoles.InvitableStaff`): solo personal activo y sin cuenta (si ya está vinculado → 409). Al activar la invitación
+  se fija `ClinicalStaff.IdentityUserId`; una cuenta no puede vincularse a dos miembros del personal (índice único → 409).
+- **Actor clínico:** el personal resuelve contexto clínico solo si está activo y tiene afiliaciones abiertas a clínicas
+  activas. Desactivar una clínica o un miembro del personal **no** termina sus afiliaciones. Con varias clínicas activas
+  las operaciones con contexto exigen `clinicId`.
+- **Duplicados bajo concurrencia:** los índices únicos existentes (código de establecimiento, licencia, cuenta vinculada,
+  afiliación abierta `UX_ClinicStaffAffiliations_Active`) se traducen a 409; ninguna otra excepción de base de datos.
 
 ---
 

@@ -1,5 +1,7 @@
 using SCI_PH.Application.DTOs.Clinical;
 using SCI_PH.Domain.Enums.Encounters;
+using SCI_PH.Domain.Enums.Organizations;
+using SCI_PH.Domain.Enums.Transport;
 using SCI_PH.Domain.Enums.Patients;
 
 namespace SCI_PH.Application.Abstractions.Clinical
@@ -35,5 +37,40 @@ namespace SCI_PH.Application.Abstractions.Clinical
 
         // Newest first.
         Task<IReadOnlyList<VitalSignSummary>> ListVitalSignsAsync(Guid encounterId, CancellationToken cancellationToken);
+
+        // Newest first (by clinical time), with the author's name.
+        Task<IReadOnlyList<ClinicalNoteSummary>> ListNotesAsync(Guid encounterId, CancellationToken cancellationToken);
+
+        // Primary first, then newest.
+        Task<IReadOnlyList<DiagnosisSummary>> ListDiagnosesAsync(Guid encounterId, CancellationToken cancellationToken);
+
+        // Whole catalog (active and inactive), by name.
+        Task<IReadOnlyList<MedicationSummary>> ListMedicationsAsync(CancellationToken cancellationToken);
+
+        // Only the ids that exist.
+        Task<IReadOnlyList<MedicationSummary>> FindMedicationsAsync(IReadOnlyCollection<Guid> medicationIds, CancellationToken cancellationToken);
+
+        // Newest first, each with its lines.
+        Task<IReadOnlyList<PrescriptionSummary>> ListPrescriptionsAsync(Guid encounterId, CancellationToken cancellationToken);
+
+        Task<PrescriptionSummary?> GetPrescriptionAsync(Guid prescriptionId, CancellationToken cancellationToken);
+
+        // Newest first (by administration time).
+        Task<IReadOnlyList<MedicationAdministrationSummary>> ListMedicationAdministrationsAsync(Guid encounterId, CancellationToken cancellationToken);
+
+        // Null when the clinic does not exist.
+        Task<ClinicStatus?> GetClinicStatusAsync(Guid clinicId, CancellationToken cancellationToken);
+
+        // Transfers of the encounter that are still Requested or InTransit.
+        Task<bool> HasActiveTransferAsync(Guid encounterId, CancellationToken cancellationToken);
+
+        Task<TransferRow?> GetTransferAsync(Guid transferId, CancellationToken cancellationToken);
+
+        // Transfers in the given statuses whose destination is one of the clinics, most recently requested first.
+        Task<IReadOnlyList<TransferRow>> ListTransfersToAsync(
+            IReadOnlyCollection<Guid> destinationClinicIds,
+            IReadOnlyCollection<ClinicalTransferStatus> statuses,
+            int limit,
+            CancellationToken cancellationToken);
     }
 }

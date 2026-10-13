@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Paramedic.ViewModels"
+             x:Class="SCI_PH.Mobile.Features.Paramedic.Views.NewEmergencyPage"
+             x:DataType="vm:NewEmergencyViewModel"
+             Style="{StaticResource SciPage}"
+             Title="Atención prehospitalaria">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="18">
+
+            <!-- Encabezado -->
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Nueva emergencia" Style="{StaticResource SciTitle}" />
+                <Label Text="Registra el evento para iniciar la atención del paciente."
+                       Style="{StaticResource SciSubtitle}" />
+            </VerticalStackLayout>
+
+            <!-- Tarjeta del formulario -->
+            <Border Style="{StaticResource SciCard}">
+                <VerticalStackLayout Spacing="14">
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Motivo de consulta" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Editor Text="{Binding ChiefComplaint}"
+                                    Placeholder="Ej. Accidente de tránsito, paciente consciente"
+                                    Style="{StaticResource SciEditor}"
+                                    AutoSize="TextChanges"
+                                    MinimumHeightRequest="100"
+                                    MaxLength="500" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <!-- Error -->
+                    <Border Style="{StaticResource SciErrorBanner}"
+                            IsVisible="{Binding HasError}">
+                        <Label Text="{Binding ErrorMessage}"
+                               TextColor="{StaticResource SciDanger}"
+                               FontSize="13" />
+                    </Border>
+
+                    <!-- Loading -->
+                    <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                       IsVisible="{Binding IsBusy}"
+                                       Color="{StaticResource SciPrimary}" />
+
+                    <Button Text="Crear emergencia"
+                            Command="{Binding SaveCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

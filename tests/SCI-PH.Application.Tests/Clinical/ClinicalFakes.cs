@@ -7,9 +7,14 @@ using SCI_PH.Application.Features.Authorization;
 using SCI_PH.Application.Features.Clinical;
 using SCI_PH.Domain.Entities.Auditing;
 using SCI_PH.Domain.Entities.Encounters;
+using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Patients;
+using SCI_PH.Domain.Entities.Transport;
 using SCI_PH.Domain.Enums.Encounters;
+using SCI_PH.Domain.Enums.Medications;
+using SCI_PH.Domain.Enums.Organizations;
 using SCI_PH.Domain.Enums.Patients;
+using SCI_PH.Domain.Enums.Transport;
 
 namespace SCI_PH.Application.Tests.Clinical
 {
@@ -54,6 +59,15 @@ namespace SCI_PH.Application.Tests.Clinical
         public List<ClinicalEncounter> Encounters { get; } = [];
         public List<Triage> Triages { get; } = [];
         public List<VitalSign> VitalSigns { get; } = [];
+        public List<ClinicalNote> Notes { get; } = [];
+        public List<Diagnosis> Diagnoses { get; } = [];
+        public List<Medication> Medications { get; } = [];
+        public List<Prescription> Prescriptions { get; } = [];
+        public List<MedicationAdministration> Administrations { get; } = [];
+        public List<ClinicalTransfer> Transfers { get; } = [];
+        // Clinics that exist, with their status. Unknown ids do not exist.
+        public Dictionary<Guid, ClinicStatus> Clinics { get; } = [];
+        public HashSet<Guid> GuardedEncounters { get; } = [];
         public List<ClinicalAuditEntry> Audit { get; } = [];
         public int SaveCount { get; private set; }
 
@@ -98,6 +112,59 @@ namespace SCI_PH.Application.Tests.Clinical
                 .Select(v => new VitalSignSummary(v.Id, v.ClinicalEncounterId, v.TriageId, v.Type, v.Value, v.Unit, v.MeasuredAtUtc, v.MeasuredByStaffId))
                 .ToList());
 
+        public Task<IReadOnlyList<ClinicalNoteSummary>> ListNotesAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ClinicalNoteSummary>>(Notes.Where(n => n.ClinicalEncounterId == encounterId)
+                .OrderByDescending(n => n.OccurredAtUtc)
+                .Select(n => new ClinicalNoteSummary(n.Id, n.ClinicalEncounterId, n.Type, n.Content, n.OccurredAtUtc, n.CreatedAtUtc, n.AuthorStaffId, "Staff"))
+                .ToList());
+
+        public Task<IReadOnlyList<DiagnosisSummary>> ListDiagnosesAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<DiagnosisSummary>>(Diagnoses.Where(d => d.ClinicalEncounterId == encounterId)
+                .Select(d => new DiagnosisSummary(d.Id, d.ClinicalEncounterId, d.Description, d.CodeSystem, d.Code, d.Type, d.IsPrimary, d.RecordedAtUtc, d.ConfirmedAtUtc, d.RecordedByStaffId))
+                .ToList());
+
+        public Task<IReadOnlyList<MedicationSummary>> ListMedicationsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<MedicationSummary>>(Medications.OrderBy(m => m.Name).Select(ToSummary).ToList());
+
+        public Task<IReadOnlyList<MedicationSummary>> FindMedicationsAsync(IReadOnlyCollection<Guid> medicationIds, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<MedicationSummary>>(Medications.Where(m => medicationIds.Contains(m.Id)).Select(ToSummary).ToList());
+
+        public Task<IReadOnlyList<PrescriptionSummary>> ListPrescriptionsAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<PrescriptionSummary>>(Prescriptions.Where(p => p.ClinicalEncounterId == encounterId)
+                .OrderByDescending(p => p.IssuedAtUtc ?? p.CreatedAtUtc).Select(ToSummary).ToList());
+
+        public Task<PrescriptionSummary?> GetPrescriptionAsync(Guid prescriptionId, CancellationToken cancellationToken) =>
+            Task.FromResult(Prescriptions.SingleOrDefault(p => p.Id == prescriptionId) is { } p ? ToSummary(p) : null);
+
+        public Task<IReadOnlyList<MedicationAdministrationSummary>> ListMedicationAdministrationsAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<MedicationAdministrationSummary>>(Administrations.Where(a => a.ClinicalEncounterId == encounterId)
+                .OrderByDescending(a => a.AdministeredAtUtc)
+                .Select(a => new MedicationAdministrationSummary(
+                    a.Id, a.ClinicalEncounterId, a.MedicationId, MedicationName(a.MedicationId), a.PrescriptionId, a.PrescriptionDetailId,
+                    a.Dose, a.DoseUnit, a.Route, a.AdministeredAtUtc, a.AdministeredByStaffId, a.Status, a.Notes))
+                .ToList());
+
+        public Task<ClinicStatus?> GetClinicStatusAsync(Guid clinicId, CancellationToken cancellationToken) =>
+            Task.FromResult(Clinics.TryGetValue(clinicId, out var status) ? status : (ClinicStatus?)null);
+
+        public Task<bool> HasActiveTransferAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            Task.FromResult(Transfers.Any(t => t.ClinicalEncounterId == encounterId
+                && ClinicalTransfer.ActiveStatuses.Contains(t.Status)));
+
+        public Task<TransferRow?> GetTransferAsync(Guid transferId, CancellationToken cancellationToken) =>
+            Task.FromResult(Transfers.SingleOrDefault(t => t.Id == transferId) is { } t ? ToRow(t) : null);
+
+        public Task<IReadOnlyList<TransferRow>> ListTransfersToAsync(
+            IReadOnlyCollection<Guid> destinationClinicIds, IReadOnlyCollection<ClinicalTransferStatus> statuses, int limit, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<TransferRow>>(Transfers
+                .Where(t => destinationClinicIds.Contains(t.DestinationClinicId) && statuses.Contains(t.Status))
+                .OrderByDescending(t => t.RequestedAtUtc).Take(limit).Select(ToRow).ToList());
+
+        public Task<ClinicalTransfer?> FindTransferAsync(Guid transferId, CancellationToken cancellationToken) =>
+            Task.FromResult(Transfers.SingleOrDefault(t => t.Id == transferId));
+
+        public void Add(ClinicalTransfer transfer) => _pending.Add(transfer);
+
         public Task<ClinicalEncounter?> FindEncounterAsync(Guid encounterId, CancellationToken cancellationToken) =>
             Task.FromResult(Encounters.SingleOrDefault(e => e.Id == encounterId));
 
@@ -105,7 +172,12 @@ namespace SCI_PH.Application.Tests.Clinical
         public void Add(ClinicalEncounter encounter) => _pending.Add(encounter);
         public void Add(Triage triage) => _pending.Add(triage);
         public void Add(VitalSign vitalSign) => _pending.Add(vitalSign);
+        public void Add(ClinicalNote note) => _pending.Add(note);
+        public void Add(Diagnosis diagnosis) => _pending.Add(diagnosis);
+        public void Add(Prescription prescription) => _pending.Add(prescription);
+        public void Add(MedicationAdministration administration) => _pending.Add(administration);
         public void Add(ClinicalAuditEntry auditEntry) => _pending.Add(auditEntry);
+        public void EnsureEncounterUnchanged(ClinicalEncounter encounter) => GuardedEncounters.Add(encounter.Id);
 
         public Task SaveChangesAsync(CancellationToken cancellationToken)
         {
@@ -113,11 +185,38 @@ namespace SCI_PH.Application.Tests.Clinical
             Encounters.AddRange(_pending.OfType<ClinicalEncounter>());
             Triages.AddRange(_pending.OfType<Triage>());
             VitalSigns.AddRange(_pending.OfType<VitalSign>());
+            Notes.AddRange(_pending.OfType<ClinicalNote>());
+            Diagnoses.AddRange(_pending.OfType<Diagnosis>());
+            Prescriptions.AddRange(_pending.OfType<Prescription>());
+            Administrations.AddRange(_pending.OfType<MedicationAdministration>());
+            Transfers.AddRange(_pending.OfType<ClinicalTransfer>());
             Audit.AddRange(_pending.OfType<ClinicalAuditEntry>());
             _pending.Clear();
             SaveCount++;
             return Task.CompletedTask;
         }
+
+        private TransferRow ToRow(ClinicalTransfer t)
+        {
+            var encounter = Encounters.Single(e => e.Id == t.ClinicalEncounterId);
+            return new TransferRow(
+                t.Id, t.ClinicalEncounterId, t.Status,
+                t.OriginClinicId is { } origin ? new ClinicSummary(origin, $"Clinic {origin:N}") : null,
+                new ClinicSummary(t.DestinationClinicId, $"Clinic {t.DestinationClinicId:N}"),
+                null, t.RequestedAtUtc, t.SentAtUtc, t.SentByStaffId, t.ReceivedAtUtc, t.ReceivedByStaffId, t.CancelledAtUtc,
+                Patients.SingleOrDefault(p => p.Id == encounter.PatientId)?.ToTestRow(), encounter.TemporaryPatientCode?.Value,
+                t.Reason, t.Notes, null, encounter.Status);
+        }
+
+        private static MedicationSummary ToSummary(Medication m) =>
+            new(m.Id, m.Code, m.Name, m.Presentation, m.Concentration, m.DefaultRoute, m.Status);
+
+        private string MedicationName(Guid medicationId) => Medications.Single(m => m.Id == medicationId).Name;
+
+        private PrescriptionSummary ToSummary(Prescription p) => new(
+            p.Id, p.ClinicalEncounterId, p.Status, p.Notes, p.CreatedAtUtc, p.IssuedAtUtc, p.ValidUntilUtc, p.CancelledAtUtc, p.PrescribedByStaffId,
+            p.Details.Select(d => new PrescriptionDetailSummary(
+                d.Id, d.MedicationId, MedicationName(d.MedicationId), d.Dose, d.DoseUnit, d.Route, d.Frequency, d.DurationDays, d.Instructions)).ToList());
 
         private EncounterRow ToRow(ClinicalEncounter e) => new(
             e.Id,
@@ -149,26 +248,32 @@ namespace SCI_PH.Application.Tests.Clinical
     {
         public static readonly DateTimeOffset Start = new(2026, 10, 1, 8, 0, 0, TimeSpan.Zero);
 
-        public ClinicalHarness(FakeCurrentUser user)
+        // A shared store lets two users act on the same data (e.g. a doctor prescribes, a nurse administers).
+        public ClinicalHarness(FakeCurrentUser user, FakeClinicalStore? store = null)
         {
             User = user;
+            Store = store ?? new FakeClinicalStore();
             Actor = new CurrentClinicalActor(user, Staff);
             var access = new PatientAccessAuthorizer(user, new NoPatientLinks());
             Patients = new PatientService(Store, Store, user, Staff, access, Time);
             Encounters = new EncounterService(Actor, Store, Store, Staff, access, Time);
             Admissions = new AdmissionService(Actor, Store);
             Records = new EncounterRecordService(Actor, user, Store, Store, access, Time);
+            Medications = new MedicationService(Actor, Store, Store, access, Time);
+            Transfers = new TransferService(Actor, Store, Store, access, Time);
         }
 
         public FakeCurrentUser User { get; }
         public FakeStaffDirectory Staff { get; } = new();
-        public FakeClinicalStore Store { get; } = new();
+        public FakeClinicalStore Store { get; }
         public FixedTime Time { get; } = new(Start);
         public CurrentClinicalActor Actor { get; }
         public PatientService Patients { get; }
         public EncounterService Encounters { get; }
         public AdmissionService Admissions { get; }
         public EncounterRecordService Records { get; }
+        public MedicationService Medications { get; }
+        public TransferService Transfers { get; }
 
         public static ClinicalHarness ForRole(string role, int clinics = 1)
         {
@@ -194,6 +299,18 @@ namespace SCI_PH.Application.Tests.Clinical
                 : ClinicalEncounter.CreateUnidentified(ClinicalEncounterType.Emergency, Start, clinicId ?? ClinicId);
             Store.Encounters.Add(encounter);
             return encounter;
+        }
+
+        public Medication SeedMedication(string name = "Paracetamol", bool active = true)
+        {
+            var medication = Medication.Register(name, "Tableta", "500 mg", $"TEST-{Guid.NewGuid():N}"[..20], MedicationRoute.Oral);
+            if (!active)
+            {
+                medication.Deactivate();
+            }
+
+            Store.Medications.Add(medication);
+            return medication;
         }
 
         private sealed class NoPatientLinks : IClinicalIdentityLinkService
