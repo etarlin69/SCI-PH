@@ -28,7 +28,7 @@
                                IsVisible="{Binding IsBusy}"
                                Color="{StaticResource SciPrimary}" />
 
-            <!-- Lectura de huella -->
+            <!-- Opciones de identificación: todas disponibles desde el inicio; la huella no es obligatoria. -->
             <Border Style="{StaticResource SciCard}" IsVisible="{Binding CanIdentify}">
                 <VerticalStackLayout Spacing="14">
                     <Label Text="Lectura de huella" Style="{StaticResource SciFieldLabel}" />
@@ -42,15 +42,23 @@
 
             <!-- Aviso: sin coincidencia -->
             <Border Style="{StaticResource SciBadgeWarning}" IsVisible="{Binding ShowFallback}">
-                <VerticalStackLayout Spacing="10">
+                <VerticalStackLayout Spacing="6">
                     <Label Text="No se encontró un paciente con esa huella."
                            TextColor="{StaticResource SciWarning}"
                            FontAttributes="Bold" />
                     <Label Text="Puedes reintentar, identificar con documento o continuar sin identificar."
                            TextColor="{StaticResource SciWarning}" FontSize="13" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding CanIdentify}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Otras opciones" Style="{StaticResource SciFieldLabel}" />
                     <Button Text="Identificar con documento"
                             Command="{Binding OpenDocumentFormCommand}"
                             Style="{StaticResource SciSecondaryButton}" />
+                    <Label Text="Si no es posible identificarlo ahora, la atención continúa como paciente no identificado (NN) y puede identificarse después."
+                           Style="{StaticResource SciSubtitle}" />
                     <Button Text="Continuar sin identificar"
                             Command="{Binding ContinueWithoutIdentifyingCommand}"
                             Style="{StaticResource SciSecondaryButton}" />

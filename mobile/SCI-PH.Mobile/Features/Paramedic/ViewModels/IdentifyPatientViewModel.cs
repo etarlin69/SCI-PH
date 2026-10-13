@@ -41,7 +41,13 @@ public partial class IdentifyPatientViewModel : BaseViewModel
     [NotifyPropertyChangedFor(nameof(ShowFallback))]
     private bool fingerprintNotFound;
 
+    /// <summary>
+    /// Mientras no esté identificado se ofrecen las tres vías a la vez (huella, documento, NN): ninguna es
+    /// requisito de otra, porque en una emergencia la huella puede no ser posible.
+    /// </summary>
     public bool CanIdentify => !IsIdentified;
+
+    /// <summary>Solo el aviso de "huella sin coincidencia"; ya no controla qué opciones se muestran.</summary>
     public bool ShowFallback => FingerprintNotFound && !IsIdentified;
 
     // ---- Formulario de documento ----
