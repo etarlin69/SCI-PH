@@ -121,7 +121,8 @@ recepción desde el cliente.
 > mediante revisión arquitectónica. Detalle de seguridad en [security.md](../architecture/security.md#endpoints).
 
 - **Prefijo:** `/api/web/admin`
-- **Autorización:** permiso específico por endpoint (`Users.Manage`, `Accounts.InvitePatient`, `Devices.Manage`, `Audit.Read`).
+- **Autorización:** permiso específico por endpoint (`Users.Manage`, `Accounts.InvitePatient`, `Devices.Manage`, `Audit.Read`,
+  `Clinics.Manage`, `ClinicalStaff.Manage`).
 - **Paginación (propuesta):** los listados aceptan `page` y `pageSize` y devuelven `{ "items": [...], "page": 1, "pageSize": 20, "total": 0 }`.
 
 | Método | Ruta | Descripción | Estado |
@@ -141,6 +142,38 @@ No existe `POST /api/web/admin/users`: las cuentas se crean por **invitación** 
 existente (ver [ADR-006](../adr/ADR-006-identity-security.md), decisión 3).
 
 Estos endpoints gestionan **cuentas** (`ApplicationUser`, schema `identity`), no pacientes.
+
+### Administración clínica: clínicas, personal y afiliaciones (implementado)
+
+Datos clínico-organizativos (schema `clinical`), separados de Identity. Solo lo que admite el Domain: **no hay edición
+(PUT/PATCH) ni borrado**; el historial se conserva. Enums como texto; miembros desconocidos → 400.
+
+| Método | Ruta | Permiso | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/web/admin/clinics?search=&status=` | `Clinics.Manage` | — | `ClinicAdminSummary[]` por nombre |
+| `GET` | `/api/web/admin/clinics/{id}` | `Clinics.Manage` | — | `ClinicAdminSummary` · 404 |
+| `POST` | `/api/web/admin/clinics` | `Clinics.Manage` | `{ name, type, province, municipality, facilityCode?, address?, phoneNumber? }` (`Clinic.Register`) | 201 · 409 código de establecimiento duplicado |
+| `POST` | `/api/web/admin/clinics/{id}/activate` · `/deactivate` | `Clinics.Manage` | — | 204 (idempotente) · 404 |
+| `GET` | `/api/web/admin/staff?search=&status=` | `ClinicalStaff.Manage` | — | `ClinicalStaffAdminSummary[]` |
+| `GET` | `/api/web/admin/staff/{id}` | `ClinicalStaff.Manage` | — | `ClinicalStaffAdminSummary` · 404 |
+| `POST` | `/api/web/admin/staff` | `ClinicalStaff.Manage` | `{ givenNames, familyNames, type, professionalLicenseNumber?, specialty?, phoneNumber? }` (`ClinicalStaff.Register`; sin cuenta y sin email) | 201 · 409 licencia duplicada |
+| `POST` | `/api/web/admin/staff/{id}/activate` · `/deactivate` | `ClinicalStaff.Manage` | — | 204 (idempotente; la cuenta no se toca) · 404 |
+| `GET` | `/api/web/admin/staff/{id}/affiliations` | `ClinicalStaff.Manage` | — | `ClinicStaffAffiliationSummary[]` (abiertas primero) · 404 |
+| `POST` | `/api/web/admin/staff/{id}/affiliations` | `ClinicalStaff.Manage` | `{ clinicId }` (empieza ahora) | 201 · 404 personal/clínica · 409 inactivos o afiliación abierta ya existente |
+| `POST` | `/api/web/admin/staff/{id}/affiliations/{affiliationId}/end` | `ClinicalStaff.Manage` | — | 200 (termina ahora; queda como historial) · 404 · 409 ya finalizada |
+
+- `ClinicAdminSummary`: `{ id, name, type, facilityCode, province, municipality, address, phoneNumber, status, activeStaffCount }`.
+- `ClinicalStaffAdminSummary`: `{ id, givenNames, familyNames, type, status, professionalLicenseNumber, specialty, phoneNumber, accountLinked, identityUserId, activeClinics: [{ id, name }] }`.
+  Solo indica si hay cuenta vinculada; los datos de la cuenta siguen en `/api/web/admin/users` (`Users.Manage`).
+- `ClinicStaffAffiliationSummary`: `{ id, clinicId, clinicName, clinicStatus, startedAtUtc, endedAtUtc, isActive }`.
+- **Cuenta del personal:** se crea con `POST /api/web/admin/invitations/staff` (`Users.Manage`, roles de
+  `SecurityRoles.InvitableStaff`): solo personal activo y sin cuenta (si ya está vinculado → 409). Al activar la invitación
+  se fija `ClinicalStaff.IdentityUserId`; una cuenta no puede vincularse a dos miembros del personal (índice único → 409).
+- **Actor clínico:** el personal resuelve contexto clínico solo si está activo y tiene afiliaciones abiertas a clínicas
+  activas. Desactivar una clínica o un miembro del personal **no** termina sus afiliaciones. Con varias clínicas activas
+  las operaciones con contexto exigen `clinicId`.
+- **Duplicados bajo concurrencia:** los índices únicos existentes (código de establecimiento, licencia, cuenta vinculada,
+  afiliación abierta `UX_ClinicStaffAffiliations_Active`) se traducen a 409; ninguna otra excepción de base de datos.
 
 ---
 

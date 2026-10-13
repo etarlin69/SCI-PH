@@ -114,6 +114,8 @@ ESP32 ─► HTTPS + X-Device-Id + X-Device-Key ─► DeviceApiKey ─► princ
 | `POST /api/web/admin/invitations/staff`, `/{id}/reissue`, `/{id}/revoke` | `Users.Manage` | |
 | `GET/POST /api/web/admin/devices…` | `Devices.Manage` | crear, listar, rotar, revocar |
 | `GET /api/web/admin/roles` | `Users.Manage` | matriz de roles |
+| `GET/POST /api/web/admin/clinics…` | `Clinics.Manage` | listar, ver, alta, activar, desactivar (datos clínico-organizativos, no Identity) |
+| `GET/POST /api/web/admin/staff…` | `ClinicalStaff.Manage` | listar, ver, alta, activar, desactivar, afiliaciones (abrir, finalizar); la cuenta del personal se crea con la invitación (`Users.Manage`) |
 | `POST /api/mobile/auth/login`, `/mfa/verify`, `/refresh`, `/logout` | Anónimo | Tokens en el cuerpo |
 | `GET /api/mobile/auth/me`, `POST /change-password`, `/revoke-sessions` | Autenticado | |
 | `POST /api/device/heartbeat` | Dispositivo con `Device.Heartbeat` | |
