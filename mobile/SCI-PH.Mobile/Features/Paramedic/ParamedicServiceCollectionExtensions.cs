@@ -30,4 +30,16 @@ public static class ParamedicServiceCollectionExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Registra las páginas del flujo que no están declaradas en el XAML del Shell (se apilan sobre la actual).
+    /// La raíz, <see cref="ParamedicRoutes.NewEmergency"/>, la declara el AppShell.
+    /// </summary>
+    public static void RegisterParamedicRoutes()
+    {
+        Routing.RegisterRoute(ParamedicRoutes.IdentifyPatient, typeof(IdentifyPatientPage));
+        Routing.RegisterRoute(ParamedicRoutes.VitalSigns, typeof(VitalSignsPage));
+        Routing.RegisterRoute(ParamedicRoutes.Procedures, typeof(ProceduresPage));
+        Routing.RegisterRoute(ParamedicRoutes.Medications, typeof(MedicationsPage));
+    }
 }
