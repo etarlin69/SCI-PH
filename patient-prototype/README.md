@@ -36,9 +36,10 @@ Actualmente no existe conexión real con el backend de SCI-PH.
 - Shell Navigation
 - Dependency Injection
 - Servicios Mock
+- MVVM con CommunityToolkit.Mvvm (la misma librería que el módulo Paramedic del Rol 6)
 - Arquitectura modular por Features
 
-El proyecto utiliza un `global.json` para trabajar con .NET 9.
+El SDK lo fija el `global.json` de la raíz del repositorio; el prototipo no tiene uno propio.
 
 ---
 
@@ -47,64 +48,50 @@ El proyecto utiliza un `global.json` para trabajar con .NET 9.
 ```text
 SCI-PH.PatientPrototype/
 │
-├── App.xaml
-├── App.xaml.cs
-│
-├── AppShell.xaml
-├── AppShell.xaml.cs
-│
-├── MauiProgram.cs
+├── App.xaml / App.xaml.cs           Recursos globales; crea el AppShell con la sesión
+├── AppShell.xaml / AppShell.xaml.cs Menú, cabecera con el nombre de la sesión y "Cerrar sesión"
+├── MauiProgram.cs                   Solo builder.Services.AddPatientFeature()
 ├── SCI-PH.PatientPrototype.csproj
 │
 ├── Features/
 │   └── Patient/
+│       ├── PatientRoutes.cs                       Todas las rutas Shell del módulo
+│       ├── PatientServiceCollectionExtensions.cs  AddPatientFeature(): servicios, ViewModels y páginas
 │       │
-│       ├── Auth/
-│       │   ├── QrScanPage.xaml
-│       │   ├── QrScanPage.xaml.cs
-│       │   ├── FaceVerifyPage.xaml
-│       │   └── FaceVerifyPage.xaml.cs
+│       ├── Auth/        QrScanPage, FaceVerifyPage
+│       ├── Home/        HomePage
+│       ├── Profile/     ProfilePage, patient_avatar.png
+│       ├── History/     HistoryPage
+│       ├── Results/     ResultsPage
+│       ├── Documents/   DocumentsPage
+│       ├── Ai/          AiAssistantPage, AssistantMessageTemplateSelector
+│       ├── Converters/  IsNotNullConverter
 │       │
-│       ├── Home/
-│       │   ├── HomePage.xaml
-│       │   └── HomePage.xaml.cs
-│       │
-│       ├── Profile/
-│       │   ├── ProfilePage.xaml
-│       │   ├── ProfilePage.xaml.cs
-│       │   └── patient_avatar.png
-│       │
-│       ├── History/
-│       │   ├── HistoryPage.xaml
-│       │   └── HistoryPage.xaml.cs
-│       │
-│       ├── Results/
-│       │   ├── ResultsPage.xaml
-│       │   └── ResultsPage.xaml.cs
-│       │
-│       ├── Documents/
-│       │   ├── DocumentsPage.xaml
-│       │   └── DocumentsPage.xaml.cs
-│       │
-│       ├── Ai/
-│       │   ├── AiAssistantPage.xaml
-│       │   └── AiAssistantPage.xaml.cs
+│       ├── ViewModels/  PatientViewModel (base: IsBusy, error), QrAccess, FaceVerify, Home, History,
+│       │                Results, Documents, Profile, AiAssistant
 │       │
 │       ├── Models/
-│       │   └── PatientSessionDto.cs
+│       │   └── Dtos/    PatientSessionDto, PatientDataDtos (resumen, historial, resultados, documentos,
+│       │                perfil, mensajes del asistente), PatientDisplayFormats
 │       │
 │       └── Services/
-│           ├── Interfaces/
-│           │   └── IPatientSessionService.cs
-│           │
-│           └── Mocks/
-│               └── MockPatientSessionService.cs
+│           ├── Interfaces/  IPatientSessionService, IPatientDataService, IPatientAssistantService,
+│           │                IPatientNavigator, IPatientDialogService
+│           ├── Mocks/       MockPatientSessionService, MockPatientDataService, MockPatientAssistantService
+│           └── ShellPatientNavigator, ShellPatientDialogService
 │
 ├── Platforms/
 ├── Resources/
-├── Properties/
-└── global.json
+└── Properties/
 ```
+
+Reglas del módulo:
+
+- Las páginas solo tienen `InitializeComponent`, el `BindingContext` y la carga en `OnAppearing`; la lógica vive en
+  los ViewModels.
+- Ninguna vista contiene datos clínicos de ejemplo: todos salen de `MockPatientDataService` a través de
+  `IPatientDataService`, que no recibe ningún identificador de paciente (el backend lo deducirá de la sesión).
+- Para conectar el Mobile BFF solo cambian los registros de `AddPatientFeature()`; páginas y ViewModels no cambian.
 
 ---
 
@@ -199,7 +186,7 @@ QR
  ↓
 Rostro
  ↓
-CreateMockSessionAsync()
+CreateSessionAsync()
  ↓
 Paciente autenticado
 ```
@@ -368,7 +355,7 @@ Todavía NO están implementadas completamente:
 - Refresh token.
 - Persistencia segura de sesión.
 - Protección completa de rutas.
-- Cierre de sesión completo.
+- Cierre de sesión con el backend (hoy "Cerrar sesión" borra la sesión mock y vuelve al QR).
 - Expiración automática de sesión.
 - Manejo completo de sesión expirada.
 - Manejo avanzado de errores.
@@ -377,10 +364,7 @@ Todavía NO están implementadas completamente:
 - Integración real con documentos.
 - Integración real con historial clínico.
 - Integración real con SCI-PH AI.
-- Pruebas automatizadas específicas del módulo Patient.
-- Refactor completo a MVVM.
-- `PatientRoutes`.
-- `PatientServiceCollectionExtensions`.
+- Pruebas automatizadas de ViewModels y servicios (se crearán con la estructura móvil compartida).
 
 Estas tareas deberán continuar después de integrar el módulo con la aplicación MAUI compartida.
 
@@ -549,14 +533,17 @@ ejecutar:
 dotnet build
 ```
 
-El proyecto ha sido probado compilando correctamente para:
+Compilación validada con el SDK del `global.json` raíz:
 
 ```text
-net9.0-android
-net9.0-ios
-net9.0-maccatalyst
-net9.0-windows10.0.19041.0
+net9.0-android               0 errores
+net9.0-windows10.0.19041.0   0 errores
+net9.0-ios / maccatalyst     requieren macOS (no validado en Windows)
 ```
+
+En Windows, el target Windows muestra el aviso MVVMTK0045 de CommunityToolkit.Mvvm (`[ObservableProperty]` sobre
+campos, igual que el módulo Paramedic). Pasar a propiedades parciales exige `LangVersion=preview` y se decidirá para
+toda la app compartida.
 
 ---
 
@@ -698,16 +685,17 @@ Sesión mock                  ✅
 Navegación base              ✅
 Compilación Android          ✅
 Compilación Windows          ✅
-Compilación iOS              ✅
-Compilación MacCatalyst      ✅
+Compilación iOS              ⏳ (requiere macOS)
+Compilación MacCatalyst      ⏳ (requiere macOS)
+MVVM + servicios mock        ✅
+Cerrar sesión (mock)         ✅
 
 Mobile BFF real              ⏳
 QR real                      ⏳
 Biometría real               ⏳
 Sesión JWT real              ⏳
 Protección de rutas          ⏳
-Expiración / logout          ⏳
-MVVM completo                ⏳
+Expiración de sesión         ⏳
 Pruebas automatizadas        ⏳
 Integración SCI-PH.Mobile    ⏳
 ```
