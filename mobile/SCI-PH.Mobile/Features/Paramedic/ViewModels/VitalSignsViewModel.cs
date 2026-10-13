@@ -3,6 +3,8 @@ using System.ComponentModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SCI_PH.Mobile.Common.Navigation;
+using SCI_PH.Mobile.Common.ViewModels;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 
@@ -14,7 +16,7 @@ namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
 /// (VitalSignLimits) para detectar errores de tipeo; NO son umbrales clínicos ni diagnóstico.
 /// </summary>
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
-public partial class VitalSignsViewModel : ObservableObject
+public partial class VitalSignsViewModel : BaseViewModel
 {
     // Límites de plausibilidad (docs: SCI-PH.Domain/Constants/VitalSignLimits.cs)
     private const int HrMin = 0, HrMax = 300;
@@ -32,14 +34,16 @@ public partial class VitalSignsViewModel : ObservableObject
     };
 
     private readonly IParamedicApiService _api;
+    private readonly IAppNavigator _navigator;
 
     // Se conservan entre reintentos para que un reenvío no duplique el registro.
     private Guid? _clientRequestId;
     private DateTime? _recordedAt;
 
-    public VitalSignsViewModel(IParamedicApiService api)
+    public VitalSignsViewModel(IParamedicApiService api, IAppNavigator navigator)
     {
         _api = api;
+        _navigator = navigator;
     }
 
     [ObservableProperty]
@@ -81,16 +85,7 @@ public partial class VitalSignsViewModel : ObservableObject
         HasHeartRateError || HasRespiratoryRateError || HasSystolicPressureError ||
         HasDiastolicPressureError || HasOxygenSaturationError || HasTemperatureError || HasGlasgowError;
 
-    // ---- Estado ----
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
-    private bool isBusy;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasError))]
-    private string? errorMessage;
-
-    public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+    protected override void OnBusyChanged() => SaveCommand.NotifyCanExecuteChanged();
 
     public ObservableCollection<string> SavedSummaries { get; } = new();
 
@@ -119,10 +114,8 @@ public partial class VitalSignsViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync()
     {
-        ErrorMessage = null;
-        IsBusy = true;
-
-        try
+        // Si falla, los datos y el ClientRequestId se conservan para reintentar.
+        await RunAsync(async () =>
         {
             _clientRequestId ??= Guid.NewGuid();
             _recordedAt ??= DateTime.UtcNow;
@@ -145,22 +138,13 @@ public partial class VitalSignsViewModel : ObservableObject
             SavedSummaries.Insert(0, BuildSummary(dto));
             SavedCount = SavedSummaries.Count;
             ClearForm();
-        }
-        catch (Exception)
-        {
-            // Mensaje genérico; los datos y el ClientRequestId se conservan para reintentar.
-            ErrorMessage = "No se pudieron guardar los signos vitales. Intenta nuevamente.";
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        }, "No se pudieron guardar los signos vitales. Intenta nuevamente.");
     }
 
     [RelayCommand]
     private async Task ContinueAsync()
     {
-        await Shell.Current.GoToAsync(
+        await _navigator.GoToAsync(
             ParamedicRoutes.Procedures,
             new Dictionary<string, object> { ["EmergencyId"] = EmergencyId });
     }

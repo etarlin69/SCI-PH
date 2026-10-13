@@ -2,25 +2,29 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SCI_PH.Mobile.Common.Navigation;
+using SCI_PH.Mobile.Common.ViewModels;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 
 namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
 
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
-public partial class ProceduresViewModel : ObservableObject
+public partial class ProceduresViewModel : BaseViewModel
 {
     private readonly IParamedicApiService _api;
     private readonly IParamedicCatalogService _catalog;
+    private readonly IAppNavigator _navigator;
 
     // Se conservan entre reintentos para que un reenvío no duplique el registro.
     private Guid? _clientRequestId;
     private DateTime? _recordedAt;
 
-    public ProceduresViewModel(IParamedicApiService api, IParamedicCatalogService catalog)
+    public ProceduresViewModel(IParamedicApiService api, IParamedicCatalogService catalog, IAppNavigator navigator)
     {
         _api = api;
         _catalog = catalog;
+        _navigator = navigator;
     }
 
     [ObservableProperty]
@@ -36,15 +40,6 @@ public partial class ProceduresViewModel : ObservableObject
     [ObservableProperty]
     private string notes = string.Empty;
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
-    private bool isBusy;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasError))]
-    private string? errorMessage;
-
-    public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CatalogLoadFailed))]
@@ -58,28 +53,20 @@ public partial class ProceduresViewModel : ObservableObject
 
     public bool HasSaved => SavedCount > 0;
 
+    protected override void OnBusyChanged() => SaveCommand.NotifyCanExecuteChanged();
+
     [RelayCommand]
     private async Task LoadCatalogAsync()
     {
         if (CatalogItems.Count > 0) return;
 
-        CatalogFailed = false;
-        IsBusy = true;
-
-        try
+        await RunAsync(async () =>
         {
             var items = await _catalog.GetProceduresAsync();
             foreach (var item in items) CatalogItems.Add(item);
-        }
-        catch (Exception)
-        {
-            CatalogFailed = true;
-            ErrorMessage = "No se pudo cargar el catálogo de procedimientos.";
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        }, "No se pudo cargar el catálogo de procedimientos.");
+
+        CatalogFailed = HasError;
     }
 
     private bool CanSave() => !IsBusy && SelectedProcedure is not null;
@@ -89,10 +76,8 @@ public partial class ProceduresViewModel : ObservableObject
     {
         if (SelectedProcedure is null) return;
 
-        ErrorMessage = null;
-        IsBusy = true;
-
-        try
+        // Si falla, los datos y el ClientRequestId se conservan para reintentar.
+        await RunAsync(async () =>
         {
             _clientRequestId ??= Guid.NewGuid();
             _recordedAt ??= DateTime.UtcNow;
@@ -117,22 +102,13 @@ public partial class ProceduresViewModel : ObservableObject
             _recordedAt = null;
             SelectedProcedure = null;
             Notes = string.Empty;
-        }
-        catch (Exception)
-        {
-            // Mensaje genérico; los datos y el ClientRequestId se conservan para reintentar.
-            ErrorMessage = "No se pudo guardar el procedimiento. Intenta nuevamente.";
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        }, "No se pudo guardar el procedimiento. Intenta nuevamente.");
     }
 
     [RelayCommand]
     private async Task ContinueAsync()
     {
-        await Shell.Current.GoToAsync(
+        await _navigator.GoToAsync(
             ParamedicRoutes.Medications,
             new Dictionary<string, object> { ["EmergencyId"] = EmergencyId });
     }

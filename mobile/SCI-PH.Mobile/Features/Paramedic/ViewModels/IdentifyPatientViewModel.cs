@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SCI_PH.Mobile.Common.Navigation;
+using SCI_PH.Mobile.Common.ViewModels;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 using SCI_PH.Mobile.Features.Paramedic.Models.Enums;
 using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
@@ -7,15 +9,17 @@ using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
 
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
-public partial class IdentifyPatientViewModel : ObservableObject
+public partial class IdentifyPatientViewModel : BaseViewModel
 {
     private readonly IParamedicApiService _api;
     private readonly IFingerprintReaderService _fingerprint;
+    private readonly IAppNavigator _navigator;
 
-    public IdentifyPatientViewModel(IParamedicApiService api, IFingerprintReaderService fingerprint)
+    public IdentifyPatientViewModel(IParamedicApiService api, IFingerprintReaderService fingerprint, IAppNavigator navigator)
     {
         _api = api;
         _fingerprint = fingerprint;
+        _navigator = navigator;
     }
 
     // PENDIENTE: los códigos de tipo de documento los define el backend (Rol 2).
@@ -23,19 +27,6 @@ public partial class IdentifyPatientViewModel : ObservableObject
 
     [ObservableProperty]
     private Guid emergencyId;
-
-    // ---- Estado general ----
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(IdentifyByFingerprintCommand))]
-    [NotifyCanExecuteChangedFor(nameof(SubmitDocumentCommand))]
-    [NotifyCanExecuteChangedFor(nameof(ContinueWithoutIdentifyingCommand))]
-    private bool isBusy;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasError))]
-    private string? errorMessage;
-
-    public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     // ---- Resultado ----
     [ObservableProperty]
@@ -63,6 +54,13 @@ public partial class IdentifyPatientViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SubmitDocumentCommand))]
     private string documentNumber = string.Empty;
+
+    protected override void OnBusyChanged()
+    {
+        IdentifyByFingerprintCommand.NotifyCanExecuteChanged();
+        SubmitDocumentCommand.NotifyCanExecuteChanged();
+        ContinueWithoutIdentifyingCommand.NotifyCanExecuteChanged();
+    }
 
     // ---- Comandos ----
     [RelayCommand(CanExecute = nameof(CanRun))]
@@ -144,30 +142,8 @@ public partial class IdentifyPatientViewModel : ObservableObject
         ShowDocumentForm = false;
     }
 
-    private async Task GoToNextStepAsync()
-    {
-        await Shell.Current.GoToAsync(
+    private Task GoToNextStepAsync() =>
+        _navigator.GoToAsync(
             ParamedicRoutes.VitalSigns,
             new Dictionary<string, object> { ["EmergencyId"] = EmergencyId });
-    }
-
-    private async Task RunAsync(Func<Task> action, string errorText)
-    {
-        ErrorMessage = null;
-        IsBusy = true;
-
-        try
-        {
-            await action();
-        }
-        catch (Exception)
-        {
-            // Mensaje genérico: no exponer detalles internos.
-            ErrorMessage = errorText;
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
 }

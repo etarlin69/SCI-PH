@@ -2,6 +2,9 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SCI_PH.Mobile.Common.Navigation;
+using SCI_PH.Mobile.Common.ViewModels;
+using SCI_PH.Mobile.Common.Dialogs;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 
@@ -11,19 +14,21 @@ namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
 /// Registro de medicamentos YA ADMINISTRADOS. SCI-PH no prescribe ni sugiere dosis.
 /// </summary>
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
-public partial class MedicationsViewModel : ObservableObject
+public partial class MedicationsViewModel : BaseViewModel
 {
     private readonly IParamedicApiService _api;
     private readonly IParamedicCatalogService _catalog;
+    private readonly IAppDialogService _dialogs;
 
     // Se conservan entre reintentos para que un reenvío no duplique el registro.
     private Guid? _clientRequestId;
     private DateTime? _recordedAt;
 
-    public MedicationsViewModel(IParamedicApiService api, IParamedicCatalogService catalog)
+    public MedicationsViewModel(IParamedicApiService api, IParamedicCatalogService catalog, IAppDialogService dialogs)
     {
         _api = api;
         _catalog = catalog;
+        _dialogs = dialogs;
     }
 
     // PENDIENTE: el contrato define "route" como texto; confirmar valores válidos con Rol 2.
@@ -54,15 +59,6 @@ public partial class MedicationsViewModel : ObservableObject
     [ObservableProperty]
     private string notes = string.Empty;
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
-    private bool isBusy;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasError))]
-    private string? errorMessage;
-
-    public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CatalogLoadFailed))]
@@ -76,28 +72,20 @@ public partial class MedicationsViewModel : ObservableObject
 
     public bool HasSaved => SavedCount > 0;
 
+    protected override void OnBusyChanged() => SaveCommand.NotifyCanExecuteChanged();
+
     [RelayCommand]
     private async Task LoadCatalogAsync()
     {
         if (CatalogItems.Count > 0) return;
 
-        CatalogFailed = false;
-        IsBusy = true;
-
-        try
+        await RunAsync(async () =>
         {
             var items = await _catalog.GetMedicationsAsync();
             foreach (var item in items) CatalogItems.Add(item);
-        }
-        catch (Exception)
-        {
-            CatalogFailed = true;
-            ErrorMessage = "No se pudo cargar el catálogo de medicamentos.";
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        }, "No se pudo cargar el catálogo de medicamentos.");
+
+        CatalogFailed = HasError;
     }
 
     private bool CanSave() =>
@@ -111,10 +99,8 @@ public partial class MedicationsViewModel : ObservableObject
     {
         if (SelectedMedication is null || SelectedRoute is null) return;
 
-        ErrorMessage = null;
-        IsBusy = true;
-
-        try
+        // Si falla, los datos y el ClientRequestId se conservan para reintentar.
+        await RunAsync(async () =>
         {
             _clientRequestId ??= Guid.NewGuid();
             _recordedAt ??= DateTime.UtcNow;
@@ -143,23 +129,14 @@ public partial class MedicationsViewModel : ObservableObject
             SelectedRoute = null;
             Dose = string.Empty;
             Notes = string.Empty;
-        }
-        catch (Exception)
-        {
-            // Mensaje genérico; los datos y el ClientRequestId se conservan para reintentar.
-            ErrorMessage = "No se pudo guardar el medicamento. Intenta nuevamente.";
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        }, "No se pudo guardar el medicamento. Intenta nuevamente.");
     }
 
     [RelayCommand]
     private async Task ContinueAsync()
     {
         // TODO: navegar a Transferencia (ParamedicRoutes.Transfer).
-        await Shell.Current.DisplayAlert(
+        await _dialogs.ShowAsync(
             "Medicamentos",
             $"Administraciones registradas: {SavedCount}\nSiguiente paso: transferencia (pendiente).",
             "OK");

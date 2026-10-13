@@ -1,42 +1,35 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SCI_PH.Mobile.Common.Navigation;
+using SCI_PH.Mobile.Common.ViewModels;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 
 namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
 
-public partial class NewEmergencyViewModel : ObservableObject
+public partial class NewEmergencyViewModel : BaseViewModel
 {
     private readonly IParamedicApiService _api;
+    private readonly IAppNavigator _navigator;
 
-    public NewEmergencyViewModel(IParamedicApiService api)
+    public NewEmergencyViewModel(IParamedicApiService api, IAppNavigator navigator)
     {
         _api = api;
+        _navigator = navigator;
     }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private string chiefComplaint = string.Empty;
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
-    private bool isBusy;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasError))]
-    private string? errorMessage;
-
-    public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+    protected override void OnBusyChanged() => SaveCommand.NotifyCanExecuteChanged();
 
     private bool CanSave() => !IsBusy && !string.IsNullOrWhiteSpace(ChiefComplaint);
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync()
     {
-        ErrorMessage = null;
-        IsBusy = true;
-
-        try
+        await RunAsync(async () =>
         {
             var emergency = await _api.CreateEmergencyAsync(new CreateEmergencyDto
             {
@@ -46,19 +39,10 @@ public partial class NewEmergencyViewModel : ObservableObject
 
             ChiefComplaint = string.Empty;
 
-            await Shell.Current.GoToAsync(
+            await _navigator.GoToAsync(
                 ParamedicRoutes.IdentifyPatient,
                 new Dictionary<string, object> { ["EmergencyId"] = emergency.Id });
-        }
-        catch (Exception)
-        {
-            // Mensaje genérico: no exponer detalles internos al usuario.
-            ErrorMessage = "No se pudo crear la emergencia. Intenta nuevamente.";
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        }, "No se pudo crear la emergencia. Intenta nuevamente.");
     }
 
     // Mejor esfuerzo: si no hay permiso o GPS, la emergencia se crea sin coordenadas.
