@@ -4,8 +4,98 @@
     x:Class="SCI_PH.PatientPrototype.Features.Patient.Ai.AiAssistantPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.ViewModels"
+    xmlns:dtos="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Models.Dtos"
+    xmlns:ai="clr-namespace:SCI_PH.PatientPrototype.Features.Patient.Ai"
+    x:DataType="vm:AiAssistantViewModel"
     Title="SCI-PH AI"
     BackgroundColor="#F4F7FB">
+
+    <ContentPage.Resources>
+
+        <!-- MENSAJE DEL ASISTENTE -->
+        <DataTemplate x:Key="AssistantMessageTemplate" x:DataType="dtos:AssistantMessageDto">
+            <Grid
+                ColumnDefinitions="Auto,*"
+                ColumnSpacing="9"
+                Padding="0,0,50,14">
+
+                <Border
+                    WidthRequest="38"
+                    HeightRequest="38"
+                    BackgroundColor="{StaticResource ColorPrimary}"
+                    StrokeThickness="0"
+                    VerticalOptions="Start">
+
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="19" />
+                    </Border.StrokeShape>
+
+                    <Label
+                        Text="AI"
+                        FontSize="12"
+                        FontAttributes="Bold"
+                        TextColor="White"
+                        HorizontalOptions="Center"
+                        VerticalOptions="Center" />
+
+                </Border>
+
+                <Border
+                    Grid.Column="1"
+                    Padding="16"
+                    BackgroundColor="White"
+                    Stroke="#DCE4ED"
+                    StrokeThickness="1"
+                    HorizontalOptions="Start"
+                    MaximumWidthRequest="650">
+
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="18" />
+                    </Border.StrokeShape>
+
+                    <Label
+                        Text="{Binding Text}"
+                        FontSize="16"
+                        TextColor="#243B5A"
+                        LineBreakMode="WordWrap" />
+
+                </Border>
+
+            </Grid>
+        </DataTemplate>
+
+        <!-- MENSAJE DEL PACIENTE -->
+        <DataTemplate x:Key="PatientMessageTemplate" x:DataType="dtos:AssistantMessageDto">
+            <Grid Padding="50,0,0,14">
+                <Border
+                    Padding="16"
+                    BackgroundColor="{StaticResource ColorPrimary}"
+                    Stroke="{StaticResource ColorPrimary}"
+                    StrokeThickness="1"
+                    HorizontalOptions="End"
+                    MaximumWidthRequest="650">
+
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="18" />
+                    </Border.StrokeShape>
+
+                    <Label
+                        Text="{Binding Text}"
+                        FontSize="16"
+                        TextColor="White"
+                        LineBreakMode="WordWrap" />
+
+                </Border>
+            </Grid>
+        </DataTemplate>
+
+        <ai:AssistantMessageTemplateSelector
+            x:Key="MessageTemplateSelector"
+            AssistantTemplate="{StaticResource AssistantMessageTemplate}"
+            PatientTemplate="{StaticResource PatientMessageTemplate}" />
+
+    </ContentPage.Resources>
 
     <Grid RowDefinitions="Auto,Auto,*,Auto">
 
@@ -33,7 +123,7 @@
                 <Border
                     WidthRequest="72"
                     HeightRequest="72"
-                    BackgroundColor="#1976D2"
+                    BackgroundColor="{StaticResource ColorPrimary}"
                     StrokeThickness="0"
                     HorizontalOptions="Center"
                     VerticalOptions="Center">
@@ -121,149 +211,14 @@
         <!-- ÁREA DE MENSAJES -->
         <!-- ============================= -->
 
-        <ScrollView
-            x:Name="MessagesScrollView"
-            Grid.Row="2">
-
-            <VerticalStackLayout
-                x:Name="MessagesContainer"
-                Padding="16,4,16,18"
-                Spacing="14">
-
-                <!-- MENSAJE DEL ASISTENTE -->
-                <Grid
-                    ColumnDefinitions="Auto,*"
-                    ColumnSpacing="9"
-                    HorizontalOptions="Fill">
-
-                    <Border
-                        WidthRequest="38"
-                        HeightRequest="38"
-                        BackgroundColor="#1976D2"
-                        StrokeThickness="0"
-                        VerticalOptions="Start">
-
-                        <Border.StrokeShape>
-                            <RoundRectangle CornerRadius="19" />
-                        </Border.StrokeShape>
-
-                        <Label
-                            Text="AI"
-                            FontSize="12"
-                            FontAttributes="Bold"
-                            TextColor="White"
-                            HorizontalOptions="Center"
-                            VerticalOptions="Center" />
-
-                    </Border>
-
-                    <Border
-                        Grid.Column="1"
-                        Padding="16"
-                        BackgroundColor="White"
-                        Stroke="#DCE4ED"
-                        StrokeThickness="1"
-                        HorizontalOptions="Start"
-                        MaximumWidthRequest="650">
-
-                        <Border.StrokeShape>
-                            <RoundRectangle CornerRadius="18" />
-                        </Border.StrokeShape>
-
-                        <Label
-                            Text="Hola. Puedo ayudarte a comprender términos médicos y resultados disponibles en tu expediente."
-                            FontSize="16"
-                            TextColor="#243B5A"
-                            LineBreakMode="WordWrap" />
-
-                    </Border>
-
-                </Grid>
-
-                <!-- MENSAJE DEL USUARIO -->
-                <Border
-                    Padding="16"
-                    Margin="50,0,0,0"
-                    BackgroundColor="#1976D2"
-                    Stroke="#1976D2"
-                    StrokeThickness="1"
-                    HorizontalOptions="End"
-                    MaximumWidthRequest="650">
-
-                    <Border.StrokeShape>
-                        <RoundRectangle CornerRadius="18" />
-                    </Border.StrokeShape>
-
-                    <Label
-                        Text="¿Qué significa tener glucosa de 92 mg/dL?"
-                        FontSize="16"
-                        TextColor="White"
-                        LineBreakMode="WordWrap" />
-
-                </Border>
-
-                <!-- SEGUNDA RESPUESTA -->
-                <Grid
-                    ColumnDefinitions="Auto,*"
-                    ColumnSpacing="9">
-
-                    <Border
-                        WidthRequest="38"
-                        HeightRequest="38"
-                        BackgroundColor="#1976D2"
-                        StrokeThickness="0"
-                        VerticalOptions="Start">
-
-                        <Border.StrokeShape>
-                            <RoundRectangle CornerRadius="19" />
-                        </Border.StrokeShape>
-
-                        <Label
-                            Text="AI"
-                            FontSize="12"
-                            FontAttributes="Bold"
-                            TextColor="White"
-                            HorizontalOptions="Center"
-                            VerticalOptions="Center" />
-
-                    </Border>
-
-                    <Border
-                        Grid.Column="1"
-                        Padding="16"
-                        BackgroundColor="White"
-                        Stroke="#DCE4ED"
-                        StrokeThickness="1"
-                        HorizontalOptions="Start"
-                        MaximumWidthRequest="650">
-
-                        <Border.StrokeShape>
-                            <RoundRectangle CornerRadius="18" />
-                        </Border.StrokeShape>
-
-                        <VerticalStackLayout Spacing="8">
-
-                            <Label
-                                Text="Ese número representa la cantidad de glucosa medida en la sangre."
-                                FontSize="16"
-                                TextColor="#243B5A"
-                                LineBreakMode="WordWrap" />
-
-                            <Label
-                                Text="Su interpretación depende del tipo de prueba y del contexto clínico."
-                                FontSize="16"
-                                TextColor="#243B5A"
-                                LineBreakMode="WordWrap" />
-
-                        </VerticalStackLayout>
-
-                    </Border>
-
-                </Grid>
-
-            </VerticalStackLayout>
-
-        </ScrollView>
+        <CollectionView
+            x:Name="MessagesView"
+            Grid.Row="2"
+            Margin="16,4,16,4"
+            SelectionMode="None"
+            ItemsSource="{Binding Messages}"
+            ItemTemplate="{StaticResource MessageTemplateSelector}"
+            ItemsUpdatingScrollMode="KeepLastItemInView" />
 
         <!-- ============================= -->
         <!-- BARRA DE ESCRITURA -->
@@ -290,8 +245,8 @@
 
                     <!-- TEXTO -->
                     <Editor
-                        x:Name="QuestionEditor"
                         Grid.Column="0"
+                        Text="{Binding Question}"
                         Placeholder="Escribe una pregunta..."
                         PlaceholderColor="#8A97A8"
                         TextColor="#1F3552"
@@ -306,13 +261,14 @@
                     <Button
                         Grid.Column="1"
                         Text="➤"
-                        Clicked="OnSendClicked"
+                        Command="{Binding SendCommand}"
+                        SemanticProperties.Description="Enviar pregunta"
                         WidthRequest="48"
                         HeightRequest="48"
                         CornerRadius="24"
                         Padding="0"
                         FontSize="20"
-                        BackgroundColor="#1976D2"
+                        BackgroundColor="{StaticResource ColorPrimary}"
                         TextColor="White"
                         VerticalOptions="End" />
 

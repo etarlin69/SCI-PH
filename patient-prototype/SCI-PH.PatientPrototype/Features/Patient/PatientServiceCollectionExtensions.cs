@@ -24,6 +24,7 @@ public static class PatientServiceCollectionExtensions
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IPatientSessionService, MockPatientSessionService>();
         services.AddSingleton<IPatientDataService, MockPatientDataService>();
+        services.AddSingleton<IPatientAssistantService, MockPatientAssistantService>();
 
         services.AddSingleton<IPatientNavigator, ShellPatientNavigator>();
         services.AddSingleton<IPatientDialogService, ShellPatientDialogService>();
@@ -38,6 +39,7 @@ public static class PatientServiceCollectionExtensions
         services.AddTransient<HistoryViewModel>();
         services.AddTransient<ResultsViewModel>();
         services.AddTransient<DocumentsViewModel>();
+        services.AddTransient<AiAssistantViewModel>();
 
         services.AddTransient<QrScanPage>();
         services.AddTransient<FaceVerifyPage>();
