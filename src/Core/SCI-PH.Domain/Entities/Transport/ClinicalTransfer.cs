@@ -11,6 +11,11 @@ namespace SCI_PH.Domain.Entities.Transport
     // or Cancelled before reception. Application keeps the encounter status in step in the same transaction.
     public sealed class ClinicalTransfer
     {
+        // An encounter can have only one transfer in these statuses at a time (enforced by a filtered unique index).
+        // Received, Completed and Cancelled transfers do not block a later transfer.
+        public static IReadOnlyCollection<ClinicalTransferStatus> ActiveStatuses { get; } =
+            [ClinicalTransferStatus.Requested, ClinicalTransferStatus.InTransit];
+
         private ClinicalTransfer() { }
 
         public Guid Id { get; private set; }

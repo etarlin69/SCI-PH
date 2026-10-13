@@ -4,8 +4,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using SCI_PH.Application.Abstractions.Clinical;
 using SCI_PH.Application.Abstractions.Security;
+using SCI_PH.Persistence.Clinical.Seed;
+using SCI_PH.Persistence.Clinical.Services;
 using SCI_PH.Persistence.Contexts;
 using SCI_PH.Persistence.Identity;
 using SCI_PH.Persistence.Identity.Models;
@@ -59,8 +63,14 @@ namespace SCI_PH.Persistence
             services.AddScoped<IAccountInvitationStore, AccountInvitationStore>();
             services.AddScoped<IDeviceCredentialStore, DeviceCredentialStore>();
             services.AddScoped<IClinicalIdentityLinkService, ClinicalIdentityLinkService>();
+            services.AddScoped<IClinicalStaffDirectory, ClinicalStaffDirectory>();
+            services.AddScoped<IClinicalReadStore, ClinicalReadStore>();
+            services.AddScoped<IClinicalOrganizationStore, ClinicalOrganizationStore>();
+            services.AddScoped<IClinicalWriteStore, ClinicalWriteStore>();
             services.AddScoped<IdentitySeeder>();
             services.AddOptions<IdentityBootstrapOptions>().Bind(configuration.GetSection(IdentityBootstrapOptions.SectionName));
+            services.AddScoped<ClinicalDevelopmentSeeder>();
+            services.AddOptions<ClinicalDevelopmentSeedOptions>().Bind(configuration.GetSection(ClinicalDevelopmentSeedOptions.SectionName));
 
             return services;
         }
@@ -75,6 +85,25 @@ namespace SCI_PH.Persistence
             }
 
             await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedAsync(cancellationToken);
+        }
+
+        // Datos clínicos de demostración: SOLO en Development y con ClinicalDevelopmentSeed:Enabled = true.
+        // En cualquier otro entorno no hace nada aunque la opción esté activada. Requiere las migraciones aplicadas.
+        public static async Task RunClinicalDevelopmentSeedAsync(
+            this IServiceProvider services, IHostEnvironment environment, CancellationToken cancellationToken = default)
+        {
+            if (!environment.IsDevelopment())
+            {
+                return;
+            }
+
+            await using var scope = services.CreateAsyncScope();
+            if (!scope.ServiceProvider.GetRequiredService<IOptions<ClinicalDevelopmentSeedOptions>>().Value.Enabled)
+            {
+                return;
+            }
+
+            await scope.ServiceProvider.GetRequiredService<ClinicalDevelopmentSeeder>().SeedAsync(cancellationToken);
         }
     }
 }
