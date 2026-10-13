@@ -7,12 +7,18 @@ namespace SCI_PH.Mobile.Common.ViewModels;
 /// </summary>
 public abstract partial class BaseViewModel : ObservableObject
 {
+    /// <summary>Mensaje para fallos sin un texto más concreto.</summary>
+    public const string GenericErrorMessage = "No se pudo completar la operación. Inténtalo de nuevo.";
+
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsNotBusy))]
     private bool isBusy;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
     private string? errorMessage;
+
+    public bool IsNotBusy => !IsBusy;
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 

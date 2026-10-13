@@ -7,7 +7,7 @@ namespace SCI_PH.Mobile.Features.Paramedic;
 /// </summary>
 public static class ParamedicRoutes
 {
-    /// <summary>Raíz del flujo, declarada en el AppShell.</summary>
+    /// <summary>Inicio del flujo; se apila sobre la entrada compartida ("Atrás" vuelve a elegir el acceso).</summary>
     public const string NewEmergency = "NewEmergency";
 
     public const string IdentifyPatient = "IdentifyPatient";

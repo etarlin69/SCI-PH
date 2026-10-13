@@ -7,4 +7,6 @@
 	<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 	<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 	<uses-feature android:name="android.hardware.location" android:required="false" />
+	<!-- Perfil del paciente, MediaPicker.PickPhotoAsync: lectura de la galería hasta Android 12; desde Android 13 usa el selector de fotos del sistema. -->
+	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 </manifest>

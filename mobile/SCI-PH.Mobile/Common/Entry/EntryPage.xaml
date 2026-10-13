@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Common.Entry"
+             x:Class="SCI_PH.Mobile.Common.Entry.EntryPage"
+             x:DataType="vm:EntryViewModel"
+             Style="{StaticResource SciPage}"
+             Shell.NavBarIsVisible="False"
+             Title="SCI-PH">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="20" VerticalOptions="Center" MaximumWidthRequest="520">
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="SCI-PH" Style="{StaticResource SciTitle}" HorizontalTextAlignment="Center" />
+                <Label Text="Elige cómo quieres acceder."
+                       Style="{StaticResource SciSubtitle}"
+                       HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+
+            <!-- Personal clínico: el inicio de sesión real aún no existe; entra directamente al prototipo. -->
+            <Border Style="{StaticResource SciCard}">
+                <VerticalStackLayout Spacing="10">
+                    <Button Text="Personal clínico"
+                            Command="{Binding OpenClinicalStaffCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                    <Label Text="Atención prehospitalaria. Prototipo: el inicio de sesión del personal todavía no está disponible."
+                           Style="{StaticResource SciSubtitle}" FontSize="13" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Paciente: QR y verificación facial simulados hasta integrar el Mobile BFF. -->
+            <Border Style="{StaticResource SciCard}">
+                <VerticalStackLayout Spacing="10">
+                    <Button Text="Paciente"
+                            Command="{Binding OpenPatientCommand}"
+                            Style="{StaticResource SciSecondaryButton}" />
+                    <Label Text="Acceso con tu código QR y verificación facial. Prototipo: ambos pasos son simulados."
+                           Style="{StaticResource SciSubtitle}" FontSize="13" />
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

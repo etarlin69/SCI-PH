@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+    Colores y estilos del área del paciente (Features/Patient), traídos del prototipo del PR #18.
+    No redefine claves del tema compartido (Colors.xaml, Styles.xaml, SciPhTheme.xaml) ni añade estilos implícitos,
+    así que no cambia las pantallas de Paramedic. A medio plazo convergerá con SciPhTheme.
+-->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:converters="clr-namespace:SCI_PH.Mobile.Features.Patient.Converters">
+
+    <!-- Colores -->
+    <Color x:Key="ColorPrimary">#1976D2</Color>
+    <Color x:Key="ColorPrimaryDark">#0F2747</Color>
+    <Color x:Key="ColorSecondary">#21B6C8</Color>
+    <Color x:Key="ColorDanger">#E53945</Color>
+    <Color x:Key="PageBackground">#F3F5F7</Color>
+    <Color x:Key="CardBackground">#FFFFFF</Color>
+    <Color x:Key="BorderColor">#E5E7EB</Color>
+    <Color x:Key="TextPrimary">#1F2937</Color>
+    <Color x:Key="TextSecondary">#6B7280</Color>
+    <Color x:Key="TextOnPrimary">#FFFFFF</Color>
+    <Color x:Key="BadgeBackground">#F6EBD9</Color>
+    <Color x:Key="BadgeText">#B7791F</Color>
+    <Color x:Key="PatientPageBackground">#F7F9FC</Color>
+    <Color x:Key="CardStroke">#E4E9F0</Color>
+    <Color x:Key="TitleText">#172B4D</Color>
+    <Color x:Key="BodyText">#526175</Color>
+    <Color x:Key="MutedText">#7A8798</Color>
+    <Color x:Key="OnDarkMutedText">#DCE8F8</Color>
+    <Color x:Key="SuccessBackground">#E7F7EF</Color>
+    <Color x:Key="SuccessText">#267A50</Color>
+    <Color x:Key="InfoBackground">#EAF4FF</Color>
+    <Color x:Key="InfoStroke">#C9E2FA</Color>
+    <Color x:Key="InfoText">#0F5EA8</Color>
+
+    <!-- Estilos -->
+    <Style x:Key="SectionTitleStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+    </Style>
+
+    <Style x:Key="BodyTextStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="TextColor" Value="{StaticResource TextSecondary}" />
+    </Style>
+
+    <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource ColorPrimary}" />
+        <Setter Property="TextColor" Value="{StaticResource TextOnPrimary}" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="HeightRequest" Value="54" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="Padding" Value="16,12" />
+    </Style>
+
+    <Style x:Key="FrameCardStyle" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}" />
+        <Setter Property="Stroke" Value="{StaticResource BorderColor}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape">
+            <Setter.Value>
+                <RoundRectangle CornerRadius="14" />
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Padding" Value="18" />
+    </Style>
+
+    <Style x:Key="PatientCardStyle" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource CardBackground}" />
+        <Setter Property="Stroke" Value="{StaticResource CardStroke}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape">
+            <Setter.Value>
+                <RoundRectangle CornerRadius="16" />
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Padding" Value="18" />
+    </Style>
+
+    <Style x:Key="PatientPageTitleStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="28" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource ColorPrimaryDark}" />
+    </Style>
+
+    <Style x:Key="PatientSectionTitleStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource ColorPrimaryDark}" />
+    </Style>
+
+    <Style x:Key="CardTitleStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource TitleText}" />
+    </Style>
+
+    <Style x:Key="CardBodyStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="TextColor" Value="{StaticResource BodyText}" />
+    </Style>
+
+    <Style x:Key="CardMetaStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="TextColor" Value="{StaticResource MutedText}" />
+    </Style>
+
+    <Style x:Key="StatusBadgeStyle" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource SuccessBackground}" />
+        <Setter Property="StrokeThickness" Value="0" />
+        <Setter Property="Padding" Value="10,5" />
+        <Setter Property="VerticalOptions" Value="Start" />
+        <Setter Property="StrokeShape">
+            <Setter.Value>
+                <RoundRectangle CornerRadius="12" />
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="StatusBadgeTextStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource SuccessText}" />
+    </Style>
+
+    <Style x:Key="ErrorTextStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="TextColor" Value="{StaticResource ColorDanger}" />
+    </Style>
+
+    <converters:IsNotNullConverter x:Key="IsNotNullConverter" />
+</ResourceDictionary>

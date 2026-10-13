@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<ContentPage
+    x:Class="SCI_PH.Mobile.Features.Patient.Home.HomePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Patient.ViewModels"
+    x:DataType="vm:HomeViewModel"
+    Title="Inicio"
+    BackgroundColor="{StaticResource PatientPageBackground}">
+
+    <ScrollView>
+
+        <VerticalStackLayout
+            Padding="20"
+            Spacing="18">
+
+            <ActivityIndicator
+                IsRunning="{Binding IsBusy}"
+                IsVisible="{Binding IsBusy}"
+                Color="{StaticResource ColorPrimary}" />
+
+            <Label
+                Text="{Binding ErrorMessage}"
+                IsVisible="{Binding HasError}"
+                Style="{StaticResource ErrorTextStyle}" />
+
+            <!-- SALUDO -->
+
+            <Grid ColumnDefinitions="*,Auto">
+
+                <VerticalStackLayout Spacing="3">
+
+                    <Label
+                        Text="{Binding Summary.DisplayName, StringFormat='Hola, {0}'}"
+                        FontSize="27"
+                        FontAttributes="Bold"
+                        TextColor="{StaticResource ColorPrimaryDark}" />
+
+                    <Label
+                        Text="Este es el resumen de tu información en SCI-PH."
+                        FontSize="14"
+                        TextColor="{StaticResource BodyText}" />
+
+                </VerticalStackLayout>
+
+                <Border
+                    Grid.Column="1"
+                    BackgroundColor="{StaticResource InfoBackground}"
+                    StrokeThickness="0"
+                    Padding="11,7"
+                    VerticalOptions="Start">
+
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="15" />
+                    </Border.StrokeShape>
+
+                    <Label
+                        Text="Paciente"
+                        FontSize="12"
+                        FontAttributes="Bold"
+                        TextColor="{StaticResource ColorPrimary}" />
+
+                </Border>
+
+            </Grid>
+
+            <!-- TARJETA IDENTIDAD -->
+
+            <Border
+                BackgroundColor="{StaticResource ColorPrimaryDark}"
+                StrokeThickness="0"
+                Padding="20">
+
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="18" />
+                </Border.StrokeShape>
+
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+
+                    <Border
+                        WidthRequest="65"
+                        HeightRequest="65"
+                        BackgroundColor="White"
+                        StrokeThickness="0">
+
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="32" />
+                        </Border.StrokeShape>
+
+                        <Image
+                            Source="patient_avatar.png"
+                            Aspect="AspectFill" />
+
+                    </Border>
+
+                    <VerticalStackLayout
+                        Grid.Column="1"
+                        VerticalOptions="Center"
+                        Spacing="3">
+
+                        <Label
+                            Text="{Binding Summary.DisplayName}"
+                            FontSize="20"
+                            FontAttributes="Bold"
+                            TextColor="White" />
+
+                        <Label
+                            Text="Cuenta verificada en SCI-PH"
+                            FontSize="13"
+                            TextColor="{StaticResource OnDarkMutedText}" />
+
+                    </VerticalStackLayout>
+
+                </Grid>
+
+            </Border>
+
+            <!-- ESTADÍSTICAS -->
+
+            <Grid
+                ColumnDefinitions="*,*"
+                ColumnSpacing="12">
+
+                <Border Grid.Column="0" Style="{StaticResource PatientCardStyle}" Padding="17">
+
+                    <VerticalStackLayout Spacing="6">
+
+                        <Label
+                            Text="{Binding Summary.AvailableResults}"
+                            FontSize="28"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource ColorPrimary}" />
+
+                        <Label
+                            Text="Resultados disponibles"
+                            Style="{StaticResource CardMetaStyle}" />
+
+                    </VerticalStackLayout>
+
+                </Border>
+
+                <Border Grid.Column="1" Style="{StaticResource PatientCardStyle}" Padding="17">
+
+                    <VerticalStackLayout Spacing="6">
+
+                        <Label
+                            Text="{Binding Summary.ClinicalDocuments}"
+                            FontSize="28"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource ColorSecondary}" />
+
+                        <Label
+                            Text="Documentos clínicos"
+                            Style="{StaticResource CardMetaStyle}" />
+
+                    </VerticalStackLayout>
+
+                </Border>
+
+            </Grid>
+
+            <!-- ÚLTIMO EPISODIO -->
+
+            <Label
+                Text="Último episodio"
+                Style="{StaticResource PatientSectionTitleStyle}"
+                IsVisible="{Binding Summary.LatestEpisode, Converter={StaticResource IsNotNullConverter}}" />
+
+            <Border
+                Style="{StaticResource PatientCardStyle}"
+                IsVisible="{Binding Summary.LatestEpisode, Converter={StaticResource IsNotNullConverter}}">
+
+                <VerticalStackLayout Spacing="8">
+
+                    <Grid ColumnDefinitions="*,Auto">
+
+                        <Label
+                            Text="{Binding Summary.LatestEpisode.Title}"
+                            Style="{StaticResource CardTitleStyle}" />
+
+                        <Border Grid.Column="1" Style="{StaticResource StatusBadgeStyle}">
+                            <Label
+                                Text="{Binding Summary.LatestEpisode.Status}"
+                                Style="{StaticResource StatusBadgeTextStyle}" />
+                        </Border>
+
+                    </Grid>
+
+                    <Label
+                        Text="{Binding Summary.LatestEpisode.Facility}"
+                        Style="{StaticResource CardBodyStyle}" />
+
+                    <Label
+                        Text="{Binding Summary.LatestEpisode.DateLabel}"
+                        Style="{StaticResource CardMetaStyle}" />
+
+                </VerticalStackLayout>
+
+            </Border>
+
+            <!-- RESULTADO RECIENTE -->
+
+            <Label
+                Text="Resultado reciente"
+                Style="{StaticResource PatientSectionTitleStyle}"
+                IsVisible="{Binding Summary.LatestResult, Converter={StaticResource IsNotNullConverter}}" />
+
+            <Border
+                Style="{StaticResource PatientCardStyle}"
+                IsVisible="{Binding Summary.LatestResult, Converter={StaticResource IsNotNullConverter}}">
+
+                <Grid ColumnDefinitions="*,Auto">
+
+                    <VerticalStackLayout Spacing="6">
+
+                        <Label
+                            Text="{Binding Summary.LatestResult.Name}"
+                            Style="{StaticResource CardTitleStyle}" />
+
+                        <Label
+                            Text="{Binding Summary.LatestResult.Value}"
+                            FontSize="25"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource ColorPrimary}" />
+
+                        <Label
+                            Text="{Binding Summary.LatestResult.DateLabel}"
+                            Style="{StaticResource CardMetaStyle}" />
+
+                    </VerticalStackLayout>
+
+                    <Border Grid.Column="1" Style="{StaticResource StatusBadgeStyle}">
+                        <Label
+                            Text="{Binding Summary.LatestResult.Status}"
+                            Style="{StaticResource StatusBadgeTextStyle}" />
+                    </Border>
+
+                </Grid>
+
+            </Border>
+
+            <!-- DOCUMENTO RECIENTE -->
+
+            <Label
+                Text="Documento reciente"
+                Style="{StaticResource PatientSectionTitleStyle}"
+                IsVisible="{Binding Summary.LatestDocument, Converter={StaticResource IsNotNullConverter}}" />
+
+            <Border
+                Style="{StaticResource PatientCardStyle}"
+                IsVisible="{Binding Summary.LatestDocument, Converter={StaticResource IsNotNullConverter}}">
+
+                <Grid
+                    ColumnDefinitions="Auto,*"
+                    ColumnSpacing="14">
+
+                    <Label
+                        Text="{Binding Summary.LatestDocument.Icon}"
+                        FontSize="35"
+                        VerticalOptions="Center" />
+
+                    <VerticalStackLayout
+                        Grid.Column="1"
+                        Spacing="4">
+
+                        <Label
+                            Text="{Binding Summary.LatestDocument.Title}"
+                            Style="{StaticResource CardTitleStyle}" />
+
+                        <Label
+                            Text="{Binding Summary.LatestDocument.Subtitle}"
+                            Style="{StaticResource CardMetaStyle}" />
+
+                        <Label
+                            Text="{Binding Summary.LatestDocument.DateLabel}"
+                            FontSize="12"
+                            TextColor="{StaticResource MutedText}" />
+
+                    </VerticalStackLayout>
+
+                </Grid>
+
+            </Border>
+
+            <!-- ACCESO AL ASISTENTE -->
+
+            <Border
+                BackgroundColor="{StaticResource InfoBackground}"
+                Stroke="{StaticResource InfoStroke}"
+                StrokeThickness="1"
+                Padding="17"
+                SemanticProperties.Description="Abrir el asistente SCI-PH AI">
+
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="16" />
+                </Border.StrokeShape>
+
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding OpenAssistantCommand}" />
+                </Border.GestureRecognizers>
+
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+
+                    <VerticalStackLayout Spacing="5">
+
+                        <Label
+                            Text="SCI-PH AI"
+                            FontSize="17"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource InfoText}" />
+
+                        <Label
+                            Text="Puedes usar el asistente educativo para comprender términos y resultados clínicos en lenguaje sencillo."
+                            FontSize="13"
+                            TextColor="{StaticResource BodyText}" />
+
+                    </VerticalStackLayout>
+
+                    <Label
+                        Grid.Column="1"
+                        Text="›"
+                        FontSize="28"
+                        TextColor="{StaticResource InfoText}"
+                        VerticalOptions="Center" />
+
+                </Grid>
+
+            </Border>
+
+        </VerticalStackLayout>
+
+    </ScrollView>
+
+</ContentPage>
