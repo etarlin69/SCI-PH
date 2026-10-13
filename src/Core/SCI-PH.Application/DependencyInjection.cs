@@ -60,6 +60,7 @@ namespace SCI_PH.Application
             services.AddScoped<EncounterRecordService>();
             services.AddScoped<MedicationService>();
             services.AddScoped<TransferService>();
+            services.AddScoped<ClinicalOrganizationService>();
 
             return services;
         }

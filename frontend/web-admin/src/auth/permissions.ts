@@ -7,6 +7,8 @@ export const Permissions = {
   Accounts: { InvitePatient: 'Accounts.InvitePatient' },
   Devices: { Manage: 'Devices.Manage' },
   Audit: { Read: 'Audit.Read' },
+  Clinics: { Manage: 'Clinics.Manage' },
+  ClinicalStaff: { Manage: 'ClinicalStaff.Manage' },
   Patients: { Read: 'Patients.Read', Create: 'Patients.Create', Update: 'Patients.Update', Identify: 'Patients.Identify' },
   Encounters: { Read: 'Encounters.Read', Create: 'Encounters.Create', Update: 'Encounters.Update', Close: 'Encounters.Close' },
   Triage: { Write: 'Triage.Write' },
@@ -31,6 +33,8 @@ export const ADMIN_PERMISSIONS: readonly Permission[] = [
   Permissions.Accounts.InvitePatient,
   Permissions.Devices.Manage,
   Permissions.Audit.Read,
+  Permissions.Clinics.Manage,
+  Permissions.ClinicalStaff.Manage,
 ];
 
 /**
