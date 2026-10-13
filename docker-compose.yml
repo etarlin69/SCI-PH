@@ -7,6 +7,8 @@ x-backend-environment: &backend-environment
 services:
   postgres:
     image: postgres:17-alpine
+    # Mismo nombre que el contenedor local existente: Compose lo reutiliza con su volumen.
+    container_name: sci-ph-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB en .env}
