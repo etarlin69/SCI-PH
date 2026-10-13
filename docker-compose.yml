@@ -85,6 +85,11 @@ services:
       AccountEmail__ActivationUrl: "http://localhost:${WEB_PORT:-5173}/activate-account"
       AccountEmail__ConfirmEmailUrl: "http://localhost:${WEB_PORT:-5173}/confirm-email"
       AccountEmail__ResetPasswordUrl: "http://localhost:${WEB_PORT:-5173}/reset-password"
+
+      # Administrador inicial (IdentitySeeder, idempotente). Sin estas variables solo se sincronizan los roles.
+      IdentityBootstrap__Enabled: ${IDENTITY_BOOTSTRAP_ENABLED:-false}
+      IdentityBootstrap__AdminEmail: ${IDENTITY_BOOTSTRAP_ADMIN_EMAIL:-}
+      IdentityBootstrap__AdminPassword: ${IDENTITY_BOOTSTRAP_ADMIN_PASSWORD:-}
     ports:
       - "127.0.0.1:${WEB_BFF_PORT:-5074}:8080"
     depends_on:
