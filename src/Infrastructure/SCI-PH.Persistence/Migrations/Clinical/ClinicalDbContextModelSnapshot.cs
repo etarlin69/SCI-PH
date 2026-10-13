@@ -1545,11 +1545,17 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                         .HasColumnType("uuid");
 
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("AmbulanceId");
+
+                    b.HasIndex("ClinicalEncounterId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ClinicalTransfers_ActivePerEncounter")
+                        .HasFilter("\"Status\" IN (1, 2)");
 
                     b.HasIndex("OriginClinicId");
 

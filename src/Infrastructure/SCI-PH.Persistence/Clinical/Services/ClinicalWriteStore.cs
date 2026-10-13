@@ -4,7 +4,9 @@ using SCI_PH.Application.Abstractions.Clinical;
 using SCI_PH.Application.Common.Errors;
 using SCI_PH.Domain.Entities.Auditing;
 using SCI_PH.Domain.Entities.Encounters;
+using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Patients;
+using SCI_PH.Domain.Entities.Transport;
 using SCI_PH.Persistence.Contexts;
 
 namespace SCI_PH.Persistence.Clinical.Services
@@ -17,7 +19,8 @@ namespace SCI_PH.Persistence.Clinical.Services
         private static readonly IReadOnlyDictionary<string, string> _knownUniqueViolations = new Dictionary<string, string>
         {
             ["UX_PatientIdentifiers_ActiveValue"] = "An active identifier with this value already belongs to another patient.",
-            ["IX_ClinicalEncounters_TemporaryPatientCode"] = "The temporary patient code is already in use; retry the operation."
+            ["IX_ClinicalEncounters_TemporaryPatientCode"] = "The temporary patient code is already in use; retry the operation.",
+            ["UX_ClinicalTransfers_ActivePerEncounter"] = "The encounter already has an active transfer."
         };
 
         private readonly ClinicalDbContext _clinical;
@@ -35,7 +38,27 @@ namespace SCI_PH.Persistence.Clinical.Services
 
         public void Add(VitalSign vitalSign) => _clinical.VitalSigns.Add(vitalSign);
 
+        public void Add(ClinicalNote note) => _clinical.ClinicalNotes.Add(note);
+
+        public void Add(Diagnosis diagnosis) => _clinical.Diagnoses.Add(diagnosis);
+
+        // Its details are inserted with it (same graph, same transaction).
+        public void Add(Prescription prescription) => _clinical.Prescriptions.Add(prescription);
+
+        public void Add(MedicationAdministration administration) => _clinical.MedicationAdministrations.Add(administration);
+
+        public Task<ClinicalTransfer?> FindTransferAsync(Guid transferId, CancellationToken cancellationToken) =>
+            _clinical.ClinicalTransfers.SingleOrDefaultAsync(t => t.Id == transferId, cancellationToken);
+
+        public void Add(ClinicalTransfer transfer) => _clinical.ClinicalTransfers.Add(transfer);
+
         public void Add(ClinicalAuditEntry auditEntry) => _clinical.ClinicalAuditEntries.Add(auditEntry);
+
+        // Marks Status as modified (same value) so SaveChanges issues UPDATE ... WHERE "Status" = original AND
+        // "PatientId" = original in the same transaction as the inserted record. PostgreSQL re-evaluates that WHERE
+        // against the latest committed row, so a concurrent close makes it match no row and the whole save rolls back.
+        public void EnsureEncounterUnchanged(ClinicalEncounter encounter) =>
+            _clinical.Entry(encounter).Property(e => e.Status).IsModified = true;
 
         public async Task SaveChangesAsync(CancellationToken cancellationToken)
         {

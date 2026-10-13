@@ -119,6 +119,8 @@ namespace SCI_PH.IntegrationTests.Clinical
         [InlineData(typeof(PatientIdentifier), "UX_PatientIdentifiers_ActivePrimary", "\"IsPrimary\"")]
         [InlineData(typeof(ClinicStaffAffiliation), "UX_ClinicStaffAffiliations_Active", "\"EndedAtUtc\" IS NULL")]
         [InlineData(typeof(EncounterStaffAssignment), "UX_EncounterStaffAssignments_Active", "\"UnassignedAtUtc\" IS NULL")]
+        // Requested (1) and InTransit (2): ClinicalTransfer.ActiveStatuses.
+        [InlineData(typeof(SCI_PH.Domain.Entities.Transport.ClinicalTransfer), "UX_ClinicalTransfers_ActivePerEncounter", "\"Status\" IN (1, 2)")]
         public void FilteredUniqueIndexesProtectActiveRecordsOnly(Type entityType, string indexName, string expectedFilter)
         {
             using var context = CreateContext();
@@ -188,6 +190,20 @@ namespace SCI_PH.IntegrationTests.Clinical
             Assert.True(encounter.FindProperty(nameof(ClinicalEncounter.PatientId))!.IsNullable);
             Assert.True(encounter.FindProperty(nameof(ClinicalEncounter.PatientId))!.IsConcurrencyToken);
             Assert.True(encounter.FindProperty(nameof(ClinicalEncounter.Status))!.IsConcurrencyToken);
+        }
+
+        [Fact]
+        public void TransferDetectsConcurrentStatusChangesAndItsActiveStatusesMatchTheIndex()
+        {
+            using var context = CreateContext();
+            var transfer = Entity<SCI_PH.Domain.Entities.Transport.ClinicalTransfer>(context);
+
+            Assert.True(transfer.FindProperty(nameof(SCI_PH.Domain.Entities.Transport.ClinicalTransfer.Status))!.IsConcurrencyToken);
+            Assert.Equal(
+                [SCI_PH.Domain.Enums.Transport.ClinicalTransferStatus.Requested, SCI_PH.Domain.Enums.Transport.ClinicalTransferStatus.InTransit],
+                SCI_PH.Domain.Entities.Transport.ClinicalTransfer.ActiveStatuses.Order());
+            Assert.Equal((int)SCI_PH.Domain.Enums.Transport.ClinicalTransferStatus.Requested, 1);
+            Assert.Equal((int)SCI_PH.Domain.Enums.Transport.ClinicalTransferStatus.InTransit, 2);
         }
 
         [Fact]

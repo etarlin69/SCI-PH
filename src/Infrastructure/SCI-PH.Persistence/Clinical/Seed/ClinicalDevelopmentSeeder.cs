@@ -3,17 +3,31 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SCI_PH.Application.Common.Security;
+using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Organizations;
+using SCI_PH.Domain.Enums.Medications;
 using SCI_PH.Domain.Enums.Organizations;
 using SCI_PH.Persistence.Contexts;
 using SCI_PH.Persistence.Identity.Models;
 
 namespace SCI_PH.Persistence.Clinical.Seed
 {
-    // Idempotent: one demo clinic (by FacilityCode), one ClinicalStaff per license number and one open affiliation.
-    // Administrators are never linked: an administrator does not become clinical staff implicitly.
+    // Idempotent: one demo clinic (by FacilityCode), one ClinicalStaff per license number and one open affiliation, plus
+    // a small demo medication catalog (by Code). Administrators are never linked: an administrator does not become
+    // clinical staff implicitly.
     public sealed class ClinicalDevelopmentSeeder
     {
+        // Demo catalog for the hospital web in Development. The "DEV-" codes keep it apart from any real catalog.
+        private static readonly (string Code, string Name, string Presentation, string Concentration, MedicationRoute Route)[] _demoMedications =
+        [
+            ("DEV-PARACETAMOL-500", "Paracetamol", "Tableta", "500 mg", MedicationRoute.Oral),
+            ("DEV-IBUPROFENO-400", "Ibuprofeno", "Tableta", "400 mg", MedicationRoute.Oral),
+            ("DEV-METAMIZOL-1G", "Metamizol", "Solución inyectable", "1 g/2 mL", MedicationRoute.Intravenous),
+            ("DEV-SALINA-09", "Cloruro de sodio 0,9 %", "Solución para infusión", "1000 mL", MedicationRoute.Intravenous),
+            ("DEV-OMEPRAZOL-40", "Omeprazol", "Polvo para solución inyectable", "40 mg", MedicationRoute.Intravenous),
+            ("DEV-SALBUTAMOL-100", "Salbutamol", "Aerosol para inhalación", "100 mcg/dosis", MedicationRoute.Inhalation)
+        ];
+
         private readonly ClinicalDbContext _clinical;
         private readonly UserManager<ApplicationUser> _users;
         private readonly ClinicalDevelopmentSeedOptions _options;
@@ -66,8 +80,22 @@ namespace SCI_PH.Persistence.Clinical.Seed
                 _logger.LogInformation("Clinical development seed: staff {LicenseNumber} is {StaffId}.", license, staff.Id);
             }
 
+            await SeedMedicationsAsync(cancellationToken);
             await _clinical.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Clinical development seed applied to clinic {ClinicId}.", clinic.Id);
+        }
+
+        private async Task SeedMedicationsAsync(CancellationToken cancellationToken)
+        {
+            var codes = _demoMedications.Select(m => m.Code).ToList();
+            var existing = await _clinical.Medications
+                .Where(m => m.Code != null && codes.Contains(m.Code))
+                .Select(m => m.Code!)
+                .ToListAsync(cancellationToken);
+            foreach (var (code, name, presentation, concentration, route) in _demoMedications.Where(m => !existing.Contains(m.Code)))
+            {
+                _clinical.Medications.Add(Medication.Register(name, presentation, concentration, code, route));
+            }
         }
 
         private async Task LinkExistingAccountAsync(ClinicalStaff staff, string? email, CancellationToken cancellationToken)

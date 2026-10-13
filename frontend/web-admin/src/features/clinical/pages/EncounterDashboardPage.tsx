@@ -12,15 +12,14 @@ import { SimulatedBadge } from '../components/SimulatedBadge';
 import { useClinicSelection } from '../hooks/useClinicSelection';
 import { useClinicalFeedback } from '../hooks/useClinicalFeedback';
 import { useClinicalQuery } from '../hooks/useClinicalQuery';
+import { useClinicalTime } from '../hooks/useClinicalTime';
 import type { ClinicalEncounterSummary, ClinicalNoteType, DiagnosisType } from '../types/clinical.types';
 import {
     DIAGNOSIS_TYPE_LABELS,
     ENCOUNTER_TYPE_LABELS,
     NOTE_TYPE_LABELS,
     formatDateTimeUtc,
-    isEncounterOpen,
-    localInputToUtc,
-    nowForDateTimeInput,
+    acceptsClinicalRecords,
 } from '../utils/clinicalLabels';
 
 /** /hospital/atenciones: atenciones abiertas. /hospital/atenciones/:id: expediente de la atención. */
@@ -117,7 +116,7 @@ function DiagnosesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
     const [type, setType] = useState<DiagnosisType | ''>('');
     const [isPrimary, setIsPrimary] = useState(false);
     const [saving, setSaving] = useState(false);
-    const open = isEncounterOpen(encounter.status);
+    const open = acceptsClinicalRecords(encounter.status);
 
     const submit = async (e: FormEvent) => {
         e.preventDefault();
@@ -215,9 +214,9 @@ function NotesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
     const { state, reload } = useClinicalQuery(`notes:${encounter.id}`, (signal) => clinicalApi.listNotes(encounter.id, signal));
     const [type, setType] = useState<ClinicalNoteType | ''>('');
     const [content, setContent] = useState('');
-    const [occurredAt, setOccurredAt] = useState(nowForDateTimeInput);
+    const occurredAt = useClinicalTime();
     const [saving, setSaving] = useState(false);
-    const open = isEncounterOpen(encounter.status);
+    const open = acceptsClinicalRecords(encounter.status);
 
     // Discharge se registra al cerrar la atención; Prehospital y TransferSummary vienen del flujo paramédico.
     const noteTypes: ClinicalNoteType[] = ['Assessment', 'Evolution', 'Other'];
@@ -227,11 +226,11 @@ function NotesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
         if (saving || !type || !content.trim()) return;
         setSaving(true);
         try {
-            await clinicalApi.createNote(encounter.id, { type, content: content.trim(), occurredAtUtc: localInputToUtc(occurredAt) });
+            await clinicalApi.createNote(encounter.id, { type, content: content.trim(), occurredAtUtc: occurredAt.toUtc() });
             feedback.success('nota clínica registrada');
             setType('');
             setContent('');
-            setOccurredAt(nowForDateTimeInput());
+            occurredAt.reset();
             reload();
         } catch (error) {
             feedback.failure('No se pudo registrar la nota.', error);
@@ -276,7 +275,13 @@ function NotesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
                             placeholder="Selecciona…"
                             required
                         />
-                        <Input label="Fecha y hora" type="datetime-local" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} required />
+                        <Input
+                            label="Fecha y hora"
+                            type="datetime-local"
+                            value={occurredAt.value}
+                            onChange={(e) => occurredAt.change(e.target.value)}
+                            required
+                        />
                     </div>
                     <Textarea label="Contenido" value={content} onChange={(e) => setContent(e.target.value)} rows={6} required />
                     <div className="flex flex-col gap-2 sm:flex-row">

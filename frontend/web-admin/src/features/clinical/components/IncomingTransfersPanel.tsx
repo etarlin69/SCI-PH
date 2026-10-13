@@ -3,6 +3,7 @@ import { Permissions, useAuth } from '../../../auth';
 import { Link } from 'react-router-dom';
 import { Button, Card, ConfirmDialog, EmptyState } from '../../../components/shared';
 import { clinicalApi } from '../api';
+import { useClinicSelection } from '../hooks/useClinicSelection';
 import { useClinicalFeedback } from '../hooks/useClinicalFeedback';
 import { useClinicalQuery } from '../hooks/useClinicalQuery';
 import type { ClinicalTransfer } from '../types/clinical.types';
@@ -13,13 +14,18 @@ import { QueryView } from './QueryView';
 import { SimulatedBadge } from './SimulatedBadge';
 
 /**
- * Traslados con destino a este hospital (lado receptor). El registro y el despacho del traslado los hace la app
- * paramédica (Rol 6); aquí solo se consulta y se marca la llegada.
+ * Traslados con destino a este hospital (lado receptor). La solicitud y el despacho los hace la clínica de origen (o la
+ * app paramédica, Rol 6); aquí solo se consultan y se registra la llegada. Al recibirlo, la atención pasa a esta clínica.
  */
 export function IncomingTransfersPanel() {
-    const { state, reload } = useClinicalQuery('incoming-transfers', (signal) => clinicalApi.listIncomingTransfers(signal));
+    const clinic = useClinicSelection();
+    const { state, reload } = useClinicalQuery(clinic.ready ? `incoming-transfers:${clinic.queryKey}` : null, (signal) =>
+        clinicalApi.listIncomingTransfers(signal),
+    );
     const feedback = useClinicalFeedback('transfers');
-    const canManage = useAuth().can(Permissions.Transfers.Manage);
+    const { can } = useAuth();
+    const canManage = can(Permissions.Transfers.Manage);
+    const canOpenEncounter = can(Permissions.Encounters.Read);
     const [pending, setPending] = useState<ClinicalTransfer | null>(null);
     const [received, setReceived] = useState<ClinicalTransfer | null>(null);
 
@@ -45,10 +51,12 @@ export function IncomingTransfersPanel() {
         >
             {received && (
                 <p role="status" className="m-0 mb-3 rounded-lg bg-success-50 px-3 py-2 text-sm text-success-700">
-                    Traslado recibido.{' '}
-                    <Link to={`/hospital/atenciones/${received.encounterId}`} className="font-semibold text-success-700">
-                        Abrir la atención
-                    </Link>
+                    Traslado recibido: la atención está ahora a cargo de este hospital.{' '}
+                    {canOpenEncounter && (
+                        <Link to={`/hospital/atenciones/${received.encounterId}`} className="font-semibold text-success-700">
+                            Abrir la atención
+                        </Link>
+                    )}
                 </p>
             )}
             <QueryView
@@ -76,16 +84,19 @@ export function IncomingTransfersPanel() {
                                     </p>
                                     {t.reason && <p className="m-0 text-[13px] text-ink-3">{t.reason}</p>}
                                 </div>
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    className="shrink-0"
-                                    disabled={t.status !== 'InTransit' || !canManage}
-                                    title={t.status !== 'InTransit' ? 'Solo se puede recibir un traslado en camino.' : undefined}
-                                    onClick={() => setPending(t)}
-                                >
-                                    Registrar llegada
-                                </Button>
+                                {/* La acción solo existe con el permiso real; el backend sigue siendo la autoridad (403/409). */}
+                                {canManage && (
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        className="shrink-0"
+                                        disabled={t.status !== 'InTransit'}
+                                        title={t.status !== 'InTransit' ? 'Solo se puede recibir un traslado en camino.' : undefined}
+                                        onClick={() => setPending(t)}
+                                    >
+                                        Registrar llegada
+                                    </Button>
+                                )}
                             </li>
                         ))}
                     </ul>

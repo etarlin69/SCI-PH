@@ -3,9 +3,6 @@ import type {
   AmbulanceStatus,
   AuditResult,
   CatalogStatus,
-  ClinicStatus,
-  LicenseStatus,
-  StaffStatus,
   TransferStatus,
 } from '../../types';
 import { cn } from '../../utils/cn';
@@ -44,23 +41,6 @@ export function Badge({ tone = 'neutral', dot = true, children, className }: Bad
 }
 
 /** Tonos estándar por estado (mismo criterio que el canvas: suspendido/revocado en gris o rojo, pendiente en ámbar). */
-export const CLINIC_STATUS_TONE: Record<ClinicStatus, BadgeTone> = {
-  Activa: 'success',
-  Inactiva: 'neutral',
-};
-
-export const STAFF_STATUS_TONE: Record<StaffStatus, BadgeTone> = {
-  Activo: 'success',
-  'De licencia': 'warning',
-  Inactivo: 'neutral',
-};
-
-export const LICENSE_STATUS_TONE: Record<LicenseStatus, BadgeTone> = {
-  Vigente: 'success',
-  'Por vencer': 'warning',
-  Vencida: 'danger',
-};
-
 export const CATALOG_STATUS_TONE: Record<CatalogStatus | AmbulanceStatus, BadgeTone> = {
   Activo: 'success',
   Inactivo: 'neutral',

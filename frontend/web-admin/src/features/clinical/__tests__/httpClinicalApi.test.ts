@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ApiError, resetApiClientForTests, setAccessToken } from '../../../api';
 import { createFakeBff, json, problem } from '../../../test/fakeBff';
-import { ClinicalApiError, describeError, isSimulated } from '../api';
+import { describeError, isSimulated } from '../api';
 import { ensureClinicalContext, resetClinicSelectionForTests, selectClinic } from '../api/clinicSelection';
 import { httpClinicalApi } from '../api/httpClinicalApi';
 import type { VitalSignInput } from '../types/clinical.types';
@@ -112,13 +112,80 @@ describe('httpClinicalApi (Web BFF real)', () => {
     expect(describeError(new ApiError(400, { status: 400, title: 'x', detail: 'measuredAtUtc cannot be in the future.' }))).toBe(
       'La fecha y hora no pueden estar en el futuro.',
     );
-    await expect(httpClinicalApi.closeEncounter(ENCOUNTER, { dischargeNote: null })).rejects.toBeInstanceOf(ClinicalApiError);
   });
 
-  it('marca como simulado solo lo que aún no tiene backend', () => {
-    for (const real of ['patients', 'encounters', 'admissions', 'triage', 'vitalSigns'] as const) expect(isSimulated(real)).toBe(false);
-    for (const mock of ['notes', 'diagnoses', 'prescriptions', 'administrations', 'discharge', 'transfers', 'medications'] as const) {
-      expect(isSimulated(mock)).toBe(true);
+  it('notas, diagnósticos y cierre van al BFF real sin enviar autor ni staff', async () => {
+    const bff = createFakeBff({
+      [`GET /api/web/encounters/${ENCOUNTER}/notes`]: () => json(200, [{ id: 'n1', type: 'Evolution', content: 'Nota real', occurredAtUtc: '2026-10-08T10:00:00Z', createdAtUtc: '2026-10-08T10:00:01Z', authorStaffId: 's1', authorDisplayName: 'Dra. Prueba' }]),
+      [`POST /api/web/encounters/${ENCOUNTER}/notes`]: () => json(201, { id: 'n2' }),
+      [`GET /api/web/encounters/${ENCOUNTER}/diagnoses`]: () => json(200, []),
+      [`POST /api/web/encounters/${ENCOUNTER}/diagnoses`]: () => json(201, { id: 'd1' }),
+      [`POST /api/web/encounters/${ENCOUNTER}/close`]: () => new Response(null, { status: 204 }),
+    });
+
+    const notes = await httpClinicalApi.listNotes(ENCOUNTER);
+    await httpClinicalApi.createNote(ENCOUNTER, { type: 'Evolution', content: 'Evolución', occurredAtUtc: '2026-10-08T10:05:00.000Z', authorStaffId: 'x' } as never);
+    await httpClinicalApi.listDiagnoses(ENCOUNTER);
+    await httpClinicalApi.createDiagnosis(ENCOUNTER, { description: 'Cefalea', type: 'Presumptive', isPrimary: true, codeSystem: 'ICD-10', code: 'R51', recordedByStaffId: 'x' } as never);
+    await httpClinicalApi.closeEncounter(ENCOUNTER, { dischargeNote: 'Alta' });
+
+    expect(notes[0].authorDisplayName).toBe('Dra. Prueba');
+    expect(bff.calls(`POST /api/web/encounters/${ENCOUNTER}/notes`)[0].body).toEqual({ type: 'Evolution', content: 'Evolución', occurredAtUtc: '2026-10-08T10:05:00.000Z' });
+    expect(bff.calls(`POST /api/web/encounters/${ENCOUNTER}/diagnoses`)[0].body).toEqual({ description: 'Cefalea', type: 'Presumptive', isPrimary: true, codeSystem: 'ICD-10', code: 'R51' });
+    expect(bff.calls(`POST /api/web/encounters/${ENCOUNTER}/close`)[0].body).toEqual({ dischargeNote: 'Alta' });
+    expect(describeError(new ApiError(409, { status: 409, title: 'x', detail: 'An encounter in status Closed does not accept clinical records.' }))).toBe(
+      'La atención está cerrada o en un estado que no admite registros.',
+    );
+  });
+
+  it('catálogo, prescripciones y Kardex van al BFF real sin prescriptor ni responsable desde el cliente', async () => {
+    const bff = createFakeBff({
+      'GET /api/web/medications': () => json(200, [{ id: 'm1', code: null, name: 'Paracetamol', presentation: null, concentration: null, defaultRoute: null, status: 'Active' }]),
+      [`GET /api/web/encounters/${ENCOUNTER}/prescriptions`]: () => json(200, []),
+      [`POST /api/web/encounters/${ENCOUNTER}/prescriptions`]: () => json(201, { id: 'rx1', details: [] }),
+      [`GET /api/web/encounters/${ENCOUNTER}/medication-administrations`]: () => json(200, []),
+      [`POST /api/web/encounters/${ENCOUNTER}/medication-administrations`]: () => json(201, { id: 'a1' }),
+    });
+    const line = { medicationId: 'm1', dose: 1, doseUnit: 'g', route: 'Oral', frequency: 'c/8h', durationDays: 3, instructions: null } as const;
+
+    const catalog = await httpClinicalApi.listMedications();
+    await httpClinicalApi.listPrescriptions(ENCOUNTER);
+    await httpClinicalApi.createPrescription(ENCOUNTER, { notes: null, details: [{ ...line, prescribedByStaffId: 'x', medicationName: 'x' } as never] });
+    await httpClinicalApi.listMedicationAdministrations(ENCOUNTER);
+    await httpClinicalApi.createMedicationAdministration(ENCOUNTER, {
+      medicationId: 'm1', dose: 1, doseUnit: 'g', route: 'Oral', administeredAtUtc: '2026-10-08T10:05:00.000Z',
+      prescriptionId: 'rx1', prescriptionDetailId: 'l1', notes: null, administeredByStaffId: 'x',
+    } as never);
+
+    expect(catalog[0].name).toBe('Paracetamol');
+    expect(bff.calls(`POST /api/web/encounters/${ENCOUNTER}/prescriptions`)[0].body).toEqual({ notes: null, details: [line] });
+    expect(bff.calls(`POST /api/web/encounters/${ENCOUNTER}/medication-administrations`)[0].body).toEqual({
+      medicationId: 'm1', dose: 1, doseUnit: 'g', route: 'Oral', administeredAtUtc: '2026-10-08T10:05:00.000Z', prescriptionId: 'rx1', prescriptionDetailId: 'l1', notes: null,
+    });
+    expect(describeError(new ApiError(409, { status: 409, title: 'x', detail: 'Medication 1 is not active in the catalog.' }))).toBe(
+      'El medicamento no está activo en el catálogo.',
+    );
+  });
+
+  it('traslados entrantes y recepción van al BFF real sin receptor ni destino desde el cliente', async () => {
+    const bff = createFakeBff({
+      'GET /api/web/transfers/incoming': () => json(200, [{ id: 't1', status: 'InTransit', encounterStatus: 'Transferred' }]),
+      'POST /api/web/transfers/t1/receive': () => json(200, { id: 't1', status: 'Received' }),
+    });
+
+    const incoming = await httpClinicalApi.listIncomingTransfers();
+    await httpClinicalApi.receiveTransfer('t1');
+
+    expect(incoming[0].status).toBe('InTransit');
+    expect(bff.calls('POST /api/web/transfers/t1/receive')[0].body).toBeUndefined();
+    expect(describeError(new ApiError(409, { status: 409, title: 'x', detail: 'Receive requires a InTransit transfer; current status is Received.' }))).toBe(
+      'El traslado ya fue recibido o todavía no está en camino.',
+    );
+  });
+
+  it('todo el módulo hospitalario usa el backend real (nada simulado fuera del modo mock)', () => {
+    for (const real of ['patients', 'encounters', 'admissions', 'triage', 'vitalSigns', 'notes', 'diagnoses', 'discharge', 'medications', 'prescriptions', 'administrations', 'transfers'] as const) {
+      expect(isSimulated(real)).toBe(false);
     }
   });
 });

@@ -16,8 +16,21 @@ export type ClinicalFeature =
     | 'discharge'
     | 'transfers';
 
-/** Funciones con endpoints reales en el Web BFF (vertical clínica 1). */
-export const HTTP_CLINICAL_FEATURES: readonly ClinicalFeature[] = ['patients', 'encounters', 'admissions', 'triage', 'vitalSigns'];
+/** Funciones con endpoints reales en el Web BFF (verticales clínicas 1 a 4): todo el módulo hospitalario. */
+export const HTTP_CLINICAL_FEATURES: readonly ClinicalFeature[] = [
+    'patients',
+    'encounters',
+    'admissions',
+    'triage',
+    'vitalSigns',
+    'notes',
+    'diagnoses',
+    'discharge',
+    'medications',
+    'prescriptions',
+    'administrations',
+    'transfers',
+];
 
 /** true = todo el módulo hospitalario es simulado. */
 export const CLINICAL_API_IS_MOCK = import.meta.env.VITE_CLINICAL_API_MODE === 'mock';

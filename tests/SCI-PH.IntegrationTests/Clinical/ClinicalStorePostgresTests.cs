@@ -14,8 +14,10 @@ using SCI_PH.Persistence;
 using SCI_PH.Persistence.Clinical.Seed;
 using SCI_PH.Persistence.Identity.Models;
 using SCI_PH.Domain.Entities.Encounters;
+using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Organizations;
 using SCI_PH.Domain.Enums.Encounters;
+using SCI_PH.Domain.Enums.Medications;
 using SCI_PH.Domain.Enums.Patients;
 using SCI_PH.IntegrationTests.Clinical.Support;
 using SCI_PH.IntegrationTests.PostgreSql;
@@ -196,6 +198,11 @@ namespace SCI_PH.IntegrationTests.Clinical
             Assert.Null(staff.Single(s => s.ProfessionalLicenseNumber == "DEV-DOC-01").IdentityUserId);
             Assert.Null(staff.Single(s => s.ProfessionalLicenseNumber == "DEV-REC-01").IdentityUserId);
             Assert.Equal(3, await host.DbAsync(db => db.ClinicStaffAffiliations.CountAsync(a => a.EndedAtUtc == null)));
+            // Demo medication catalog: created once (by code), active, with "DEV-" codes.
+            var catalog = await host.DbAsync(db => db.Medications.ToListAsync());
+            Assert.Equal(6, catalog.Count);
+            Assert.All(catalog, m => Assert.StartsWith("DEV-", m.Code));
+            Assert.All(catalog, m => Assert.Equal(MedicationStatus.Active, m.Status));
 
             // Entry point used by Program.cs: with the option enabled it seeds in Development and does nothing elsewhere.
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -213,6 +220,143 @@ namespace SCI_PH.IntegrationTests.Clinical
             Assert.False(await host.DbAsync(db => db.Clinics.AnyAsync(c => c.FacilityCode == "DEV-ENV-GUARD")));
             await provider.RunClinicalDevelopmentSeedAsync(new TestEnvironment(Environments.Development));
             Assert.True(await host.DbAsync(db => db.Clinics.AnyAsync(c => c.FacilityCode == "DEV-ENV-GUARD")));
+            Assert.Equal(6, await host.DbAsync(db => db.Medications.CountAsync()));
+        }
+
+        // The administration store turns the known uniqueness violations into conflicts (409), never server errors:
+        // an open affiliation per staff member and clinic, an account linked to one staff member, unique facility code and
+        // license number. Both writers passed any Application check; PostgreSQL decides.
+        [SkippableFact]
+        public async Task TheOrganizationStoreReportsKnownDuplicatesAsConflicts()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            await using var host = await ClinicalApiHost.StartAsync(_postgres);
+            var (_, staff) = await ClinicWithStaffAsync(host);
+            var other = ClinicalStaff.Register("Otra", "Persona", ClinicalStaffType.Nurse);
+            await host.DbAsync(async db =>
+            {
+                db.ClinicalStaffMembers.Add(other);
+                await db.SaveChangesAsync();
+            });
+
+            async Task<ResourceConflictException> ConflictAsync(Action<IClinicalOrganizationStore, IClinicalOrganizationStore> write)
+            {
+                await using var scopeA = host.Services.CreateAsyncScope();
+                await using var scopeB = host.Services.CreateAsyncScope();
+                var storeA = scopeA.ServiceProvider.GetRequiredService<IClinicalOrganizationStore>();
+                var storeB = scopeB.ServiceProvider.GetRequiredService<IClinicalOrganizationStore>();
+                write(storeA, storeB);
+                await storeA.SaveChangesAsync(None);
+                return await Assert.ThrowsAsync<ResourceConflictException>(() => storeB.SaveChangesAsync(None));
+            }
+
+            // ClinicWithStaffAsync already opened staff@clinic: start another clinic for a clean race.
+            var second = await host.CreateClinicAsync("Hospital carrera");
+            var affiliation = await ConflictAsync((a, b) =>
+            {
+                a.Add(ClinicStaffAffiliation.Start(second.Id, staff.Id, DateTimeOffset.UtcNow));
+                b.Add(ClinicStaffAffiliation.Start(second.Id, staff.Id, DateTimeOffset.UtcNow));
+            });
+            Assert.Equal(1, await host.DbAsync(db => db.ClinicStaffAffiliations.CountAsync(a => a.ClinicId == second.Id && a.EndedAtUtc == null)));
+
+            var license = await ConflictAsync((a, b) =>
+            {
+                a.Add(ClinicalStaff.Register("A", "B", ClinicalStaffType.Physician, "LIC-RACE-1"));
+                b.Add(ClinicalStaff.Register("C", "D", ClinicalStaffType.Physician, "lic-race-1"));
+            });
+            var facility = await ConflictAsync((a, b) =>
+            {
+                a.Add(Clinic.Register("H1", ClinicType.Hospital, "P", "M", "FAC-RACE-1"));
+                b.Add(Clinic.Register("H2", ClinicType.Hospital, "P", "M", "fac-race-1"));
+            });
+
+            // The same account cannot be linked to two staff members.
+            var account = staff.IdentityUserId!.Value;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var store = scope.ServiceProvider.GetRequiredService<IClinicalOrganizationStore>();
+                (await store.FindStaffAsync(other.Id, None))!.LinkIdentityUser(account);
+                var linked = await Assert.ThrowsAsync<ResourceConflictException>(() => store.SaveChangesAsync(None));
+                Assert.Equal("The account is already linked to another staff member.", linked.Message);
+            }
+
+            Assert.Equal("The staff member already has an open affiliation with this clinic.", affiliation.Message);
+            Assert.Equal("A staff member with this professional license number already exists.", license.Message);
+            Assert.Equal("A clinic with this facility code already exists.", facility.Message);
+            Assert.Null(await host.DbAsync(db => db.ClinicalStaffMembers.Where(s => s.Id == other.Id).Select(s => s.IdentityUserId).SingleAsync()));
+        }
+
+        // Last line of defence of "one active transfer per encounter": two writers that both passed the Application check
+        // (both read "no active transfer") reach PostgreSQL; the filtered unique index lets only one active transfer in and
+        // the store reports the other as a conflict (409), not a server error. Finished transfers do not block.
+        [SkippableFact]
+        public async Task TheDatabaseAllowsOnlyOneActiveTransferPerEncounter()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            await using var host = await ClinicalApiHost.StartAsync(_postgres);
+            var (origin, _) = await ClinicWithStaffAsync(host);
+            var destination = await host.CreateClinicAsync("Hospital destino");
+            var encounter = await AddEncounterAsync(host, origin.Id);
+
+            await using var scopeA = host.Services.CreateAsyncScope();
+            await using var scopeB = host.Services.CreateAsyncScope();
+            var storeA = scopeA.ServiceProvider.GetRequiredService<IClinicalWriteStore>();
+            var storeB = scopeB.ServiceProvider.GetRequiredService<IClinicalWriteStore>();
+            var first = Domain.Entities.Transport.ClinicalTransfer.Request(encounter.Id, destination.Id, DateTimeOffset.UtcNow, origin.Id);
+            var second = Domain.Entities.Transport.ClinicalTransfer.Request(encounter.Id, destination.Id, DateTimeOffset.UtcNow, origin.Id);
+            storeA.Add(first);
+            storeB.Add(second);
+
+            await storeA.SaveChangesAsync(None);
+            var conflict = await Assert.ThrowsAsync<ResourceConflictException>(() => storeB.SaveChangesAsync(None));
+
+            Assert.Equal("The encounter already has an active transfer.", conflict.Message);
+            Assert.Equal(1, await host.DbAsync(db => db.ClinicalTransfers.CountAsync(t => t.ClinicalEncounterId == encounter.Id)));
+
+            // A cancelled transfer no longer blocks a new one.
+            await host.DbAsync(async db =>
+            {
+                (await db.ClinicalTransfers.SingleAsync(t => t.Id == first.Id)).Cancel(DateTimeOffset.UtcNow);
+                await db.SaveChangesAsync();
+                db.ClinicalTransfers.Add(Domain.Entities.Transport.ClinicalTransfer.Request(encounter.Id, destination.Id, DateTimeOffset.UtcNow, origin.Id));
+                await db.SaveChangesAsync();
+            });
+            Assert.Equal(2, await host.DbAsync(db => db.ClinicalTransfers.CountAsync(t => t.ClinicalEncounterId == encounter.Id)));
+        }
+
+        // The store writes a prescription with its details in one save; the composite keys reject an administration that
+        // points to a prescription of another encounter, and nothing of that save is stored.
+        [SkippableFact]
+        public async Task PrescriptionDetailsAreSavedTogetherAndCompositeKeysKeepAdministrationsInTheirEncounter()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            await using var host = await ClinicalApiHost.StartAsync(_postgres);
+            var (clinic, staff) = await ClinicWithStaffAsync(host);
+            var encounterA = await AddEncounterAsync(host, clinic.Id);
+            var encounterB = await AddEncounterAsync(host, clinic.Id);
+            var medication = await host.SeedMedicationAsync();
+            var prescription = Prescription.Draft(encounterA.Id, staff.Id);
+            var detail = prescription.AddDetail(medication.Id, 500, "mg", MedicationRoute.Oral, "cada 8 horas", 3);
+            prescription.Issue(DateTimeOffset.UtcNow);
+
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var store = scope.ServiceProvider.GetRequiredService<IClinicalWriteStore>();
+                store.Add(prescription);
+                await store.SaveChangesAsync(None);
+            }
+
+            Assert.Equal(detail.Id, await host.DbAsync(db => db.PrescriptionDetails.Where(d => d.PrescriptionId == prescription.Id).Select(d => d.Id).SingleAsync()));
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var store = scope.ServiceProvider.GetRequiredService<IClinicalWriteStore>();
+                store.Add(MedicationAdministration.Record(
+                    encounterB.Id, medication.Id, 500, "mg", MedicationRoute.Oral, DateTimeOffset.UtcNow, staff.Id, prescription.Id, detail.Id));
+                var exception = await Assert.ThrowsAsync<DbUpdateException>(() => store.SaveChangesAsync(None));
+                Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, Assert.IsType<PostgresException>(exception.InnerException).SqlState);
+            }
+
+            Assert.False(await host.DbAsync(db => db.MedicationAdministrations.AnyAsync()));
         }
 
         private sealed class TestEnvironment(string name) : IHostEnvironment

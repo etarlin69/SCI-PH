@@ -7,7 +7,10 @@ namespace SCI_PH.Application.Features.Clinical
     {
         // Domain factories reject invalid input with ArgumentException (Guard). Only these calls are translated to
         // a 400: an ArgumentException anywhere else is still a programming error and stays a 500.
-        public static T Apply<T>(Func<T> domainCall)
+        public static T Apply<T>(Func<T> domainCall) => Apply(domainCall, fieldPrefix: null);
+
+        // fieldPrefix locates a list item, e.g. "details[1]" turns the parameter "dose" into "details[1].dose".
+        public static T Apply<T>(Func<T> domainCall, string? fieldPrefix)
         {
             try
             {
@@ -15,7 +18,9 @@ namespace SCI_PH.Application.Features.Clinical
             }
             catch (ArgumentException exception)
             {
-                throw new RequestValidationException(exception.Message, ToField(exception.ParamName), exception);
+                var field = ToField(exception.ParamName);
+                throw new RequestValidationException(
+                    exception.Message, fieldPrefix is null ? field : field is null ? fieldPrefix : $"{fieldPrefix}.{field}", exception);
             }
         }
 

@@ -1,43 +1,35 @@
-export type ClinicType = 'Hospital' | 'Clínica' | 'Centro de diagnóstico';
-export type ClinicStatus = 'Activa' | 'Inactiva';
+// Contratos reales de /api/web/admin/clinics (ClinicAdminSummary / RegisterClinicRequest). Solo los campos de
+// Clinic en el Domain: no hay email, horario, capacidades ni servicios, y no existe edición ni borrado.
 
-export interface Clinic {
+export type ClinicType = 'Hospital' | 'Clinic' | 'PrimaryCareCenter' | 'EmergencyCenter' | 'Other';
+
+export type ClinicStatus = 'Active' | 'Inactive';
+
+export interface ClinicAdmin {
   id: string;
-  nombre: string;
-  tipo: ClinicType;
-  direccion: string;
-  provincia: string;
-  telefono: string;
-  email: string;
-  contacto: string;
-  estado: ClinicStatus;
-  personal: number;
-  dispositivos: number;
-  horario: string;
-  lat?: number;
-  lng?: number;
+  name: string;
+  type: ClinicType;
+  facilityCode: string | null;
+  province: string;
+  municipality: string;
+  address: string | null;
+  phoneNumber: string | null;
+  status: ClinicStatus;
+  /** Personal con una afiliación abierta a la clínica. */
+  activeStaffCount: number;
 }
 
-export interface ClinicServiceCapacity {
-  ocupadas: number;
-  total: number;
-  unidad: string;
+export interface RegisterClinicRequest {
+  name: string;
+  type: ClinicType;
+  province: string;
+  municipality: string;
+  facilityCode: string | null;
+  address: string | null;
+  phoneNumber: string | null;
 }
 
-export interface ClinicService {
-  id: string;
-  clinicId: string;
-  nombre: string;
-  disponible: boolean;
-  capacidad?: ClinicServiceCapacity;
-  nota?: string;
-  alerta?: boolean;
-}
-
-export type ClinicInput = Pick<Clinic, 'nombre' | 'tipo' | 'direccion' | 'provincia' | 'telefono' | 'email' | 'contacto' | 'estado'>;
-
-export interface ClinicFilters {
-  q: string;
-  provincia: string;
-  estado: ClinicStatus | '';
+export interface ClinicListQuery {
+  search?: string;
+  status?: ClinicStatus;
 }

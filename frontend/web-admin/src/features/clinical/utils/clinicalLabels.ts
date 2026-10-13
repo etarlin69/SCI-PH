@@ -37,6 +37,9 @@ export const ENCOUNTER_TYPE_LABELS: Record<ClinicalEncounterType, string> = {
 /** Estados desde los que el Domain permite pasar a Closed. Solo orienta la UI; el backend decide. */
 export const CLOSABLE_STATUSES: ClinicalEncounterStatus[] = ['InProgress', 'Received', 'InEvolution'];
 export const isEncounterOpen = (status: ClinicalEncounterStatus) => status !== 'Closed' && status !== 'Cancelled';
+/** Estados que admiten registros clínicos (EncounterRecordService.RecordableStatuses). Solo orienta la UI; el backend decide. */
+export const RECORDABLE_STATUSES: ClinicalEncounterStatus[] = ['Created', 'InProgress', 'Received', 'InEvolution'];
+export const acceptsClinicalRecords = (status: ClinicalEncounterStatus) => RECORDABLE_STATUSES.includes(status);
 
 /** Escala de cinco niveles. El color es solo visual: al backend se envía la clave del enum. */
 export const TRIAGE_PRIORITIES: { value: TriagePriority; label: string; color: string; className: string }[] = [

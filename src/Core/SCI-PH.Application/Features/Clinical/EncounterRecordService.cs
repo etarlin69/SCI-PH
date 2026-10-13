@@ -11,8 +11,10 @@ using SCI_PH.Domain.Exceptions;
 
 namespace SCI_PH.Application.Features.Clinical
 {
-    // Triage and vital signs of an encounter. The first real clinical record moves the encounter from Created to
-    // InProgress through ClinicalEncounter.ChangeStatus, in the same transaction as the record itself.
+    // Clinical records of an encounter: triage, vital signs, clinical notes and diagnoses. The first real clinical record
+    // moves the encounter from Created to InProgress through ClinicalEncounter.ChangeStatus, in the same transaction as
+    // the record itself. Every record re-checks the encounter's concurrency tokens, so nothing is written after another
+    // transaction closed the encounter.
     public sealed class EncounterRecordService
     {
         public const int MaxMeasurementsPerTriage = 20;
@@ -121,14 +123,72 @@ namespace SCI_PH.Application.Features.Clinical
             return vitalSign.ToSummary();
         }
 
-        private async Task<(ClinicalActor Actor, ClinicalEncounter Encounter, DateTimeOffset Now)> LoadForRecordingAsync(
-            Guid encounterId, string permission, CancellationToken cancellationToken)
+        public async Task<IReadOnlyList<ClinicalNoteSummary>> ListNotesAsync(Guid encounterId, CancellationToken cancellationToken)
         {
-            var actor = await _actor.GetAsync(cancellationToken);
-            var encounter = await _writes.FindEncounterAsync(encounterId, cancellationToken)
+            await EncounterService.GetReadableAsync(_actor, _reads, _patientAccess, encounterId, cancellationToken);
+            return await _reads.ListNotesAsync(encounterId, cancellationToken);
+        }
+
+        public async Task<IReadOnlyList<DiagnosisSummary>> ListDiagnosesAsync(Guid encounterId, CancellationToken cancellationToken)
+        {
+            await EncounterService.GetReadableAsync(_actor, _reads, _patientAccess, encounterId, cancellationToken);
+            return await _reads.ListDiagnosesAsync(encounterId, cancellationToken);
+        }
+
+        // ClinicalNote.Write by the current ClinicalStaff. Notes are immutable: corrections are new notes.
+        public async Task<ClinicalNoteSummary> RecordNoteAsync(Guid encounterId, RecordClinicalNoteRequest request, CancellationToken cancellationToken)
+        {
+            var (actor, encounter, now) = await LoadForRecordingAsync(encounterId, Permissions.ClinicalNotes.Write, cancellationToken);
+            var occurredAt = ClinicalInput.ClinicalTime(request.OccurredAtUtc, now, encounter.StartedAtUtc, "occurredAtUtc");
+            var note = ClinicalInput.Apply(() => ClinicalNote.Write(encounter.Id, actor.StaffId, request.Type, request.Content, occurredAt));
+
+            StartIfCreated(encounter, now);
+            _writes.Add(note);
+            _writes.Add(ClinicalAuditEntry.Success(
+                actor.AuditActor, AuditActionType.Create, nameof(ClinicalNote), note.Id.ToString(), now,
+                new AuditContext(encounter.PatientId, encounter.Id)));
+            await _writes.SaveChangesAsync(cancellationToken);
+
+            return note.ToSummary(authorDisplayName: null);
+        }
+
+        // Diagnosis.Record by the current ClinicalStaff, recorded now.
+        public async Task<DiagnosisSummary> RecordDiagnosisAsync(Guid encounterId, RecordDiagnosisRequest request, CancellationToken cancellationToken)
+        {
+            var (actor, encounter, now) = await LoadForRecordingAsync(encounterId, Permissions.Diagnoses.Write, cancellationToken);
+            var diagnosis = ClinicalInput.Apply(() => Diagnosis.Record(
+                encounter.Id, actor.StaffId, request.Description, request.Type, now, request.IsPrimary, request.CodeSystem, request.Code));
+
+            StartIfCreated(encounter, now);
+            _writes.Add(diagnosis);
+            _writes.Add(ClinicalAuditEntry.Success(
+                actor.AuditActor, AuditActionType.Create, nameof(Diagnosis), diagnosis.Id.ToString(), now,
+                new AuditContext(encounter.PatientId, encounter.Id)));
+            await _writes.SaveChangesAsync(cancellationToken);
+
+            return diagnosis.ToSummary();
+        }
+
+        private Task<(ClinicalActor Actor, ClinicalEncounter Encounter, DateTimeOffset Now)> LoadForRecordingAsync(
+            Guid encounterId, string permission, CancellationToken cancellationToken) =>
+            LoadForRecordingAsync(_actor, _writes, _patientAccess, _time, encounterId, permission, cancellationToken);
+
+        // Shared write check of every clinical record (also MedicationService): the encounter exists, belongs to one of
+        // the actor's clinics, the patient rule allows the permission, and its status accepts records.
+        internal static async Task<(ClinicalActor Actor, ClinicalEncounter Encounter, DateTimeOffset Now)> LoadForRecordingAsync(
+            ICurrentClinicalActor currentActor,
+            IClinicalWriteStore writes,
+            IPatientAccessAuthorizer patientAccess,
+            TimeProvider time,
+            Guid encounterId,
+            string permission,
+            CancellationToken cancellationToken)
+        {
+            var actor = await currentActor.GetAsync(cancellationToken);
+            var encounter = await writes.FindEncounterAsync(encounterId, cancellationToken)
                 ?? throw new ResourceNotFoundException(nameof(ClinicalEncounter), encounterId);
             actor.EnsureClinic(encounter.ClinicId);
-            if (encounter.PatientId is { } patientId && !await _patientAccess.CanWriteAsync(patientId, permission, cancellationToken))
+            if (encounter.PatientId is { } patientId && !await patientAccess.CanWriteAsync(patientId, permission, cancellationToken))
             {
                 throw new AccessDeniedException("The current user cannot write this patient's clinical records.");
             }
@@ -138,11 +198,13 @@ namespace SCI_PH.Application.Features.Clinical
                 throw new ResourceConflictException($"An encounter in status {encounter.Status} does not accept clinical records.");
             }
 
-            return (actor, encounter, _time.GetUtcNow());
+            // The status check above can be outdated by commit time; the store re-checks it inside the save.
+            writes.EnsureEncounterUnchanged(encounter);
+            return (actor, encounter, time.GetUtcNow());
         }
 
         // Created -> InProgress only through the Domain transition; an encounter already in progress is left as is.
-        private static void StartIfCreated(ClinicalEncounter encounter, DateTimeOffset now)
+        internal static void StartIfCreated(ClinicalEncounter encounter, DateTimeOffset now)
         {
             if (encounter.Status != ClinicalEncounterStatus.Created)
             {
