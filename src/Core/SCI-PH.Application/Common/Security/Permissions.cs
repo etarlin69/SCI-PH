@@ -26,6 +26,18 @@ namespace SCI_PH.Application.Common.Security
             public const string Read = "Audit.Read";
         }
 
+        // Clinical organization master data (not Identity): clinics of the network.
+        public static class Clinics
+        {
+            public const string Manage = "Clinics.Manage";
+        }
+
+        // Clinical staff records and their clinic affiliations. Inviting the staff member to an account is Users.Manage.
+        public static class ClinicalStaff
+        {
+            public const string Manage = "ClinicalStaff.Manage";
+        }
+
         public static class Patients
         {
             public const string Read = "Patients.Read";

@@ -223,6 +223,69 @@ namespace SCI_PH.IntegrationTests.Clinical
             Assert.Equal(6, await host.DbAsync(db => db.Medications.CountAsync()));
         }
 
+        // The administration store turns the known uniqueness violations into conflicts (409), never server errors:
+        // an open affiliation per staff member and clinic, an account linked to one staff member, unique facility code and
+        // license number. Both writers passed any Application check; PostgreSQL decides.
+        [SkippableFact]
+        public async Task TheOrganizationStoreReportsKnownDuplicatesAsConflicts()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            await using var host = await ClinicalApiHost.StartAsync(_postgres);
+            var (_, staff) = await ClinicWithStaffAsync(host);
+            var other = ClinicalStaff.Register("Otra", "Persona", ClinicalStaffType.Nurse);
+            await host.DbAsync(async db =>
+            {
+                db.ClinicalStaffMembers.Add(other);
+                await db.SaveChangesAsync();
+            });
+
+            async Task<ResourceConflictException> ConflictAsync(Action<IClinicalOrganizationStore, IClinicalOrganizationStore> write)
+            {
+                await using var scopeA = host.Services.CreateAsyncScope();
+                await using var scopeB = host.Services.CreateAsyncScope();
+                var storeA = scopeA.ServiceProvider.GetRequiredService<IClinicalOrganizationStore>();
+                var storeB = scopeB.ServiceProvider.GetRequiredService<IClinicalOrganizationStore>();
+                write(storeA, storeB);
+                await storeA.SaveChangesAsync(None);
+                return await Assert.ThrowsAsync<ResourceConflictException>(() => storeB.SaveChangesAsync(None));
+            }
+
+            // ClinicWithStaffAsync already opened staff@clinic: start another clinic for a clean race.
+            var second = await host.CreateClinicAsync("Hospital carrera");
+            var affiliation = await ConflictAsync((a, b) =>
+            {
+                a.Add(ClinicStaffAffiliation.Start(second.Id, staff.Id, DateTimeOffset.UtcNow));
+                b.Add(ClinicStaffAffiliation.Start(second.Id, staff.Id, DateTimeOffset.UtcNow));
+            });
+            Assert.Equal(1, await host.DbAsync(db => db.ClinicStaffAffiliations.CountAsync(a => a.ClinicId == second.Id && a.EndedAtUtc == null)));
+
+            var license = await ConflictAsync((a, b) =>
+            {
+                a.Add(ClinicalStaff.Register("A", "B", ClinicalStaffType.Physician, "LIC-RACE-1"));
+                b.Add(ClinicalStaff.Register("C", "D", ClinicalStaffType.Physician, "lic-race-1"));
+            });
+            var facility = await ConflictAsync((a, b) =>
+            {
+                a.Add(Clinic.Register("H1", ClinicType.Hospital, "P", "M", "FAC-RACE-1"));
+                b.Add(Clinic.Register("H2", ClinicType.Hospital, "P", "M", "fac-race-1"));
+            });
+
+            // The same account cannot be linked to two staff members.
+            var account = staff.IdentityUserId!.Value;
+            await using (var scope = host.Services.CreateAsyncScope())
+            {
+                var store = scope.ServiceProvider.GetRequiredService<IClinicalOrganizationStore>();
+                (await store.FindStaffAsync(other.Id, None))!.LinkIdentityUser(account);
+                var linked = await Assert.ThrowsAsync<ResourceConflictException>(() => store.SaveChangesAsync(None));
+                Assert.Equal("The account is already linked to another staff member.", linked.Message);
+            }
+
+            Assert.Equal("The staff member already has an open affiliation with this clinic.", affiliation.Message);
+            Assert.Equal("A staff member with this professional license number already exists.", license.Message);
+            Assert.Equal("A clinic with this facility code already exists.", facility.Message);
+            Assert.Null(await host.DbAsync(db => db.ClinicalStaffMembers.Where(s => s.Id == other.Id).Select(s => s.IdentityUserId).SingleAsync()));
+        }
+
         // Last line of defence of "one active transfer per encounter": two writers that both passed the Application check
         // (both read "no active transfer") reach PostgreSQL; the filtered unique index lets only one active transfer in and
         // the store reports the other as a conflict (409), not a server error. Finished transfers do not block.
