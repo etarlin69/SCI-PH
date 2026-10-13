@@ -89,10 +89,16 @@ recepción desde el cliente.
 | `GET` | `/api/web/transfers/{id}` | `Transfers.Read` | — | `ClinicalTransferSummary` (solo clínica origen o destino; si no, 403) |
 | `POST` | `/api/web/encounters/{id}/transfers` | `Transfers.Manage` | `{ destinationClinicId, reason?, notes? }` (el origen es la clínica de la atención) | 201 `ClinicalTransferSummary` · 404 atención/clínica · 409 clínica inactiva, atención no trasladable o traslado activo · 400 mismo origen y destino |
 | `POST` | `/api/web/transfers/{id}/dispatch` | `Transfers.Manage` (clínica origen) | — | 200 `ClinicalTransferSummary` · 409 si no está `Requested` o la atención cambió |
+| `POST` | `/api/web/transfers/{id}/cancel` | `Transfers.Manage` (clínica origen) | — | 200 `ClinicalTransferSummary` · 409 si ya no está `Requested`/`InTransit` |
 | `POST` | `/api/web/transfers/{id}/receive` | `Transfers.Manage` (clínica destino) | — | 200 `ClinicalTransferSummary` · 409 si no está `InTransit` (p. ej. ya recibido) |
 
-- **Solicitar** no cambia la atención (el paciente aún no salió). Una sola transferencia activa (`Requested`/`InTransit`)
-  por atención.
+- **Solicitar** no cambia la atención (el paciente aún no salió). Una sola transferencia activa (`Requested`/`InTransit`,
+  `ClinicalTransfer.ActiveStatuses`) por atención: Application lo rechaza con 409 y PostgreSQL lo garantiza ante
+  solicitudes simultáneas con el índice único filtrado `UX_ClinicalTransfers_ActivePerEncounter` (la violación se
+  traduce a 409). `Received`, `Completed` y `Cancelled` no bloquean un traslado posterior.
+- **Cancelar** (clínica origen; el Domain no registra motivo): un traslado `Requested` solo pasa a `Cancelled` (la
+  atención no había cambiado); uno `InTransit` pasa a `Cancelled` y la atención vuelve `Transferred → InProgress` en la
+  clínica de origen. Recibidos, completados o ya cancelados → 409. Queda auditado como `Transfer`.
 - **Despachar**: traslado `InTransit` y atención `Transferred` en una transacción. Mientras va en camino la atención sigue
   en la clínica de origen (y sale de su lista de abiertas).
 - **Recibir**: traslado `Received` y `ClinicalEncounter.ReceiveAtClinic` en una transacción: la **misma** atención pasa a
@@ -100,8 +106,10 @@ recepción desde el cliente.
   La clínica destino la continúa con las reglas clínicas normales (`Received → InProgress/InEvolution/Closed`); la de
   origen conserva la traza (traslado y auditoría `Transfer`) pero pierde el acceso clínico.
 - `Complete` no se expone: el Domain no define cuándo se completa un traslado recibido.
-- **Concurrencia:** despachar y recibir cambian el `Status` de la atención (concurrency token): dos recepciones, dos
-  despachos o un cierre simultáneo terminan con una sola operación aplicada y 409 para la otra.
+- **Concurrencia:** el `Status` del traslado y el de la atención son concurrency tokens. Dos recepciones, dos despachos,
+  dos cancelaciones, cancelar contra recibir o despachar, o un cierre simultáneo nunca se mezclan: se aplica una
+  operación y la otra recibe 409 (o se aplica después, en orden, si sigue siendo válida; p. ej. cancelar un traslado
+  que se acaba de despachar). Cancelar un traslado `Requested` no toca la atención y no compite con cerrarla.
 - `ClinicalTransferSummary`: `{ id, encounterId, status, originClinic: { id, name }?, destinationClinic: { id, name }, ambulance: { id, code, callSign }?, requestedAtUtc, sentAtUtc, sentByStaffId, receivedAtUtc, receivedByStaffId, cancelledAtUtc, patient: PatientSummary?, temporaryPatientCode, reason, notes, latestTriagePriority, encounterStatus }`
   (identificador del paciente enmascarado).
 

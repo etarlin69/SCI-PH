@@ -69,8 +69,9 @@ prescrito) o registrarse sin prescripción. Prescriptor y responsable de la admi
 **Traslados.** La lista entrante muestra los traslados `Requested` e `InTransit` con destino a la clínica del usuario;
 solo uno `InTransit` admite «Registrar llegada». Al recibirlo, la misma atención pasa a esta clínica (estado
 `Received`) y la clínica de origen deja de tener acceso clínico. Quién recibe y el destino los fija el backend. La
-solicitud y el despacho (`POST /api/web/encounters/{id}/transfers`, `POST /api/web/transfers/{id}/dispatch`) existen
-en el backend para la clínica de origen y la app paramédica; el hospital todavía no tiene pantalla para ellos.
+solicitud, el despacho y la cancelación (`POST /api/web/encounters/{id}/transfers`,
+`POST /api/web/transfers/{id}/dispatch`, `POST /api/web/transfers/{id}/cancel`) existen en el backend para la clínica de
+origen y la app paramédica; el hospital todavía no tiene pantalla para ellos.
 
 ## Aún simulado (MOCK)
 
