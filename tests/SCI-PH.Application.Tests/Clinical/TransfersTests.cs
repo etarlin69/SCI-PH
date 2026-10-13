@@ -206,6 +206,72 @@ namespace SCI_PH.Application.Tests.Clinical
         }
 
         [Fact]
+        public async Task CancellingARequestedTransferLeavesTheEncounterAndAllowsANewRequest()
+        {
+            var s = InProgress();
+            var requested = await s.Origin.Transfers.RequestAsync(s.Encounter.Id, new RequestTransferRequest(s.ClinicB), None);
+
+            var cancelled = await s.Origin.Transfers.CancelAsync(requested.Id, None);
+
+            Assert.Equal(ClinicalTransferStatus.Cancelled, cancelled.Status);
+            Assert.NotNull(cancelled.CancelledAtUtc);
+            Assert.Equal(ClinicalEncounterStatus.InProgress, s.Encounter.Status);
+            Assert.Equal(AuditActionType.Transfer, s.Origin.Store.Audit.Last().Action);
+            var again = await s.Origin.Transfers.RequestAsync(s.Encounter.Id, new RequestTransferRequest(s.ClinicB), None);
+            Assert.Equal(ClinicalTransferStatus.Requested, again.Status);
+        }
+
+        [Fact]
+        public async Task CancellingAnInTransitTransferReturnsTheEncounterToInProgressAtTheOrigin()
+        {
+            var s = InProgress();
+            var transfer = await InTransitAsync(s);
+            s.Origin.Time.Now = s.Origin.Time.Now.AddMinutes(10);
+
+            var cancelled = await s.Origin.Transfers.CancelAsync(transfer.Id, None);
+
+            Assert.Equal(ClinicalTransferStatus.Cancelled, cancelled.Status);
+            Assert.Equal(ClinicalEncounterStatus.InProgress, s.Encounter.Status);
+            Assert.Equal(s.ClinicA, s.Encounter.ClinicId);
+            Assert.Empty(await s.Destination.Transfers.ListIncomingAsync(null, None));
+            await Assert.ThrowsAsync<ResourceConflictException>(() => s.Destination.Transfers.ReceiveAsync(transfer.Id, None));
+            Assert.Equal(ClinicalTransferStatus.Requested,
+                (await s.Origin.Transfers.RequestAsync(s.Encounter.Id, new RequestTransferRequest(s.ClinicB), None)).Status);
+        }
+
+        [Fact]
+        public async Task OnlyTheOriginCancelsAndOnlyAnActiveTransfer()
+        {
+            var s = InProgress();
+            var transfer = await InTransitAsync(s);
+            var third = Other(s.Origin, Guid.NewGuid());
+
+            await Assert.ThrowsAsync<AccessDeniedException>(() => s.Destination.Transfers.CancelAsync(transfer.Id, None));
+            await Assert.ThrowsAsync<AccessDeniedException>(() => third.Transfers.CancelAsync(transfer.Id, None));
+            await Assert.ThrowsAsync<ResourceNotFoundException>(() => s.Origin.Transfers.CancelAsync(Guid.NewGuid(), None));
+            await s.Destination.Transfers.ReceiveAsync(transfer.Id, None);
+            // A received transfer cannot be cancelled (and the encounter is no longer the origin's).
+            await Assert.ThrowsAsync<ResourceConflictException>(() => s.Origin.Transfers.CancelAsync(transfer.Id, None));
+            Assert.Equal(ClinicalTransferStatus.Received, s.Origin.Store.Transfers.Single().Status);
+
+            var other = InProgress();
+            var requested = await other.Origin.Transfers.RequestAsync(other.Encounter.Id, new RequestTransferRequest(other.ClinicB), None);
+            await other.Origin.Transfers.CancelAsync(requested.Id, None);
+            await Assert.ThrowsAsync<ResourceConflictException>(() => other.Origin.Transfers.CancelAsync(requested.Id, None));
+        }
+
+        [Fact]
+        public async Task WithoutTransfersManageNothingIsCancelled()
+        {
+            var s = InProgress();
+            var transfer = await InTransitAsync(s);
+            var nurse = Other(s.Origin, s.ClinicA, SecurityRoles.Nurse);
+
+            await Assert.ThrowsAsync<AccessDeniedException>(() => nurse.Transfers.CancelAsync(transfer.Id, None));
+            Assert.Equal(ClinicalTransferStatus.InTransit, s.Origin.Store.Transfers.Single().Status);
+        }
+
+        [Fact]
         public async Task InvalidActorsCannotManageTransfers()
         {
             var s = InProgress();

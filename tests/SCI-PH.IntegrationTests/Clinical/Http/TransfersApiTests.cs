@@ -360,6 +360,251 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             Assert.Equal(ClinicalTransferStatus.InTransit, (await TransferAsync(s, transfer.Id)).Status);
         }
 
+        private static Task<int> ActiveTransfersAsync(Setup s, Guid encounterId) =>
+            s.Host.DbAsync(db => db.ClinicalTransfers.CountAsync(t =>
+                t.ClinicalEncounterId == encounterId && ClinicalTransfer.ActiveStatuses.Contains(t.Status)));
+
+        private static async Task<HttpResponseMessage[]> ConcurrentlyAsync(params Func<Task<HttpResponseMessage>>[] calls)
+        {
+            using var start = new ManualResetEventSlim();
+            var tasks = calls.Select(call => Task.Run(async () => { start.Wait(); return await call(); })).ToArray();
+            start.Set();
+            return await Task.WhenAll(tasks);
+        }
+
+        // Two real concurrent requests for the same encounter: one transfer is stored, the other request gets a 409
+        // (from the Application check or, when both passed it, from the filtered unique index). Never a 500.
+        [SkippableFact]
+        public async Task ConcurrentRequestTransfersOnlyOneWins()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var s = await InProgressAsync();
+            await using var _ = s.Host;
+
+            for (var round = 0; round < 4; round++)
+            {
+                var encounter = round == 0 ? s.Encounter : await OpenEncounterAsync(s.Host, s.ReceptionA, s.NurseA);
+                var body = new { destinationClinicId = s.ClinicB.Id };
+                var responses = await ConcurrentlyAsync(
+                    () => s.DoctorA.Client.PostAsJsonAsync($"{Encounters}/{encounter.Id}/transfers", body),
+                    () => s.ReceptionA.Client.PostAsJsonAsync($"{Encounters}/{encounter.Id}/transfers", body));
+
+                Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.Created));
+                await AssertStatusAsync(responses.Single(r => r.StatusCode != HttpStatusCode.Created), HttpStatusCode.Conflict);
+                Assert.Equal(1, await ActiveTransfersAsync(s, encounter.Id));
+            }
+        }
+
+        // Requested and InTransit block another request; Cancelled, Received and Completed do not.
+        [SkippableFact]
+        public async Task OnlyActiveTransfersBlockANewRequest()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var s = await InProgressAsync();
+            await using var _ = s.Host;
+            var id = s.Encounter.Id;
+            var toB = new { destinationClinicId = s.ClinicB.Id };
+
+            var first = await RequestAsync(s);
+            await AssertStatusAsync(await s.DoctorA.Client.PostAsJsonAsync($"{Encounters}/{id}/transfers", toB), HttpStatusCode.Conflict);
+            Assert.Equal(HttpStatusCode.OK, (await s.DoctorA.Client.PostAsync($"{Transfers}/{first.Id}/dispatch", null)).StatusCode);
+            await AssertStatusAsync(await s.DoctorA.Client.PostAsJsonAsync($"{Encounters}/{id}/transfers", toB), HttpStatusCode.Conflict);
+            Assert.Equal(1, await ActiveTransfersAsync(s, id));
+
+            // Cancelled: the encounter is back in progress at the origin and can be transferred again.
+            Assert.Equal(HttpStatusCode.OK, (await s.DoctorA.Client.PostAsync($"{Transfers}/{first.Id}/cancel", null)).StatusCode);
+            var second = await InTransitAsync(s);
+            Assert.Equal(HttpStatusCode.OK, (await s.DoctorB.Client.PostAsync($"{Transfers}/{second.Id}/receive", null)).StatusCode);
+
+            // Received: once the encounter is again in a transferable status (Received -> InProgress through the Domain;
+            // no endpoint exposes it yet), clinic B can request another transfer.
+            await MoveEncounterAsync(s, id, e => e.ChangeStatus(ClinicalEncounterStatus.InProgress, DateTimeOffset.UtcNow));
+            var backToA = await s.DoctorB.Client.PostAsJsonAsync($"{Encounters}/{id}/transfers", new { destinationClinicId = s.ClinicA.Id });
+            Assert.Equal(HttpStatusCode.Created, backToA.StatusCode);
+            var third = await backToA.ReadAsAsync<ClinicalTransferSummary>();
+            Assert.Equal(s.ClinicB.Id, third.OriginClinic!.Id);
+
+            // Completed (built through the Domain on the received transfer) does not block either.
+            Assert.Equal(HttpStatusCode.OK, (await s.DoctorB.Client.PostAsync($"{Transfers}/{third.Id}/cancel", null)).StatusCode);
+            await s.Host.DbAsync(async db =>
+            {
+                (await db.ClinicalTransfers.SingleAsync(t => t.Id == second.Id)).Complete(DateTimeOffset.UtcNow);
+                await db.SaveChangesAsync();
+            });
+            Assert.Equal(HttpStatusCode.Created, (await s.DoctorB.Client.PostAsJsonAsync($"{Encounters}/{id}/transfers",
+                new { destinationClinicId = s.ClinicA.Id })).StatusCode);
+            var statuses = await s.Host.DbAsync(db => db.ClinicalTransfers.Where(t => t.ClinicalEncounterId == id).Select(t => t.Status).ToListAsync());
+            Assert.Equal(
+                [ClinicalTransferStatus.Requested, ClinicalTransferStatus.Completed, ClinicalTransferStatus.Cancelled, ClinicalTransferStatus.Cancelled],
+                statuses.OrderBy(x => x));
+        }
+
+        [SkippableFact]
+        public async Task CancellationFromTheOriginRestoresTheEncounterAndIsAudited()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var s = await InProgressAsync();
+            await using var _ = s.Host;
+            var id = s.Encounter.Id;
+
+            // Requested: only the transfer changes.
+            var requested = await RequestAsync(s);
+            var cancelled = await (await s.ReceptionA.Client.PostAsync($"{Transfers}/{requested.Id}/cancel", null)).ReadAsAsync<ClinicalTransferSummary>();
+            Assert.Equal(ClinicalTransferStatus.Cancelled, cancelled.Status);
+            Assert.NotNull((await TransferAsync(s, requested.Id)).CancelledAtUtc);
+            Assert.Equal(ClinicalEncounterStatus.InProgress, (await EncounterAsync(s, id)).Status);
+
+            // InTransit: the encounter returns Transferred -> InProgress, still at the origin, and leaves clinic B's inbox.
+            var inTransit = await InTransitAsync(s);
+            Assert.Single(await (await s.DoctorB.Client.GetAsync($"{Transfers}/incoming")).ReadAsAsync<List<ClinicalTransferSummary>>());
+            Assert.Equal(HttpStatusCode.OK, (await s.DoctorA.Client.PostAsync($"{Transfers}/{inTransit.Id}/cancel", null)).StatusCode);
+            var back = await EncounterAsync(s, id);
+            Assert.Equal((ClinicalEncounterStatus.InProgress, s.ClinicA.Id), (back.Status, back.ClinicId!.Value));
+            Assert.Empty(await (await s.DoctorB.Client.GetAsync($"{Transfers}/incoming")).ReadAsAsync<List<ClinicalTransferSummary>>());
+            Assert.Contains(await (await s.DoctorA.Client.GetAsync(Encounters)).ReadAsAsync<List<EncounterSummary>>(), e => e.Id == id);
+            await AssertStatusAsync(await s.DoctorB.Client.PostAsync($"{Transfers}/{inTransit.Id}/receive", null), HttpStatusCode.Conflict);
+            // Request, cancel, request, dispatch, cancel: two cancellations audited as Transfer on their transfers.
+            Assert.Equal(1, await s.Host.DbAsync(db => db.ClinicalAuditEntries.CountAsync(a => a.EntityId == requested.Id.ToString() && a.Action == AuditActionType.Transfer)));
+            Assert.Equal(2, await s.Host.DbAsync(db => db.ClinicalAuditEntries.CountAsync(a => a.EntityId == inTransit.Id.ToString() && a.Action == AuditActionType.Transfer)));
+        }
+
+        [SkippableFact]
+        public async Task OnlyTheOriginCancelsAnActiveTransfer()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var s = await InProgressAsync();
+            await using var _ = s.Host;
+            var transfer = await InTransitAsync(s);
+            var clinicC = await s.Host.CreateClinicAsync("Hospital ajeno");
+            var doctorC = await s.Host.SignInAsync(SecurityRoles.Doctor, [clinicC], staffType: ClinicalStaffType.Physician);
+            var cancel = $"{Transfers}/{transfer.Id}/cancel";
+
+            await AssertStatusAsync(await s.Host.Anonymous().PostAsync(cancel, null), HttpStatusCode.Unauthorized);
+            await AssertStatusAsync(await s.NurseA.Client.PostAsync(cancel, null), HttpStatusCode.Forbidden);
+            await AssertStatusAsync(await s.DoctorB.Client.PostAsync(cancel, null), HttpStatusCode.Forbidden);
+            await AssertStatusAsync(await doctorC.Client.PostAsync(cancel, null), HttpStatusCode.Forbidden);
+            await AssertStatusAsync(await s.DoctorA.Client.PostAsync($"{Transfers}/{Guid.NewGuid()}/cancel", null), HttpStatusCode.NotFound);
+            Assert.Equal(ClinicalTransferStatus.InTransit, (await TransferAsync(s, transfer.Id)).Status);
+
+            Assert.Equal(HttpStatusCode.OK, (await s.DoctorB.Client.PostAsync($"{Transfers}/{transfer.Id}/receive", null)).StatusCode);
+            await AssertStatusAsync(await s.DoctorA.Client.PostAsync(cancel, null), HttpStatusCode.Conflict);
+
+            var requested = await RequestAsync(s, (await OpenEncounterAsync(s.Host, s.ReceptionA, s.NurseA)).Id);
+            Assert.Equal(HttpStatusCode.OK, (await s.DoctorA.Client.PostAsync($"{Transfers}/{requested.Id}/cancel", null)).StatusCode);
+            await AssertStatusAsync(await s.DoctorA.Client.PostAsync($"{Transfers}/{requested.Id}/cancel", null), HttpStatusCode.Conflict);
+            await AssertStatusAsync(await s.DoctorA.Client.PostAsync($"{Transfers}/{requested.Id}/dispatch", null), HttpStatusCode.Conflict);
+        }
+
+        [SkippableFact]
+        public async Task ConcurrentCancellationsYieldOneCancellation()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var s = await InProgressAsync();
+            await using var _ = s.Host;
+
+            for (var round = 0; round < 3; round++)
+            {
+                var encounter = round == 0 ? s.Encounter : await OpenEncounterAsync(s.Host, s.ReceptionA, s.NurseA);
+                var transfer = round % 2 == 0 ? await RequestAsync(s, encounter.Id) : await InTransitAsync(s, encounter.Id);
+                var responses = await ConcurrentlyAsync(
+                    () => s.DoctorA.Client.PostAsync($"{Transfers}/{transfer.Id}/cancel", null),
+                    () => s.ReceptionA.Client.PostAsync($"{Transfers}/{transfer.Id}/cancel", null));
+
+                Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.OK));
+                await AssertStatusAsync(responses.Single(r => r.StatusCode != HttpStatusCode.OK), HttpStatusCode.Conflict);
+                Assert.Equal(1, await s.Host.DbAsync(db => db.ClinicalAuditEntries.CountAsync(
+                    a => a.EntityId == transfer.Id.ToString() && a.Action == AuditActionType.Transfer)) - (round % 2));
+                Assert.Equal(ClinicalEncounterStatus.InProgress, (await EncounterAsync(s, encounter.Id)).Status);
+            }
+        }
+
+        // Cancel and dispatch of the same Requested transfer. They never interleave: either the cancel wins (the dispatch gets
+        // a 409, encounter in progress), or the dispatch commits first and then the cancel legitimately cancels the
+        // InTransit transfer (both 200, encounter back in progress), or the dispatch wins and the cancel gets a 409
+        // (InTransit, encounter transferred). Never a cancelled transfer with a transferred encounter, never a 500.
+        [SkippableFact]
+        public async Task ACancelAndADispatchOfTheSameTransferNeverInterleave()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var s = await InProgressAsync();
+            await using var _ = s.Host;
+
+            for (var round = 0; round < 4; round++)
+            {
+                var encounter = round == 0 ? s.Encounter : await OpenEncounterAsync(s.Host, s.ReceptionA, s.NurseA);
+                var transfer = await RequestAsync(s, encounter.Id);
+                var responses = await ConcurrentlyAsync(
+                    () => s.DoctorA.Client.PostAsync($"{Transfers}/{transfer.Id}/cancel", null),
+                    () => s.ReceptionA.Client.PostAsync($"{Transfers}/{transfer.Id}/dispatch", null));
+
+                Assert.All(responses, r => Assert.Contains(r.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.Conflict }));
+                Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.OK);
+                var cancel = responses[0].StatusCode;
+                var (stored, state) = (await TransferAsync(s, transfer.Id), await EncounterAsync(s, encounter.Id));
+                var expected = cancel == HttpStatusCode.OK
+                    ? (ClinicalTransferStatus.Cancelled, ClinicalEncounterStatus.InProgress)
+                    : (ClinicalTransferStatus.InTransit, ClinicalEncounterStatus.Transferred);
+                Assert.Equal(expected, (stored.Status, state.Status));
+                // Both applied only in sequence: the dispatch audited before the cancel.
+                var audits = await s.Host.DbAsync(db => db.ClinicalAuditEntries.CountAsync(a => a.EntityId == transfer.Id.ToString() && a.Action == AuditActionType.Transfer));
+                Assert.Equal(responses.Count(r => r.StatusCode == HttpStatusCode.OK), audits);
+            }
+        }
+
+        // Cancel at the origin and reception at the destination of the same InTransit transfer: one applies; the encounter
+        // ends either back in progress at the origin or received at the destination, never mixed.
+        [SkippableFact]
+        public async Task ACancelAndAReceptionOfTheSameTransferNeverBothApply()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var s = await InProgressAsync();
+            await using var _ = s.Host;
+
+            for (var round = 0; round < 4; round++)
+            {
+                var encounter = round == 0 ? s.Encounter : await OpenEncounterAsync(s.Host, s.ReceptionA, s.NurseA);
+                var transfer = await InTransitAsync(s, encounter.Id);
+                var responses = await ConcurrentlyAsync(
+                    () => s.DoctorA.Client.PostAsync($"{Transfers}/{transfer.Id}/cancel", null),
+                    () => s.DoctorB.Client.PostAsync($"{Transfers}/{transfer.Id}/receive", null));
+
+                Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.OK));
+                await AssertStatusAsync(responses.Single(r => r.StatusCode != HttpStatusCode.OK), HttpStatusCode.Conflict);
+                var (stored, state) = (await TransferAsync(s, transfer.Id), await EncounterAsync(s, encounter.Id));
+                Assert.Contains((stored.Status, state.Status, state.ClinicId), new[]
+                {
+                    (ClinicalTransferStatus.Cancelled, ClinicalEncounterStatus.InProgress, (Guid?)s.ClinicA.Id),
+                    (ClinicalTransferStatus.Received, ClinicalEncounterStatus.Received, (Guid?)s.ClinicB.Id)
+                });
+            }
+        }
+
+        // Cancelling a Requested transfer does not touch the encounter, so it does not conflict with closing it: both apply.
+        [SkippableFact]
+        public async Task CancellingARequestedTransferAndClosingTheEncounterBothApply()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var s = await InProgressAsync();
+            await using var _ = s.Host;
+            var transfer = await RequestAsync(s);
+
+            var responses = await ConcurrentlyAsync(
+                () => s.ReceptionA.Client.PostAsync($"{Transfers}/{transfer.Id}/cancel", null),
+                () => s.DoctorA.Client.PostAsJsonAsync($"{Encounters}/{s.Encounter.Id}/close", new { }));
+
+            Assert.Equal(HttpStatusCode.OK, responses[0].StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, responses[1].StatusCode);
+            Assert.Equal(ClinicalTransferStatus.Cancelled, (await TransferAsync(s, transfer.Id)).Status);
+            Assert.Equal(ClinicalEncounterStatus.Closed, (await EncounterAsync(s, s.Encounter.Id)).Status);
+        }
+
+        private static Task MoveEncounterAsync(Setup s, Guid encounterId, Action<ClinicalEncounter> domainCall) =>
+            s.Host.DbAsync(async db =>
+            {
+                domainCall(await db.ClinicalEncounters.SingleAsync(e => e.Id == encounterId));
+                await db.SaveChangesAsync();
+            });
+
         private static async Task AssertStatusAsync(HttpResponseMessage response, HttpStatusCode expected)
         {
             Assert.Equal(expected, response.StatusCode);

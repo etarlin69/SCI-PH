@@ -52,6 +52,15 @@ namespace SCI_PH.Web.BFF.Controllers.Clinical
         public async Task<IActionResult> Dispatch(Guid id, CancellationToken cancellationToken) =>
             Ok(await _transfers.DispatchAsync(id, cancellationToken));
 
+        // ClinicalTransfer.Cancel from the origin clinic; an InTransit transfer also returns the encounter to InProgress.
+        [HttpPost("{id:guid}/cancel")]
+        [Authorize(Policy = Permissions.Transfers.Manage)]
+        [ProducesResponseType<ClinicalTransferSummary>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> Cancel(Guid id, CancellationToken cancellationToken) =>
+            Ok(await _transfers.CancelAsync(id, cancellationToken));
+
         // ClinicalTransfer.Receive + ClinicalEncounter.ReceiveAtClinic, from the destination clinic.
         [HttpPost("{id:guid}/receive")]
         [Authorize(Policy = Permissions.Transfers.Manage)]

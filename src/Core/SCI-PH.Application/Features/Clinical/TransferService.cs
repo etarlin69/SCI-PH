@@ -19,11 +19,13 @@ namespace SCI_PH.Application.Features.Clinical
     // Transfers of an encounter between clinics (ClinicalTransfer: Requested -> InTransit -> Received).
     // - Request: from the encounter's clinic; the encounter keeps its status (the patient has not left yet).
     // - Dispatch: from the origin clinic; transfer InTransit and encounter Transferred in one transaction.
+    // - Cancel: from the origin clinic; a Requested transfer only, an InTransit one also returns the encounter to InProgress.
     // - Receive: from the destination clinic stored in the transfer; transfer Received and the encounter moves to the
     //   destination (ClinicalEncounter.ReceiveAtClinic) in one transaction. The origin clinic keeps the trace
     //   (transfer and audit) but loses normal clinical access.
     // Complete is not exposed: the Domain does not define when a received transfer is completed.
-    // Dispatch and Receive change the encounter Status (a concurrency token), so concurrent dispatches, receptions or a
+    // Dispatch, Cancel and Receive also change the transfer Status (a concurrency token), and Dispatch and Receive the
+    // encounter Status (another one), so concurrent dispatches, cancellations, receptions or a
     // concurrent close lose with a 409. The actor always comes from the session.
     public sealed class TransferService
     {
@@ -166,6 +168,39 @@ namespace SCI_PH.Application.Features.Clinical
                     transfer = new[] { ClinicalTransferStatus.InTransit.ToString(), transfer.Status.ToString() },
                     encounterStatus = new[] { previousStatus.ToString(), encounter.Status.ToString() },
                     clinicId = new[] { previousClinic?.ToString(), encounter.ClinicId?.ToString() }
+                }))));
+            await _writes.SaveChangesAsync(cancellationToken);
+
+            return await GetSavedAsync(transfer.Id, cancellationToken);
+        }
+
+        // Transfers.Manage from the origin clinic (ClinicalTransfer.Cancel; the Domain records no reason).
+        // - Requested: only the transfer is cancelled; the request had not changed the encounter.
+        // - InTransit: the transfer is cancelled and the encounter returns Transferred -> InProgress (the Domain transition
+        //   for a cancelled transfer), still at the origin clinic.
+        // Received, Completed or already cancelled transfers cannot be cancelled (409).
+        public async Task<ClinicalTransferSummary> CancelAsync(Guid transferId, CancellationToken cancellationToken)
+        {
+            var (actor, transfer, encounter) = await LoadAsync(transferId, cancellationToken);
+            actor.EnsureClinic(transfer.OriginClinicId);
+            await EnsureCanManageAsync(encounter, cancellationToken);
+
+            var now = _time.GetUtcNow();
+            var previousTransfer = transfer.Status;
+            var previousEncounter = encounter.Status;
+            Conflict(() => transfer.Cancel(now));
+            if (previousTransfer == ClinicalTransferStatus.InTransit)
+            {
+                actor.EnsureClinic(encounter.ClinicId);
+                Conflict(() => encounter.ChangeStatus(ClinicalEncounterStatus.InProgress, now));
+            }
+
+            _writes.Add(ClinicalAuditEntry.Success(
+                actor.AuditActor, AuditActionType.Transfer, nameof(ClinicalTransfer), transfer.Id.ToString(), now,
+                new AuditContext(encounter.PatientId, encounter.Id, ChangesJson: JsonSerializer.Serialize(new
+                {
+                    transfer = new[] { previousTransfer.ToString(), transfer.Status.ToString() },
+                    encounterStatus = new[] { previousEncounter.ToString(), encounter.Status.ToString() }
                 }))));
             await _writes.SaveChangesAsync(cancellationToken);
 
