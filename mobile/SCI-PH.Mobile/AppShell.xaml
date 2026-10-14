@@ -6,6 +6,7 @@
     xmlns:local="clr-namespace:SCI_PH.Mobile"
     xmlns:nav="clr-namespace:SCI_PH.Mobile.Common.Navigation"
     xmlns:entry="clr-namespace:SCI_PH.Mobile.Common.Entry"
+    xmlns:startup="clr-namespace:SCI_PH.Mobile.Common.Startup"
     xmlns:patient="clr-namespace:SCI_PH.Mobile.Features.Patient"
     xmlns:patientHome="clr-namespace:SCI_PH.Mobile.Features.Patient.Home"
     xmlns:patientProfile="clr-namespace:SCI_PH.Mobile.Features.Patient.Profile"
@@ -23,10 +24,11 @@
 
     <!--
         Una sola app para dos tipos de usuario (ver mobile/README.md):
-          - Personal clínico (Paramedic): login real pendiente; hoy entra directamente al prototipo.
+          - Personal clínico: login real contra el Mobile BFF (con MFA) y permiso Emergencies.Operate; los datos del
+            área paramédica siguen simulados.
           - Paciente (Patient): QR + verificación facial, simulados hasta integrar el Mobile BFF.
-        Los flujos de acceso (NewEmergency, QrAccess → FaceVerify) se apilan sobre la entrada y los registra cada
-        feature. Aquí solo se declaran la entrada y las secciones del área del paciente.
+        Los flujos de acceso (ClinicalLogin → ClinicalMfa, QrAccess → FaceVerify) y el paramédico se apilan sobre la
+        entrada y los registra cada feature. Aquí solo se declaran el arranque, la entrada y el área del paciente.
     -->
 
     <!-- CABECERA DEL MENÚ (área del paciente): nombre tomado de la sesión -->
@@ -54,6 +56,13 @@
         </Grid>
     </Shell.FlyoutHeader>
 
+    <!-- ARRANQUE: restaura la sesión clínica guardada antes de mostrar nada más -->
+    <ShellContent
+        Title="SCI-PH"
+        Route="Startup"
+        ContentTemplate="{DataTemplate startup:StartupPage}"
+        Shell.FlyoutItemIsVisible="False" />
+
     <!-- ENTRADA COMPARTIDA -->
     <ShellContent
         Title="SCI-PH"
@@ -61,7 +70,7 @@
         ContentTemplate="{DataTemplate entry:EntryPage}"
         Shell.FlyoutItemIsVisible="False" />
 
-    <!-- Paramedic (Rol 6): sin menú; su flujo se apila sobre la entrada (RegisterParamedicRoutes). -->
+    <!-- Paramedic (Rol 6): sin menú; tras el login su flujo se apila sobre la entrada (RegisterParamedicRoutes). -->
 
     <!-- Patient (Rol 7): área con sesión de paciente -->
     <FlyoutItem Title="Inicio" Route="{x:Static patient:PatientRoutes.Home}">
