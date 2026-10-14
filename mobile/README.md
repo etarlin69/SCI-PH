@@ -130,6 +130,20 @@ sin interfaz para que el proyecto de tests la referencie. Los tests usan fakes d
 `IAppDialogService` y de los servicios de cada feature, sin Shell, ventanas ni handlers. Sin tests de render XAML,
 de dispositivo ni de integración con el Mobile BFF por ahora.
 
+## CI
+
+`.github/workflows/mobile.yml` (SCI-PH Mobile CI) corre en pull requests y pushes a `develop`/`main` solo cuando cambian
+`mobile/**`, `global.json` o el propio workflow:
+
+| Job | Runner | Qué hace |
+|---|---|---|
+| `mobile-tests` | ubuntu-latest | `dotnet test` de `SCI-PH.Mobile.Tests` (net9.0) con el workload `maui-android` |
+| `mobile-android` | ubuntu-latest | Build Release de `net9.0-android`; sube el APK firmado con la clave de depuración como artefacto `sciph-mobile-android` (7 días) |
+| `mobile-windows` | windows-latest | Build Release de `net9.0-windows10.0.19041.0` con el workload `maui-windows` |
+
+Cada job fija su target con `-p:TargetFrameworks=…`, así no necesita los workloads de iOS/Mac Catalyst. No usa secretos,
+no firma con claves propias y no publica nada.
+
 ## Pendiente
 
 - Inicio de sesión real del personal clínico; QR y verificación facial reales del paciente (con el Rol 8).
@@ -137,5 +151,5 @@ de dispositivo ni de integración con el Mobile BFF por ahora.
 - Huella real (Device API), catálogos reales, pantalla de transferencia, modo sin conexión.
 - Contratos e integración de historial, resultados, documentos y asistente del paciente.
 - Converger PatientTheme con SciPhTheme.
-- CI móvil (pendiente con el Rol 9).
+- CI de iOS y Mac Catalyst (requiere runners macOS).
 - Identidad de la app (`ApplicationId`) definitiva.
