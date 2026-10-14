@@ -14,6 +14,7 @@ using SCI_PH.Domain.Enums.Transport;
 using SCI_PH.IntegrationTests.Clinical.Support;
 using SCI_PH.IntegrationTests.PostgreSql;
 using SCI_PH.IntegrationTests.Security.Support;
+using Xunit.Abstractions;
 
 namespace SCI_PH.IntegrationTests.Clinical.Http
 {
@@ -25,8 +26,13 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
         private const string Encounters = "/api/web/encounters";
         private const string Transfers = "/api/web/transfers";
         private readonly PostgresFixture _postgres;
+        private readonly ITestOutputHelper _output;
 
-        public TransfersApiTests(PostgresFixture postgres) => _postgres = postgres;
+        public TransfersApiTests(PostgresFixture postgres, ITestOutputHelper output)
+        {
+            _postgres = postgres;
+            _output = output;
+        }
 
         private sealed record Setup(
             ClinicalApiHost Host, Clinic ClinicA, Clinic ClinicB, StaffSession DoctorA, StaffSession ReceptionA, StaffSession NurseA,
@@ -551,8 +557,14 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             }
         }
 
-        // Cancel at the origin and reception at the destination of the same InTransit transfer: one applies; the encounter
-        // ends either back in progress at the origin or received at the destination, never mixed.
+        // Cancel at the origin and reception at the destination of the same InTransit transfer: exactly one applies and the
+        // other changes nothing (Status is a concurrency token of both the transfer and the encounter).
+        // - Cancel wins: the reception can only lose on the state (409: the transfer is cancelled, the encounter is back in
+        //   progress, or the concurrency token changed). Final: Cancelled, encounter InProgress at the origin clinic.
+        // - Reception wins: the cancel loses with 409 when it reads the transfer after the reception (Received transfers
+        //   cannot be cancelled, or the concurrency token changed), or with 403 when it reads the transfer before and the
+        //   encounter after: the encounter already belongs to the destination clinic, where the origin doctor is not
+        //   affiliated (EnsureClinic). Final: Received, encounter Received at the destination clinic.
         [SkippableFact]
         public async Task ACancelAndAReceptionOfTheSameTransferNeverBothApply()
         {
@@ -567,15 +579,30 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 var responses = await ConcurrentlyAsync(
                     () => s.DoctorA.Client.PostAsync($"{Transfers}/{transfer.Id}/cancel", null),
                     () => s.DoctorB.Client.PostAsync($"{Transfers}/{transfer.Id}/receive", null));
+                var (cancel, receive) = (responses[0], responses[1]);
 
                 Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.OK));
-                await AssertStatusAsync(responses.Single(r => r.StatusCode != HttpStatusCode.OK), HttpStatusCode.Conflict);
                 var (stored, state) = (await TransferAsync(s, transfer.Id), await EncounterAsync(s, encounter.Id));
-                Assert.Contains((stored.Status, state.Status, state.ClinicId), new[]
+                if (cancel.StatusCode == HttpStatusCode.OK)
                 {
-                    (ClinicalTransferStatus.Cancelled, ClinicalEncounterStatus.InProgress, (Guid?)s.ClinicA.Id),
-                    (ClinicalTransferStatus.Received, ClinicalEncounterStatus.Received, (Guid?)s.ClinicB.Id)
-                });
+                    await AssertStatusAsync(receive, HttpStatusCode.Conflict);
+                    Assert.Equal(
+                        (ClinicalTransferStatus.Cancelled, ClinicalEncounterStatus.InProgress, (Guid?)s.ClinicA.Id),
+                        (stored.Status, state.Status, state.ClinicId));
+                }
+                else
+                {
+                    Assert.Equal(HttpStatusCode.OK, receive.StatusCode);
+                    await AssertStatusAsync(cancel, HttpStatusCode.Conflict, HttpStatusCode.Forbidden);
+                    Assert.Equal(
+                        (ClinicalTransferStatus.Received, ClinicalEncounterStatus.Received, (Guid?)s.ClinicB.Id),
+                        (stored.Status, state.Status, state.ClinicId));
+                }
+
+                // The dispatch and the single winner: the loser left no audit entry.
+                var audits = await s.Host.DbAsync(db => db.ClinicalAuditEntries.CountAsync(a => a.EntityId == transfer.Id.ToString() && a.Action == AuditActionType.Transfer));
+                Assert.Equal(2, audits);
+                _output.WriteLine($"round {round}: {(cancel.StatusCode == HttpStatusCode.OK ? "cancel" : "receive")} won, loser {(int)(cancel.StatusCode == HttpStatusCode.OK ? receive : cancel).StatusCode}");
             }
         }
 
@@ -605,12 +632,12 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 await db.SaveChangesAsync();
             });
 
-        private static async Task AssertStatusAsync(HttpResponseMessage response, HttpStatusCode expected)
+        private static async Task AssertStatusAsync(HttpResponseMessage response, params HttpStatusCode[] allowed)
         {
-            Assert.Equal(expected, response.StatusCode);
+            Assert.Contains(response.StatusCode, allowed);
             Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
             using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            Assert.Equal((int)expected, problem.RootElement.GetProperty("status").GetInt32());
+            Assert.Equal((int)response.StatusCode, problem.RootElement.GetProperty("status").GetInt32());
         }
     }
 }
