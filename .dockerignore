@@ -70,3 +70,7 @@
 
 **/*.tmp
 **/*.log
+
+# Fuera de las imágenes del backend y del front: app MAUI y herramientas locales.
+mobile/
+tools/
