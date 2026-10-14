@@ -37,6 +37,7 @@ namespace SCI_PH.Application.Common.Security
                     Triage.Write, VitalSigns.Write, ClinicalNotes.Write, Procedures.Write,
                     Medications.Read, MedicationAdministrations.Write,
                     Transfers.Read, Transfers.Manage,
+                    Emergencies.Operate,
                     Documents.Upload
                 ],
                 // Administrative registration only: no access to clinical notes, results or prescriptions.

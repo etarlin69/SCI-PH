@@ -88,6 +88,7 @@ datos clínicos ni con la identidad de los dispositivos.
 | MedicationAdministrations.Write | ✔ | ✔ | ✔ | ✔ | | |
 | Transfers.Read | ✔ | ✔ | ✔ | ✔ | ✔ | propio* |
 | Transfers.Manage | ✔ | ✔ | | ✔ | ✔ | |
+| Emergencies.Operate | ✔ | | | ✔ | | |
 | Documents.Read | ✔ | ✔ | ✔ | | | propio* |
 | Documents.Upload | ✔ | ✔ | ✔ | ✔ | ✔ | |
 
