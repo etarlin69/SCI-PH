@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SOLO DEBUG (se incluye desde SCI-PH.Mobile.csproj y se activa en MainApplication.cs con #if DEBUG).
+    Permite HTTP sin cifrar únicamente hacia el Mobile BFF local de desarrollo:
+      - 10.0.2.2: el PC anfitrión visto desde el emulador de Android.
+      - localhost: un dispositivo físico conectado con `adb reverse tcp:5191 tcp:5191`.
+    Cualquier otro destino sigue exigiendo HTTPS con validación normal de certificados. Release no incluye este
+    archivo: el tráfico HTTP queda bloqueado (comportamiento por defecto desde Android 9).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>
