@@ -1,0 +1,116 @@
+name: SCI-PH Mobile CI
+
+# Shared MAUI app (mobile/SCI-PH.Mobile.sln). Separate from build.yml (backend, frontend, containers):
+# it only runs when something that affects the mobile app changes.
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - "mobile/**"
+      - "global.json"
+      - ".github/workflows/mobile.yml"
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "mobile/**"
+      - "global.json"
+      - ".github/workflows/mobile.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "true"
+  APP_PROJECT: mobile/SCI-PH.Mobile/SCI-PH.Mobile.csproj
+  TESTS_PROJECT: mobile/tests/SCI-PH.Mobile.Tests/SCI-PH.Mobile.Tests.csproj
+
+# The multi-platform project restores all its TargetFrameworks; each job pins its own with
+# -p:TargetFrameworks=... so it does not need the iOS/Mac Catalyst workloads (unavailable on Linux).
+# iOS and Mac Catalyst are deferred (they need macOS runners).
+jobs:
+  mobile-tests:
+    name: mobile-tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # UseMaui needs the MAUI SDK even for the net9.0 target; maui-android provides it on Linux.
+      - name: Install MAUI workload
+        run: dotnet workload install maui-android
+
+      - name: Test
+        run: >
+          dotnet test "$TESTS_PROJECT"
+          --configuration Release
+          --framework net9.0
+          -p:TargetFrameworks=net9.0
+          --verbosity normal
+
+  mobile-android:
+    name: mobile-android
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install Android workload
+        run: dotnet workload install maui-android
+
+      # The runner already has the Android SDK (ANDROID_HOME) and JDK 17, the version .NET 9 for Android requires.
+      - name: Build Android
+        run: >
+          dotnet build "$APP_PROJECT"
+          --configuration Release
+          --framework net9.0-android
+          -p:TargetFrameworks=net9.0-android
+          -p:JavaSdkDirectory="$JAVA_HOME_17_X64"
+
+      # Signed with the SDK debug key: for testing only, never published to a store.
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: sciph-mobile-android
+          path: mobile/SCI-PH.Mobile/bin/Release/net9.0-android/*-Signed.apk
+          if-no-files-found: warn
+          retention-days: 7
+
+  mobile-windows:
+    name: mobile-windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install Windows workload
+        run: dotnet workload install maui-windows
+
+      - name: Build Windows
+        shell: pwsh
+        run: >
+          dotnet build $env:APP_PROJECT
+          --configuration Release
+          --framework net9.0-windows10.0.19041.0
+          -p:TargetFrameworks=net9.0-windows10.0.19041.0
