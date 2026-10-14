@@ -105,6 +105,13 @@ namespace SCI_PH.Application.Common.Security
             public const string Manage = "Transfers.Manage";
         }
 
+        // Prehospital care in the field (paramedic flow of the mobile app). The /api/mobile/emergencies endpoints will
+        // require it in addition to the clinical permissions of each action.
+        public static class Emergencies
+        {
+            public const string Operate = "Emergencies.Operate";
+        }
+
         public static class Documents
         {
             public const string Read = "Documents.Read";

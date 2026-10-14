@@ -113,6 +113,9 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 > Pueden evolucionar mediante revisión arquitectónica.
 
 - **Usuarios:** personal paramédico autenticado. El rol y sus permisos los define el Rol 3.
+- **Autorización:** todos los endpoints de `/api/mobile/emergencies` exigirán el permiso `Emergencies.Operate` (rol
+  Paramedic; Administrator lo tiene por tener todos), además del permiso clínico de cada acción (por ejemplo
+  `VitalSigns.Write` para registrar signos vitales). La app móvil lo usa para habilitar el área paramédica.
 - **Modelo:** una *emergencia* es un episodio de atención prehospitalaria. Puede empezar **sin paciente identificado** y vincularse a un `Patient` después.
 - **Registros clínicos:** signos vitales, procedimientos y medicamentos se **agregan** al episodio; no se editan ni se borran desde la app (las correcciones se definirán con el Rol 2).
 - **Hora del evento:** cada registro lleva `recordedAt` (hora en que ocurrió en campo), distinta de la hora en que llega al servidor, para soportar envío diferido.
