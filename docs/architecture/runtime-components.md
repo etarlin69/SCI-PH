@@ -79,7 +79,7 @@ Los errores se devuelven como `application/problem+json` (ProblemDetails, RFC 78
 
 | Componente | Cómo se ejecuta | Dirección |
 |---|---|---|
-| PostgreSQL 17 | `docker compose up -d` | `127.0.0.1:5432` |
+| PostgreSQL 17 | `docker compose up -d postgres` | `127.0.0.1:5432` |
 | Web BFF | `dotnet run --project src/Presentation/SCI-PH.Web.BFF` | http://localhost:5074 |
 | Mobile BFF | `dotnet run --project src/Presentation/SCI-PH.Mobile.BFF` | http://localhost:5191 |
 | Device API | `dotnet run --project src/Presentation/SCI-PH.Device.API` | http://localhost:5139 |

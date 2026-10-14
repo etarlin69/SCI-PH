@@ -1,15 +1,20 @@
-# Entorno de desarrollo local de SCI-PH.
-# Por ahora solo incluye PostgreSQL; las APIs se agregarán más adelante.
+# Stack local de SCI-PH: PostgreSQL, Azurite (Blob), migraciones, Web BFF, Mobile BFF, Device API y web-admin.
 #
-# Uso:
-#   1. Copiar .env.example a .env y definir valores propios.
-#   2. docker compose up -d
+# Uso (detalle en docs/architecture/local-containers.md):
+#   1. Copiar .env.example a .env y reemplazar los valores REPLACE_ME (clave JWT y administrador inicial).
+#   2. docker compose up -d --build
+#   3. Detener sin borrar datos: docker compose down   (no usar -v: borra los volúmenes de PostgreSQL y Azurite)
 
 name: sci-ph
+
+x-backend-environment: &backend-environment
+  ASPNETCORE_ENVIRONMENT: Development
+  ConnectionStrings__SciPhDatabase: "Host=postgres;Port=5432;Database=${POSTGRES_DB:?Define POSTGRES_DB en .env};Username=${POSTGRES_USER:?Define POSTGRES_USER en .env};Password=${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}"
 
 services:
   postgres:
     image: postgres:17-alpine
+    # Mismo nombre que el contenedor local existente: Compose lo reutiliza con su volumen.
     container_name: sci-ph-postgres
     restart: unless-stopped
     environment:
@@ -17,7 +22,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
     ports:
-      # Solo expuesto en localhost.
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -28,6 +32,125 @@ services:
       retries: 5
       start_period: 10s
 
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
+    restart: unless-stopped
+    command:
+      - azurite-blob
+      - --blobHost
+      - 0.0.0.0
+      - --blobPort
+      - "10000"
+      - --location
+      - /data
+      - --silent
+      - --disableTelemetry
+    ports:
+      - "127.0.0.1:${AZURITE_BLOB_PORT:-10000}:10000"
+    volumes:
+      - azurite_data:/data
+
+  migrations:
+    build:
+      context: .
+      dockerfile: src/Presentation/SCI-PH.Web.BFF/Dockerfile
+      target: migrations
+    image: sciph-web-bff-migrations:local
+    environment:
+      <<: *backend-environment
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Define JWT_SIGNING_KEY en .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -c
+      - |
+        dotnet ef database update \
+          --context IdentityDbContext \
+          --project src/Infrastructure/SCI-PH.Persistence \
+          --startup-project src/Presentation/SCI-PH.Web.BFF \
+          --configuration Release &&
+        dotnet ef database update \
+          --context ClinicalDbContext \
+          --project src/Infrastructure/SCI-PH.Persistence \
+          --startup-project src/Presentation/SCI-PH.Web.BFF \
+          --configuration Release
+    restart: "no"
+
+  web-bff:
+    build:
+      context: .
+      dockerfile: src/Presentation/SCI-PH.Web.BFF/Dockerfile
+      target: final
+    image: sciph-web-bff:local
+    environment:
+      <<: *backend-environment
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Define JWT_SIGNING_KEY en .env}
+
+      Security__AllowedOrigins__0: "http://localhost:${WEB_PORT:-5173}"
+      Security__AllowedOrigins__1: "https://localhost:${WEB_PORT:-5173}"
+
+      AccountEmail__ActivationUrl: "http://localhost:${WEB_PORT:-5173}/activate-account"
+      AccountEmail__ConfirmEmailUrl: "http://localhost:${WEB_PORT:-5173}/confirm-email"
+      AccountEmail__ResetPasswordUrl: "http://localhost:${WEB_PORT:-5173}/reset-password"
+
+      # Administrador inicial (IdentitySeeder, idempotente). Sin estas variables solo se sincronizan los roles.
+      IdentityBootstrap__Enabled: ${IDENTITY_BOOTSTRAP_ENABLED:-false}
+      IdentityBootstrap__AdminEmail: ${IDENTITY_BOOTSTRAP_ADMIN_EMAIL:-}
+      IdentityBootstrap__AdminPassword: ${IDENTITY_BOOTSTRAP_ADMIN_PASSWORD:-}
+    ports:
+      - "127.0.0.1:${WEB_BFF_PORT:-5074}:8080"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+  mobile-bff:
+    build:
+      context: .
+      dockerfile: src/Presentation/SCI-PH.Mobile.BFF/Dockerfile
+      target: final
+    image: sciph-mobile-bff:local
+    environment:
+      <<: *backend-environment
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Define JWT_SIGNING_KEY en .env}
+    ports:
+      - "127.0.0.1:${MOBILE_BFF_PORT:-5191}:8080"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+  device-api:
+    build:
+      context: .
+      dockerfile: src/Presentation/SCI-PH.Device.API/Dockerfile
+      target: final
+    image: sciph-device-api:local
+    environment:
+      <<: *backend-environment
+    ports:
+      - "127.0.0.1:${DEVICE_API_PORT:-5139}:8080"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/web-admin/Dockerfile
+    image: sciph-web:local
+    environment:
+      WEB_BFF_UPSTREAM: "http://web-bff:8080"
+      NGINX_ENVSUBST_FILTER: "WEB_BFF_UPSTREAM"
+    ports:
+      - "127.0.0.1:${WEB_PORT:-5173}:8080"
+    depends_on:
+      web-bff:
+        condition: service_started
+
 volumes:
   postgres_data:
     name: sci-ph-postgres-data
+
+  azurite_data:
+    name: sci-ph-azurite-data

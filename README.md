@@ -46,19 +46,24 @@ Detalle en [docs/architecture/solution-structure.md](docs/architecture/solution-
 ## Requisitos
 
 - .NET SDK 9.0.305 o superior dentro de 9.0.x (ver [`global.json`](global.json))
-- Docker (para PostgreSQL local)
+- Docker (para PostgreSQL local o el stack completo en contenedores)
 - Herramientas locales (incluye `dotnet-ef` 9.0.9, alineado con EF Core): `dotnet tool restore`
 - Docker también para las pruebas con PostgreSQL 17 (Testcontainers); sin Docker esas pruebas se omiten localmente
 
 ## Puesta en marcha local
 
+Para levantar todo (PostgreSQL, migraciones, BFFs, Device API y web-admin) en contenedores, sigue
+[Stack local en contenedores](docs/architecture/local-containers.md). Para desarrollar con `dotnet run`:
+
 1. **Base de datos**
 
    ```bash
    cp .env.example .env      # define tus propios valores; .env nunca se sube
-   docker compose up -d
+   docker compose up -d postgres
    docker compose ps         # postgres debe aparecer (healthy)
    ```
+
+   Para detenerla sin perder datos: `docker compose down` (nunca `-v`, que borra el volumen de la base).
 
 2. **Cadena de conexión** (una vez por proyecto; se guarda en user-secrets, fuera del repo)
 
