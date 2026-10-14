@@ -1,3 +1,10 @@
+# Stack local de SCI-PH: PostgreSQL, Azurite (Blob), migraciones, Web BFF, Mobile BFF, Device API y web-admin.
+#
+# Uso (detalle en docs/architecture/local-containers.md):
+#   1. Copiar .env.example a .env y reemplazar los valores REPLACE_ME (clave JWT y administrador inicial).
+#   2. docker compose up -d --build
+#   3. Detener sin borrar datos: docker compose down   (no usar -v: borra los volúmenes de PostgreSQL y Azurite)
+
 name: sci-ph
 
 x-backend-environment: &backend-environment
