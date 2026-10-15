@@ -55,6 +55,10 @@ app.MapHealthChecks("/health").AllowAnonymous();
 // Solo se ejecuta con IdentityBootstrap:Enabled = true.
 await app.Services.RunIdentityBootstrapAsync();
 
+// Cuentas de prueba, una por rol (excepto Administrator). Solo en Development y con
+// IdentityDevelopmentAccounts:Enabled = true; activada en otro entorno, el Web BFF no arranca.
+await app.Services.RunIdentityDevelopmentAccountsAsync(app.Environment);
+
 // Clínica y personal clínico de demostración para cuentas ya existentes. Solo en Development y con
 // ClinicalDevelopmentSeed:Enabled = true (User Secrets); nunca en Production.
 await app.Services.RunClinicalDevelopmentSeedAsync(app.Environment);

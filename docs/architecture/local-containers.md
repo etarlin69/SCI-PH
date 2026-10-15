@@ -25,6 +25,8 @@ Todos los puertos se publican solo en `127.0.0.1`. Los servicios corren con `ASP
      cumplir la política (mayúsculas, minúsculas, dígito y símbolo); con `REPLACE_ME` el Web BFF no arranca.
      El seeder es idempotente: crea la cuenta solo si el email no existe y nunca escribe la contraseña en los logs.
      Con `IDENTITY_BOOTSTRAP_ENABLED=false`, o sin email/contraseña, solo se sincronizan los roles.
+   - `IDENTITY_DEV_ACCOUNTS_PASSWORD`: la contraseña de las cuentas de prueba (misma política). Ver
+     [Cuentas de prueba](#cuentas-de-prueba).
 3. Levanta el stack:
 
    ```bash
@@ -43,6 +45,32 @@ curl http://localhost:5173/health       # web-admin (nginx)
 ```
 
 El front queda en http://localhost:5173; inicia sesión con el administrador inicial.
+
+## Cuentas de prueba
+
+Con `IDENTITY_DEV_ACCOUNTS_ENABLED=true` (valor de `.env.example`) el Web BFF crea al arrancar una cuenta por rol, todas
+con la contraseña `IDENTITY_DEV_ACCOUNTS_PASSWORD` de tu `.env`:
+
+| Cuenta | Rol | Para probar |
+|---|---|---|
+| El email de `IDENTITY_BOOTSTRAP_ADMIN_EMAIL` | Administrator | Panel web (usuarios, roles, invitaciones) |
+| `doctor@sci-ph.test` | Doctor | Web hospitalaria: atenciones, diagnósticos y prescripciones |
+| `nurse@sci-ph.test` | Nurse | Web hospitalaria: signos vitales y administración de medicamentos; en la app móvil, acceso denegado |
+| `paramedic@sci-ph.test` | Paramedic | App móvil, acceso del personal clínico (`Emergencies.Operate`) |
+| `receptionist@sci-ph.test` | Receptionist | Registro de pacientes e invitaciones de paciente |
+| `patient@sci-ph.test` | Patient | Cuenta de paciente sin expediente vinculado |
+
+También se crea la clínica de desarrollo (`DEV-SCIPH-01`) con el doctor, la enfermera, el paramédico y la recepcionista
+como personal clínico vinculado a esas cuentas, y el catálogo de medicamentos de demostración.
+
+- Solo en Development: si `IdentityDevelopmentAccounts:Enabled` es `true` en otro entorno, el Web BFF no arranca.
+- Es idempotente: crea cada cuenta una vez. Cambiar la contraseña en `.env` no cambia la de una cuenta ya creada; para
+  eso usa el cambio de contraseña de la propia cuenta.
+- Un email que ya existe sin ese rol (por ejemplo una cuenta real) no se modifica.
+- Las contraseñas nunca se escriben en los logs ni en el repositorio: cada persona del equipo pone la suya en su `.env`.
+- Sin `docker compose` (con `dotnet run`), configura lo mismo en User Secrets del Web BFF:
+  `IdentityDevelopmentAccounts:Enabled`, `IdentityDevelopmentAccounts:Password` y
+  `IdentityDevelopmentAccounts:Accounts:N:Email` / `:Role`.
 
 ## Detener sin perder datos
 

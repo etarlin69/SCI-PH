@@ -69,6 +69,8 @@ namespace SCI_PH.Persistence
             services.AddScoped<IClinicalWriteStore, ClinicalWriteStore>();
             services.AddScoped<IdentitySeeder>();
             services.AddOptions<IdentityBootstrapOptions>().Bind(configuration.GetSection(IdentityBootstrapOptions.SectionName));
+            services.AddScoped<IdentityDevelopmentAccountSeeder>();
+            services.AddOptions<IdentityDevelopmentAccountsOptions>().Bind(configuration.GetSection(IdentityDevelopmentAccountsOptions.SectionName));
             services.AddScoped<ClinicalDevelopmentSeeder>();
             services.AddOptions<ClinicalDevelopmentSeedOptions>().Bind(configuration.GetSection(ClinicalDevelopmentSeedOptions.SectionName));
 
@@ -85,6 +87,27 @@ namespace SCI_PH.Persistence
             }
 
             await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedAsync(cancellationToken);
+        }
+
+        // Cuentas de prueba (una por rol): SOLO en Development y con IdentityDevelopmentAccounts:Enabled = true. Activada
+        // fuera de Development, el host no arranca: es una configuración peligrosa, no algo que ignorar en silencio.
+        // Requiere los roles de RunIdentityBootstrapAsync.
+        public static async Task RunIdentityDevelopmentAccountsAsync(
+            this IServiceProvider services, IHostEnvironment environment, CancellationToken cancellationToken = default)
+        {
+            await using var scope = services.CreateAsyncScope();
+            if (!scope.ServiceProvider.GetRequiredService<IOptions<IdentityDevelopmentAccountsOptions>>().Value.Enabled)
+            {
+                return;
+            }
+
+            if (!environment.IsDevelopment())
+            {
+                throw new InvalidOperationException(
+                    $"IdentityDevelopmentAccounts:Enabled is only allowed in Development (current: {environment.EnvironmentName}).");
+            }
+
+            await scope.ServiceProvider.GetRequiredService<IdentityDevelopmentAccountSeeder>().SeedAsync(cancellationToken);
         }
 
         // Datos clínicos de demostración: SOLO en Development y con ClinicalDevelopmentSeed:Enabled = true.

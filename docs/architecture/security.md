@@ -24,7 +24,7 @@ SCI-PH.Persistence/
 ├── Identity/Models/        ApplicationUser, RefreshToken, SecurityAuditEvent, AccountInvitation, DeviceCredential, MfaLoginChallenge
 ├── Identity/Services/      IdentityService, RefreshTokenStore, SecurityAuditLog, AuthenticatorService, MfaChallengeStore, AccountTokenService,
 │                           UserDirectory, AccountInvitationStore, DeviceCredentialStore, ClinicalIdentityLinkService
-├── Identity/Seed/          IdentitySeeder, IdentityBootstrapOptions
+├── Identity/Seed/          IdentitySeeder, IdentityBootstrapOptions, IdentityDevelopmentAccountSeeder (solo Development)
 ├── Configurations/Identity/
 └── Migrations/Identity/    InitialIdentity, IdentitySecurityFoundation, IdentitySecurityCompletion, MfaChallengeReplayProtection
 
@@ -139,6 +139,7 @@ Errores (ProblemDetails): 400 validación o enlace inválido, 401 sin credencial
 | `RateLimiting:*` | `appsettings` | Límites por política |
 | `DeviceAuthentication:RequireHttps` | `appsettings` | `false` solo en Development |
 | `IdentityBootstrap:*` | User Secrets / variables | Primer administrador |
+| `IdentityDevelopmentAccounts:*` | User Secrets / variables | Cuentas de prueba, una por rol excepto Administrator; solo Development (en otro entorno el Web BFF no arranca) |
 
 ## Reglas para el código nuevo
 
