@@ -4,6 +4,7 @@ using SCI_PH.Infrastructure.Web;
 using SCI_PH.Persistence;
 using SCI_PH.Web.BFF.Errors;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using SCI_PH.Infrastructure.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +26,8 @@ builder.Services.AddInfrastructure(builder.Configuration)
     .AddSecurityRateLimiting(builder.Configuration);
 
 var app = builder.Build();
+
+app.UseRequestObservability();
 
 // Configure the HTTP request pipeline.
 // Errores no controlados y respuestas 4xx/5xx sin cuerpo se devuelven como ProblemDetails (RFC 7807).
