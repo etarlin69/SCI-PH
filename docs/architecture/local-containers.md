@@ -29,22 +29,67 @@ Todos los puertos se publican solo en `127.0.0.1`. Los servicios corren con `ASP
      [Cuentas de prueba](#cuentas-de-prueba).
 3. Levanta el stack:
 
-   ```bash
-   docker compose up -d --build
-   ```
+```bash
+docker compose up -d --build
+```
 
 ## Comprobar
 
 ```bash
-docker compose ps                       # postgres healthy, migrations "exited (0)", el resto running
-docker compose logs migrations          # resultado de las migraciones
-curl http://localhost:5074/health       # Web BFF
-curl http://localhost:5191/health       # Mobile BFF
-curl http://localhost:5139/health       # Device API
-curl http://localhost:5173/health       # web-admin (nginx)
+docker compose ps
+docker compose logs migrations
+
+# Web BFF
+curl http://localhost:5074/health
+curl http://localhost:5074/health/live
+curl http://localhost:5074/health/ready
+
+# Mobile BFF
+curl http://localhost:5191/health
+curl http://localhost:5191/health/live
+curl http://localhost:5191/health/ready
+
+# Device API
+curl http://localhost:5139/health
+curl http://localhost:5139/health/live
+curl http://localhost:5139/health/ready
+
+# web-admin (nginx)
+curl http://localhost:5173/health
 ```
 
+Los tres backends exponen dos probes específicas:
+
+- `/health/live`: comprueba que el proceso ASP.NET puede responder. No depende de PostgreSQL.
+- `/health/ready`: comprueba que el servicio está preparado para recibir tráfico e incluye la disponibilidad de PostgreSQL.
+
+`/health` se conserva como endpoint de compatibilidad y se comporta como liveness.
+
+Docker Compose utiliza `/health/ready` para determinar el estado de `web-bff`, `mobile-bff` y `device-api`. Si PostgreSQL deja de estar disponible, los procesos continúan ejecutándose pero los contenedores pasan a `unhealthy`; cuando PostgreSQL se recupera, vuelven automáticamente a `healthy`.
+
 El front queda en http://localhost:5173; inicia sesión con el administrador inicial.
+
+## Observabilidad local
+
+Los backends generan un identificador de correlación basado en el `TraceId` de ASP.NET Core. Cada respuesta incluye el header:
+
+```text
+X-Correlation-ID: <trace-id>
+```
+
+El mismo identificador se incluye en los logs de la petición junto con el método HTTP, la ruta, el código de respuesta y la duración. Esto permite relacionar una respuesta recibida por un cliente con su entrada correspondiente en los logs.
+
+Los health checks no generan entradas de request logging para evitar ruido producido por las probes periódicas.
+
+Dentro de Docker, los backends utilizan el formateador JSON del logging de .NET y conservan los scopes de logging. Los logs pueden consultarse con:
+
+```bash
+docker compose logs web-bff
+docker compose logs mobile-bff
+docker compose logs device-api
+```
+
+El middleware de observabilidad no registra cuerpos de peticiones, tokens JWT, claves de dispositivos ni headers de autenticación.
 
 ## Cuentas de prueba
 
@@ -75,8 +120,10 @@ como personal clínico vinculado a esas cuentas, y el catálogo de medicamentos 
 ## Detener sin perder datos
 
 ```bash
-docker compose down        # para y elimina los contenedores; los volúmenes se conservan
+docker compose down
 ```
+
+`docker compose down` para y elimina los contenedores, pero conserva los volúmenes.
 
 PostgreSQL y Azurite guardan sus datos en volúmenes con nombre (`sci-ph-postgres-data`, `sci-ph-azurite-data`), que
 `docker compose down` no toca. **No uses `docker compose down -v`** en el uso normal: borra esos volúmenes y con ellos
