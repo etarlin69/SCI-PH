@@ -2,6 +2,7 @@ using SCI_PH.Application;
 using SCI_PH.Infrastructure;
 using SCI_PH.Infrastructure.Web;
 using SCI_PH.Persistence;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,6 +46,32 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHealthChecks("/health").AllowAnonymous();
+// Liveness only verifies that the ASP.NET process can answer requests.
+app.MapHealthChecks(
+        "/health/live",
+        new HealthCheckOptions
+        {
+            Predicate = _ => false
+        })
+    .AllowAnonymous();
+
+// Readiness verifies the dependencies required to serve traffic.
+app.MapHealthChecks(
+        "/health/ready",
+        new HealthCheckOptions
+        {
+            Predicate = healthCheck =>
+                healthCheck.Tags.Contains("ready")
+        })
+    .AllowAnonymous();
+
+// Keep the existing endpoint for compatibility.
+app.MapHealthChecks(
+        "/health",
+        new HealthCheckOptions
+        {
+            Predicate = _ => false
+        })
+    .AllowAnonymous();
 
 await app.RunAsync();
