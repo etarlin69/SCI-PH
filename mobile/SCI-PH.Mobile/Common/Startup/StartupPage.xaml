@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Common.Startup"
+             x:Class="SCI_PH.Mobile.Common.Startup.StartupPage"
+             x:DataType="vm:StartupViewModel"
+             Style="{StaticResource SciPage}"
+             Shell.NavBarIsVisible="False"
+             Title="SCI-PH">
+
+    <VerticalStackLayout Padding="24" Spacing="16" VerticalOptions="Center" HorizontalOptions="Center">
+        <Label Text="SCI-PH" Style="{StaticResource SciTitle}" HorizontalTextAlignment="Center" />
+        <ActivityIndicator IsRunning="True" Color="{StaticResource SciPrimary}" />
+        <Label Text="Verificando sesión…"
+               AutomationId="StartupStatus"
+               Style="{StaticResource SciSubtitle}"
+               HorizontalTextAlignment="Center" />
+    </VerticalStackLayout>
+
+</ContentPage>

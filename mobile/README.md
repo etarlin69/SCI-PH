@@ -8,8 +8,9 @@ solución, separada del backend:
 | `SCI-PH.sln` (raíz) | Backend: Domain, Application, Persistence, Infrastructure, BFFs, Device API y tests |
 | `mobile/SCI-PH.Mobile.sln` | App MAUI `mobile/SCI-PH.Mobile/SCI-PH.Mobile.csproj` y sus tests `mobile/tests/SCI-PH.Mobile.Tests` |
 
-La app no referencia proyectos del backend: se comunicará con `SCI-PH.Mobile.BFF` (`/api/mobile`) por HTTP, según
-[docs/api/mobile-bff-contracts.md](../docs/api/mobile-bff-contracts.md).
+La app no referencia proyectos del backend: se comunica con `SCI-PH.Mobile.BFF` (`/api/mobile`) por HTTP, según
+[docs/api/mobile-bff-contracts.md](../docs/api/mobile-bff-contracts.md), con DTOs propios.
+Hoy solo es real el acceso del personal clínico (`api/mobile/auth`); el resto sigue simulado.
 
 ## Estructura
 
@@ -18,9 +19,14 @@ mobile/
   SCI-PH.Mobile.sln
   SCI-PH.Mobile/
     App.xaml / App.xaml.cs        Recursos globales y ventana principal
-    AppShell.xaml / .cs           Shell único: entrada compartida + área del paciente (menú con sesión)
-    MauiProgram.cs                AddCoreServices() + AddParamedicFeature() + AddPatientFeature()
+    AppShell.xaml / .cs           Shell único: arranque, entrada compartida y área del paciente (menú con sesión)
+    MauiProgram.cs                AddCoreServices() + AddAuthFeature() + AddParamedicFeature() + AddPatientFeature()
     Common/                       Compartido por todas las features
+      Api/                        Cliente del Mobile BFF: MobileApiOptions, MobileApiClient, errores y
+                                  AuthenticatedHttpHandler (Bearer + refresh ante 401)
+      Authentication/             Sesión del personal clínico: MobileAuthService, ClinicalSessionService (memoria),
+                                  ISecureTokenStore (SecureStorage), contratos de api/mobile/auth
+      Startup/                    StartupPage: restaura la sesión clínica guardada antes de mostrar nada
       Entry/                      EntryPage + EntryViewModel: elegir personal clínico o paciente
       Navigation/                 IAppNavigator (implementación sobre Shell), AppRoutes
       Dialogs/                    IAppDialogService
@@ -28,6 +34,7 @@ mobile/
       ViewModels/                 BaseViewModel (IsBusy/IsNotBusy, ErrorMessage, RunAsync)
     Extensions/                   AddCoreServices(): registro de lo común y de la entrada
     Features/
+      Auth/                       Login y MFA del personal clínico; cierre de sesión (ClinicalAccountViewModel)
       Paramedic/                  Rol 6: emergencias prehospitalarias
       Patient/                    Rol 7: acceso QR + rostro y área del paciente
     Resources/                    Fuentes, iconos, splash, avatar del paciente y estilos
@@ -44,26 +51,89 @@ Reglas de cada feature:
   ViewModel escribe la cadena de una ruta.
 - Las páginas solo asignan el `BindingContext` (y, si hace falta, cargan datos en `OnAppearing`); la lógica está en
   ViewModels que heredan de `BaseViewModel` y usan `IAppNavigator`/`IAppDialogService`, nunca `Shell.Current`.
-- Los servicios externos están detrás de interfaces. Hoy todos son mocks en memoria; al conectar el Mobile BFF solo
-  cambian los registros.
+- Los servicios externos están detrás de interfaces. Salvo la autenticación clínica, hoy todos son mocks en memoria;
+  al conectar el Mobile BFF solo cambian los registros y se usa `IMobileApiClient` (nunca `HttpClient` en un
+  ViewModel).
 - Los enums de los contratos se serializan por nombre (`JsonStringEnumConverter<T>`), así que sus valores numéricos
   no tienen que coincidir con los del Domain.
 
 ## Entrada a la aplicación
 
 ```text
-SCI-PH Mobile (entrada compartida)
-  ├─ Personal clínico (Paramedic) → futuro: inicio de sesión real   | hoy: entra directamente al prototipo
-  └─ Paciente (Patient)           → QR → verificación facial 1:1 → sesión | hoy: los dos pasos son simulados
+Arranque ─┬─ refresh token guardado → refresh + /me + Emergencies.Operate → área paramédica
+          │                            └─ rechazado → se borra → entrada
+          └─ sin token o sin conexión → entrada
+
+Entrada compartida
+  ├─ Personal clínico → login real (Mobile BFF) → [MFA] → /me → Emergencies.Operate → área paramédica
+  └─ Paciente (Patient) → QR → verificación facial 1:1 → sesión | hoy: los dos pasos son simulados
 ```
 
-La app arranca en la entrada. **Ninguna autenticación es real todavía**: la entrada no pide usuario ni contraseña
-y lo dice en pantalla. Los dos accesos se apilan sobre la entrada, así que "Atrás" permite volver a elegir.
+Los dos accesos se apilan sobre la entrada, así que "Atrás" permite volver a elegir.
 
-- Personal clínico: Nueva emergencia y el resto del flujo paramédico, sin menú lateral.
+- Personal clínico: inicio de sesión real (ver "Acceso del personal clínico"); después, Nueva emergencia y el resto
+  del flujo paramédico, sin menú lateral, con "Cerrar sesión" en la barra de Nueva emergencia.
 - Paciente: el QR solo inicia el acceso (no autentica); la sesión se crea tras la verificación facial y abre el área
   del paciente. El menú lateral, con el nombre de la sesión, solo se habilita con sesión de paciente; "Cerrar
   sesión" la borra y vuelve a la entrada.
+
+## Acceso del personal clínico
+
+Contrato: `api/mobile/auth` del Mobile BFF (`login`, `mfa/verify`, `refresh`, `logout`, `me`). Sin cookies ni CSRF:
+el refresh token viaja en el cuerpo.
+
+| Dato | Dónde vive | Cuánto |
+|---|---|---|
+| Access token y su caducidad | Memoria (`ClinicalSessionService`) | Mientras la app está abierta |
+| Refresh token | `SecureStorage` (`MauiSecureTokenStore`) | Hasta logout, rechazo del servidor o caducidad |
+| Usuario (`/me`: id, usuario, email, roles, permisos) | Memoria | Mientras la sesión es válida |
+| Challenge MFA | Memoria (`PendingMfaChallenge`) | Solo entre el login y la verificación |
+| Contraseña, código TOTP, código de recuperación | En ningún sitio | Se borran del estado al enviarlos |
+
+- **Login**: correo o usuario y contraseña. Si la cuenta tiene MFA no se crea sesión: se pide el código de 6 dígitos
+  del autenticador o, alternativamente, un código de recuperación (`mfa/verify` con `code` o `recoveryCode`).
+- **Autorización**: toda sesión nueva (login, MFA, restauración) llama a `/me` y exige el permiso
+  `Emergencies.Operate`; nunca se decide por rol. Sin él, la sesión se revoca en el servidor, se borra y se muestra
+  "Tu cuenta no tiene acceso al módulo prehospitalario.".
+- **Peticiones protegidas** (`IMobileApiClient`): `AuthenticatedHttpHandler` añade `Authorization: Bearer`. Ante un
+  401 hace un único refresh (single-flight: con varias peticiones a la vez solo una llama a `/refresh`), guarda el
+  refresh token rotado y repite la petición una vez. Si la repetición vuelve a dar 401, o el refresh es rechazado
+  (caducado, revocado o reutilizado), se borra la sesión y la app vuelve a la entrada. Login, MFA, refresh y logout
+  usan un cliente sin ese handler, así que un refresh nunca dispara otro.
+- **Arranque**: con refresh token guardado se renueva y se valida con `/me` antes de mostrar el área paramédica. Si el
+  servidor lo rechaza, se borra; si `/refresh` no tiene conexión, se conserva para el siguiente arranque y se muestra la
+  entrada. Si `/refresh` funciona pero `/me` falla, el token ya rotado se revoca (si hay conexión) y se borra: no queda
+  una sesión a medias y hay que volver a iniciar sesión.
+- **Logout**: revoca el refresh token en el servidor si hay conexión y siempre borra la sesión local. No toca la
+  sesión del paciente.
+- **Errores**: nunca se muestra ProblemDetails, el estado HTTP ni el texto de una excepción. Un fallo de red muestra
+  "No fue posible conectar con SCI-PH. Intenta nuevamente." (nunca "credenciales incorrectas"); un 429 respeta
+  `Retry-After`.
+
+### Dirección del Mobile BFF
+
+`MobileApiOptions` la resuelve al arrancar, sin IPs personales en el repositorio:
+
+| Compilación | Plataforma | Dirección |
+|---|---|---|
+| Debug | Windows (y el resto) | `http://localhost:5191` |
+| Debug | Emulador Android | `http://10.0.2.2:5191` (10.0.2.2 es el PC anfitrión) |
+| Cualquiera | Cualquiera | `-p:MobileBffBaseUrl=...` al compilar tiene prioridad; en Release solo se acepta `https://` |
+| Release | Cualquiera | Sin dirección salvo `MobileBffBaseUrl`: la app avisa que no tiene servidor configurado |
+
+Android bloquea HTTP sin cifrar. Solo en **Debug** se incluye
+`Platforms/Android/DebugResources/xml/network_security_config.xml`, que lo permite únicamente hacia `10.0.2.2` y
+`localhost`; Release no declara network security config y además fija `usesCleartextTraffic="false"`, así que el
+tráfico HTTP queda bloqueado también en Android 6-8 (donde el bloqueo por defecto de Android 9 no aplica). La
+validación TLS nunca se desactiva.
+
+Dispositivo Android físico, sin poner una IP en el repositorio:
+
+- Con cable (Debug): `adb reverse tcp:5191 tcp:5191` y compilar con `-p:MobileBffBaseUrl=http://localhost:5191`.
+- O un Mobile BFF accesible por HTTPS: `-p:MobileBffBaseUrl=https://<host>`.
+
+El Mobile BFF local corre con `dotnet run --project src/Presentation/SCI-PH.Mobile.BFF` (puerto 5191) o con
+`docker compose` (ver [docs/architecture/local-containers.md](../docs/architecture/local-containers.md)).
 
 ## Paramedic (estado actual)
 
@@ -75,8 +145,9 @@ y lo dice en pantalla. Los dos accesos se apilan sobre la entrada, así que "Atr
 | Procedimientos | Registro desde el catálogo. |
 | Medicamentos | Registro de lo ya administrado (SCI-PH no prescribe). |
 
-Datos simulados: `MockParamedicApiService` (emergencias en memoria con idempotencia), `MockParamedicCatalogService`
-y `MockFingerprintReaderService` (alterna sin coincidencia / identificado). Pendiente: transferencia.
+Se entra con la sesión real del personal clínico, pero **los datos siguen simulados**: `MockParamedicApiService`
+(emergencias en memoria con idempotencia), `MockParamedicCatalogService` y `MockFingerprintReaderService` (alterna
+sin coincidencia / identificado). Pendiente: transferencia.
 
 ## Patient (estado actual)
 
@@ -103,6 +174,7 @@ Reglas que se mantienen al conectar el backend:
 - Los documentos se entregarán mediante el Mobile BFF, nunca con URLs permanentes.
 - No se guardan plantillas ni fotos biométricas en el dispositivo; el token irá a SecureStorage, nunca a
   Preferences, que solo guarda la foto y la descripción locales del perfil de demostración.
+- La sesión del paciente es independiente de la del personal clínico: nunca usa su access token.
 - El asistente es educativo: no diagnostica, no prescribe y no sustituye a un profesional.
 
 ## Compilar
@@ -127,8 +199,9 @@ dotnet test mobile/tests/SCI-PH.Mobile.Tests/SCI-PH.Mobile.Tests.csproj
 
 La app tiene además el target `net9.0` (sin `OutputType=Exe`): no es una app ni se publica, solo compila la lógica
 sin interfaz para que el proyecto de tests la referencie. Los tests usan fakes de `IAppNavigator`,
-`IAppDialogService` y de los servicios de cada feature, sin Shell, ventanas ni handlers. Sin tests de render XAML,
-de dispositivo ni de integración con el Mobile BFF por ahora.
+`IAppDialogService` y de los servicios de cada feature, sin Shell, ventanas ni handlers. La autenticación se prueba
+con el cliente, el handler y el servicio reales contra un Mobile BFF en memoria (`Auth/FakeMobileBff`) y un
+`ISecureStorage` falso. Sin tests de render XAML ni de dispositivo.
 
 ## CI
 
@@ -146,8 +219,8 @@ no firma con claves propias y no publica nada.
 
 ## Pendiente
 
-- Inicio de sesión real del personal clínico; QR y verificación facial reales del paciente (con el Rol 8).
-- Cliente HTTP del Mobile BFF, sesión con SecureStorage, refresh, manejo de 401 y protección de rutas.
+- QR y verificación facial reales del paciente (con el Rol 8).
+- Conectar los datos del área paramédica (`/api/mobile/emergencies`, con `Emergencies.Operate`) a `IMobileApiClient`.
 - Huella real (Device API), catálogos reales, pantalla de transferencia, modo sin conexión.
 - Contratos e integración de historial, resultados, documentos y asistente del paciente.
 - Converger PatientTheme con SciPhTheme.

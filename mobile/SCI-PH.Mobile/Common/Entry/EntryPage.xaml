@@ -18,13 +18,14 @@
                        HorizontalTextAlignment="Center" />
             </VerticalStackLayout>
 
-            <!-- Personal clínico: el inicio de sesión real aún no existe; entra directamente al prototipo. -->
+            <!-- Personal clínico: inicio de sesión real contra el Mobile BFF. -->
             <Border Style="{StaticResource SciCard}">
                 <VerticalStackLayout Spacing="10">
                     <Button Text="Personal clínico"
+                            AutomationId="EntryClinicalStaff"
                             Command="{Binding OpenClinicalStaffCommand}"
                             Style="{StaticResource SciPrimaryButton}" />
-                    <Label Text="Atención prehospitalaria. Prototipo: el inicio de sesión del personal todavía no está disponible."
+                    <Label Text="Atención prehospitalaria. Requiere una cuenta del personal clínico de SCI-PH."
                            Style="{StaticResource SciSubtitle}" FontSize="13" />
                 </VerticalStackLayout>
             </Border>
@@ -33,6 +34,7 @@
             <Border Style="{StaticResource SciCard}">
                 <VerticalStackLayout Spacing="10">
                     <Button Text="Paciente"
+                            AutomationId="EntryPatient"
                             Command="{Binding OpenPatientCommand}"
                             Style="{StaticResource SciSecondaryButton}" />
                     <Label Text="Acceso con tu código QR y verificación facial. Prototipo: ambos pasos son simulados."

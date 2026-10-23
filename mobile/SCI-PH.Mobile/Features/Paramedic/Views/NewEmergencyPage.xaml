@@ -7,6 +7,11 @@
              Style="{StaticResource SciPage}"
              Title="Atención prehospitalaria">
 
+    <!-- Cierre de la sesión del personal clínico (ClinicalAccountViewModel; se enlaza en el code-behind). -->
+    <ContentPage.ToolbarItems>
+        <ToolbarItem x:Name="LogoutToolbarItem" Text="Cerrar sesión" AutomationId="ClinicalLogout" />
+    </ContentPage.ToolbarItems>
+
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="18">
 

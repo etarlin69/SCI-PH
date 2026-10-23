@@ -63,6 +63,16 @@
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
+	<!-- Android, solo Debug: HTTP hacia el Mobile BFF local (10.0.2.2 y localhost). Release no lo incluye. -->
+	<ItemGroup Condition="'$(Configuration)' == 'Debug' And $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<AndroidResource Include="Platforms\Android\DebugResources\xml\network_security_config.xml" Link="Platforms\Android\Resources\xml\network_security_config.xml" />
+	</ItemGroup>
+
+	<!-- Dirección del Mobile BFF fijada al compilar (backend desplegado o dispositivo físico): -p:MobileBffBaseUrl=https://... -->
+	<ItemGroup Condition="'$(MobileBffBaseUrl)' != ''">
+		<AssemblyMetadata Include="MobileBffBaseUrl" Value="$(MobileBffBaseUrl)" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />

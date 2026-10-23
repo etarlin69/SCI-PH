@@ -1,0 +1,19 @@
+using SCI_PH.Mobile.Common.Navigation;
+using SCI_PH.Mobile.Features.Paramedic;
+
+namespace SCI_PH.Mobile.Features.Auth;
+
+/// <summary>Rutas del acceso del personal clínico; se registran con <see cref="AuthServiceCollectionExtensions.RegisterAuthRoutes"/>.</summary>
+public static class AuthRoutes
+{
+    /// <summary>Se apila sobre la entrada compartida ("Volver" regresa a elegir el acceso).</summary>
+    public const string Login = "ClinicalLogin";
+
+    /// <summary>Segundo factor; se apila sobre el login.</summary>
+    public const string Mfa = "ClinicalMfa";
+
+    /// <summary>
+    /// Área paramédica tras autenticar: reemplaza la pila (login y MFA dejan de estar detrás) y deja la entrada como raíz.
+    /// </summary>
+    public static string ClinicalArea { get; } = $"{AppRoutes.Root(AppRoutes.Entry)}/{ParamedicRoutes.NewEmergency}";
+}

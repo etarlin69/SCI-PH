@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using SCI_PH.Mobile.Extensions;
+using SCI_PH.Mobile.Features.Auth;
 using SCI_PH.Mobile.Features.Paramedic;
 using SCI_PH.Mobile.Features.Patient;
 
@@ -23,6 +24,7 @@ namespace SCI_PH.Mobile
 #endif
             builder.Services
                 .AddCoreServices()
+                .AddAuthFeature()
                 .AddParamedicFeature()
                 .AddPatientFeature();
 
