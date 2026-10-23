@@ -99,6 +99,39 @@ services:
       IdentityBootstrap__Enabled: ${IDENTITY_BOOTSTRAP_ENABLED:-false}
       IdentityBootstrap__AdminEmail: ${IDENTITY_BOOTSTRAP_ADMIN_EMAIL:-}
       IdentityBootstrap__AdminPassword: ${IDENTITY_BOOTSTRAP_ADMIN_PASSWORD:-}
+
+      # Cuentas de prueba, una por rol (IdentityDevelopmentAccountSeeder, idempotente). Comparten la contraseña del .env.
+      IdentityDevelopmentAccounts__Enabled: ${IDENTITY_DEV_ACCOUNTS_ENABLED:-false}
+      IdentityDevelopmentAccounts__Password: ${IDENTITY_DEV_ACCOUNTS_PASSWORD:-}
+      IdentityDevelopmentAccounts__Accounts__0__Email: doctor@sci-ph.test
+      IdentityDevelopmentAccounts__Accounts__0__Role: Doctor
+      IdentityDevelopmentAccounts__Accounts__1__Email: nurse@sci-ph.test
+      IdentityDevelopmentAccounts__Accounts__1__Role: Nurse
+      IdentityDevelopmentAccounts__Accounts__2__Email: paramedic@sci-ph.test
+      IdentityDevelopmentAccounts__Accounts__2__Role: Paramedic
+      IdentityDevelopmentAccounts__Accounts__3__Email: receptionist@sci-ph.test
+      IdentityDevelopmentAccounts__Accounts__3__Role: Receptionist
+      IdentityDevelopmentAccounts__Accounts__4__Email: patient@sci-ph.test
+      IdentityDevelopmentAccounts__Accounts__4__Role: Patient
+
+      # Clínica de desarrollo con el personal clínico de esas cuentas ya vinculado (ClinicalDevelopmentSeeder).
+      ClinicalDevelopmentSeed__Enabled: ${IDENTITY_DEV_ACCOUNTS_ENABLED:-false}
+      ClinicalDevelopmentSeed__Staff__0__LicenseNumber: DEV-DOC-01
+      ClinicalDevelopmentSeed__Staff__0__GivenNames: Doctor
+      ClinicalDevelopmentSeed__Staff__0__Type: Physician
+      ClinicalDevelopmentSeed__Staff__0__Email: doctor@sci-ph.test
+      ClinicalDevelopmentSeed__Staff__1__LicenseNumber: DEV-NUR-01
+      ClinicalDevelopmentSeed__Staff__1__GivenNames: Enfermera
+      ClinicalDevelopmentSeed__Staff__1__Type: Nurse
+      ClinicalDevelopmentSeed__Staff__1__Email: nurse@sci-ph.test
+      ClinicalDevelopmentSeed__Staff__2__LicenseNumber: DEV-PAR-01
+      ClinicalDevelopmentSeed__Staff__2__GivenNames: Paramédico
+      ClinicalDevelopmentSeed__Staff__2__Type: Paramedic
+      ClinicalDevelopmentSeed__Staff__2__Email: paramedic@sci-ph.test
+      ClinicalDevelopmentSeed__Staff__3__LicenseNumber: DEV-REC-01
+      ClinicalDevelopmentSeed__Staff__3__GivenNames: Recepción
+      ClinicalDevelopmentSeed__Staff__3__Type: OtherClinical
+      ClinicalDevelopmentSeed__Staff__3__Email: receptionist@sci-ph.test
     ports:
       - "127.0.0.1:${WEB_BFF_PORT:-5074}:8080"
     depends_on:
