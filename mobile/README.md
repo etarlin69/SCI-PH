@@ -101,7 +101,9 @@ el refresh token viaja en el cuerpo.
   (caducado, revocado o reutilizado), se borra la sesión y la app vuelve a la entrada. Login, MFA, refresh y logout
   usan un cliente sin ese handler, así que un refresh nunca dispara otro.
 - **Arranque**: con refresh token guardado se renueva y se valida con `/me` antes de mostrar el área paramédica. Si el
-  servidor lo rechaza, se borra; si no hay conexión, se conserva para el siguiente arranque y se muestra la entrada.
+  servidor lo rechaza, se borra; si `/refresh` no tiene conexión, se conserva para el siguiente arranque y se muestra la
+  entrada. Si `/refresh` funciona pero `/me` falla, el token ya rotado se revoca (si hay conexión) y se borra: no queda
+  una sesión a medias y hay que volver a iniciar sesión.
 - **Logout**: revoca el refresh token en el servidor si hay conexión y siempre borra la sesión local. No toca la
   sesión del paciente.
 - **Errores**: nunca se muestra ProblemDetails, el estado HTTP ni el texto de una excepción. Un fallo de red muestra

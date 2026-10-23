@@ -24,7 +24,14 @@ public enum ClinicalSessionRestore
     Restored,
     NoAccess,
 
-    /// <summary>Sin conexión con el servidor: no hay sesión, pero el refresh token se conserva para otro intento.</summary>
+    /// <summary>
+    /// No se pudo completar la restauración por un fallo de conexión o del servidor; no hay sesión y se muestra la entrada.
+    /// <list type="bullet">
+    /// <item>Si falló <c>/refresh</c>, el refresh token guardado se conserva para el siguiente arranque.</item>
+    /// <item>Si <c>/refresh</c> funcionó pero falló <c>/me</c>, el token ya rotado se revoca (si hay conexión) y se borra:
+    /// nunca queda una sesión a medias y hay que volver a iniciar sesión.</item>
+    /// </list>
+    /// </summary>
     Unavailable
 }
 
@@ -165,7 +172,7 @@ public sealed class MobileAuthService : IMobileAuthService, IClinicalSessionRefr
             }
             catch (MobileApiException)
             {
-                // CompleteSignInAsync ya descartó la sesión.
+                // /me falló: CompleteSignInAsync ya revocó (si pudo) y borró el refresh token rotado y la sesión.
                 return ClinicalSessionRestore.Unavailable;
             }
         }
