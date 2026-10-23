@@ -125,6 +125,7 @@ Para levantar todo (PostgreSQL, migraciones, BFFs, Device API y web-admin) en co
   - [ADR-005 Modelo de datos clínico](docs/adr/ADR-005-clinical-model.md)
   - [ADR-006 Identidad y seguridad](docs/adr/ADR-006-identity-security.md)
   - [ADR-007 Autenticación de dispositivos](docs/adr/ADR-007-device-authentication.md)
+  - [ADR-008 Emergencia prehospitalaria: acceso sin clínica e idempotencia](docs/adr/ADR-008-prehospital-emergency.md)
 - Contratos de API (previstos)
   - [Web BFF](docs/api/web-bff-contracts.md)
   - [Mobile BFF](docs/api/mobile-bff-contracts.md)

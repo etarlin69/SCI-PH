@@ -57,7 +57,8 @@ superior. El detalle de cada entidad está en [clinical-entities.md](../architec
   `Created`/`InProgress`. `Closed` y `Cancelled` son finales y fijan `EndedAtUtc`.
 - `PatientId` y `Status` son tokens de concurrencia: dos canales que identifiquen o cambien el estado a la vez
   producen `DbUpdateConcurrencyException` en lugar de sobrescribirse.
-- La clínica es obligatoria salvo en atención prehospitalaria.
+- La clínica es obligatoria salvo en atención prehospitalaria. El acceso a una atención prehospitalaria sin clínica
+  (por asignación) y la idempotencia de su apertura se deciden en [ADR-008](ADR-008-prehospital-emergency.md).
 
 ### 4. Registros de la atención
 
