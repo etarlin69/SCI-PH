@@ -134,10 +134,19 @@ public sealed partial class MfaViewModel : BaseViewModel
     [RelayCommand]
     private Task BackToLoginAsync()
     {
+        ForgetChallenge();
+        return _navigator.GoToAsync("..");
+    }
+
+    /// <summary>
+    /// Al salir de la verificación por cualquier vía (botón, flecha de la barra de título, atrás del sistema) el challenge y
+    /// los códigos dejan de estar en memoria.
+    /// </summary>
+    public void ForgetChallenge()
+    {
         _pendingMfa.Clear();
         Code = string.Empty;
         RecoveryCode = string.Empty;
-        return _navigator.GoToAsync("..");
     }
 
     private bool IsExpired(DateTimeOffset expiresAtUtc) => _clock.GetUtcNow() >= expiresAtUtc;

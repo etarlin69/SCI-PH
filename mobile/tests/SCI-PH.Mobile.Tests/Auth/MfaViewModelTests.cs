@@ -166,4 +166,19 @@ public class MfaViewModelTests
         Assert.Equal(string.Empty, vm.Code);
         Assert.Equal("..", Assert.Single(_navigator.Navigations).Route);
     }
+
+    [Fact]
+    public void LeavingTheMfaPageAnyOtherWayForgetsTheChallengeAndCodes()
+    {
+        var vm = Create();
+        vm.Code = "123456";
+        vm.RecoveryCode = "abcde-12345";
+
+        vm.ForgetChallenge();
+
+        Assert.Null(_pendingMfa.Current);
+        Assert.Equal(string.Empty, vm.Code);
+        Assert.Equal(string.Empty, vm.RecoveryCode);
+        Assert.Empty(_navigator.Navigations);
+    }
 }
