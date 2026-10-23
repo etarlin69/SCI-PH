@@ -317,6 +317,76 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             await AssertStatusAsync(await paramedic.Client.GetAsync($"{Emergencies}/{opened.Id}"), HttpStatusCode.Forbidden);
         }
 
+        // startedAt is an instant: "Z" or an explicit offset, read as UTC. Without offset it is ambiguous and rejected;
+        // it is never read in the server's time zone (before this rule, "10:25:13" became 15:25:13Z on a UTC-6 host).
+        [SkippableFact]
+        public async Task StartedAtNeedsZOrAnExplicitOffset()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            await using var host = await MobileEmergencyHost.StartAsync(_postgres);
+            var paramedic = await host.SignInAsync(SecurityRoles.Paramedic, [await host.Web.CreateClinicAsync()]);
+            var instant = NowToTheMillisecond().AddHours(-1);
+            var utc = instant.UtcDateTime;
+            var minus4 = instant.ToOffset(TimeSpan.FromHours(-4));
+
+            foreach (var (sent, expected) in new[]
+            {
+                (utc.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", Inv), instant.AddMilliseconds(-instant.Millisecond)),
+                (utc.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", Inv), instant),
+                (minus4.ToString("yyyy-MM-dd'T'HH:mm:sszzz", Inv), instant.AddMilliseconds(-instant.Millisecond)),
+                (minus4.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", Inv), instant)
+            })
+            {
+                var response = await PostRawAsync(paramedic.Client, Guid.NewGuid(), $"\"{sent}\"");
+                Assert.True(response.StatusCode == HttpStatusCode.Created, $"{sent}: {response.StatusCode}");
+                Assert.Equal(expected, (await response.ReadAsAsync<PrehospitalEmergencySummary>()).StartedAtUtc);
+            }
+
+            foreach (var startedAt in new[]
+            {
+                string.Create(Inv, $"\"{utc.AddHours(-6):yyyy-MM-dd'T'HH:mm:ss}\""),        // no offset: ambiguous
+                string.Create(Inv, $"\"{utc:yyyy-MM-dd'T'HH:mm:ss.fff}\""),                 // no offset, with fraction
+                "\"not a date\"",
+                "\"2026-02-30T10:00:00Z\"",                             // date that does not exist
+                string.Create(Inv, $"\"{utc:yyyy-MM-dd'T'HH:mm:ss}+25:00\""),              // offset out of range
+                "\"\"",
+                "1761233400",
+                "null"
+            })
+            {
+                await AssertStatusAsync(await PostRawAsync(paramedic.Client, Guid.NewGuid(), startedAt), HttpStatusCode.BadRequest);
+            }
+
+            Assert.Equal(4, await host.Web.DbAsync(db => db.ClinicalEncounters.CountAsync()));
+            Assert.Equal(4, await host.Web.DbAsync(db => db.IdempotencyReceipts.CountAsync()));
+        }
+
+        // The same instant written as Z and as -04:00 is the same request: replay, not a conflict.
+        [SkippableFact]
+        public async Task TheSameInstantWithAnotherOffsetReplaysTheEmergency()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            await using var host = await MobileEmergencyHost.StartAsync(_postgres);
+            var paramedic = await host.SignInAsync(SecurityRoles.Paramedic, [await host.Web.CreateClinicAsync()]);
+            var instant = NowToTheMillisecond().AddMinutes(-30);
+            var key = Guid.NewGuid();
+
+            var first = await PostRawAsync(paramedic.Client, key, string.Create(Inv, $"\"{instant.UtcDateTime:yyyy-MM-dd'T'HH:mm:ss.fff'Z'}\""));
+            var again = await PostRawAsync(paramedic.Client, key, string.Create(Inv, $"\"{instant.ToOffset(TimeSpan.FromHours(-4)):yyyy-MM-dd'T'HH:mm:ss.fffzzz}\""));
+
+            Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+            Assert.Equal((await first.ReadAsAsync<PrehospitalEmergencySummary>()).Id, (await again.ReadAsAsync<PrehospitalEmergencySummary>()).Id);
+            await AssertSingleEmergencyAsync(host, paramedic.UserId);
+        }
+
+        private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
+
+        private static Task<HttpResponseMessage> PostRawAsync(HttpClient client, Guid clientRequestId, string startedAtJson) =>
+            client.PostAsync(Emergencies, new StringContent(
+                $$"""{"clientRequestId":"{{clientRequestId}}","startedAt":{{startedAtJson}},"chiefComplaint":"Dolor torácico"}""",
+                System.Text.Encoding.UTF8, "application/json"));
+
         private static async Task AssertSingleEmergencyAsync(MobileEmergencyHost host, Guid userId)
         {
             Assert.Equal(1, await host.Web.DbAsync(db => db.ClinicalEncounters.CountAsync()));

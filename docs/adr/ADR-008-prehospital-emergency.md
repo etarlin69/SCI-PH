@@ -63,6 +63,12 @@ reconocer el reintento: cada reintento creaba otra atención NN.
 ### 4. Hora de inicio
 
 - `startedAt` la envía el dispositivo y se guarda como `StartedAtUtc`.
+- Es un instante: ISO-8601 con `Z` o un offset explícito. Un valor sin offset es ambiguo y se rechaza con `400`: nunca
+  se interpreta con la zona horaria del servidor ni se supone UTC. La regla vive en el boundary HTTP (convertidor JSON
+  `ExplicitOffsetInstantConverter` del DTO), no en el Domain: tras deserializar un `DateTimeOffset` ya no se puede
+  saber si el JSON traía offset.
+- Se normaliza a UTC antes de validar, calcular el hash y guardar, así que el mismo instante con otro offset es un
+  reintento (`200`), no un conflicto.
 - Se acepta desde 24 horas antes hasta 5 minutos después de la hora del servidor (`TimeProvider`), ambos límites
   incluidos; fuera de ese rango, `400`.
 - Un reintento de una apertura ya registrada se responde aunque `startedAt` haya quedado fuera del rango.

@@ -181,11 +181,17 @@ Permisos: `Emergencies.Operate` + `Encounters.Create`. Crea en **una sola transa
 ```
 
 - `clientRequestId`: obligatorio, distinto de `Guid.Empty`. Se conserva en los reintentos.
-- `startedAt`: obligatorio, con zona horaria (`Z` u offset). Se acepta desde **24 horas antes** hasta **5 minutos
-  después** de la hora del servidor, ambos límites incluidos; fuera de ese rango, `400` (`field: startedAt`). Un
-  reintento de una apertura ya registrada se responde aunque `startedAt` haya quedado fuera del rango.
+- `startedAt`: obligatorio. Es un **instante**: ISO-8601 `yyyy-MM-ddTHH:mm:ss[.fffffff]` seguido de `Z` o de un
+  offset explícito (`2026-10-23T15:30:00Z`, `2026-10-23T15:30:00.123Z`, `2026-10-23T11:30:00-04:00`,
+  `2026-10-23T11:30:00.123-04:00`). El servidor lo normaliza a UTC antes de validar, calcular el hash y guardar.
+  - **Sin offset** (`2026-10-23T15:30:00`) el instante es ambiguo: `400`. Nunca se interpreta con la zona horaria del
+    servidor ni se supone UTC. También `400` para texto, fechas u offsets inválidos.
+  - Se acepta desde **24 horas antes** hasta **5 minutos después** de la hora del servidor, ambos límites incluidos;
+    fuera de ese rango, `400` (`field: startedAt`). Un reintento de una apertura ya registrada se responde aunque
+    `startedAt` haya quedado fuera del rango.
 - `chiefComplaint`: obligatorio (máx. 4000 caracteres; se recortan los espacios).
-- El hash de idempotencia usa `startedAt` (normalizado a UTC) y `chiefComplaint` (recortado).
+- El hash de idempotencia usa `startedAt` (normalizado a UTC) y `chiefComplaint` (recortado): el mismo instante
+  escrito con `Z` o con otro offset es el mismo contenido (`200`, no `409`).
 - **No se aceptan** `location`, `clinicId`, `staffId`, `paramedicId`, `patientId` ni `temporaryPatientCode` (ni ningún
   otro campo): `400`. El servidor decide la clínica (ninguna), el personal (el usuario autenticado) y el código NN.
 
@@ -206,7 +212,7 @@ Permisos: `Emergencies.Operate` + `Encounters.Create`. Crea en **una sola transa
 |---|---|
 | `201` | Primera apertura con ese `clientRequestId` |
 | `200` | Reintento con el mismo `clientRequestId` y el mismo contenido: la misma emergencia, nada nuevo |
-| `400` | Validación: campos que faltan o sobran, `startedAt` fuera de rango, `clientRequestId` vacío |
+| `400` | Validación: campos que faltan o sobran, `startedAt` sin offset, inválido o fuera de rango, `clientRequestId` vacío |
 | `401` | Sin token válido |
 | `403` | Sin `Emergencies.Operate` o `Encounters.Create`; la cuenta no es `ClinicalStaff` activo o no tiene afiliación activa |
 | `409` | El `clientRequestId` ya se usó con otro contenido |
