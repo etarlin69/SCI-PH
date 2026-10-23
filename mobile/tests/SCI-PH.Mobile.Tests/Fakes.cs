@@ -1,5 +1,4 @@
 using SCI_PH.Mobile.Common.Dialogs;
-using SCI_PH.Mobile.Common.Location;
 using SCI_PH.Mobile.Common.Navigation;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
@@ -33,11 +32,6 @@ internal sealed class FakeDialogs : IAppDialogService
         Shown.Add((title, message));
         return Task.CompletedTask;
     }
-}
-
-internal sealed class NoLocation : IDeviceLocationService
-{
-    public Task<DeviceLocation?> TryGetLocationAsync() => Task.FromResult<DeviceLocation?>(null);
 }
 
 /// <summary>Cuenta las lecturas para comprobar que un flujo no exige la huella.</summary>

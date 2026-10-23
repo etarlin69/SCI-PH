@@ -1,3 +1,4 @@
+using SCI_PH.Mobile.Features.Paramedic.Services;
 using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 using SCI_PH.Mobile.Features.Paramedic.Services.Mocks;
 using SCI_PH.Mobile.Features.Paramedic.ViewModels;
@@ -9,8 +10,9 @@ public static class ParamedicServiceCollectionExtensions
 {
     public static IServiceCollection AddParamedicFeature(this IServiceCollection services)
     {
-        // Servicios (por ahora siempre mocks)
-        services.AddSingleton<IParamedicApiService, MockParamedicApiService>();
+        // Abrir y leer la emergencia: Mobile BFF real. Identificación, registros, catálogo y huella: todavía mocks.
+        services.AddSingleton<MockParamedicApiService>();
+        services.AddSingleton<IParamedicApiService, HttpParamedicApiService>();
         services.AddSingleton<IFingerprintReaderService, MockFingerprintReaderService>();
         services.AddSingleton<IParamedicCatalogService, MockParamedicCatalogService>();
 

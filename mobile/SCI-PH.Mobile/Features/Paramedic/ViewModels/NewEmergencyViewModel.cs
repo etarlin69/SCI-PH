@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using SCI_PH.Mobile.Common.Location;
+using SCI_PH.Mobile.Common.Api;
 using SCI_PH.Mobile.Common.Navigation;
 using SCI_PH.Mobile.Common.ViewModels;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
@@ -12,18 +12,16 @@ public partial class NewEmergencyViewModel : BaseViewModel
 {
     private readonly IParamedicApiService _api;
     private readonly IAppNavigator _navigator;
-    private readonly IDeviceLocationService _location;
 
-    // Se conservan entre reintentos del mismo envío para que el servidor no cree dos emergencias;
-    // se renuevan cuando la emergencia se crea correctamente.
+    // Se conservan entre reintentos del mismo envío para que el servidor no cree dos emergencias (devuelve la misma);
+    // se renuevan solo cuando la emergencia se crea correctamente. Nunca se regeneran por un error.
     private Guid? _clientRequestId;
     private DateTime? _startedAt;
 
-    public NewEmergencyViewModel(IParamedicApiService api, IAppNavigator navigator, IDeviceLocationService location)
+    public NewEmergencyViewModel(IParamedicApiService api, IAppNavigator navigator)
     {
         _api = api;
         _navigator = navigator;
-        _location = location;
     }
 
     [ObservableProperty]
@@ -37,17 +35,19 @@ public partial class NewEmergencyViewModel : BaseViewModel
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync()
     {
-        await RunAsync(async () =>
+        ErrorMessage = null;
+        IsBusy = true;
+        try
         {
             _clientRequestId ??= Guid.NewGuid();
             _startedAt ??= DateTime.UtcNow;
 
+            // 201 (nueva) o 200 (el servidor ya la había creado con esta clave): en ambos casos, su id real.
             var emergency = await _api.CreateEmergencyAsync(new CreateEmergencyDto
             {
                 ClientRequestId = _clientRequestId.Value,
                 StartedAt = _startedAt.Value,
-                ChiefComplaint = ChiefComplaint.Trim(),
-                Location = await TryGetLocationAsync()
+                ChiefComplaint = ChiefComplaint.Trim()
             });
 
             _clientRequestId = null;
@@ -57,15 +57,23 @@ public partial class NewEmergencyViewModel : BaseViewModel
             await _navigator.GoToAsync(
                 ParamedicRoutes.IdentifyPatient,
                 new Dictionary<string, object> { ["EmergencyId"] = emergency.Id });
-        }, "No se pudo crear la emergencia. Intenta nuevamente.");
-    }
-
-    // Mejor esfuerzo: si no hay permiso, GPS o posición conocida, la emergencia se crea sin coordenadas.
-    private async Task<LocationDto?> TryGetLocationAsync()
-    {
-        var location = await _location.TryGetLocationAsync();
-        return location is null
-            ? null
-            : new LocationDto { Latitude = location.Latitude, Longitude = location.Longitude };
+        }
+        catch (MobileApiException ex) when (ex.Error == MobileApiError.Conflict)
+        {
+            // La clave ya se usó con otros datos: no se genera otra en silencio (podría duplicar la emergencia).
+            ErrorMessage = ParamedicMessages.EmergencyRequestReused;
+        }
+        catch (MobileApiException ex) when (ex.Error is not (MobileApiError.Server or MobileApiError.InvalidResponse))
+        {
+            ErrorMessage = MobileApiErrorMessages.For(ex);
+        }
+        catch (Exception)
+        {
+            ErrorMessage = ParamedicMessages.CreateEmergencyFailed;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 }
