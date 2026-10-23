@@ -90,6 +90,11 @@ namespace SCI_PH.Persistence.Clinical.Services
         public async Task<EncounterRow?> GetEncounterAsync(Guid encounterId, CancellationToken cancellationToken) =>
             (await ToRowsAsync(_clinical.ClinicalEncounters.Where(e => e.Id == encounterId), 1, cancellationToken)).SingleOrDefault();
 
+        public Task<bool> HasActiveStaffAssignmentAsync(Guid encounterId, Guid staffId, CancellationToken cancellationToken) =>
+            _clinical.EncounterStaffAssignments.AsNoTracking().AnyAsync(
+                a => a.ClinicalEncounterId == encounterId && a.ClinicalStaffId == staffId && a.UnassignedAtUtc == null,
+                cancellationToken);
+
         public Task<IReadOnlyList<EncounterRow>> ListEncountersAsync(
             Guid clinicId,
             IReadOnlyCollection<ClinicalEncounterStatus> excludedStatuses,

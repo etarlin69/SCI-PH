@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Errores esperados (validación, acceso, no encontrado, conflicto) como ProblemDetails; el resto sigue a UseExceptionHandler.
-builder.Services.AddControllers(options => options.Filters.Add<RequestExceptionFilter>());
+builder.Services.AddControllers(options => options.Filters.Add<WebRequestExceptionFilter>());
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 

@@ -25,6 +25,9 @@ namespace SCI_PH.Application.Abstractions.Clinical
 
         Task<EncounterRow?> GetEncounterAsync(Guid encounterId, CancellationToken cancellationToken);
 
+        // The staff member has an open (not unassigned) EncounterStaffAssignment on the encounter.
+        Task<bool> HasActiveStaffAssignmentAsync(Guid encounterId, Guid staffId, CancellationToken cancellationToken);
+
         Task<IReadOnlyList<EncounterRow>> ListEncountersAsync(
             Guid clinicId,
             IReadOnlyCollection<ClinicalEncounterStatus> excludedStatuses,

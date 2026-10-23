@@ -1,26 +1,26 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SCI_PH.Application.Common.Errors;
 using SCI_PH.Domain.Exceptions;
 
-namespace SCI_PH.Web.BFF.Errors
+namespace SCI_PH.Infrastructure.Web
 {
-    // Central translation of expected failures into ProblemDetails. Only known exception types are mapped:
-    // ArgumentException and InvalidOperationException are NOT mapped globally (Application translates the Domain's
-    // argument guards itself), so a programming error still ends as a 500 from UseExceptionHandler.
-    public sealed class RequestExceptionFilter : IExceptionFilter
+    // Central translation of expected failures into ProblemDetails, shared by the hosts. Only known exception types are
+    // mapped: ArgumentException and InvalidOperationException are NOT mapped globally (Application translates the
+    // Domain's argument guards itself), so a programming error still ends as a 500 from UseExceptionHandler.
+    // A host may add mappings for its own dependencies by overriding Classify (Web BFF: EF Core concurrency).
+    public class RequestExceptionFilter : IExceptionFilter
     {
-        private const string ConcurrencyMessage = "The record was changed by another operation. Reload it and try again.";
-
         private readonly ProblemDetailsFactory _problems;
-        private readonly ILogger<RequestExceptionFilter> _logger;
+        private readonly ILogger _logger;
 
-        public RequestExceptionFilter(ProblemDetailsFactory problems, ILogger<RequestExceptionFilter> logger)
+        public RequestExceptionFilter(ProblemDetailsFactory problems, ILoggerFactory loggers)
         {
             _problems = problems;
-            _logger = logger;
+            _logger = loggers.CreateLogger(GetType());
         }
 
         public void OnException(ExceptionContext context)
@@ -48,14 +48,13 @@ namespace SCI_PH.Web.BFF.Errors
             context.ExceptionHandled = true;
         }
 
-        private static (int Status, string Title, string? Detail)? Classify(Exception exception) =>
+        protected virtual (int Status, string Title, string? Detail)? Classify(Exception exception) =>
             exception switch
             {
                 RequestValidationException => (StatusCodes.Status400BadRequest, "The request is not valid.", exception.Message),
                 AccessDeniedException => (StatusCodes.Status403Forbidden, "Access denied.", exception.Message),
                 ResourceNotFoundException => (StatusCodes.Status404NotFound, "The resource was not found.", exception.Message),
                 ResourceConflictException => (StatusCodes.Status409Conflict, "The request conflicts with the current state.", exception.Message),
-                DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "The request conflicts with the current state.", ConcurrencyMessage),
                 // Domain state rules are conflicts; any other Domain rule is invalid input (e.g. a vital sign out of range).
                 PatientAlreadyIdentifiedException or InvalidClinicalEncounterStateException =>
                     (StatusCodes.Status409Conflict, "The request conflicts with the current state.", exception.Message),

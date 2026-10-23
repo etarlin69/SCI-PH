@@ -6,7 +6,8 @@ using SCI_PH.Persistence;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+// Errores esperados (validación, acceso, no encontrado, conflicto) como ProblemDetails; el resto sigue a UseExceptionHandler.
+builder.Services.AddControllers(options => options.Filters.Add<RequestExceptionFilter>());
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 
@@ -14,7 +15,8 @@ builder.Services.AddHealthChecks();
 builder.Services.AddOpenApi(options => options.AddBearerSecurity());
 
 // La app MAUI no es un navegador: no usa CORS ni cookies; guarda el refresh token en SecureStorage.
-builder.Services.AddApplication().AddAccountSecurity();
+// AddClinicalWorkflows: emergencia prehospitalaria del paramédico (api/mobile/emergencies).
+builder.Services.AddApplication().AddAccountSecurity().AddClinicalWorkflows();
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration)
     .AddJwtSecurity(builder.Configuration)

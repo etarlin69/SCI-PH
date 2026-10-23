@@ -1,4 +1,5 @@
 using SCI_PH.Application.Abstractions.Clinical;
+using SCI_PH.Application.Abstractions.Idempotency;
 using SCI_PH.Application.Abstractions.Security;
 using SCI_PH.Application.Common.Security;
 using SCI_PH.Application.DTOs.Clinical;
@@ -50,13 +51,18 @@ namespace SCI_PH.Application.Tests.Clinical
         public override DateTimeOffset GetUtcNow() => Now;
     }
 
-    // In-memory clinical store: writes become visible only after SaveChangesAsync, like a transaction.
-    internal sealed class FakeClinicalStore : IClinicalReadStore, IClinicalWriteStore
+    // In-memory clinical store: writes become visible only after SaveChangesAsync, like a transaction. It also holds the
+    // idempotency receipts, committed by the same SaveChangesAsync (as ClinicalWriteStore + ClinicalIdempotencyStore).
+    internal sealed class FakeClinicalStore : IClinicalReadStore, IClinicalWriteStore, IIdempotencyStore
     {
         private readonly List<object> _pending = [];
 
         public List<Patient> Patients { get; } = [];
         public List<ClinicalEncounter> Encounters { get; } = [];
+        public List<EncounterStaffAssignment> Assignments { get; } = [];
+        public List<IdempotencyReceipt> Receipts { get; } = [];
+        // Runs at the start of SaveChangesAsync: lets a test commit a competing request first (a race).
+        public Action? BeforeSave { get; set; }
         public List<Triage> Triages { get; } = [];
         public List<VitalSign> VitalSigns { get; } = [];
         public List<ClinicalNote> Notes { get; } = [];
@@ -94,6 +100,14 @@ namespace SCI_PH.Application.Tests.Clinical
 
         public Task<EncounterRow?> GetEncounterAsync(Guid encounterId, CancellationToken cancellationToken) =>
             Task.FromResult(Encounters.SingleOrDefault(e => e.Id == encounterId) is { } e ? ToRow(e) : null);
+
+        public Task<bool> HasActiveStaffAssignmentAsync(Guid encounterId, Guid staffId, CancellationToken cancellationToken) =>
+            Task.FromResult(Assignments.Any(a => a.ClinicalEncounterId == encounterId && a.ClinicalStaffId == staffId && a.IsActive));
+
+        public Task<IdempotencyReceipt?> FindAsync(IdempotencyKey key, CancellationToken cancellationToken) =>
+            Task.FromResult(Receipts.SingleOrDefault(r => r.Key == key));
+
+        public void Add(IdempotencyReceipt receipt) => _pending.Add(receipt);
 
         public Task<IReadOnlyList<EncounterRow>> ListEncountersAsync(
             Guid clinicId, IReadOnlyCollection<ClinicalEncounterStatus> excludedStatuses, bool onlyUnidentified, int limit, CancellationToken cancellationToken) =>
@@ -170,6 +184,7 @@ namespace SCI_PH.Application.Tests.Clinical
 
         public void Add(Patient patient) => _pending.Add(patient);
         public void Add(ClinicalEncounter encounter) => _pending.Add(encounter);
+        public void Add(EncounterStaffAssignment assignment) => _pending.Add(assignment);
         public void Add(Triage triage) => _pending.Add(triage);
         public void Add(VitalSign vitalSign) => _pending.Add(vitalSign);
         public void Add(ClinicalNote note) => _pending.Add(note);
@@ -181,6 +196,16 @@ namespace SCI_PH.Application.Tests.Clinical
 
         public Task SaveChangesAsync(CancellationToken cancellationToken)
         {
+            BeforeSave?.Invoke();
+            // The unique key of the receipts: the whole save is discarded, as the transaction would be rolled back.
+            if (_pending.OfType<IdempotencyReceipt>().Any(pending => Receipts.Any(r => r.Key == pending.Key)))
+            {
+                _pending.Clear();
+                throw new IdempotencyKeyCollisionException(new InvalidOperationException("unique violation (fake)"));
+            }
+
+            Receipts.AddRange(_pending.OfType<IdempotencyReceipt>());
+            Assignments.AddRange(_pending.OfType<EncounterStaffAssignment>());
             Patients.AddRange(_pending.OfType<Patient>());
             Encounters.AddRange(_pending.OfType<ClinicalEncounter>());
             Triages.AddRange(_pending.OfType<Triage>());
@@ -261,6 +286,7 @@ namespace SCI_PH.Application.Tests.Clinical
             Records = new EncounterRecordService(Actor, user, Store, Store, access, Time);
             Medications = new MedicationService(Actor, Store, Store, access, Time);
             Transfers = new TransferService(Actor, Store, Store, access, Time);
+            Emergencies = new PrehospitalEmergencyService(Actor, new EncounterAccessService(Store), Store, Store, Store, access, Time);
         }
 
         public FakeCurrentUser User { get; }
@@ -274,6 +300,7 @@ namespace SCI_PH.Application.Tests.Clinical
         public EncounterRecordService Records { get; }
         public MedicationService Medications { get; }
         public TransferService Transfers { get; }
+        public PrehospitalEmergencyService Emergencies { get; }
 
         public static ClinicalHarness ForRole(string role, int clinics = 1)
         {
