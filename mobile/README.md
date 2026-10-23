@@ -116,17 +116,18 @@ el refresh token viaja en el cuerpo.
 |---|---|---|
 | Debug | Windows (y el resto) | `http://localhost:5191` |
 | Debug | Emulador Android | `http://10.0.2.2:5191` (10.0.2.2 es el PC anfitrión) |
-| Cualquiera | Cualquiera | `-p:MobileBffBaseUrl=https://...` al compilar tiene prioridad |
+| Cualquiera | Cualquiera | `-p:MobileBffBaseUrl=...` al compilar tiene prioridad; en Release solo se acepta `https://` |
 | Release | Cualquiera | Sin dirección salvo `MobileBffBaseUrl`: la app avisa que no tiene servidor configurado |
 
 Android bloquea HTTP sin cifrar. Solo en **Debug** se incluye
 `Platforms/Android/DebugResources/xml/network_security_config.xml`, que lo permite únicamente hacia `10.0.2.2` y
-`localhost`; Release no declara network security config y el tráfico HTTP queda bloqueado. La validación TLS nunca
-se desactiva.
+`localhost`; Release no declara network security config y además fija `usesCleartextTraffic="false"`, así que el
+tráfico HTTP queda bloqueado también en Android 6-8 (donde el bloqueo por defecto de Android 9 no aplica). La
+validación TLS nunca se desactiva.
 
 Dispositivo Android físico, sin poner una IP en el repositorio:
 
-- Con cable: `adb reverse tcp:5191 tcp:5191` y compilar con `-p:MobileBffBaseUrl=http://localhost:5191`.
+- Con cable (Debug): `adb reverse tcp:5191 tcp:5191` y compilar con `-p:MobileBffBaseUrl=http://localhost:5191`.
 - O un Mobile BFF accesible por HTTPS: `-p:MobileBffBaseUrl=https://<host>`.
 
 El Mobile BFF local corre con `dotnet run --project src/Presentation/SCI-PH.Mobile.BFF` (puerto 5191) o con

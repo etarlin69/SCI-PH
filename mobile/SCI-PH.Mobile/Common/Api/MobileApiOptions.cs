@@ -5,7 +5,8 @@ namespace SCI_PH.Mobile.Common.Api;
 /// <summary>
 /// Dirección del Mobile BFF. Se resuelve una vez al arrancar:
 /// <list type="number">
-/// <item>Si se compiló con <c>-p:MobileBffBaseUrl=...</c>, esa URL (backend desplegado, dispositivo físico).</item>
+/// <item>Si se compiló con <c>-p:MobileBffBaseUrl=...</c>, esa URL (backend desplegado, dispositivo físico). En
+/// Release solo se acepta HTTPS.</item>
 /// <item>En Debug, el Mobile BFF local: <c>http://10.0.2.2:5191</c> en el emulador Android (10.0.2.2 es el PC) y
 /// <c>http://localhost:5191</c> en el resto.</item>
 /// <item>En Release sin URL configurada, ninguna: la app informa que no tiene servidor configurado.</item>
@@ -41,8 +42,9 @@ public sealed class MobileApiOptions
     {
         if (!string.IsNullOrWhiteSpace(configuredUrl))
         {
+            // HTTP solo en Debug (dispositivo físico contra el BFF local); Release exige HTTPS.
             return Uri.TryCreate(configuredUrl.Trim(), UriKind.Absolute, out var uri)
-                && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp)
+                && (uri.Scheme == Uri.UriSchemeHttps || (isDebug && uri.Scheme == Uri.UriSchemeHttp))
                 ? uri
                 : null;
         }

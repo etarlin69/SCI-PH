@@ -132,6 +132,9 @@ public class MobileApiClientTests
     [InlineData(null, false, false, null)]
     [InlineData("https://bff.example.test", false, true, "https://bff.example.test/")]
     [InlineData("https://bff.example.test", true, false, "https://bff.example.test/")]
+    [InlineData("http://bff.example.test:5191", true, true, "http://bff.example.test:5191/")]
+    [InlineData("http://bff.example.test:5191", false, true, null)]
+    [InlineData("http://bff.example.test:5191", false, false, null)]
     [InlineData("not a url", true, true, null)]
     [InlineData("ftp://bff.example.test", false, false, null)]
     public void TheServerDependsOnBuildAndPlatformNeverOnAPersonalAddress(string? configured, bool isDebug, bool isAndroid, string? expected)
