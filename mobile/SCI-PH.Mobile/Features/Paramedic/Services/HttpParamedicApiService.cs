@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json.Serialization;
 using SCI_PH.Mobile.Common.Api;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 using SCI_PH.Mobile.Features.Paramedic.Models.Enums;
@@ -8,10 +9,10 @@ using SCI_PH.Mobile.Features.Paramedic.Services.Mocks;
 namespace SCI_PH.Mobile.Features.Paramedic.Services;
 
 /// <summary>
-/// Servicio híbrido del área paramédica. REAL (Mobile BFF, con el cliente autenticado): abrir la emergencia, leerla e
-/// identificar al paciente por documento. Sigue en MOCK: identificación por huella, signos vitales, procedimientos y
-/// medicamentos; trabajan sobre el id REAL que devuelve el servidor, sin crear otra emergencia. Los fallos de las
-/// llamadas reales llegan como <see cref="MobileApiException"/>.
+/// Servicio híbrido del área paramédica. REAL (Mobile BFF, con el cliente autenticado): abrir la emergencia, leerla,
+/// identificar al paciente por documento y registrar signos vitales. Sigue en MOCK: identificación por huella,
+/// procedimientos y medicamentos; trabajan sobre el id REAL que devuelve el servidor, sin crear otra emergencia. Los
+/// fallos de las llamadas reales llegan como <see cref="MobileApiException"/>.
 /// </summary>
 public sealed class HttpParamedicApiService : IParamedicApiService
 {
@@ -68,7 +69,16 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         }
     }
 
-    public Task RegisterVitalsAsync(Guid emergencyId, RegisterVitalsDto dto) => _mock.RegisterVitalsAsync(emergencyId, dto);
+    // Una toma: 1 a 7 valores en una sola petición, todo o nada. 201 (nueva) o 200 (reintento con la misma clave y los
+    // mismos datos): en ambos casos quedó registrada una sola vez. Solo viajan los valores capturados; la unidad la pone
+    // el servidor. 400/403/409 y el resto llegan como MobileApiException.
+    public async Task RegisterVitalsAsync(Guid emergencyId, RegisterVitalsDto dto)
+    {
+        var request = new VitalSignsRequest(
+            dto.ClientRequestId, ToUtc(dto.RecordedAt), dto.HeartRate, dto.RespiratoryRate, dto.SystolicPressure,
+            dto.DiastolicPressure, dto.OxygenSaturation, dto.Temperature, dto.Glasgow);
+        await _client.PostAsync<VitalSignsRequest, VitalSignsResponse>($"{Emergencies}/{emergencyId}/vital-signs", request);
+    }
 
     public Task RegisterProcedureAsync(Guid emergencyId, RegisterProcedureDto dto) => _mock.RegisterProcedureAsync(emergencyId, dto);
 
@@ -98,6 +108,20 @@ public sealed class HttpParamedicApiService : IParamedicApiService
     private sealed record OpenEmergencyRequest(Guid ClientRequestId, DateTimeOffset StartedAt, string ChiefComplaint);
 
     private sealed record IdentifyByDocumentRequest(Guid ClientRequestId, PatientDocumentType DocumentType, string DocumentNumber);
+
+    // Contrato exacto de la toma: los valores ausentes no se envían.
+    private sealed record VitalSignsRequest(
+        Guid ClientRequestId,
+        DateTimeOffset RecordedAt,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? HeartRate,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? RespiratoryRate,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? SystolicPressure,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? DiastolicPressure,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? OxygenSaturation,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? Temperature,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Glasgow);
+
+    private sealed record VitalSignsResponse(Guid EncounterId, DateTimeOffset RecordedAtUtc);
 
     private sealed record EmergencyResponse(
         Guid Id,

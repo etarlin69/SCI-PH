@@ -1,9 +1,10 @@
 namespace SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 
 /// <summary>
-/// Body de POST /api/mobile/emergencies/{id}/vitals.
-/// Todos los valores son opcionales individualmente. Límites de plausibilidad (dominio, VitalSignLimits):
-/// FC 0-300, FR 0-100, sistólica 0-300, diastólica 0-250, SpO2 0-100, Temp 25-45 °C, Glasgow 3-15.
+/// Una toma de POST /api/mobile/emergencies/{id}/vital-signs: todos los valores son opcionales individualmente, pero
+/// hace falta al menos uno; solo se envían los capturados. Límites de plausibilidad (dominio, VitalSignLimits):
+/// FC 0-300, FR 0-100, sistólica 0-300, diastólica 0-250, SpO2 0-100, Temp 25-45 °C (máx. 2 decimales), Glasgow 3-15.
+/// RecordedAt (UTC) y ClientRequestId se generan una vez por toma y se conservan en los reintentos.
 /// </summary>
 public class RegisterVitalsDto
 {

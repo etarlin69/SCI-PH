@@ -19,4 +19,10 @@ public static class ParamedicMessages
     public const string IdentifyByDocumentFailed = "No se pudo identificar con el documento. Intenta nuevamente.";
 
     public const string DocumentTypeRequired = "Selecciona el tipo de documento.";
+
+    /// <summary>409: la clave de la toma ya se usó con otros valores, o la emergencia ya no admite registros.</summary>
+    public const string VitalSignsConflict =
+        "No se pudo registrar la toma: la solicitud ya se usó con otros datos o la emergencia ya no admite registros.";
+
+    public const string RegisterVitalSignsFailed = "No se pudieron guardar los signos vitales. Intenta nuevamente.";
 }

@@ -80,8 +80,8 @@ public class RealEmergencyTests
         var service = Service();
         var emergency = await service.CreateEmergencyAsync(new CreateEmergencyDto { ChiefComplaint = "Dolor" });
 
-        var identified = await service.IdentifyAsync(emergency.Id, new IdentifyEmergencyDto { Method = IdentificationMethod.Document });
-        await service.RegisterVitalsAsync(emergency.Id, new RegisterVitalsDto { HeartRate = 80 });
+        // Signos vitales ya son reales (VitalSignsTests); la huella, los procedimientos y los medicamentos siguen en mock.
+        var identified = await service.IdentifyAsync(emergency.Id, new IdentifyEmergencyDto { Method = IdentificationMethod.Fingerprint, PatientId = Guid.NewGuid() });
         await service.RegisterProcedureAsync(emergency.Id, new RegisterProcedureDto { ProcedureCode = "PROC-001" });
         await service.RegisterMedicationAsync(emergency.Id, new RegisterMedicationDto { MedicationCode = "MED-001" });
 
