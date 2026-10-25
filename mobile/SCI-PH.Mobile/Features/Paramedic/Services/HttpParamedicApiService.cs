@@ -8,9 +8,10 @@ using SCI_PH.Mobile.Features.Paramedic.Services.Mocks;
 namespace SCI_PH.Mobile.Features.Paramedic.Services;
 
 /// <summary>
-/// Servicio híbrido del área paramédica. REAL (Mobile BFF, con el cliente autenticado): abrir la emergencia y leerla.
-/// Sigue en MOCK: identificación, signos vitales, procedimientos y medicamentos; trabajan sobre el id REAL que devuelve
-/// el servidor, sin crear otra emergencia. Los fallos de las llamadas reales llegan como <see cref="MobileApiException"/>.
+/// Servicio híbrido del área paramédica. REAL (Mobile BFF, con el cliente autenticado): abrir la emergencia, leerla e
+/// identificar al paciente por documento. Sigue en MOCK: identificación por huella, signos vitales, procedimientos y
+/// medicamentos; trabajan sobre el id REAL que devuelve el servidor, sin crear otra emergencia. Los fallos de las
+/// llamadas reales llegan como <see cref="MobileApiException"/>.
 /// </summary>
 public sealed class HttpParamedicApiService : IParamedicApiService
 {
@@ -46,7 +47,26 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         }
     }
 
+    // Huella (y cualquier otro método): sigue en mock.
     public Task<EmergencyDto> IdentifyAsync(Guid emergencyId, IdentifyEmergencyDto dto) => _mock.IdentifyAsync(emergencyId, dto);
+
+    // 200: la MISMA emergencia, ya identificada (también al reintentar con la misma clave). 404: ningún paciente tiene ese
+    // documento; la emergencia sigue NN (null). 409 y el resto llegan como MobileApiException.
+    public async Task<EmergencyDto?> IdentifyByDocumentAsync(Guid emergencyId, IdentifyByDocumentDto dto)
+    {
+        var request = new IdentifyByDocumentRequest(dto.ClientRequestId, dto.DocumentType, dto.DocumentNumber);
+        try
+        {
+            var emergency = ToDto(await _client.PostAsync<IdentifyByDocumentRequest, EmergencyResponse>(
+                $"{Emergencies}/{emergencyId}/identify/document", request));
+            _mock.Adopt(emergency);
+            return emergency;
+        }
+        catch (MobileApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
 
     public Task RegisterVitalsAsync(Guid emergencyId, RegisterVitalsDto dto) => _mock.RegisterVitalsAsync(emergencyId, dto);
 
@@ -76,6 +96,8 @@ public sealed class HttpParamedicApiService : IParamedicApiService
 
     // Contrato V1 exacto: sin ubicación, clínica, personal ni paciente (el servidor rechaza cualquier otro campo).
     private sealed record OpenEmergencyRequest(Guid ClientRequestId, DateTimeOffset StartedAt, string ChiefComplaint);
+
+    private sealed record IdentifyByDocumentRequest(Guid ClientRequestId, PatientDocumentType DocumentType, string DocumentNumber);
 
     private sealed record EmergencyResponse(
         Guid Id,

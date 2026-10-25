@@ -75,6 +75,14 @@ namespace SCI_PH.Persistence.Clinical.Services
                 .Select(_patientRow)
                 .ToListAsync(cancellationToken);
 
+        public Task<Guid?> FindPatientIdByPlatformIdentifierAsync(
+            PatientIdentifierType type, string normalizedValue, CancellationToken cancellationToken) =>
+            _clinical.PatientIdentifiers.AsNoTracking()
+                .Where(i => i.Type == type && i.Issuer == string.Empty && i.NormalizedValue == normalizedValue
+                    && i.Status == PatientIdentifierStatus.Active)
+                .Select(i => (Guid?)i.PatientId)
+                .SingleOrDefaultAsync(cancellationToken);
+
         // Case-insensitive "contains" over the full name. Contains is translated with escaped LIKE wildcards.
         public async Task<IReadOnlyList<PatientRow>> FindPatientsByNameAsync(string term, int limit, CancellationToken cancellationToken)
         {

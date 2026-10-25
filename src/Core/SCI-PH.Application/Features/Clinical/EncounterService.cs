@@ -14,7 +14,8 @@ using SCI_PH.Domain.Exceptions;
 namespace SCI_PH.Application.Features.Clinical
 {
     // Encounter lifecycle at the clinic: open (identified or NN), read, list the open ones and identify an NN patient.
-    // Every operation is scoped to the clinics of the current ClinicalStaff.
+    // Every operation is scoped to the clinics of the current ClinicalStaff; identifying also reaches a prehospital
+    // encounter without clinic through its staff assignment (IEncounterAccessService).
     public sealed class EncounterService
     {
         public const int MaxListSize = 200;
@@ -24,6 +25,7 @@ namespace SCI_PH.Application.Features.Clinical
             [ClinicalEncounterStatus.Closed, ClinicalEncounterStatus.Cancelled, ClinicalEncounterStatus.Transferred];
 
         private readonly ICurrentClinicalActor _actor;
+        private readonly IEncounterAccessService _access;
         private readonly IClinicalReadStore _reads;
         private readonly IClinicalWriteStore _writes;
         private readonly IClinicalStaffDirectory _staff;
@@ -32,6 +34,7 @@ namespace SCI_PH.Application.Features.Clinical
 
         public EncounterService(
             ICurrentClinicalActor actor,
+            IEncounterAccessService access,
             IClinicalReadStore reads,
             IClinicalWriteStore writes,
             IClinicalStaffDirectory staff,
@@ -39,6 +42,7 @@ namespace SCI_PH.Application.Features.Clinical
             TimeProvider time)
         {
             _actor = actor;
+            _access = access;
             _reads = reads;
             _writes = writes;
             _staff = staff;
@@ -109,7 +113,9 @@ namespace SCI_PH.Application.Features.Clinical
             var actor = await _actor.GetAsync(cancellationToken);
             var encounter = await _writes.FindEncounterAsync(encounterId, cancellationToken)
                 ?? throw new ResourceNotFoundException(nameof(ClinicalEncounter), encounterId);
-            actor.EnsureClinic(encounter.ClinicId);
+            // The clinic's staff for a clinic encounter; the assigned staff for a prehospital one without clinic.
+            await _access.EnsureCanAccessAsync(
+                actor, new EncounterAccessTarget(encounter.Id, encounter.Type, encounter.ClinicId), cancellationToken);
             if (!await _reads.PatientExistsAsync(patientId, cancellationToken))
             {
                 throw new ResourceNotFoundException(nameof(Patient), patientId);

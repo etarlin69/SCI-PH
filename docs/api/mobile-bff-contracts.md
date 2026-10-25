@@ -1,7 +1,7 @@
 # Contratos del Mobile BFF
 
-> **Estado: contratos iniciales previstos, salvo los marcados como _Implementado_** (autenticación, y apertura y
-> lectura de la emergencia prehospitalaria).
+> **Estado: contratos iniciales previstos, salvo los marcados como _Implementado_** (autenticación; apertura, lectura
+> e identificación por documento de la emergencia prehospitalaria).
 >
 > Estos endpoints describen la intención acordada para empezar a trabajar en paralelo (app móvil y backend). Pueden evolucionar mediante **revisión arquitectónica**; cualquier cambio debe reflejarse en este documento dentro del mismo PR.
 
@@ -110,15 +110,16 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 
 ## Paramedic Workflow
 
-> **Implementados:** `POST /api/mobile/emergencies` y `GET /api/mobile/emergencies/{id}` (V1, ver
-> [ADR-008](../adr/ADR-008-prehospital-emergency.md)). **El resto siguen siendo contratos previstos** y pueden
-> evolucionar mediante revisión arquitectónica.
+> **Implementados:** `POST /api/mobile/emergencies`, `GET /api/mobile/emergencies/{id}` (V1, ver
+> [ADR-008](../adr/ADR-008-prehospital-emergency.md)) y `POST /api/mobile/emergencies/{id}/identify/document`.
+> **El resto siguen siendo contratos previstos** y pueden evolucionar mediante revisión arquitectónica.
 
 - **Usuarios:** personal clínico autenticado: un `ClinicalStaff` activo, vinculado a la cuenta y con al menos una
   afiliación activa. El rol y sus permisos los define el Rol 3.
 - **Autorización:** todos los endpoints de `/api/mobile/emergencies` exigen el permiso `Emergencies.Operate` (rol
   Paramedic; Administrator lo tiene por tener todos) para entrar al módulo, además del permiso clínico de cada acción
-  (abrir: `Encounters.Create`; leer: `Encounters.Read`; previsto: `VitalSigns.Write` para signos vitales, etc.). Nunca
+  (abrir: `Encounters.Create`; leer: `Encounters.Read`; identificar por documento: `Patients.Read` + `Patients.Identify`;
+  previsto: `VitalSigns.Write` para signos vitales, etc.). Nunca
   se comprueba un rol. Doctor, Nurse y Receptionist no tienen `Emergencies.Operate`: `403`.
 - **Acceso al caso concreto:** una emergencia es un `ClinicalEncounter` de tipo `Prehospital` **sin clínica**
   (`clinicId = null`) mientras no llega al hospital. La clínica base del paramédico no es el lugar de la emergencia y
@@ -129,7 +130,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
   (`POST /api/web/transfers/{id}/receive`) y la **misma** atención pasa a tener la clínica destino.
 - **Registros clínicos:** signos vitales, procedimientos y medicamentos se **agregan** al episodio; no se editan ni se borran desde la app (las correcciones se definirán con el Rol 2).
 - **Hora del evento:** la apertura lleva `startedAt` y cada registro llevará `recordedAt` (hora en que ocurrió en campo), distinta de la hora en que llega al servidor, para soportar envío diferido.
-- **Idempotencia:** implementada en la apertura; los demás `POST` la usarán igual. Cada `POST` lleva un
+- **Idempotencia:** implementada en la apertura y en la identificación por documento; los demás `POST` la usarán
+  igual. Cada `POST` lleva un
   `clientRequestId` (`Guid` generado en el dispositivo una vez por operación y **reutilizado en cada reintento**). El
   servidor guarda un recibo por (usuario, operación, `clientRequestId`) con el hash SHA-256 del contenido lógico:
   - misma clave y mismo contenido → la **misma** respuesta (`200`, sin crear nada);
@@ -141,7 +143,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 |---|---|---|---|
 | `POST` | `/api/mobile/emergencies` | Abre una emergencia | Implementado |
 | `GET` | `/api/mobile/emergencies/{id}` | Datos básicos de la emergencia | Implementado (sin registros todavía) |
-| `POST` | `/api/mobile/emergencies/{id}/identify` | Vincula la emergencia a un paciente | Previsto |
+| `POST` | `/api/mobile/emergencies/{id}/identify/document` | Identifica al paciente NN por cédula o pasaporte | Implementado |
+| `POST` | `/api/mobile/emergencies/{id}/identify` | Vincula la emergencia a un paciente (huella, manual) | Previsto |
 | `POST` | `/api/mobile/emergencies/{id}/vitals` | Registra signos vitales | Previsto |
 | `POST` | `/api/mobile/emergencies/{id}/procedures` | Registra un procedimiento realizado | Previsto |
 | `POST` | `/api/mobile/emergencies/{id}/medications` | Registra un medicamento administrado | Previsto |
@@ -151,7 +154,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 
 ```
 POST /emergencies                  abre el episodio (paciente aún desconocido)
-POST /emergencies/{id}/identify    identifica al paciente (documento, huella vía Device API, etc.)
+POST /emergencies/{id}/identify/document   identifica al paciente por documento (implementado)
+POST /emergencies/{id}/identify    identifica al paciente (huella vía Device API, manual)
 POST /emergencies/{id}/vitals      ┐
 POST /emergencies/{id}/procedures  ├ registros durante la atención (0..n veces)
 POST /emergencies/{id}/medications ┘
@@ -235,25 +239,99 @@ clínicos (signos vitales, procedimientos, medicamentos, traslado) se añadirán
 
 ---
 
+### `POST /api/mobile/emergencies/{id}/identify/document` — Implementado
+
+Permisos: `Emergencies.Operate` + `Patients.Read` + `Patients.Identify`, y acceso a la emergencia (mientras no tenga
+clínica, una asignación activa del usuario). Busca el paciente por documento y lo vincula a la **misma** emergencia: no
+se crea otra atención, no se crea ningún paciente y no se copia nada. Es la identificación de cualquier atención NN
+(`EncounterService.IdentifyPatientAsync`), con su auditoría y su control de concurrencia.
+
+**Body:**
+
+```json
+{
+  "clientRequestId": "00000000-0000-0000-0000-000000000000",
+  "documentType": "NationalId",
+  "documentNumber": "001-1234567-8"
+}
+```
+
+- `clientRequestId`: obligatorio, distinto de `Guid.Empty`. Propio de la identificación (no es el de la apertura): la
+  app lo genera una vez por intento y lo conserva en los reintentos.
+- `documentType`: `NationalId` (cédula) o `Passport`. Cualquier otro tipo (`Other`, `QrCode`, `InternalCode`, …), un
+  número en lugar del nombre o un valor desconocido: `400` (`Other` no demuestra identidad).
+- `documentNumber`: obligatorio (máx. 250 caracteres), tal como se escribió. El servidor lo normaliza con la regla del
+  Domain (`PatientIdentifier.Normalize`: para cédula y pasaporte, solo letras y dígitos, en mayúsculas), así que
+  `001-1234567-8` y `00112345678` son el mismo documento. Vacío tras normalizar: `400`.
+- **Alcance de plataforma:** la coincidencia es exacta sobre identificadores **activos** con `issuer` vacío (el
+  alcance SCI-PH). El índice único `(type, issuer, normalizedValue)` garantiza 0 o 1 paciente. Un paciente que solo
+  tiene ese número con otro emisor (por ejemplo `issuer = "DO"`) **no se encuentra** (`404`). La app no envía emisor;
+  un contrato con país o emisor explícito se definirá más adelante.
+- No se aceptan otros campos (`issuer`, `patientId`, …): `400`.
+
+**Respuesta `200 OK`:** la misma forma que `GET /api/mobile/emergencies/{id}`, con el paciente identificado. El
+documento sale **enmascarado** (`primaryIdentifier`); el número enviado nunca se devuelve.
+
+```json
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "temporaryPatientCode": "NN-0123456789ABCDEF0123456789ABCDEF",
+  "status": "Created",
+  "startedAtUtc": "2026-01-01T00:00:00+00:00",
+  "chiefComplaint": "Dolor torácico",
+  "patient": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "displayName": "Ana Pérez",
+    "birthDate": "1985-03-14",
+    "biologicalSex": "Female",
+    "identityStatus": "Unverified",
+    "primaryIdentifier": { "type": "NationalId", "value": "*******5678" }
+  }
+}
+```
+
+- La emergencia conserva su `id`, su `temporaryPatientCode` (`NN-…`, como historia), su estado y su clínica (ninguna).
+- Se registra **una** auditoría `Identify` (código NN y paciente; nunca el documento).
+
+| Estado | Cuándo |
+|---|---|
+| `200` | Identificada; también al repetir el mismo `clientRequestId` con el mismo contenido (nada nuevo, sin otra auditoría) |
+| `400` | Validación: tipo no admitido, número vacío o demasiado largo, `clientRequestId` vacío, campos que sobran |
+| `401` | Sin token válido |
+| `403` | Sin `Emergencies.Operate`, `Patients.Read` o `Patients.Identify`; sin asignación a la emergencia; la cuenta no es `ClinicalStaff` activo o no tiene afiliación activa. Se responde antes de buscar el documento |
+| `404` | Ningún paciente tiene ese documento en el alcance de plataforma (la emergencia sigue NN), o la emergencia no existe o no es prehospitalaria |
+| `409` | La emergencia ya está identificada (por otra solicitud, aunque sea el mismo paciente), o el `clientRequestId` ya se usó con otro documento, tipo o emergencia |
+
+- **Idempotencia:** operación `prehospital-emergency.identify-document.v1`, clave (usuario, operación,
+  `clientRequestId`). El hash usa el id de la emergencia, el tipo y el número **normalizado**: otra forma de escribir el
+  mismo documento es el mismo contenido. El recibo guarda solo el hash, nunca el documento. Dos envíos simultáneos con la
+  misma clave identifican una sola vez y ambos responden `200`. Dos identificaciones simultáneas con pacientes distintos:
+  una gana y la otra recibe `409` (control de concurrencia sobre `PatientId`); nunca queda un estado mixto.
+- **No encontrado no guarda nada** (ni recibo, ni paciente, ni auditoría): si el paciente se registra después, el mismo
+  intento lo encuentra.
+- El documento no se registra en logs ni aparece en los errores.
+
+---
+
 ### `POST /api/mobile/emergencies/{id}/identify`
 
-Vincula la emergencia con un paciente existente o registra una identificación provisional.
+Vincula la emergencia con un paciente por huella o de forma manual. La identificación por documento tiene su propio
+endpoint (`/identify/document`, arriba).
 
 **Body (forma propuesta):**
 
 ```json
 {
   "clientRequestId": "00000000-0000-0000-0000-000000000000",
-  "method": "Document | Fingerprint | Manual",
-  "patientId": "00000000-0000-0000-0000-000000000000",
-  "document": { "type": "…", "number": "…" }
+  "method": "Fingerprint | Manual",
+  "patientId": "00000000-0000-0000-0000-000000000000"
 }
 ```
 
 - `Fingerprint`: la identificación la resuelve `POST /api/device/fingerprint/identify` (Device API); aquí solo se vincula el resultado (`patientId`).
 - Los campos exactos de `Manual` (paciente no identificable) se definirán con el Rol 2.
 
-**Respuestas previstas:** `200 OK`, `400`, `401`, `403`, `404` (emergencia o paciente inexistente), `409` (ya identificada con otro paciente).
+**Respuestas previstas:** `200 OK`, `400`, `401`, `403`, `404` (emergencia o paciente inexistente), `409` (ya identificada).
 
 ---
 

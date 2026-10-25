@@ -36,15 +36,24 @@ public class MockParamedicApiService : IParamedicApiService
     }
 
     /// <summary>
-    /// Emergencia creada por el servidor real (<see cref="HttpParamedicApiService"/>): los pasos que siguen en mock la
-    /// usan con su id real, sin crear otra.
+    /// Emergencia creada o identificada por el servidor real (<see cref="HttpParamedicApiService"/>): los pasos que siguen
+    /// en mock la usan con su id real y su estado más reciente, sin crear otra.
     /// </summary>
-    public void Adopt(EmergencyDto emergency) => _emergencies.TryAdd(emergency.Id, emergency);
+    public void Adopt(EmergencyDto emergency) => _emergencies[emergency.Id] = emergency;
 
     public async Task<EmergencyDto?> GetEmergencyAsync(Guid id)
     {
         await Task.Delay(SimulatedDelayMs);
         return _emergencies.TryGetValue(id, out var emergency) ? emergency : null;
+    }
+
+    // Solo para el modo mock: cualquier documento encuentra un paciente ficticio.
+    public async Task<EmergencyDto?> IdentifyByDocumentAsync(Guid emergencyId, IdentifyByDocumentDto dto)
+    {
+        await Task.Delay(SimulatedDelayMs);
+        var emergency = GetOrThrow(emergencyId);
+        emergency.Patient ??= new PatientSummaryDto { Id = Guid.NewGuid(), DisplayName = "Paciente Ficticio" };
+        return emergency;
     }
 
     public async Task<EmergencyDto> IdentifyAsync(Guid emergencyId, IdentifyEmergencyDto dto)
