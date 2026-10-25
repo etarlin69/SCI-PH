@@ -1,5 +1,6 @@
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 using SCI_PH.Mobile.Features.Paramedic.Models.Enums;
+using SCI_PH.Mobile.Features.Paramedic.Services;
 using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 
 namespace SCI_PH.Mobile.Features.Paramedic.Services.Mocks;
@@ -33,6 +34,12 @@ public class MockParamedicApiService : IParamedicApiService
         _createdByRequest[dto.ClientRequestId] = emergency.Id;
         return emergency;
     }
+
+    /// <summary>
+    /// Emergencia creada por el servidor real (<see cref="HttpParamedicApiService"/>): los pasos que siguen en mock la
+    /// usan con su id real, sin crear otra.
+    /// </summary>
+    public void Adopt(EmergencyDto emergency) => _emergencies.TryAdd(emergency.Id, emergency);
 
     public async Task<EmergencyDto?> GetEmergencyAsync(Guid id)
     {

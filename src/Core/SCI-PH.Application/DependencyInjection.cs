@@ -49,8 +49,9 @@ namespace SCI_PH.Application
             return services;
         }
 
-        // Casos de uso clínicos (pacientes, atenciones, admisión, registros clínicos, medicación y traslados). Requiere AddAccountSecurity
-        // (IPatientAccessAuthorizer), AddJwtSecurity (ICurrentUser) y AddPersistence (stores clínicos).
+        // Casos de uso clínicos (pacientes, atenciones, admisión, registros clínicos, medicación, traslados y emergencia
+        // prehospitalaria). Requiere AddAccountSecurity (IPatientAccessAuthorizer), AddJwtSecurity (ICurrentUser) y
+        // AddPersistence (stores clínicos y recibos de idempotencia).
         public static IServiceCollection AddClinicalWorkflows(this IServiceCollection services)
         {
             services.AddScoped<ICurrentClinicalActor, CurrentClinicalActor>();
@@ -61,6 +62,8 @@ namespace SCI_PH.Application
             services.AddScoped<MedicationService>();
             services.AddScoped<TransferService>();
             services.AddScoped<ClinicalOrganizationService>();
+            services.AddScoped<IEncounterAccessService, EncounterAccessService>();
+            services.AddScoped<PrehospitalEmergencyService>();
 
             return services;
         }

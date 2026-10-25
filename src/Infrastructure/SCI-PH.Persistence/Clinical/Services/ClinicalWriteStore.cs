@@ -1,12 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using SCI_PH.Application.Abstractions.Clinical;
+using SCI_PH.Application.Abstractions.Idempotency;
 using SCI_PH.Application.Common.Errors;
 using SCI_PH.Domain.Entities.Auditing;
 using SCI_PH.Domain.Entities.Encounters;
 using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Patients;
 using SCI_PH.Domain.Entities.Transport;
+using SCI_PH.Persistence.Configurations.Clinical.Idempotency;
 using SCI_PH.Persistence.Contexts;
 
 namespace SCI_PH.Persistence.Clinical.Services
@@ -33,6 +35,8 @@ namespace SCI_PH.Persistence.Clinical.Services
         public void Add(Patient patient) => _clinical.Patients.Add(patient);
 
         public void Add(ClinicalEncounter encounter) => _clinical.ClinicalEncounters.Add(encounter);
+
+        public void Add(EncounterStaffAssignment assignment) => _clinical.EncounterStaffAssignments.Add(assignment);
 
         public void Add(Triage triage) => _clinical.Triages.Add(triage);
 
@@ -70,6 +74,16 @@ namespace SCI_PH.Persistence.Clinical.Services
             {
                 _clinical.ChangeTracker.Clear();
                 throw new ResourceConflictException("The record was changed by another operation. Reload it and try again.", exception);
+            }
+            catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: IdempotencyReceiptConfiguration.UniqueKeyName
+            })
+            {
+                // Another request with the same idempotency key committed first; this transaction was rolled back.
+                _clinical.ChangeTracker.Clear();
+                throw new IdempotencyKeyCollisionException(exception);
             }
             catch (DbUpdateException exception) when (exception.InnerException is PostgresException
             {

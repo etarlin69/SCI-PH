@@ -1583,6 +1583,49 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                         });
                 });
 
+            modelBuilder.Entity("SCI_PH.Persistence.Clinical.Idempotency.IdempotencyReceiptEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClientRequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId", "Operation", "ClientRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_IdempotencyReceipts_Key");
+
+                    b.ToTable("IdempotencyReceipts", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_IdempotencyReceipts_Operation", "length(btrim(\"Operation\")) > 0");
+
+                            t.HasCheckConstraint("CK_IdempotencyReceipts_RequestHash", "length(\"RequestHash\") = 64");
+                        });
+                });
+
             modelBuilder.Entity("SCI_PH.Domain.Entities.Documents.ClinicalDocument", b =>
                 {
                     b.HasOne("SCI_PH.Domain.Entities.Encounters.ClinicalEncounter", "Encounter")

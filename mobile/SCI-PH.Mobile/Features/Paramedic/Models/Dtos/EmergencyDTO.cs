@@ -9,6 +9,8 @@ namespace SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 public class EmergencyDto
 {
     public Guid Id { get; set; }
+    /// <summary>Código NN que asigna el servidor mientras el paciente no está identificado.</summary>
+    public string? TemporaryPatientCode { get; set; }
     public EmergencyStatus Status { get; set; }
     public DateTime StartedAt { get; set; }
     public PatientSummaryDto? Patient { get; set; }

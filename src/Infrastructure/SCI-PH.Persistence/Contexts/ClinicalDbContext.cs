@@ -6,7 +6,9 @@ using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Organizations;
 using SCI_PH.Domain.Entities.Patients;
 using SCI_PH.Domain.Entities.Transport;
+using SCI_PH.Persistence.Clinical.Idempotency;
 using SCI_PH.Persistence.Configurations.Clinical;
+using SCI_PH.Persistence.Configurations.Clinical.Idempotency;
 
 namespace SCI_PH.Persistence.Contexts
 {
@@ -53,6 +55,9 @@ namespace SCI_PH.Persistence.Contexts
         public DbSet<ClinicalDocument> ClinicalDocuments => Set<ClinicalDocument>();
         public DbSet<ClinicalAuditEntry> ClinicalAuditEntries => Set<ClinicalAuditEntry>();
 
+        // Technical state (not a Domain entity), committed with the clinical rows it protects.
+        public DbSet<IdempotencyReceiptEntry> IdempotencyReceipts => Set<IdempotencyReceiptEntry>();
+
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
         {
             EnsureAuditEntriesAreAppendOnly();
@@ -71,6 +76,7 @@ namespace SCI_PH.Persistence.Contexts
 
             modelBuilder.HasDefaultSchema(Schema);
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(ClinicalDbContext).Assembly, ConfiguresDomainEntity);
+            modelBuilder.ApplyConfiguration(new IdempotencyReceiptConfiguration());
             modelBuilder.RestrictAllDeletes().AddEnumCheckConstraints();
         }
 

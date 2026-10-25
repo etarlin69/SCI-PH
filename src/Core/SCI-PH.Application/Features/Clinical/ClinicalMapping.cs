@@ -55,6 +55,15 @@ namespace SCI_PH.Application.Features.Clinical
                 encounter.IdentifiedAtUtc,
                 encounter.LatestTriagePriority);
 
+        public static PrehospitalEmergencySummary ToEmergency(this EncounterRow encounter) =>
+            new(
+                encounter.Id,
+                encounter.TemporaryPatientCode,
+                encounter.Status,
+                encounter.StartedAtUtc,
+                encounter.Reason,
+                encounter.Patient?.ToSummary());
+
         public static AdmissionEncounterSummary ToAdmission(this EncounterRow encounter) =>
             new(
                 encounter.Id,

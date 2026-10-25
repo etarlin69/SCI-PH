@@ -68,6 +68,21 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
             bool staffActive = true,
             ClinicalStaffType staffType = ClinicalStaffType.OtherClinical)
         {
+            var (account, staffId) = await CreateStaffAccountAsync(role, clinics, asClinicalStaff, staffActive, staffType);
+            var login = await _factory.CreateHttpsClient().PostAsJsonAsync("/api/web/auth/login", new LoginRequest(account.Email, account.Password));
+            login.EnsureSuccessStatusCode();
+            var session = await login.ReadAsAsync<WebLoginResponse>();
+            return new StaffSession(_factory.CreateHttpsClient().WithBearer(session.Session!.AccessToken), account.Id, staffId);
+        }
+
+        // The account without signing in, for another host over the same database (e.g. the Mobile BFF).
+        public async Task<(TestAccount Account, Guid? StaffId)> CreateStaffAccountAsync(
+            string role,
+            Clinic[] clinics,
+            bool asClinicalStaff = true,
+            bool staffActive = true,
+            ClinicalStaffType staffType = ClinicalStaffType.OtherClinical)
+        {
             var account = await _factory.CreateUserAsync(role);
             Guid? staffId = null;
             if (asClinicalStaff)
@@ -89,10 +104,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
                 staffId = staff.Id;
             }
 
-            var login = await _factory.CreateHttpsClient().PostAsJsonAsync("/api/web/auth/login", new LoginRequest(account.Email, account.Password));
-            login.EnsureSuccessStatusCode();
-            var session = await login.ReadAsAsync<WebLoginResponse>();
-            return new StaffSession(_factory.CreateHttpsClient().WithBearer(session.Session!.AccessToken), account.Id, staffId);
+            return (account, staffId);
         }
 
         // Real web login of an existing account (e.g. one created through an invitation).

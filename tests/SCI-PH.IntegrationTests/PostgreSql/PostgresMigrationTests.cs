@@ -25,7 +25,8 @@ namespace SCI_PH.IntegrationTests.PostgreSql
             Assert.Equal(
                 new[] { "AccountInvitations", "AspNetRoleClaims", "AspNetRoles", "AspNetUserClaims", "AspNetUserLogins", "AspNetUserRoles", "AspNetUserTokens", "AspNetUsers", "DataProtectionKeys", "DeviceCredentials", "MfaLoginChallenges", "RefreshTokens", "SecurityAuditEvents", "__EFMigrationsHistory" }.Order(StringComparer.Ordinal),
                 identityTables.Order(StringComparer.Ordinal));
-            Assert.Equal(28, await ScalarAsync<long>(connection,
+            // 28 Domain tables + IdempotencyReceipts.
+            Assert.Equal(29, await ScalarAsync<long>(connection,
                 "select count(*) from information_schema.tables where table_schema = 'clinical' and table_name <> '__EFMigrationsHistory'"));
             Assert.Equal(0, await ScalarAsync<long>(connection,
                 "select count(*) from information_schema.tables where table_schema not in ('identity', 'clinical', 'pg_catalog', 'information_schema')"));
@@ -36,8 +37,8 @@ namespace SCI_PH.IntegrationTests.PostgreSql
                 where c.contype = 'f' and ns.nspname <> nr.nspname
                 """));
             Assert.Equal(4, await ScalarAsync<long>(connection, "select count(*) from identity.\"__EFMigrationsHistory\""));
-            // InitialClinical + EnforceSingleActiveTransferPerEncounter.
-            Assert.Equal(2, await ScalarAsync<long>(connection, "select count(*) from clinical.\"__EFMigrationsHistory\""));
+            // InitialClinical + EnforceSingleActiveTransferPerEncounter + AddClinicalIdempotencyReceipts.
+            Assert.Equal(3, await ScalarAsync<long>(connection, "select count(*) from clinical.\"__EFMigrationsHistory\""));
             Assert.Equal(0, await ScalarAsync<long>(connection,
                 "select count(*) from pg_index i join pg_class c on c.oid = i.indexrelid join pg_namespace n on n.oid = c.relnamespace where n.nspname in ('identity', 'clinical') and not i.indisvalid"));
 

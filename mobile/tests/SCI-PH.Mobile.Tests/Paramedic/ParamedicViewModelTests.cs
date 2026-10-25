@@ -12,7 +12,7 @@ public class ParamedicViewModelTests
     {
         var api = new RecordingParamedicApi { TransientFailuresLeft = 1 };
         var navigator = new FakeNavigator();
-        var vm = new NewEmergencyViewModel(api, navigator, new NoLocation()) { ChiefComplaint = "Dolor torácico" };
+        var vm = new NewEmergencyViewModel(api, navigator) { ChiefComplaint = "Dolor torácico" };
 
         await vm.SaveCommand.ExecuteAsync(null);
 

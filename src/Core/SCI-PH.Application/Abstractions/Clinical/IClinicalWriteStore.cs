@@ -17,6 +17,8 @@ namespace SCI_PH.Application.Abstractions.Clinical
 
         void Add(ClinicalEncounter encounter);
 
+        void Add(EncounterStaffAssignment assignment);
+
         void Add(Triage triage);
 
         void Add(VitalSign vitalSign);
@@ -41,7 +43,8 @@ namespace SCI_PH.Application.Abstractions.Clinical
         // encounter after it was loaded, the record is rejected (ResourceConflictException) instead of being written.
         void EnsureEncounterUnchanged(ClinicalEncounter encounter);
 
-        // Concurrent changes and known uniqueness violations surface as ResourceConflictException.
+        // Concurrent changes and known uniqueness violations surface as ResourceConflictException; a concurrent
+        // request that committed the same idempotency receipt first surfaces as IdempotencyKeyCollisionException.
         Task SaveChangesAsync(CancellationToken cancellationToken);
     }
 }

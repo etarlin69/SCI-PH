@@ -1,6 +1,7 @@
 # Contratos del Mobile BFF
 
-> **Estado: contratos iniciales previstos. NO están implementados todavía.**
+> **Estado: contratos iniciales previstos, salvo los marcados como _Implementado_** (autenticación, y apertura y
+> lectura de la emergencia prehospitalaria).
 >
 > Estos endpoints describen la intención acordada para empezar a trabajar en paralelo (app móvil y backend). Pueden evolucionar mediante **revisión arquitectónica**; cualquier cambio debe reflejarse en este documento dentro del mismo PR.
 
@@ -107,24 +108,39 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 
 ---
 
-## Paramedic Workflow — contratos iniciales previstos
+## Paramedic Workflow
 
-> **ESTOS ENDPOINTS SON CONTRATOS PREVISTOS Y TODAVÍA NO ESTÁN IMPLEMENTADOS.**
-> Pueden evolucionar mediante revisión arquitectónica.
+> **Implementados:** `POST /api/mobile/emergencies` y `GET /api/mobile/emergencies/{id}` (V1, ver
+> [ADR-008](../adr/ADR-008-prehospital-emergency.md)). **El resto siguen siendo contratos previstos** y pueden
+> evolucionar mediante revisión arquitectónica.
 
-- **Usuarios:** personal paramédico autenticado. El rol y sus permisos los define el Rol 3.
-- **Autorización:** todos los endpoints de `/api/mobile/emergencies` exigirán el permiso `Emergencies.Operate` (rol
-  Paramedic; Administrator lo tiene por tener todos), además del permiso clínico de cada acción (por ejemplo
-  `VitalSigns.Write` para registrar signos vitales). La app móvil lo usa para habilitar el área paramédica.
-- **Modelo:** una *emergencia* es un episodio de atención prehospitalaria. Puede empezar **sin paciente identificado** y vincularse a un `Patient` después.
+- **Usuarios:** personal clínico autenticado: un `ClinicalStaff` activo, vinculado a la cuenta y con al menos una
+  afiliación activa. El rol y sus permisos los define el Rol 3.
+- **Autorización:** todos los endpoints de `/api/mobile/emergencies` exigen el permiso `Emergencies.Operate` (rol
+  Paramedic; Administrator lo tiene por tener todos) para entrar al módulo, además del permiso clínico de cada acción
+  (abrir: `Encounters.Create`; leer: `Encounters.Read`; previsto: `VitalSigns.Write` para signos vitales, etc.). Nunca
+  se comprueba un rol. Doctor, Nurse y Receptionist no tienen `Emergencies.Operate`: `403`.
+- **Acceso al caso concreto:** una emergencia es un `ClinicalEncounter` de tipo `Prehospital` **sin clínica**
+  (`clinicId = null`) mientras no llega al hospital. La clínica base del paramédico no es el lugar de la emergencia y
+  no da acceso: solo la lee el personal con una asignación activa (`EncounterStaffAssignment`, función `Paramedic`), y
+  quien la abre queda asignado. Otro paramédico, aunque comparta la clínica base: `403`.
+- **Modelo:** una *emergencia* es un episodio de atención prehospitalaria. Empieza **sin paciente identificado** (NN,
+  código `NN-…` generado por el servidor) y se vincula a un `Patient` después. Al llegar, el hospital la recibe
+  (`POST /api/web/transfers/{id}/receive`) y la **misma** atención pasa a tener la clínica destino.
 - **Registros clínicos:** signos vitales, procedimientos y medicamentos se **agregan** al episodio; no se editan ni se borran desde la app (las correcciones se definirán con el Rol 2).
-- **Hora del evento:** cada registro lleva `recordedAt` (hora en que ocurrió en campo), distinta de la hora en que llega al servidor, para soportar envío diferido.
-- **Idempotencia (propuesta):** los `POST` aceptan un `clientRequestId` (`Guid` generado en el dispositivo) para que un reintento sin conexión no duplique registros.
+- **Hora del evento:** la apertura lleva `startedAt` y cada registro llevará `recordedAt` (hora en que ocurrió en campo), distinta de la hora en que llega al servidor, para soportar envío diferido.
+- **Idempotencia:** implementada en la apertura; los demás `POST` la usarán igual. Cada `POST` lleva un
+  `clientRequestId` (`Guid` generado en el dispositivo una vez por operación y **reutilizado en cada reintento**). El
+  servidor guarda un recibo por (usuario, operación, `clientRequestId`) con el hash SHA-256 del contenido lógico:
+  - misma clave y mismo contenido → la **misma** respuesta (`200`, sin crear nada);
+  - misma clave y contenido distinto → `409`; la app debe empezar de nuevo con otra clave;
+  - dos envíos simultáneos con la misma clave → uno crea (`201`) y el otro devuelve lo mismo (`200`), nunca un duplicado.
+- **Ubicación:** fuera de V1 (FUTURE). No se envía ni se acepta: un campo `location` se rechaza con `400`.
 
 | Método | Ruta | Descripción | Estado |
 |---|---|---|---|
-| `POST` | `/api/mobile/emergencies` | Abre una emergencia | Previsto |
-| `GET` | `/api/mobile/emergencies/{id}` | Detalle de la emergencia y sus registros | Previsto |
+| `POST` | `/api/mobile/emergencies` | Abre una emergencia | Implementado |
+| `GET` | `/api/mobile/emergencies/{id}` | Datos básicos de la emergencia | Implementado (sin registros todavía) |
 | `POST` | `/api/mobile/emergencies/{id}/identify` | Vincula la emergencia a un paciente | Previsto |
 | `POST` | `/api/mobile/emergencies/{id}/vitals` | Registra signos vitales | Previsto |
 | `POST` | `/api/mobile/emergencies/{id}/procedures` | Registra un procedimiento realizado | Previsto |
@@ -145,43 +161,77 @@ POST /emergencies/{id}/transfer    traslado → lo recibe el hospital en Web BFF
 
 ---
 
-### `POST /api/mobile/emergencies`
+### `POST /api/mobile/emergencies` — Implementado
 
-**Body (forma propuesta):**
+Permisos: `Emergencies.Operate` + `Encounters.Create`. Crea en **una sola transacción** (todo o nada):
+
+- la atención `Prehospital` sin clínica y con paciente NN;
+- la asignación del paramédico autenticado (`Paramedic`);
+- el registro de auditoría;
+- el recibo de idempotencia.
+
+**Body:**
 
 ```json
 {
   "clientRequestId": "00000000-0000-0000-0000-000000000000",
   "startedAt": "2026-01-01T00:00:00Z",
-  "location": { "latitude": 0.0, "longitude": 0.0 },
-  "chiefComplaint": "…"
+  "chiefComplaint": "Dolor torácico"
 }
 ```
 
-**Respuestas previstas:** `201 Created` (con `id` y cabecera `Location`), `400`, `401`, `403`.
+- `clientRequestId`: obligatorio, distinto de `Guid.Empty`. Se conserva en los reintentos.
+- `startedAt`: obligatorio. Es un **instante**: ISO-8601 `yyyy-MM-ddTHH:mm:ss[.fffffff]` seguido de `Z` o de un
+  offset explícito (`2026-10-23T15:30:00Z`, `2026-10-23T15:30:00.123Z`, `2026-10-23T11:30:00-04:00`,
+  `2026-10-23T11:30:00.123-04:00`). El servidor lo normaliza a UTC antes de validar, calcular el hash y guardar.
+  - **Sin offset** (`2026-10-23T15:30:00`) el instante es ambiguo: `400`. Nunca se interpreta con la zona horaria del
+    servidor ni se supone UTC. También `400` para texto, fechas u offsets inválidos.
+  - Se acepta desde **24 horas antes** hasta **5 minutos después** de la hora del servidor, ambos límites incluidos;
+    fuera de ese rango, `400` (`field: startedAt`). Un reintento de una apertura ya registrada se responde aunque
+    `startedAt` haya quedado fuera del rango.
+- `chiefComplaint`: obligatorio (máx. 4000 caracteres; se recortan los espacios).
+- El hash de idempotencia usa `startedAt` (normalizado a UTC) y `chiefComplaint` (recortado): el mismo instante
+  escrito con `Z` o con otro offset es el mismo contenido (`200`, no `409`).
+- **No se aceptan** `location`, `clinicId`, `staffId`, `paramedicId`, `patientId` ni `temporaryPatientCode` (ni ningún
+  otro campo): `400`. El servidor decide la clínica (ninguna), el personal (el usuario autenticado) y el código NN.
 
----
-
-### `GET /api/mobile/emergencies/{id}`
-
-**Respuesta `200 OK` (forma propuesta):**
+**Respuesta** (`201 Created` con cabecera `Location: /api/mobile/emergencies/{id}`, o `200 OK` en un reintento):
 
 ```json
 {
   "id": "00000000-0000-0000-0000-000000000000",
-  "status": "Open",
-  "startedAt": "2026-01-01T00:00:00Z",
-  "patient": null,
-  "vitals": [],
-  "procedures": [],
-  "medications": [],
-  "transfer": null
+  "temporaryPatientCode": "NN-0123456789ABCDEF0123456789ABCDEF",
+  "status": "Created",
+  "startedAtUtc": "2026-01-01T00:00:00+00:00",
+  "chiefComplaint": "Dolor torácico",
+  "patient": null
 }
 ```
 
-`patient` es `null` mientras la emergencia no esté identificada.
+| Estado | Cuándo |
+|---|---|
+| `201` | Primera apertura con ese `clientRequestId` |
+| `200` | Reintento con el mismo `clientRequestId` y el mismo contenido: la misma emergencia, nada nuevo |
+| `400` | Validación: campos que faltan o sobran, `startedAt` sin offset, inválido o fuera de rango, `clientRequestId` vacío |
+| `401` | Sin token válido |
+| `403` | Sin `Emergencies.Operate` o `Encounters.Create`; la cuenta no es `ClinicalStaff` activo o no tiene afiliación activa |
+| `409` | El `clientRequestId` ya se usó con otro contenido |
 
-**Errores previstos:** `401`, `403`, `404`.
+---
+
+### `GET /api/mobile/emergencies/{id}` — Implementado
+
+Permisos: `Emergencies.Operate` + `Encounters.Read`. Mientras la emergencia no tenga clínica, además hace falta una
+asignación activa del usuario a ella. Cuando el hospital la recibe, se aplica la regla de clínica de cualquier atención
+(un paramédico de otra base deja de leerla).
+
+Devuelve la misma forma que el `POST`; `patient` es `null` mientras la emergencia no esté identificada. Los registros
+clínicos (signos vitales, procedimientos, medicamentos, traslado) se añadirán con sus endpoints.
+
+`status` es el estado de la atención: `Created`, `InProgress`, `Transferred`, `Received`, `InEvolution`, `Closed` o
+`Cancelled`.
+
+**Errores:** `401`, `403` (sin permiso o sin asignación), `404` (no existe o no es una emergencia prehospitalaria).
 
 ---
 

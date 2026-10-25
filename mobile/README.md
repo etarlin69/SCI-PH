@@ -10,7 +10,8 @@ solución, separada del backend:
 
 La app no referencia proyectos del backend: se comunica con `SCI-PH.Mobile.BFF` (`/api/mobile`) por HTTP, según
 [docs/api/mobile-bff-contracts.md](../docs/api/mobile-bff-contracts.md), con DTOs propios.
-Hoy solo es real el acceso del personal clínico (`api/mobile/auth`); el resto sigue simulado.
+Hoy son reales el acceso del personal clínico (`api/mobile/auth`) y la apertura y lectura de la emergencia
+(`api/mobile/emergencies`); el resto sigue simulado.
 
 ## Estructura
 
@@ -51,9 +52,9 @@ Reglas de cada feature:
   ViewModel escribe la cadena de una ruta.
 - Las páginas solo asignan el `BindingContext` (y, si hace falta, cargan datos en `OnAppearing`); la lógica está en
   ViewModels que heredan de `BaseViewModel` y usan `IAppNavigator`/`IAppDialogService`, nunca `Shell.Current`.
-- Los servicios externos están detrás de interfaces. Salvo la autenticación clínica, hoy todos son mocks en memoria;
-  al conectar el Mobile BFF solo cambian los registros y se usa `IMobileApiClient` (nunca `HttpClient` en un
-  ViewModel).
+- Los servicios externos están detrás de interfaces. Salvo la autenticación clínica y la apertura y lectura de la
+  emergencia, hoy todos son mocks en memoria; al conectar el Mobile BFF solo cambian los registros y se usa
+  `IMobileApiClient` (nunca `HttpClient` en un ViewModel).
 - Los enums de los contratos se serializan por nombre (`JsonStringEnumConverter<T>`), así que sus valores numéricos
   no tienen que coincidir con los del Domain.
 
@@ -139,15 +140,29 @@ El Mobile BFF local corre con `dotnet run --project src/Presentation/SCI-PH.Mobi
 
 | Pantalla | Qué hace |
 |---|---|
-| Nueva emergencia | Motivo de consulta; ubicación puntual si hay permiso. Reintentos con el mismo `clientRequestId`. |
+| Nueva emergencia | Motivo de consulta. Abre la emergencia **real** en el Mobile BFF; los reintentos reutilizan `clientRequestId`, `startedAt` y el motivo. |
 | Identificar paciente | Huella, documento o continuar como paciente no identificado (NN), las tres desde el inicio. |
 | Signos vitales | Tomas con límites de plausibilidad del Domain (`VitalSignLimits`); no son umbrales clínicos. |
 | Procedimientos | Registro desde el catálogo. |
 | Medicamentos | Registro de lo ya administrado (SCI-PH no prescribe). |
 
-Se entra con la sesión real del personal clínico, pero **los datos siguen simulados**: `MockParamedicApiService`
-(emergencias en memoria con idempotencia), `MockParamedicCatalogService` y `MockFingerprintReaderService` (alterna
-sin coincidencia / identificado). Pendiente: transferencia.
+Se entra con la sesión real del personal clínico. `HttpParamedicApiService` es híbrido:
+
+| Operación | Origen |
+|---|---|
+| Crear emergencia (`POST /api/mobile/emergencies`) | **REAL** (cliente autenticado, `IMobileApiClient`) |
+| Leer emergencia (`GET /api/mobile/emergencies/{id}`) | **REAL** |
+| Identificar, signos vitales, procedimientos, medicamentos | Mock (`MockParamedicApiService`) sobre el id **real** |
+| Catálogo y huella | Mock (`MockParamedicCatalogService`, `MockFingerprintReaderService`, que alterna sin coincidencia / identificado) |
+
+- **Reintentos:** un error de red deja la pantalla como estaba. El siguiente intento lleva el mismo `clientRequestId`,
+  `startedAt` y motivo, así que si el servidor ya la había creado devuelve la misma emergencia (`200`).
+- **Conflicto:** si el motivo cambió después de un fallo de resultado desconocido, el servidor responde `409`. La app
+  muestra "La solicitud ya fue utilizada con datos diferentes. Vuelve a iniciar la creación de la emergencia." y
+  **no** genera otra clave en silencio; para empezar de nuevo, sal de la pantalla y vuelve a entrar.
+- **Ubicación:** fuera de V1. La app no la toma ni la envía (`IDeviceLocationService` queda para cuando exista ese
+  contrato).
+- **Pendiente:** transferencia.
 
 ## Patient (estado actual)
 
@@ -220,7 +235,9 @@ no firma con claves propias y no publica nada.
 ## Pendiente
 
 - QR y verificación facial reales del paciente (con el Rol 8).
-- Conectar los datos del área paramédica (`/api/mobile/emergencies`, con `Emergencies.Operate`) a `IMobileApiClient`.
+- Conectar el resto del área paramédica (identificación, signos vitales, procedimientos, medicamentos, traslado) al
+  Mobile BFF; la apertura y lectura de la emergencia ya son reales.
+- Ubicación de la emergencia (contrato y almacenamiento por definir; ver ADR-008).
 - Huella real (Device API), catálogos reales, pantalla de transferencia, modo sin conexión.
 - Contratos e integración de historial, resultados, documentos y asistente del paciente.
 - Converger PatientTheme con SciPhTheme.

@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using SCI_PH.Application.Abstractions.Clinical;
+using SCI_PH.Application.Abstractions.Idempotency;
 using SCI_PH.Application.Abstractions.Security;
 using SCI_PH.Persistence.Clinical.Seed;
 using SCI_PH.Persistence.Clinical.Services;
@@ -67,6 +68,7 @@ namespace SCI_PH.Persistence
             services.AddScoped<IClinicalReadStore, ClinicalReadStore>();
             services.AddScoped<IClinicalOrganizationStore, ClinicalOrganizationStore>();
             services.AddScoped<IClinicalWriteStore, ClinicalWriteStore>();
+            services.AddScoped<IIdempotencyStore, ClinicalIdempotencyStore>();
             services.AddScoped<IdentitySeeder>();
             services.AddOptions<IdentityBootstrapOptions>().Bind(configuration.GetSection(IdentityBootstrapOptions.SectionName));
             services.AddScoped<IdentityDevelopmentAccountSeeder>();
