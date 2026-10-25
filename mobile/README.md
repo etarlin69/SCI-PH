@@ -10,8 +10,8 @@ solución, separada del backend:
 
 La app no referencia proyectos del backend: se comunica con `SCI-PH.Mobile.BFF` (`/api/mobile`) por HTTP, según
 [docs/api/mobile-bff-contracts.md](../docs/api/mobile-bff-contracts.md), con DTOs propios.
-Hoy son reales el acceso del personal clínico (`api/mobile/auth`) y la apertura y lectura de la emergencia
-(`api/mobile/emergencies`); el resto sigue simulado.
+Hoy son reales el acceso del personal clínico (`api/mobile/auth`) y la apertura, lectura e identificación por documento
+de la emergencia (`api/mobile/emergencies`); el resto sigue simulado.
 
 ## Estructura
 
@@ -141,7 +141,7 @@ El Mobile BFF local corre con `dotnet run --project src/Presentation/SCI-PH.Mobi
 | Pantalla | Qué hace |
 |---|---|
 | Nueva emergencia | Motivo de consulta. Abre la emergencia **real** en el Mobile BFF; los reintentos reutilizan `clientRequestId`, `startedAt` y el motivo. |
-| Identificar paciente | Huella, documento o continuar como paciente no identificado (NN), las tres desde el inicio. |
+| Identificar paciente | Huella, documento (cédula o pasaporte) o continuar como paciente no identificado (NN), las tres desde el inicio. |
 | Signos vitales | Tomas con límites de plausibilidad del Domain (`VitalSignLimits`); no son umbrales clínicos. |
 | Procedimientos | Registro desde el catálogo. |
 | Medicamentos | Registro de lo ya administrado (SCI-PH no prescribe). |
@@ -152,7 +152,8 @@ Se entra con la sesión real del personal clínico. `HttpParamedicApiService` es
 |---|---|
 | Crear emergencia (`POST /api/mobile/emergencies`) | **REAL** (cliente autenticado, `IMobileApiClient`) |
 | Leer emergencia (`GET /api/mobile/emergencies/{id}`) | **REAL** |
-| Identificar, signos vitales, procedimientos, medicamentos | Mock (`MockParamedicApiService`) sobre el id **real** |
+| Identificar por documento (`POST /api/mobile/emergencies/{id}/identify/document`) | **REAL**: la misma emergencia queda vinculada al paciente; sin coincidencia sigue NN |
+| Identificar por huella, signos vitales, procedimientos, medicamentos | Mock (`MockParamedicApiService`) sobre el id **real** |
 | Catálogo y huella | Mock (`MockParamedicCatalogService`, `MockFingerprintReaderService`, que alterna sin coincidencia / identificado) |
 
 - **Reintentos:** un error de red deja la pantalla como estaba. El siguiente intento lleva el mismo `clientRequestId`,
@@ -160,6 +161,10 @@ Se entra con la sesión real del personal clínico. `HttpParamedicApiService` es
 - **Conflicto:** si el motivo cambió después de un fallo de resultado desconocido, el servidor responde `409`. La app
   muestra "La solicitud ya fue utilizada con datos diferentes. Vuelve a iniciar la creación de la emergencia." y
   **no** genera otra clave en silencio; para empezar de nuevo, sal de la pantalla y vuelve a entrar.
+- **Identificación por documento:** solo Cédula (`NationalId`) y Pasaporte (`Passport`); el número va tal como se
+  escribió (lo normaliza el servidor). Tiene su propio `clientRequestId`, que se conserva ante errores de red, `404` y
+  `409`. Sin coincidencia: "No se encontró un paciente con ese documento." y se puede corregir, reintentar o continuar
+  sin identificar. La huella sigue en mock.
 - **Ubicación:** fuera de V1. La app no la toma ni la envía (`IDeviceLocationService` queda para cuando exista ese
   contrato).
 - **Pendiente:** transferencia.
@@ -235,8 +240,8 @@ no firma con claves propias y no publica nada.
 ## Pendiente
 
 - QR y verificación facial reales del paciente (con el Rol 8).
-- Conectar el resto del área paramédica (identificación, signos vitales, procedimientos, medicamentos, traslado) al
-  Mobile BFF; la apertura y lectura de la emergencia ya son reales.
+- Conectar el resto del área paramédica (identificación por huella, signos vitales, procedimientos, medicamentos,
+  traslado) al Mobile BFF; la apertura, la lectura y la identificación por documento ya son reales.
 - Ubicación de la emergencia (contrato y almacenamiento por definir; ver ADR-008).
 - Huella real (Device API), catálogos reales, pantalla de transferencia, modo sin conexión.
 - Contratos e integración de historial, resultados, documentos y asistente del paciente.

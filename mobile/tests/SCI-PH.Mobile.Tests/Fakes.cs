@@ -75,6 +75,14 @@ internal sealed class RecordingParamedicApi : IParamedicApiService
         return Task.FromResult(new EmergencyDto { Id = emergencyId });
     }
 
+    public int IdentifyByDocumentCalls { get; private set; }
+
+    public Task<EmergencyDto?> IdentifyByDocumentAsync(Guid emergencyId, IdentifyByDocumentDto dto)
+    {
+        IdentifyByDocumentCalls++;
+        return Task.FromResult<EmergencyDto?>(new EmergencyDto { Id = emergencyId });
+    }
+
     public Task RegisterVitalsAsync(Guid emergencyId, RegisterVitalsDto dto) => Task.CompletedTask;
 
     public Task RegisterProcedureAsync(Guid emergencyId, RegisterProcedureDto dto) => Task.CompletedTask;
