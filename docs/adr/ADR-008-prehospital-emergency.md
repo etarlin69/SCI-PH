@@ -35,8 +35,8 @@ reconocer el reintento: cada reintento creaba otra atención NN.
   - **cualquier otro tipo sin clínica**: nunca accesible.
 - `ClinicalActor` no hace consultas: la búsqueda de la asignación está en el read store.
 - `EnsureClinic` **no se reemplazó globalmente**: los caminos del hospital (Web BFF) mantienen su regla, y una atención
-  sin clínica sigue siendo invisible para ellos. El servicio se conectará uno a uno en los próximos caminos móviles
-  (identificar, signos vitales, procedimientos, medicamentos, traslado).
+  sin clínica sigue siendo invisible para ellos. El servicio se conecta uno a uno en los caminos móviles: ya lo usa la
+  identificación (decisión 6); faltan signos vitales, procedimientos, medicamentos y traslado.
 
 ### 3. Recibos de idempotencia: infraestructura técnica reutilizable
 
@@ -78,10 +78,29 @@ reconocer el reintento: cada reintento creaba otra atención NN.
 La ubicación (latitud/longitud, dirección de la escena) queda **fuera de V1** (FUTURE). No hay columnas para ella. La
 app no la envía y el contrato no la acepta: un campo `location` se rechaza con `400`, en lugar de aceptarlo y descartarlo.
 
+### 6. Identificación por documento
+
+- `POST /api/mobile/emergencies/{id}/identify/document` vincula el paciente NN a la **misma** atención reutilizando
+  `EncounterService.IdentifyPatientAsync` (regla del Domain, auditoría `Identify`, control de concurrencia sobre
+  `PatientId`; el código NN se conserva). No crea pacientes ni atenciones.
+- `IdentifyPatientAsync` comprueba el acceso con `IEncounterAccessService` en lugar de `EnsureClinic`: para una
+  atención con clínica es la misma regla (el Web BFF no cambia); para una `Prehospital` sin clínica, solo el personal
+  asignado.
+- **Alcance de plataforma:** el documento se busca con coincidencia exacta sobre identificadores activos con
+  `issuer` vacío (alcance SCI-PH). La unicidad del Domain es por `(type, issuer, normalizedValue)`, así que buscar sin
+  emisor podría devolver varios pacientes; con el emisor vacío el índice único garantiza 0 o 1. Un identificador con
+  otro emisor no se encuentra (`404`). El emisor explícito (país) se añadirá al contrato cuando haga falta.
+- Solo `NationalId` y `Passport`: `Other` no demuestra identidad y los demás tipos no se digitan.
+- Idempotente con los mismos recibos (`prehospital-emergency.identify-document.v1`); el hash usa el número normalizado
+  y el recibo no guarda el documento. Un `404` no guarda nada, para que el mismo intento encuentre al paciente si se
+  registra después. Una atención ya identificada responde `409` a cualquier solicitud nueva, aunque sea el mismo
+  paciente (regla del Domain sin cambios).
+
 ## Consecuencias
 
 - La primera vertical real del paramédico (abrir y leer la emergencia) funciona sin inventar una clínica.
-- Una migración clínica (`AddClinicalIdempotencyReceipts`); ninguna de Identity. Los recibos se acumulan y no se
+- Una migración clínica (`AddClinicalIdempotencyReceipts`); ninguna de Identity. La identificación por documento no
+  añade migraciones. Los recibos se acumulan y no se
   purgan todavía: la retención queda pendiente.
 - Tras la llegada al hospital, el paramédico de otra base deja de leer la emergencia, porque se aplica la regla de
   clínica. El acceso posterior al traslado se decidirá con la vertical de traslado.
