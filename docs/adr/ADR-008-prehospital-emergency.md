@@ -1,6 +1,6 @@
 # ADR-008: Emergencia prehospitalaria: acceso sin clínica e idempotencia
 
-- **Estado:** Propuesto para revisión en el PR de `feature/mobile-emergency-foundation`
+- **Estado:** Aceptado (implementado en los PR #25 y #26 y en el de `feature/mobile-vital-signs`)
 - **Fecha:** 2026-10-23
 - **Relacionado:** [ADR-005](ADR-005-clinical-model.md), [ADR-006](ADR-006-identity-security.md),
   [contratos del Mobile BFF](../api/mobile-bff-contracts.md#paramedic-workflow)
@@ -35,8 +35,8 @@ reconocer el reintento: cada reintento creaba otra atención NN.
   - **cualquier otro tipo sin clínica**: nunca accesible.
 - `ClinicalActor` no hace consultas: la búsqueda de la asignación está en el read store.
 - `EnsureClinic` **no se reemplazó globalmente**: los caminos del hospital (Web BFF) mantienen su regla, y una atención
-  sin clínica sigue siendo invisible para ellos. El servicio se conecta uno a uno en los caminos móviles: ya lo usa la
-  identificación (decisión 6); faltan signos vitales, procedimientos, medicamentos y traslado.
+  sin clínica sigue siendo invisible para ellos. El servicio se conecta uno a uno en los caminos móviles: ya lo usan la
+  identificación (decisión 6) y los signos vitales (decisión 7); faltan procedimientos, medicamentos y traslado.
 
 ### 3. Recibos de idempotencia: infraestructura técnica reutilizable
 
@@ -96,6 +96,23 @@ app no la envía y el contrato no la acepta: un campo `location` se rechaza con 
   registra después. Una atención ya identificada responde `409` a cualquier solicitud nueva, aunque sea el mismo
   paciente (regla del Domain sin cambios).
 
+### 7. Signos vitales
+
+- `POST /api/mobile/emergencies/{id}/vital-signs` registra una toma de 1 a 7 valores (campos fijos, uno por tipo) en una
+  transacción: los `VitalSign`, una auditoría por valor, `Created -> InProgress` en la primera toma y el recibo
+  (`prehospital-emergency.vital-signs.v1`, recurso: la emergencia). No hay entidad de "toma": la respuesta se reconstruye
+  desde la petición canónica y las unidades del servidor.
+- El acceso usa `IEncounterAccessService` en un camino propio. La comprobación compartida de `EncounterRecordService`
+  (`LoadForRecordingAsync`) no cambia, así que los medicamentos y los signos vitales del Web mantienen la regla de
+  clínica hasta su propia vertical.
+- `recordedAt` va desde el inicio de la emergencia hasta 5 minutos después de la hora del servidor (el margen del reloj
+  del dispositivo ya aceptado para `startedAt`). Nunca se modifica la hora del dispositivo y no se relaja la regla
+  global: el Web sigue rechazando horas futuras.
+- Con el reloj del dispositivo adelantado, la emergencia puede empezar "después" de la hora del servidor, y el Domain no
+  cambia el estado antes del inicio. Por eso la hora de la transición `Created -> InProgress` de este camino (una hora
+  del servidor) es `max(ahora, inicio)`.
+- Temperatura con hasta 2 decimales (la columna es `numeric(8,2)`): con más, `400`, nunca un redondeo silencioso.
+
 ## Consecuencias
 
 - La primera vertical real del paramédico (abrir y leer la emergencia) funciona sin inventar una clínica.
@@ -105,7 +122,7 @@ app no la envía y el contrato no la acepta: un campo `location` se rechaza con 
 - Tras la llegada al hospital, el paramédico de otra base deja de leer la emergencia, porque se aplica la regla de
   clínica. El acceso posterior al traslado se decidirá con la vertical de traslado.
 - `startedAt` puede estar hasta 5 minutos en el futuro, y el Domain exige que las horas clínicas posteriores no sean
-  anteriores al inicio. Un registro hecho en esos minutos se rechazaría, así que las próximas verticales deben
-  tenerlo en cuenta.
+  anteriores al inicio. Los signos vitales móviles lo resuelven con el mismo margen (decisión 7); las próximas
+  verticales (procedimientos, medicamentos) deben tenerlo en cuenta.
 - Solicitar y despachar un traslado de una atención sin clínica todavía no está expuesto (`TransferService` exige
   clínica de origen); llegará con la vertical de traslado usando `IEncounterAccessService`.

@@ -1,7 +1,7 @@
 # Contratos del Mobile BFF
 
-> **Estado: contratos iniciales previstos, salvo los marcados como _Implementado_** (autenticación; apertura, lectura
-> e identificación por documento de la emergencia prehospitalaria).
+> **Estado: contratos iniciales previstos, salvo los marcados como _Implementado_** (autenticación; apertura, lectura,
+> identificación por documento y signos vitales de la emergencia prehospitalaria).
 >
 > Estos endpoints describen la intención acordada para empezar a trabajar en paralelo (app móvil y backend). Pueden evolucionar mediante **revisión arquitectónica**; cualquier cambio debe reflejarse en este documento dentro del mismo PR.
 
@@ -111,7 +111,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 ## Paramedic Workflow
 
 > **Implementados:** `POST /api/mobile/emergencies`, `GET /api/mobile/emergencies/{id}` (V1, ver
-> [ADR-008](../adr/ADR-008-prehospital-emergency.md)) y `POST /api/mobile/emergencies/{id}/identify/document`.
+> [ADR-008](../adr/ADR-008-prehospital-emergency.md)), `POST /api/mobile/emergencies/{id}/identify/document` y
+> `POST /api/mobile/emergencies/{id}/vital-signs`.
 > **El resto siguen siendo contratos previstos** y pueden evolucionar mediante revisión arquitectónica.
 
 - **Usuarios:** personal clínico autenticado: un `ClinicalStaff` activo, vinculado a la cuenta y con al menos una
@@ -119,7 +120,7 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 - **Autorización:** todos los endpoints de `/api/mobile/emergencies` exigen el permiso `Emergencies.Operate` (rol
   Paramedic; Administrator lo tiene por tener todos) para entrar al módulo, además del permiso clínico de cada acción
   (abrir: `Encounters.Create`; leer: `Encounters.Read`; identificar por documento: `Patients.Read` + `Patients.Identify`;
-  previsto: `VitalSigns.Write` para signos vitales, etc.). Nunca
+  signos vitales: `VitalSigns.Write`; previstos: los de procedimientos, medicamentos, etc.). Nunca
   se comprueba un rol. Doctor, Nurse y Receptionist no tienen `Emergencies.Operate`: `403`.
 - **Acceso al caso concreto:** una emergencia es un `ClinicalEncounter` de tipo `Prehospital` **sin clínica**
   (`clinicId = null`) mientras no llega al hospital. La clínica base del paramédico no es el lugar de la emergencia y
@@ -130,8 +131,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
   (`POST /api/web/transfers/{id}/receive`) y la **misma** atención pasa a tener la clínica destino.
 - **Registros clínicos:** signos vitales, procedimientos y medicamentos se **agregan** al episodio; no se editan ni se borran desde la app (las correcciones se definirán con el Rol 2).
 - **Hora del evento:** la apertura lleva `startedAt` y cada registro llevará `recordedAt` (hora en que ocurrió en campo), distinta de la hora en que llega al servidor, para soportar envío diferido.
-- **Idempotencia:** implementada en la apertura y en la identificación por documento; los demás `POST` la usarán
-  igual. Cada `POST` lleva un
+- **Idempotencia:** implementada en la apertura, en la identificación por documento y en los signos vitales; los
+  demás `POST` la usarán igual. Cada `POST` lleva un
   `clientRequestId` (`Guid` generado en el dispositivo una vez por operación y **reutilizado en cada reintento**). El
   servidor guarda un recibo por (usuario, operación, `clientRequestId`) con el hash SHA-256 del contenido lógico:
   - misma clave y mismo contenido → la **misma** respuesta (`200`, sin crear nada);
@@ -145,7 +146,7 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 | `GET` | `/api/mobile/emergencies/{id}` | Datos básicos de la emergencia | Implementado (sin registros todavía) |
 | `POST` | `/api/mobile/emergencies/{id}/identify/document` | Identifica al paciente NN por cédula o pasaporte | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/identify` | Vincula la emergencia a un paciente (huella, manual) | Previsto |
-| `POST` | `/api/mobile/emergencies/{id}/vitals` | Registra signos vitales | Previsto |
+| `POST` | `/api/mobile/emergencies/{id}/vital-signs` | Registra una toma de signos vitales | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/procedures` | Registra un procedimiento realizado | Previsto |
 | `POST` | `/api/mobile/emergencies/{id}/medications` | Registra un medicamento administrado | Previsto |
 | `POST` | `/api/mobile/emergencies/{id}/transfer` | Inicia el traslado a un establecimiento | Previsto |
@@ -156,7 +157,7 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 POST /emergencies                  abre el episodio (paciente aún desconocido)
 POST /emergencies/{id}/identify/document   identifica al paciente por documento (implementado)
 POST /emergencies/{id}/identify    identifica al paciente (huella vía Device API, manual)
-POST /emergencies/{id}/vitals      ┐
+POST /emergencies/{id}/vital-signs ┐ (signos vitales: implementado)
 POST /emergencies/{id}/procedures  ├ registros durante la atención (0..n veces)
 POST /emergencies/{id}/medications ┘
 POST /emergencies/{id}/transfer    traslado → lo recibe el hospital en Web BFF
@@ -335,27 +336,94 @@ endpoint (`/identify/document`, arriba).
 
 ---
 
-### `POST /api/mobile/emergencies/{id}/vitals`
+### `POST /api/mobile/emergencies/{id}/vital-signs` — Implementado
 
-**Body (forma propuesta):**
+Permisos: `Emergencies.Operate` + `VitalSigns.Write`, y acceso a la emergencia (mientras no tenga clínica, una
+asignación activa del usuario). Registra **una toma** de 1 a 7 signos vitales sobre la **misma** emergencia, NN o
+identificada, en **una sola transacción** (todo o nada):
+
+- una fila `VitalSign` por valor, todas con la misma hora (`recordedAt`) y el personal autenticado;
+- una auditoría `Create` de `VitalSign` por valor;
+- el paso de la atención de `Created` a `InProgress` en la primera toma (como el primer registro en el Web);
+- el recibo de idempotencia.
+
+Si algo falla (un valor fuera de rango, la hora, el estado, la concurrencia), no queda nada: ni valores, ni auditorías,
+ni recibo.
+
+**Body:**
 
 ```json
 {
   "clientRequestId": "00000000-0000-0000-0000-000000000000",
   "recordedAt": "2026-01-01T00:00:00Z",
-  "heartRate": 0,
-  "respiratoryRate": 0,
-  "systolicPressure": 0,
-  "diastolicPressure": 0,
-  "oxygenSaturation": 0,
-  "temperature": 0.0,
-  "glasgow": 0
+  "heartRate": 88,
+  "respiratoryRate": 18,
+  "systolicPressure": 120,
+  "diastolicPressure": 80,
+  "oxygenSaturation": 97,
+  "temperature": 37.5,
+  "glasgow": 15
 }
 ```
 
-Todos los valores son opcionales individualmente; las unidades y rangos válidos se definirán con el Rol 2.
+- `clientRequestId`: obligatorio, distinto de `Guid.Empty`. Propio de la toma (no es el de la apertura ni el de la
+  identificación): la app lo genera una vez por toma y lo conserva en los reintentos.
+- `recordedAt`: obligatorio, la hora de la toma en el dispositivo. ISO-8601 con `Z` o un offset explícito, como
+  `startedAt`; sin offset, `400`. Se normaliza a UTC y no se modifica. Se acepta desde el **inicio de la emergencia**
+  (`startedAtUtc`) hasta **5 minutos después** de la hora del servidor, ambos límites incluidos (el mismo margen de
+  reloj del dispositivo que la apertura); fuera de ese rango, `400` (`field: recordedAt`). Ese margen es solo de esta
+  operación móvil: los signos vitales del Web siguen rechazando horas futuras.
+- Valores: todos opcionales, pero hace falta **al menos uno** (`400`). A lo sumo uno por tipo (campos fijos). Enteros,
+  salvo la temperatura (hasta **2 decimales**; con más, `400` en lugar de redondear). Límites de plausibilidad del
+  Domain (`VitalSignLimits`), ambos incluidos; no son umbrales clínicos y no hay reglas entre valores:
 
-**Respuestas previstas:** `201 Created`, `400`, `401`, `403`, `404`, `409` (emergencia cerrada).
+  | Campo | Tipo | Unidad (servidor) | Rango |
+  |---|---|---|---|
+  | `heartRate` | `HeartRate` | `/min` | 0–300 |
+  | `respiratoryRate` | `RespiratoryRate` | `/min` | 0–100 |
+  | `systolicPressure` | `SystolicBloodPressure` | `mm[Hg]` | 0–300 |
+  | `diastolicPressure` | `DiastolicBloodPressure` | `mm[Hg]` | 0–250 |
+  | `oxygenSaturation` | `OxygenSaturation` | `%` | 0–100 |
+  | `temperature` | `Temperature` | `Cel` | 25–45 |
+  | `glasgow` | `GlasgowComaScale` | `{score}` | 3–15 |
+
+- **No se aceptan** `unit` ni ningún otro campo: `400`. Las unidades las pone el servidor.
+
+**Respuesta** (`201 Created` la primera vez, sin `Location`: una toma no tiene recurso propio; `200 OK` en un
+reintento). Se construye con los valores recibidos en forma canónica y las unidades del servidor, así que un reintento
+responde exactamente lo mismo:
+
+```json
+{
+  "encounterId": "00000000-0000-0000-0000-000000000000",
+  "recordedAtUtc": "2026-01-01T00:00:00+00:00",
+  "measurements": [
+    { "type": "HeartRate", "value": 88, "unit": "/min" },
+    { "type": "Temperature", "value": 37.5, "unit": "Cel" }
+  ]
+}
+```
+
+| Estado | Cuándo |
+|---|---|
+| `201` | Primera toma con ese `clientRequestId` |
+| `200` | Reintento con el mismo `clientRequestId` y la misma toma: nada nuevo, sin otras auditorías |
+| `400` | Hora sin offset, inválida o fuera de rango; toma vacía; valor fuera de rango, no entero o con más de 2 decimales; campos que sobran; `clientRequestId` vacío |
+| `401` | Sin token válido |
+| `403` | Sin `Emergencies.Operate` o `VitalSigns.Write` (Doctor, Nurse, Receptionist); sin asignación a la emergencia (otro paramédico) |
+| `404` | La emergencia no existe o no es prehospitalaria |
+| `409` | El `clientRequestId` ya se usó con otra toma o en otra emergencia; la emergencia ya no admite registros (`Transferred`, `Closed`, `Cancelled`) o cambió durante la operación |
+
+- **Idempotencia:** operación `prehospital-emergency.vital-signs.v1`, clave (usuario, operación, `clientRequestId`); el
+  recibo apunta a la emergencia. El hash usa la emergencia, `recordedAt` en UTC y los pares tipo/valor presentes en un
+  orden fijo y con su valor numérico (`37.5` y `37.50` son lo mismo; `Z` u otro offset del mismo instante, también).
+  Dos envíos simultáneos de la misma toma la registran una sola vez (N valores y N auditorías, no 2N) y ambos responden
+  sin error.
+- Un reintento de una toma ya registrada se responde aunque la hora o el estado hayan cambiado después, pero el acceso
+  se vuelve a comprobar: un recibo nunca salta la autorización.
+- Dos tomas con distinto `clientRequestId` son dos tomas, aunque tengan la misma hora: los signos vitales son una serie
+  temporal.
+- Los valores no se registran en logs ni aparecen en los errores.
 
 ---
 
