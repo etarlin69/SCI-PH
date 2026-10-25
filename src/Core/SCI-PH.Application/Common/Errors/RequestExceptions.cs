@@ -29,6 +29,13 @@ namespace SCI_PH.Application.Common.Errors
             Resource = resource;
         }
 
+        // For a lookup by a sensitive value (a document number): the message never repeats it.
+        public ResourceNotFoundException(string resource, string message)
+            : base(message)
+        {
+            Resource = resource;
+        }
+
         public string Resource { get; }
     }
 

@@ -93,6 +93,13 @@ namespace SCI_PH.Application.Tests.Clinical
                 .Where(p => p.Identifiers.Any(i => i.IsActive && i.Type == type && i.NormalizedValue == normalizedValue))
                 .Take(limit).Select(p => p.ToTestRow()).ToList());
 
+        public Task<Guid?> FindPatientIdByPlatformIdentifierAsync(
+            PatientIdentifierType type, string normalizedValue, CancellationToken cancellationToken) =>
+            Task.FromResult(Patients.SelectMany(p => p.Identifiers)
+                .Where(i => i.IsActive && i.Type == type && i.Issuer == string.Empty && i.NormalizedValue == normalizedValue)
+                .Select(i => (Guid?)i.PatientId)
+                .SingleOrDefault());
+
         public Task<IReadOnlyList<PatientRow>> FindPatientsByNameAsync(string term, int limit, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<PatientRow>>(Patients
                 .Where(p => $"{p.GivenNames} {p.FamilyNames}".Contains(term, StringComparison.OrdinalIgnoreCase))
@@ -281,12 +288,13 @@ namespace SCI_PH.Application.Tests.Clinical
             Actor = new CurrentClinicalActor(user, Staff);
             var access = new PatientAccessAuthorizer(user, new NoPatientLinks());
             Patients = new PatientService(Store, Store, user, Staff, access, Time);
-            Encounters = new EncounterService(Actor, Store, Store, Staff, access, Time);
+            var encounterAccess = new EncounterAccessService(Store);
+            Encounters = new EncounterService(Actor, encounterAccess, Store, Store, Staff, access, Time);
             Admissions = new AdmissionService(Actor, Store);
             Records = new EncounterRecordService(Actor, user, Store, Store, access, Time);
             Medications = new MedicationService(Actor, Store, Store, access, Time);
             Transfers = new TransferService(Actor, Store, Store, access, Time);
-            Emergencies = new PrehospitalEmergencyService(Actor, new EncounterAccessService(Store), Store, Store, Store, access, Time);
+            Emergencies = new PrehospitalEmergencyService(Actor, encounterAccess, Store, Store, Store, access, Encounters, Time);
         }
 
         public FakeCurrentUser User { get; }
