@@ -56,30 +56,6 @@ public class MockParamedicApiService : IParamedicApiService
         return emergency;
     }
 
-    public async Task<EmergencyDto> IdentifyAsync(Guid emergencyId, IdentifyEmergencyDto dto)
-    {
-        await Task.Delay(SimulatedDelayMs);
-
-        var emergency = GetOrThrow(emergencyId);
-
-        if (!_processedRequests.Add(dto.ClientRequestId))
-            return emergency;
-
-        // 409 del contrato: ya identificada con otro paciente.
-        if (emergency.Patient is not null && dto.PatientId is not null && emergency.Patient.Id != dto.PatientId)
-            throw new InvalidOperationException("La emergencia ya está identificada con otro paciente.");
-
-        emergency.Patient = new PatientSummaryDto
-        {
-            Id = dto.PatientId ?? Guid.NewGuid(),
-            DisplayName = dto.Method == IdentificationMethod.Manual
-                ? "Paciente (registro manual)"
-                : "Paciente Ficticio"
-        };
-
-        return emergency;
-    }
-
     public async Task RegisterVitalsAsync(Guid emergencyId, RegisterVitalsDto dto)
     {
         await Task.Delay(SimulatedDelayMs);

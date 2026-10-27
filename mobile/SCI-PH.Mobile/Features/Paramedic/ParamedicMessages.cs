@@ -74,6 +74,40 @@ public static class ParamedicMessages
 
     public const string TransferCancelled = "Traslado cancelado. Puedes solicitar otro destino.";
 
+    public const string FingerprintReadersFailed = "No se pudo cargar la lista de lectores de huella.";
+
+    public const string NoFingerprintReaders = "No hay lectores de huella disponibles. Identifica con documento o continúa sin identificar.";
+
+    public const string FingerprintReaderRequired = "Selecciona el lector de huella.";
+
+    public const string FingerprintWaiting = "Pide al paciente colocar el dedo en el lector.";
+
+    public const string FingerprintNoMatch = "No se encontró una coincidencia.";
+
+    public const string FingerprintLowQuality = "Lectura de huella insuficiente. Intente nuevamente.";
+
+    public const string FingerprintSensorError = "Lector no disponible.";
+
+    public const string FingerprintExpired = "La lectura venció. Intente nuevamente.";
+
+    public const string FingerprintCancelled = "Lectura de huella cancelada.";
+
+    /// <summary>404 al abrir: el lector ya no está activo o la emergencia no existe para este usuario.</summary>
+    public const string FingerprintReaderNotFound = "El lector ya no está disponible o no se encontró la emergencia. Vuelve a cargar los lectores.";
+
+    /// <summary>409 al abrir: ya hay otra lectura en curso, el lector está ocupado, la emergencia ya fue identificada o la recibió el hospital.</summary>
+    public const string FingerprintOpenConflict =
+        "No se pudo iniciar la lectura: ya hay otra en curso, el lector está ocupado o la emergencia ya fue identificada o recibida por el hospital.";
+
+    /// <summary>409 al confirmar: la sesión venció o cambió, la referencia se revocó o la emergencia ya fue identificada o recibida.</summary>
+    public const string FingerprintConfirmConflict =
+        "No se pudo confirmar: la lectura venció o cambió, o la emergencia ya fue identificada o recibida por el hospital.";
+
+    public const string FingerprintFailed = "No se pudo completar la identificación por huella. Intenta nuevamente.";
+
+    /// <summary>Sin conexión mientras se consulta la lectura: se sigue intentando hasta que venza.</summary>
+    public const string FingerprintCheckingOffline = "Sin conexión. Se sigue consultando la lectura…";
+
     /// <summary>Hora de la observación antes del primer intento de guardar: se fija automáticamente.</summary>
     public const string NoteTimePending = "Se registrará con la hora al guardar.";
 }

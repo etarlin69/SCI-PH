@@ -12,8 +12,8 @@ using SCI_PH.Mobile.Features.Paramedic.ViewModels;
 
 namespace SCI_PH.Mobile.Tests.Paramedic;
 
-// Abrir y leer la emergencia contra el contrato real del Mobile BFF (POST/GET api/mobile/emergencies); el resto del
-// flujo sigue en mock sobre el id real.
+// Abrir y leer la emergencia contra el contrato real del Mobile BFF (POST/GET api/mobile/emergencies). Ningún paso del área
+// paramédica queda en mock.
 public class RealEmergencyTests
 {
     private readonly FakeEmergenciesBff _bff = new();
@@ -36,9 +36,9 @@ public class RealEmergencyTests
 
         using var provider = services.BuildServiceProvider();
         Assert.IsType<HttpParamedicApiService>(provider.GetRequiredService<IParamedicApiService>());
-        // Catálogos reales (procedimientos y medicamentos); huella mock.
+        // Catálogos e identificación por huella reales.
         Assert.IsType<HttpParamedicCatalogService>(provider.GetRequiredService<IParamedicCatalogService>());
-        Assert.IsType<MockFingerprintReaderService>(provider.GetRequiredService<IFingerprintReaderService>());
+        Assert.IsType<HttpFingerprintIdentificationService>(provider.GetRequiredService<IFingerprintIdentificationService>());
     }
 
     [Fact]
@@ -72,22 +72,6 @@ public class RealEmergencyTests
         Assert.Equal($"GET /api/mobile/emergencies/{created.Id}", _bff.Paths[1]);
         Assert.Equal(created.Id, read!.Id);
         Assert.Null(await Service().GetEmergencyAsync(Guid.NewGuid()));
-    }
-
-    [Fact]
-    public async Task TheMockedStepsUseTheRealEmergencyIdWithoutCreatingAnother()
-    {
-        var service = Service();
-        var emergency = await service.CreateEmergencyAsync(new CreateEmergencyDto { ChiefComplaint = "Dolor" });
-
-        // Signos vitales, procedimientos y medicamentos ya son reales (VitalSignsTests, ProceduresTests,
-        // MedicationsTests); la huella sigue en mock.
-        var identified = await service.IdentifyAsync(emergency.Id, new IdentifyEmergencyDto { Method = IdentificationMethod.Fingerprint, PatientId = Guid.NewGuid() });
-
-        Assert.Equal(emergency.Id, identified.Id);
-        Assert.Equal(1, _bff.Created);
-        // La huella no llama todavía al servidor.
-        Assert.Single(_bff.Paths);
     }
 
     [Fact]

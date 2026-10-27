@@ -11,8 +11,9 @@ namespace SCI_PH.Mobile.Features.Paramedic.Services;
 /// <summary>
 /// Servicio híbrido del área paramédica. REAL (Mobile BFF, con el cliente autenticado): abrir la emergencia, leerla,
 /// identificar al paciente por documento, registrar signos vitales, procedimientos, medicamentos administrados y
-/// observaciones, y el traslado (solicitar, iniciar, cancelar). Sigue en MOCK: identificación por huella, que trabaja sobre el id REAL que devuelve el servidor, sin
-/// crear otra emergencia. Los fallos de las llamadas reales llegan como <see cref="MobileApiException"/>.
+/// observaciones, y el traslado (solicitar, iniciar, cancelar). La identificación por huella es real y tiene su propio
+/// servicio (<see cref="HttpFingerprintIdentificationService"/>). Los fallos de las llamadas reales llegan como
+/// <see cref="MobileApiException"/>.
 /// </summary>
 public sealed class HttpParamedicApiService : IParamedicApiService
 {
@@ -47,9 +48,6 @@ public sealed class HttpParamedicApiService : IParamedicApiService
             return null;
         }
     }
-
-    // Huella (y cualquier otro método): sigue en mock.
-    public Task<EmergencyDto> IdentifyAsync(Guid emergencyId, IdentifyEmergencyDto dto) => _mock.IdentifyAsync(emergencyId, dto);
 
     // 200: la MISMA emergencia, ya identificada (también al reintentar con la misma clave). 404: ningún paciente tiene ese
     // documento; la emergencia sigue NN (null). 409 y el resto llegan como MobileApiException.
