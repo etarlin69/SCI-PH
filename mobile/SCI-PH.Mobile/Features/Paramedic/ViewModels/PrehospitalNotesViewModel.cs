@@ -4,7 +4,7 @@ using System.Net;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SCI_PH.Mobile.Common.Api;
-using SCI_PH.Mobile.Common.Dialogs;
+using SCI_PH.Mobile.Common.Navigation;
 using SCI_PH.Mobile.Common.ViewModels;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
@@ -22,7 +22,7 @@ public partial class PrehospitalNotesViewModel : BaseViewModel
     public const int ContentMaxLength = 4000;
 
     private readonly IParamedicApiService _api;
-    private readonly IAppDialogService _dialogs;
+    private readonly IAppNavigator _navigator;
 
     // Una observación = una clave y una hora, generadas en el primer intento de guardar y conservadas en cada reintento
     // (error de red, respuesta perdida, 400/403/404/409) para que el servidor no la registre dos veces. Se renuevan solo
@@ -30,10 +30,10 @@ public partial class PrehospitalNotesViewModel : BaseViewModel
     private Guid? _clientRequestId;
     private DateTime? _occurredAt;
 
-    public PrehospitalNotesViewModel(IParamedicApiService api, IAppDialogService dialogs)
+    public PrehospitalNotesViewModel(IParamedicApiService api, IAppNavigator navigator)
     {
         _api = api;
-        _dialogs = dialogs;
+        _navigator = navigator;
     }
 
     [ObservableProperty]
@@ -124,16 +124,12 @@ public partial class PrehospitalNotesViewModel : BaseViewModel
         }
     }
 
-    // Transferencia aún no existe: se informa con un diálogo en lugar de navegar.
+    // Siguiente paso del flujo: el traslado de la misma emergencia.
     [RelayCommand]
-    private async Task ContinueAsync()
-    {
-        // TODO: navegar a Transferencia (ParamedicRoutes.Transfer).
-        await _dialogs.ShowAsync(
-            "Observaciones",
-            $"Observaciones registradas: {SavedCount}\nSiguiente paso: transferencia (pendiente).",
-            "OK");
-    }
+    private Task ContinueAsync() =>
+        _navigator.GoToAsync(
+            ParamedicRoutes.Transfer,
+            new Dictionary<string, object> { ["EmergencyId"] = EmergencyId });
 
     private void ClearForm()
     {

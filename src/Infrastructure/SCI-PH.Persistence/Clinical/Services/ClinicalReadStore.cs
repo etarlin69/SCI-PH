@@ -201,6 +201,25 @@ namespace SCI_PH.Persistence.Clinical.Services
                 t => t.ClinicalEncounterId == encounterId && Domain.Entities.Transport.ClinicalTransfer.ActiveStatuses.Contains(t.Status),
                 cancellationToken);
 
+        public async Task<Guid?> FindActiveTransferIdAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            await _clinical.ClinicalTransfers.AsNoTracking()
+                .Where(t => t.ClinicalEncounterId == encounterId && Domain.Entities.Transport.ClinicalTransfer.ActiveStatuses.Contains(t.Status))
+                .Select(t => (Guid?)t.Id)
+                .SingleOrDefaultAsync(cancellationToken);
+
+        public async Task<IReadOnlyList<TransferDestinationRow>> ListTransferDestinationsAsync(CancellationToken cancellationToken) =>
+            await _clinical.Clinics.AsNoTracking()
+                .Where(c => c.Status == ClinicStatus.Active)
+                .OrderBy(c => c.Name).ThenBy(c => c.Municipality).ThenBy(c => c.Id)
+                .Select(c => new TransferDestinationRow(c.Id, c.Name, c.Type, c.Municipality, c.Province, c.Status))
+                .ToListAsync(cancellationToken);
+
+        public async Task<TransferDestinationRow?> GetTransferDestinationAsync(Guid clinicId, CancellationToken cancellationToken) =>
+            await _clinical.Clinics.AsNoTracking()
+                .Where(c => c.Id == clinicId)
+                .Select(c => new TransferDestinationRow(c.Id, c.Name, c.Type, c.Municipality, c.Province, c.Status))
+                .SingleOrDefaultAsync(cancellationToken);
+
         public async Task<TransferRow?> GetTransferAsync(Guid transferId, CancellationToken cancellationToken) =>
             (await ToTransferRowsAsync(_clinical.ClinicalTransfers.Where(t => t.Id == transferId), 1, cancellationToken)).SingleOrDefault();
 

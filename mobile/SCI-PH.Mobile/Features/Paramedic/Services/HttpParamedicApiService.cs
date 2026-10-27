@@ -11,7 +11,7 @@ namespace SCI_PH.Mobile.Features.Paramedic.Services;
 /// <summary>
 /// Servicio híbrido del área paramédica. REAL (Mobile BFF, con el cliente autenticado): abrir la emergencia, leerla,
 /// identificar al paciente por documento, registrar signos vitales, procedimientos, medicamentos administrados y
-/// observaciones. Sigue en MOCK: identificación por huella, que trabaja sobre el id REAL que devuelve el servidor, sin
+/// observaciones, y el traslado (solicitar, iniciar, cancelar). Sigue en MOCK: identificación por huella, que trabaja sobre el id REAL que devuelve el servidor, sin
 /// crear otra emergencia. Los fallos de las llamadas reales llegan como <see cref="MobileApiException"/>.
 /// </summary>
 public sealed class HttpParamedicApiService : IParamedicApiService
@@ -109,6 +109,21 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         await _client.PostAsync<NoteRequest, NoteResponse>($"{Emergencies}/{emergencyId}/notes", request);
     }
 
+    // Traslado a una clínica del catálogo: sin origen, horas ni personal (los pone el servidor). 201 (nuevo) o 200
+    // (reintento con la misma clave y los mismos datos): el mismo traslado. 400/403/404/409 llegan como MobileApiException.
+    public async Task<TransferDto> RequestTransferAsync(Guid emergencyId, RequestTransferDto dto)
+    {
+        var request = new TransferRequest(dto.ClientRequestId, dto.DestinationClinicId, dto.Reason, dto.Notes);
+        return ToDto(await _client.PostAsync<TransferRequest, TransferResponse>($"{Emergencies}/{emergencyId}/transfers", request));
+    }
+
+    // Siempre sobre ESE traslado: un reintento tardío nunca toca otro traslado de la emergencia.
+    public async Task<TransferDto> StartTransferAsync(Guid emergencyId, Guid transferId) =>
+        ToDto(await _client.PostAsync<object, TransferResponse>($"{Emergencies}/{emergencyId}/transfers/{transferId}/start", new { }));
+
+    public async Task<TransferDto> CancelTransferAsync(Guid emergencyId, Guid transferId) =>
+        ToDto(await _client.PostAsync<object, TransferResponse>($"{Emergencies}/{emergencyId}/transfers/{transferId}/cancel", new { }));
+
     private static DateTimeOffset ToUtc(DateTime value) =>
         new(value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(value, DateTimeKind.Utc) : value.ToUniversalTime());
 
@@ -118,7 +133,18 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         TemporaryPatientCode = response.TemporaryPatientCode,
         Status = ToStatus(response.Status),
         StartedAt = response.StartedAtUtc.UtcDateTime,
-        Patient = response.Patient is null ? null : new PatientSummaryDto { Id = response.Patient.Id, DisplayName = response.Patient.DisplayName }
+        Patient = response.Patient is null ? null : new PatientSummaryDto { Id = response.Patient.Id, DisplayName = response.Patient.DisplayName },
+        ActiveTransfer = response.ActiveTransfer is null ? null : ToDto(response.ActiveTransfer)
+    };
+
+    private static TransferDto ToDto(TransferResponse response) => new()
+    {
+        Id = response.Id,
+        Status = response.Status,
+        Destination = response.Destination,
+        RequestedAt = response.RequestedAtUtc.UtcDateTime,
+        SentAt = response.SentAtUtc?.UtcDateTime,
+        CancelledAt = response.CancelledAtUtc?.UtcDateTime
     };
 
     // Estados de la atención en el servidor (texto) → estados que muestra la app.
@@ -180,7 +206,23 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         string? Status,
         DateTimeOffset StartedAtUtc,
         string? ChiefComplaint,
-        EmergencyPatient? Patient);
+        EmergencyPatient? Patient,
+        TransferResponse? ActiveTransfer = null);
+
+    // Contrato exacto de la solicitud: sin origen, horas, estado ni personal; sin motivo o notas, el campo no se envía.
+    private sealed record TransferRequest(
+        Guid ClientRequestId,
+        Guid DestinationClinicId,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Reason,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Notes);
+
+    private sealed record TransferResponse(
+        Guid Id,
+        TransferStatus Status,
+        TransferDestinationDto Destination,
+        DateTimeOffset RequestedAtUtc,
+        DateTimeOffset? SentAtUtc,
+        DateTimeOffset? CancelledAtUtc);
 
     private sealed record EmergencyPatient(Guid Id, string? DisplayName);
 }

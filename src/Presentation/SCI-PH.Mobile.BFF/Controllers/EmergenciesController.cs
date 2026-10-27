@@ -133,5 +133,45 @@ namespace SCI_PH.Mobile.BFF.Controllers
             var result = await _emergencies.RecordNoteAsync(id, request, cancellationToken);
             return result.Created ? StatusCode(StatusCodes.Status201Created, result.Note) : Ok(result.Note);
         }
+
+        // Transfer to a clinic of GET api/mobile/catalogs/transfer-destinations. 201 the first time (no Location: the transfer
+        // is read through the emergency's activeTransfer); 200 with the same transfer when the same clientRequestId is
+        // retried with the same data; 404 for an unknown destination; 409 for an inactive destination, an emergency already
+        // on its way or with another active transfer, or a clientRequestId used with different data.
+        [HttpPost("{id:guid}/transfers")]
+        [Authorize(Policy = Permissions.Transfers.Manage)]
+        [ProducesResponseType<EmergencyTransferSummary>(StatusCodes.Status201Created)]
+        [ProducesResponseType<EmergencyTransferSummary>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> RequestTransfer(Guid id, RequestEmergencyTransferRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _emergencies.RequestTransferAsync(id, request, cancellationToken);
+            return result.Created ? StatusCode(StatusCodes.Status201Created, result.Transfer) : Ok(result.Transfer);
+        }
+
+        // The ambulance leaves: Requested -> InTransit and the emergency goes Transferred. 200 also when that transfer is
+        // already InTransit (a retry); 404 for a transfer of another emergency; 409 for a cancelled, received or completed one.
+        [HttpPost("{id:guid}/transfers/{transferId:guid}/start")]
+        [Authorize(Policy = Permissions.Transfers.Manage)]
+        [ProducesResponseType<EmergencyTransferSummary>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> StartTransfer(Guid id, Guid transferId, CancellationToken cancellationToken) =>
+            Ok(await _emergencies.StartTransferAsync(id, transferId, cancellationToken));
+
+        // Calls off THIS transfer (Requested or InTransit; an InTransit one returns the emergency to InProgress). 200 also
+        // when it is already cancelled (a retry); 404 for a transfer of another emergency; 409 for a received or completed one.
+        [HttpPost("{id:guid}/transfers/{transferId:guid}/cancel")]
+        [Authorize(Policy = Permissions.Transfers.Manage)]
+        [ProducesResponseType<EmergencyTransferSummary>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> CancelTransfer(Guid id, Guid transferId, CancellationToken cancellationToken) =>
+            Ok(await _emergencies.CancelTransferAsync(id, transferId, cancellationToken));
     }
 }

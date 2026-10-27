@@ -59,6 +59,21 @@ public static class ParamedicMessages
 
     public const string NoteRecorded = "Observación registrada. Puedes agregar otra.";
 
+    public const string TransferDestinationsFailed = "No se pudo cargar la lista de destinos.";
+
+    public const string RequestTransferFailed = "No se pudo solicitar el traslado. Intenta nuevamente.";
+
+    public const string TransferStepFailed = "No se pudo actualizar el traslado. Intenta nuevamente.";
+
+    /// <summary>404: la emergencia, el traslado o el destino ya no existen para este usuario.</summary>
+    public const string TransferNotFound = "No se encontró la emergencia, el traslado o el destino. Vuelve a cargar la pantalla.";
+
+    /// <summary>409: destino inactivo, ya hay otro traslado, estado incompatible, la solicitud se usó con otros datos o el hospital ya recibió al paciente.</summary>
+    public const string TransferConflict =
+        "No se pudo completar: el destino no está activo, ya hay otro traslado, el traslado cambió de estado o el hospital ya recibió al paciente.";
+
+    public const string TransferCancelled = "Traslado cancelado. Puedes solicitar otro destino.";
+
     /// <summary>Hora de la observación antes del primer intento de guardar: se fija automáticamente.</summary>
     public const string NoteTimePending = "Se registrará con la hora al guardar.";
 }

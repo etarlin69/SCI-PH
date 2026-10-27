@@ -14,4 +14,9 @@ public interface IParamedicApiService
     Task RegisterProcedureAsync(Guid emergencyId, RegisterProcedureDto dto);
     Task RegisterMedicationAsync(Guid emergencyId, RegisterMedicationDto dto);
     Task RegisterNoteAsync(Guid emergencyId, RegisterNoteDto dto);
+    Task<TransferDto> RequestTransferAsync(Guid emergencyId, RequestTransferDto dto);
+    /// <summary>Inicia ESE traslado (Requested → InTransit). Repetirlo sobre uno ya InTransit devuelve el mismo traslado.</summary>
+    Task<TransferDto> StartTransferAsync(Guid emergencyId, Guid transferId);
+    /// <summary>Cancela ESE traslado. Repetirlo sobre uno ya cancelado devuelve el mismo traslado.</summary>
+    Task<TransferDto> CancelTransferAsync(Guid emergencyId, Guid transferId);
 }

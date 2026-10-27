@@ -407,8 +407,8 @@ namespace SCI_PH.Application.Tests.Clinical
             Assert.Empty(Administrations(harness));
         }
 
+        // Transferred without clinic is the way to the hospital and accepts records (EmergencyTransferTests).
         [Theory]
-        [InlineData(ClinicalEncounterStatus.Transferred)]
         [InlineData(ClinicalEncounterStatus.Closed)]
         [InlineData(ClinicalEncounterStatus.Cancelled)]
         public async Task AnEmergencyThatNoLongerAcceptsRecordsRejectsTheDose(ClinicalEncounterStatus status)

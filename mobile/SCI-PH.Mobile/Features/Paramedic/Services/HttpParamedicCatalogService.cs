@@ -7,12 +7,14 @@ namespace SCI_PH.Mobile.Features.Paramedic.Services;
 
 /// <summary>
 /// Catálogos REALES del área paramédica: procedimientos (GET /api/mobile/catalogs/procedures, catálogo fijo del servidor)
-/// y medicamentos activos (GET /api/mobile/catalogs/medications). Los fallos llegan como <see cref="MobileApiException"/>.
+/// medicamentos activos (GET /api/mobile/catalogs/medications) y destinos de traslado (GET
+/// /api/mobile/catalogs/transfer-destinations). Los fallos llegan como <see cref="MobileApiException"/>.
 /// </summary>
 public sealed class HttpParamedicCatalogService : IParamedicCatalogService
 {
     private const string ProceduresCatalog = "api/mobile/catalogs/procedures";
     private const string MedicationsCatalog = "api/mobile/catalogs/medications";
+    private const string TransferDestinations = "api/mobile/catalogs/transfer-destinations";
 
     private readonly IMobileApiClient _client;
 
@@ -35,6 +37,9 @@ public sealed class HttpParamedicCatalogService : IParamedicCatalogService
                 DefaultRoute = item.DefaultRoute
             })
             .ToList();
+
+    public async Task<IReadOnlyList<TransferDestinationDto>> GetTransferDestinationsAsync() =>
+        (await _client.GetAsync<List<TransferDestinationDto>>(TransferDestinations)).ToList();
 
     private sealed record ProcedureCatalogItem(string Code, string Name, string? Description);
 

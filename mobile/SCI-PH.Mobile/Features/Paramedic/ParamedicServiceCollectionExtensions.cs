@@ -10,8 +10,8 @@ public static class ParamedicServiceCollectionExtensions
 {
     public static IServiceCollection AddParamedicFeature(this IServiceCollection services)
     {
-        // Emergencia, identificación por documento, signos vitales, procedimientos, medicamentos, sus catálogos y
-        // observaciones: Mobile BFF real. Huella: todavía mock.
+        // Emergencia, identificación por documento, signos vitales, procedimientos, medicamentos, observaciones, traslado
+        // y sus catálogos: Mobile BFF real. Huella: todavía mock.
         services.AddSingleton<MockParamedicApiService>();
         services.AddSingleton<IParamedicApiService, HttpParamedicApiService>();
         services.AddSingleton<IFingerprintReaderService, MockFingerprintReaderService>();
@@ -24,6 +24,7 @@ public static class ParamedicServiceCollectionExtensions
         services.AddTransient<ProceduresViewModel>();
         services.AddTransient<MedicationsViewModel>();
         services.AddTransient<PrehospitalNotesViewModel>();
+        services.AddTransient<TransferViewModel>();
 
         // Views
         services.AddTransient<NewEmergencyPage>();
@@ -32,6 +33,7 @@ public static class ParamedicServiceCollectionExtensions
         services.AddTransient<ProceduresPage>();
         services.AddTransient<MedicationsPage>();
         services.AddTransient<PrehospitalNotesPage>();
+        services.AddTransient<TransferPage>();
 
         return services;
     }
@@ -48,5 +50,6 @@ public static class ParamedicServiceCollectionExtensions
         Routing.RegisterRoute(ParamedicRoutes.Procedures, typeof(ProceduresPage));
         Routing.RegisterRoute(ParamedicRoutes.Medications, typeof(MedicationsPage));
         Routing.RegisterRoute(ParamedicRoutes.Notes, typeof(PrehospitalNotesPage));
+        Routing.RegisterRoute(ParamedicRoutes.Transfer, typeof(TransferPage));
     }
 }

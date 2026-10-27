@@ -73,6 +73,15 @@ namespace SCI_PH.Application.Abstractions.Clinical
         // Transfers of the encounter that are still Requested or InTransit.
         Task<bool> HasActiveTransferAsync(Guid encounterId, CancellationToken cancellationToken);
 
+        // The Requested or InTransit transfer of the encounter (at most one, by a unique index), or null.
+        Task<Guid?> FindActiveTransferIdAsync(Guid encounterId, CancellationToken cancellationToken);
+
+        // Active clinics as transfer destinations, by name, then municipality, then id.
+        Task<IReadOnlyList<TransferDestinationRow>> ListTransferDestinationsAsync(CancellationToken cancellationToken);
+
+        // Any clinic (active or not) as a transfer destination, or null when it does not exist.
+        Task<TransferDestinationRow?> GetTransferDestinationAsync(Guid clinicId, CancellationToken cancellationToken);
+
         Task<TransferRow?> GetTransferAsync(Guid transferId, CancellationToken cancellationToken);
 
         // Transfers in the given statuses whose destination is one of the clinics, most recently requested first.

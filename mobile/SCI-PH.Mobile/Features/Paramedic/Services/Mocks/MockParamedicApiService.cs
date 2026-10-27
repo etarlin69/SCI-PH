@@ -147,6 +147,16 @@ public class MockParamedicApiService : IParamedicApiService
         _processedRequests.Add(dto.ClientRequestId);
     }
 
+    // El traslado solo existe en el servidor (HttpParamedicApiService); el servicio simulado no lo representa.
+    public Task<TransferDto> RequestTransferAsync(Guid emergencyId, RequestTransferDto dto) =>
+        throw new NotSupportedException("El traslado solo existe en el Mobile BFF.");
+
+    public Task<TransferDto> StartTransferAsync(Guid emergencyId, Guid transferId) =>
+        throw new NotSupportedException("El traslado solo existe en el Mobile BFF.");
+
+    public Task<TransferDto> CancelTransferAsync(Guid emergencyId, Guid transferId) =>
+        throw new NotSupportedException("El traslado solo existe en el Mobile BFF.");
+
     private EmergencyDto GetOrThrow(Guid id) =>
         _emergencies.TryGetValue(id, out var e)
             ? e

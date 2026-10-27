@@ -454,14 +454,15 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
         }
 
         [SkippableFact]
-        public async Task AClosedOrTransferredEmergencyRejectsTheDose()
+        public async Task AClosedOrCancelledEmergencyRejectsTheDose()
         {
             Skip.IfNot(_postgres.Available, _postgres.SkipReason);
             await using var host = await MobileEmergencyHost.StartAsync(_postgres);
             var paramedic = await host.SignInAsync(SecurityRoles.Paramedic, [await host.Web.CreateClinicAsync()]);
             var medication = await host.Web.SeedMedicationAsync();
 
-            foreach (var target in new[] { ClinicalEncounterStatus.Transferred, ClinicalEncounterStatus.Closed, ClinicalEncounterStatus.Cancelled })
+            // Transferred without clinic is the way to the hospital and accepts records (MobileTransferApiTests).
+            foreach (var target in new[] { ClinicalEncounterStatus.Closed, ClinicalEncounterStatus.Cancelled })
             {
                 var opened = await OpenAsync(paramedic, NowToTheMillisecond().AddMinutes(-10));
                 await host.Web.DbAsync(async db =>
