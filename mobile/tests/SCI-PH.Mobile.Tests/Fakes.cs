@@ -12,6 +12,9 @@ internal sealed class EmptyParamedicCatalog : IParamedicCatalogService
 
     public Task<IReadOnlyList<MedicationCatalogItemDto>> GetMedicationsAsync() =>
         Task.FromResult<IReadOnlyList<MedicationCatalogItemDto>>([]);
+
+    public Task<IReadOnlyList<TransferDestinationDto>> GetTransferDestinationsAsync() =>
+        Task.FromResult<IReadOnlyList<TransferDestinationDto>>([]);
 }
 
 /// <summary>Registra cada navegación en lugar de usar Shell.</summary>
@@ -99,4 +102,10 @@ internal sealed class RecordingParamedicApi : IParamedicApiService
     public Task RegisterMedicationAsync(Guid emergencyId, RegisterMedicationDto dto) => Task.CompletedTask;
 
     public Task RegisterNoteAsync(Guid emergencyId, RegisterNoteDto dto) => Task.CompletedTask;
+
+    public Task<TransferDto> RequestTransferAsync(Guid emergencyId, RequestTransferDto dto) => Task.FromResult(new TransferDto());
+
+    public Task<TransferDto> StartTransferAsync(Guid emergencyId, Guid transferId) => Task.FromResult(new TransferDto());
+
+    public Task<TransferDto> CancelTransferAsync(Guid emergencyId, Guid transferId) => Task.FromResult(new TransferDto());
 }

@@ -81,13 +81,12 @@ public class ParamedicViewModelTests
         await new VitalSignsViewModel(api, navigator) { EmergencyId = emergencyId }.ContinueCommand.ExecuteAsync(null);
         await new ProceduresViewModel(api, catalog, navigator) { EmergencyId = emergencyId }.ContinueCommand.ExecuteAsync(null);
         await new MedicationsViewModel(api, catalog, navigator) { EmergencyId = emergencyId }.ContinueCommand.ExecuteAsync(null);
-        await new PrehospitalNotesViewModel(api, dialogs) { EmergencyId = emergencyId }.ContinueCommand.ExecuteAsync(null);
+        await new PrehospitalNotesViewModel(api, navigator) { EmergencyId = emergencyId }.ContinueCommand.ExecuteAsync(null);
 
         Assert.Equal(
-            [ParamedicRoutes.Procedures, ParamedicRoutes.Medications, ParamedicRoutes.Notes],
+            [ParamedicRoutes.Procedures, ParamedicRoutes.Medications, ParamedicRoutes.Notes, ParamedicRoutes.Transfer],
             navigator.Navigations.Select(n => n.Route));
         Assert.All(navigator.Navigations, n => Assert.Equal(emergencyId, n.Parameters!["EmergencyId"]));
-        // Transferencia aún no existe: Observaciones informa con un diálogo en lugar de navegar.
-        Assert.Single(dialogs.Shown);
+        Assert.Empty(dialogs.Shown);
     }
 }

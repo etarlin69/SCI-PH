@@ -15,20 +15,20 @@ namespace SCI_PH.Mobile.Tests.Paramedic;
 
 // Observaciones REALES (POST api/mobile/emergencies/{id}/notes) sobre la emergencia real: una por envío, con su propia
 // clave y su hora automática, conservadas en los reintentos. Tras registrar, la pantalla queda lista para otra
-// observación; "Continuar" informa que la transferencia está pendiente.
+// observación; "Continuar" lleva al traslado.
 public class PrehospitalNotesTests
 {
     private const string Text = "Paciente consciente, orientado.";
     private readonly FakeNotesBff _bff = new();
     private readonly MockParamedicApiService _mock = new();
-    private readonly FakeDialogs _dialogs = new();
+    private readonly FakeNavigator _navigator = new();
     private readonly Guid _emergencyId = Guid.NewGuid();
 
     public PrehospitalNotesTests() => _mock.Adopt(new EmergencyDto { Id = _emergencyId });
 
     private HttpParamedicApiService Service() => new(_bff.Client(), _mock);
 
-    private PrehospitalNotesViewModel ViewModel(string content = Text) => new(Service(), _dialogs) { EmergencyId = _emergencyId, Content = content };
+    private PrehospitalNotesViewModel ViewModel(string content = Text) => new(Service(), _navigator) { EmergencyId = _emergencyId, Content = content };
 
     private JsonElement Body(int index) => JsonDocument.Parse(_bff.Bodies[index]).RootElement;
 
@@ -37,8 +37,8 @@ public class PrehospitalNotesTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IMobileApiClient>(_bff.Client());
-        services.AddSingleton<IAppDialogService>(_dialogs);
-        services.AddSingleton<IAppNavigator>(new FakeNavigator());
+        services.AddSingleton<IAppDialogService>(new FakeDialogs());
+        services.AddSingleton<IAppNavigator>(_navigator);
 
         services.AddParamedicFeature();
 
@@ -164,7 +164,7 @@ public class PrehospitalNotesTests
         Assert.Equal(1, _bff.Recorded);
 
         await vm.ContinueCommand.ExecuteAsync(null);
-        Assert.Single(_dialogs.Shown);
+        Assert.Equal(ParamedicRoutes.Transfer, Assert.Single(_navigator.Navigations).Route);
     }
 
     // Success: confirmation, the note in the session list, an empty editor and a new key and time for the next note.
@@ -178,7 +178,7 @@ public class PrehospitalNotesTests
         Assert.Equal((null, ParamedicMessages.NoteRecorded), (vm.ErrorMessage, vm.SuccessMessage));
         Assert.Equal(("", ParamedicMessages.NoteTimePending, 1), (vm.Content, vm.OccurredAtText, vm.SavedCount));
         Assert.EndsWith(Text, vm.SavedSummaries[0]);
-        Assert.Empty(_dialogs.Shown);
+        Assert.Empty(_navigator.Navigations);
 
         vm.Content = "Segunda observación.";
         await Task.Delay(1100);
@@ -192,16 +192,15 @@ public class PrehospitalNotesTests
     }
 
     [Fact]
-    public async Task ContinueShowsThePendingTransferPlaceholder()
+    public async Task ContinueGoesToTheTransferOfTheSameEmergency()
     {
         var vm = ViewModel();
         await vm.SaveCommand.ExecuteAsync(null);
 
         await vm.ContinueCommand.ExecuteAsync(null);
 
-        var (title, message) = Assert.Single(_dialogs.Shown);
-        Assert.Equal("Observaciones", title);
-        Assert.Contains("transferencia (pendiente)", message);
+        var (route, parameters) = Assert.Single(_navigator.Navigations);
+        Assert.Equal((ParamedicRoutes.Transfer, _emergencyId), (route, parameters!["EmergencyId"]));
     }
 
     [Fact]
