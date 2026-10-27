@@ -25,8 +25,8 @@ namespace SCI_PH.Application.Features.Clinical
     // assigned to it (EncounterStaffAssignment, function Paramedic), which is what gives access to this concrete case
     // (IEncounterAccessService). On arrival, TransferService/ReceiveAtClinic sets the destination clinic on the SAME
     // encounter. The NN patient can then be identified by document on that same encounter (EncounterService), and readings
-    // of vital signs, completed procedures and administered medications are recorded on it, identified or not. Opening,
-    // identifying and recording are idempotent per (user, operation, clientRequestId): see IIdempotencyStore.
+    // of vital signs, completed procedures, administered medications and observations are recorded on it, identified or
+    // not. Opening, identifying and recording are idempotent per (user, operation, clientRequestId): see IIdempotencyStore.
     public sealed class PrehospitalEmergencyService
     {
         // Server-controlled operation name of the idempotency receipts; a new version gets a new name.
@@ -35,6 +35,7 @@ namespace SCI_PH.Application.Features.Clinical
         public const string RecordVitalSignsOperation = "prehospital-emergency.vital-signs.v1";
         public const string RecordProcedureOperation = "prehospital-emergency.procedure.v1";
         public const string RecordMedicationAdministrationOperation = "prehospital-emergency.medication-administration.v1";
+        public const string RecordNoteOperation = "prehospital-emergency.note.v1";
 
         // VitalSign.Value is numeric(8,2): a value with more decimals is rejected rather than rounded by the database.
         public const int MaxVitalSignDecimals = 2;
@@ -367,7 +368,51 @@ namespace SCI_PH.Application.Features.Clinical
                 Created: true);
         }
 
-        // Shared write check of the records on an emergency (vital signs, procedures, medication administrations). Only prehospital encounters are
+        // An observation of the paramedic (ClinicalNote.Write, type always Prehospital, author = the session's staff), with its
+        // audit entry (never the content), the start of the encounter (Created -> InProgress) and the receipt, in one
+        // transaction. Notes are immutable: a correction is another note. Access, statuses, the clock window and the
+        // encounter's concurrency tokens are the same as for the other records; the Web path (EncounterRecordService) keeps
+        // the clinic rule. Same key and same note again (also when it races the first one): the same answer, nothing new;
+        // access is still checked. Same key with another content, time or emergency: 409.
+        public async Task<RecordEmergencyNoteResult> RecordNoteAsync(
+            Guid emergencyId, RecordEmergencyNoteRequest request, CancellationToken cancellationToken)
+        {
+            var clientRequestId = ClinicalInput.Id(request.ClientRequestId, "clientRequestId");
+            var occurredAt = request.OccurredAt.ToUniversalTime();
+            var content = NoteContent(request.Content);
+            var actor = await _actor.GetAsync(cancellationToken);
+            var key = new IdempotencyKey(actor.IdentityUserId, RecordNoteOperation, clientRequestId);
+            // The instant in UTC and the trimmed content, never the raw JSON; CreatedAtUtc is not part of the request.
+            var requestHash = IdempotencyRequestHash.Compute(
+                emergencyId.ToString("D"), IdempotencyRequestHash.Instant(occurredAt), content);
+
+            if (await _receipts.FindAsync(key, cancellationToken) is { } existing)
+            {
+                return await ReplayNoteAsync(actor, existing, requestHash, emergencyId, occurredAt, content, cancellationToken);
+            }
+
+            var encounter = await LoadForRecordingAsync(actor, emergencyId, Permissions.ClinicalNotes.Write, cancellationToken);
+            var now = _time.GetUtcNow();
+            DeviceClinicalTime(occurredAt, encounter.StartedAtUtc, now, "occurredAt");
+            var note = ClinicalInput.Apply(() => ClinicalNote.Write(
+                encounter.Id, actor.StaffId, ClinicalNoteType.Prehospital, content, occurredAt));
+
+            StartIfCreated(encounter, now);
+            _writes.Add(note);
+            _writes.Add(ClinicalAuditEntry.Success(
+                actor.AuditActor, AuditActionType.Create, nameof(ClinicalNote), note.Id.ToString(), now,
+                new AuditContext(encounter.PatientId, encounter.Id)));
+            _receipts.Add(new IdempotencyReceipt(key, requestHash, note.Id, now));
+            if (await SaveRecordAsync(key, cancellationToken) is { } winner)
+            {
+                return await ReplayNoteAsync(actor, winner, requestHash, emergencyId, occurredAt, content, cancellationToken);
+            }
+
+            return new RecordEmergencyNoteResult(
+                new EmergencyNoteSummary(note.Id, encounter.Id, ClinicalNoteType.Prehospital, content, occurredAt), Created: true);
+        }
+
+        // Shared write check of the records on an emergency (vital signs, procedures, medication administrations, notes). Only prehospital encounters are
         // emergencies here. Access: the assignment while there is no clinic (IEncounterAccessService), plus the patient
         // rule for the permission once the patient is identified; the shared recording check of EncounterRecordService is
         // not used, so the Web records keep the clinic rule. The status check can be outdated by commit time, so the
@@ -472,6 +517,23 @@ namespace SCI_PH.Application.Features.Clinical
                 new EmergencyMedicationAdministrationSummary(
                     receipt.ResourceId, emergency.Id, medication.Id, medication.Name, dose, doseUnit, route, administeredAt, notes),
                 Created: false);
+        }
+
+        // The receipt's resource is the recorded note; the emergency is the one of the request (the hash covers it). A replay
+        // re-checks access (ReadAsync) but not the clock or the status: the note was valid when it was recorded.
+        private async Task<RecordEmergencyNoteResult> ReplayNoteAsync(
+            ClinicalActor actor,
+            IdempotencyReceipt receipt,
+            string requestHash,
+            Guid emergencyId,
+            DateTimeOffset occurredAt,
+            string content,
+            CancellationToken cancellationToken)
+        {
+            EnsureSameRequest(receipt, requestHash);
+            var emergency = await ReadAsync(actor, emergencyId, cancellationToken);
+            return new RecordEmergencyNoteResult(
+                new EmergencyNoteSummary(receipt.ResourceId, emergency.Id, ClinicalNoteType.Prehospital, content, occurredAt), Created: false);
         }
 
         // A replay re-checks access (ReadAsync) but not the clock or the status: the reading was valid when it was recorded.
@@ -608,6 +670,20 @@ namespace SCI_PH.Application.Features.Clinical
             return text.Length <= FieldLengths.LongText
                 ? text
                 : throw new RequestValidationException($"{field} cannot exceed {FieldLengths.LongText} characters.", field);
+        }
+
+        // ClinicalNote.Content: required, trimmed, 1 to FieldLengths.NoteContent characters. Never echoed in errors.
+        private static string NoteContent(string? value)
+        {
+            var text = value?.Trim();
+            if (string.IsNullOrEmpty(text))
+            {
+                throw new RequestValidationException("content is required.", "content");
+            }
+
+            return text.Length <= FieldLengths.NoteContent
+                ? text
+                : throw new RequestValidationException($"content cannot exceed {FieldLengths.NoteContent} characters.", "content");
         }
 
         // MedicationAdministration.Dose: > 0 (Domain), at most 3 decimals and below 10^9 (numeric(12,3)), in canonical form

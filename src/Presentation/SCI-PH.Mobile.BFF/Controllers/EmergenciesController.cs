@@ -116,5 +116,22 @@ namespace SCI_PH.Mobile.BFF.Controllers
             var result = await _emergencies.RecordMedicationAdministrationAsync(id, request, cancellationToken);
             return result.Created ? StatusCode(StatusCodes.Status201Created, result.Administration) : Ok(result.Administration);
         }
+
+        // One observation of the paramedic (type Prehospital, fixed by the server). 201 the first time (no Location: there is
+        // no endpoint that reads a single note); 200 with the same note when the same clientRequestId is retried with the
+        // same data; 409 when that clientRequestId was used with different data or the emergency no longer accepts records.
+        [HttpPost("{id:guid}/notes")]
+        [Authorize(Policy = Permissions.ClinicalNotes.Write)]
+        [ProducesResponseType<EmergencyNoteSummary>(StatusCodes.Status201Created)]
+        [ProducesResponseType<EmergencyNoteSummary>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> RecordNote(Guid id, RecordEmergencyNoteRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _emergencies.RecordNoteAsync(id, request, cancellationToken);
+            return result.Created ? StatusCode(StatusCodes.Status201Created, result.Note) : Ok(result.Note);
+        }
     }
 }
