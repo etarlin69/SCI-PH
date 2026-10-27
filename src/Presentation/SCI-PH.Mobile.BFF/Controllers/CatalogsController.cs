@@ -8,7 +8,8 @@ namespace SCI_PH.Mobile.BFF.Controllers
 {
     // Catalogs of the paramedic app. Emergencies.Operate opens the module (controller level), as for the emergencies.
     // The procedure catalog holds no patient data and is only used to record a procedure, so it takes the permission of
-    // that write (Procedures.Write): there is no Procedures.Read. No role is checked here.
+    // that write (Procedures.Write): there is no Procedures.Read. The medication catalog takes Medications.Read. No role is
+    // checked here.
     [ApiController]
     [Route("api/mobile/catalogs")]
     [Authorize(Policy = Permissions.Emergencies.Operate)]
@@ -24,5 +25,13 @@ namespace SCI_PH.Mobile.BFF.Controllers
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> Procedures(CancellationToken cancellationToken) =>
             Ok(await _emergencies.ListProcedureCatalogAsync(cancellationToken));
+
+        // Active medications of the global catalog (Medications.Read, as the Web catalog); inactive ones are not listed.
+        [HttpGet("medications")]
+        [Authorize(Policy = Permissions.Medications.Read)]
+        [ProducesResponseType<IReadOnlyList<PrehospitalMedicationCatalogItem>>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> Medications(CancellationToken cancellationToken) =>
+            Ok(await _emergencies.ListMedicationCatalogAsync(cancellationToken));
     }
 }

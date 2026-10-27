@@ -10,9 +10,11 @@ using SCI_PH.Application.DTOs.Clinical;
 using SCI_PH.Domain.Constants;
 using SCI_PH.Domain.Entities.Auditing;
 using SCI_PH.Domain.Entities.Encounters;
+using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Patients;
 using SCI_PH.Domain.Enums.Auditing;
 using SCI_PH.Domain.Enums.Encounters;
+using SCI_PH.Domain.Enums.Medications;
 using SCI_PH.Domain.Enums.Patients;
 using SCI_PH.Domain.Exceptions;
 
@@ -23,8 +25,8 @@ namespace SCI_PH.Application.Features.Clinical
     // assigned to it (EncounterStaffAssignment, function Paramedic), which is what gives access to this concrete case
     // (IEncounterAccessService). On arrival, TransferService/ReceiveAtClinic sets the destination clinic on the SAME
     // encounter. The NN patient can then be identified by document on that same encounter (EncounterService), and readings
-    // of vital signs and completed procedures are recorded on it, identified or not. Opening, identifying and recording are
-    // idempotent per (user, operation, clientRequestId): see IIdempotencyStore.
+    // of vital signs, completed procedures and administered medications are recorded on it, identified or not. Opening,
+    // identifying and recording are idempotent per (user, operation, clientRequestId): see IIdempotencyStore.
     public sealed class PrehospitalEmergencyService
     {
         // Server-controlled operation name of the idempotency receipts; a new version gets a new name.
@@ -32,9 +34,15 @@ namespace SCI_PH.Application.Features.Clinical
         public const string IdentifyByDocumentOperation = "prehospital-emergency.identify-document.v1";
         public const string RecordVitalSignsOperation = "prehospital-emergency.vital-signs.v1";
         public const string RecordProcedureOperation = "prehospital-emergency.procedure.v1";
+        public const string RecordMedicationAdministrationOperation = "prehospital-emergency.medication-administration.v1";
 
         // VitalSign.Value is numeric(8,2): a value with more decimals is rejected rather than rounded by the database.
         public const int MaxVitalSignDecimals = 2;
+
+        // MedicationAdministration.Dose is numeric(12,3): more decimals would be rounded by the database and 10^9 or more
+        // would overflow it, so both are a 400 here instead.
+        public const int MaxDoseDecimals = 3;
+        public const decimal DoseUpperBound = 1_000_000_000m;
 
         // Document types a paramedic can identify with: identity-bearing and typed by hand.
         public static IReadOnlyCollection<PatientIdentifierType> DocumentTypes { get; } =
@@ -290,7 +298,76 @@ namespace SCI_PH.Application.Features.Clinical
                 new EmergencyProcedureSummary(procedure.Id, encounter.Id, entry.Code, entry.Name, performedAt, outcome), Created: true);
         }
 
-        // Shared write check of the records on an emergency (vital signs, procedures). Only prehospital encounters are
+        // The active entries of the global medication catalog, by name and concentration. Only active clinical staff use it
+        // (same actor rule as the Web catalog). An entry deactivated after the app loaded the list is still rejected by
+        // RecordMedicationAdministrationAsync.
+        public async Task<IReadOnlyList<PrehospitalMedicationCatalogItem>> ListMedicationCatalogAsync(CancellationToken cancellationToken)
+        {
+            await _actor.GetAsync(cancellationToken);
+            return (await _reads.ListMedicationsAsync(cancellationToken))
+                .Where(m => m.Status == MedicationStatus.Active)
+                .Select(m => new PrehospitalMedicationCatalogItem(m.Id, m.Code, m.Name, m.Presentation, m.Concentration, m.DefaultRoute))
+                .ToList();
+        }
+
+        // A dose the paramedic already gave (MedicationAdministration.Record, without prescription: the paramedic does not
+        // prescribe), with its audit entry, the start of the encounter (Created -> InProgress) and the receipt, in one
+        // transaction. The medication must exist (404) and be active (409); the staff comes from the session. Access,
+        // statuses, the clock window and the encounter's concurrency tokens are the same as for vital signs and procedures;
+        // the Web path (MedicationService) keeps the clinic rule. Same key and same dose again (also when it races the first
+        // one): the same answer, nothing new, even if the medication was deactivated since; access is still checked. Same
+        // key with any other value or emergency: 409.
+        public async Task<RecordEmergencyMedicationAdministrationResult> RecordMedicationAdministrationAsync(
+            Guid emergencyId, RecordEmergencyMedicationAdministrationRequest request, CancellationToken cancellationToken)
+        {
+            var clientRequestId = ClinicalInput.Id(request.ClientRequestId, "clientRequestId");
+            ClinicalInput.Id(request.MedicationId, "medicationId");
+            var dose = Dose(request.Dose);
+            var doseUnit = DoseUnit(request.DoseUnit);
+            var route = ClinicalInput.Defined(request.Route, "route");
+            var administeredAt = request.AdministeredAt.ToUniversalTime();
+            var notes = OptionalLongText(request.Notes, "notes");
+            var actor = await _actor.GetAsync(cancellationToken);
+            var key = new IdempotencyKey(actor.IdentityUserId, RecordMedicationAdministrationOperation, clientRequestId);
+            // Canonical values: the dose without trailing zeros (500 = 500.0), the trimmed unit, the route name, the
+            // instant in UTC and the trimmed notes (blank = none). Never the raw JSON.
+            var requestHash = IdempotencyRequestHash.Compute(
+                emergencyId.ToString("D"), request.MedicationId.ToString("D"), dose.ToString(CultureInfo.InvariantCulture), doseUnit,
+                route.ToString(), IdempotencyRequestHash.Instant(administeredAt), notes);
+
+            if (await _receipts.FindAsync(key, cancellationToken) is { } existing)
+            {
+                return await ReplayMedicationAdministrationAsync(
+                    actor, existing, requestHash, emergencyId, request.MedicationId, dose, doseUnit, route, administeredAt, notes, cancellationToken);
+            }
+
+            var encounter = await LoadForRecordingAsync(actor, emergencyId, Permissions.MedicationAdministrations.Write, cancellationToken);
+            var now = _time.GetUtcNow();
+            DeviceClinicalTime(administeredAt, encounter.StartedAtUtc, now, "administeredAt");
+            var medication = (await MedicationService.LoadActiveMedicationsAsync(_reads, [request.MedicationId], cancellationToken))[request.MedicationId];
+            var administration = ClinicalInput.Apply(() => MedicationAdministration.Record(
+                encounter.Id, medication.Id, dose, doseUnit, route, administeredAt, actor.StaffId,
+                prescriptionId: null, prescriptionDetailId: null, notes: notes));
+
+            StartIfCreated(encounter, now);
+            _writes.Add(administration);
+            _writes.Add(ClinicalAuditEntry.Success(
+                actor.AuditActor, AuditActionType.Create, nameof(MedicationAdministration), administration.Id.ToString(), now,
+                new AuditContext(encounter.PatientId, encounter.Id)));
+            _receipts.Add(new IdempotencyReceipt(key, requestHash, administration.Id, now));
+            if (await SaveRecordAsync(key, cancellationToken) is { } winner)
+            {
+                return await ReplayMedicationAdministrationAsync(
+                    actor, winner, requestHash, emergencyId, request.MedicationId, dose, doseUnit, route, administeredAt, notes, cancellationToken);
+            }
+
+            return new RecordEmergencyMedicationAdministrationResult(
+                new EmergencyMedicationAdministrationSummary(
+                    administration.Id, encounter.Id, medication.Id, medication.Name, dose, doseUnit, route, administeredAt, notes),
+                Created: true);
+        }
+
+        // Shared write check of the records on an emergency (vital signs, procedures, medication administrations). Only prehospital encounters are
         // emergencies here. Access: the assignment while there is no clinic (IEncounterAccessService), plus the patient
         // rule for the permission once the patient is identified; the shared recording check of EncounterRecordService is
         // not used, so the Web records keep the clinic rule. The status check can be outdated by commit time, so the
@@ -369,6 +446,32 @@ namespace SCI_PH.Application.Features.Clinical
             var emergency = await ReadAsync(actor, emergencyId, cancellationToken);
             return new RecordEmergencyProcedureResult(
                 new EmergencyProcedureSummary(receipt.ResourceId, emergency.Id, entry.Code, entry.Name, performedAt, outcome), Created: false);
+        }
+
+        // The receipt's resource is the recorded administration; the emergency and the medication are the ones of the request
+        // (the hash covers them). A replay re-checks access (ReadAsync) but not the clock, the status or whether the
+        // medication is still active: the dose was valid when it was recorded. Only its name is read again.
+        private async Task<RecordEmergencyMedicationAdministrationResult> ReplayMedicationAdministrationAsync(
+            ClinicalActor actor,
+            IdempotencyReceipt receipt,
+            string requestHash,
+            Guid emergencyId,
+            Guid medicationId,
+            decimal dose,
+            string doseUnit,
+            MedicationRoute route,
+            DateTimeOffset administeredAt,
+            string? notes,
+            CancellationToken cancellationToken)
+        {
+            EnsureSameRequest(receipt, requestHash);
+            var emergency = await ReadAsync(actor, emergencyId, cancellationToken);
+            var medication = (await _reads.FindMedicationsAsync([medicationId], cancellationToken)).SingleOrDefault()
+                ?? throw new InvalidOperationException("The medication of a recorded administration was not found.");
+            return new RecordEmergencyMedicationAdministrationResult(
+                new EmergencyMedicationAdministrationSummary(
+                    receipt.ResourceId, emergency.Id, medication.Id, medication.Name, dose, doseUnit, route, administeredAt, notes),
+                Created: false);
         }
 
         // A replay re-checks access (ReadAsync) but not the clock or the status: the reading was valid when it was recorded.
@@ -490,7 +593,11 @@ namespace SCI_PH.Application.Features.Clinical
         }
 
         // ClinicalProcedure.Outcome: trimmed, blank = none, at most FieldLengths.LongText characters. Never echoed in errors.
-        private static string? Outcome(string? value)
+        private static string? Outcome(string? value) => OptionalLongText(value, "outcome");
+
+        // Optional free text of a record (procedure outcome, administration notes): trimmed, blank = none, at most
+        // FieldLengths.LongText characters. Never echoed in errors.
+        private static string? OptionalLongText(string? value, string field)
         {
             var text = value?.Trim();
             if (string.IsNullOrEmpty(text))
@@ -500,7 +607,41 @@ namespace SCI_PH.Application.Features.Clinical
 
             return text.Length <= FieldLengths.LongText
                 ? text
-                : throw new RequestValidationException($"outcome cannot exceed {FieldLengths.LongText} characters.", "outcome");
+                : throw new RequestValidationException($"{field} cannot exceed {FieldLengths.LongText} characters.", field);
+        }
+
+        // MedicationAdministration.Dose: > 0 (Domain), at most 3 decimals and below 10^9 (numeric(12,3)), in canonical form
+        // (500.0 -> 500), so the database neither rounds nor overflows it. No clinical dose rule.
+        private static decimal Dose(decimal value)
+        {
+            if (value <= 0)
+            {
+                throw new RequestValidationException("dose must be greater than zero.", "dose");
+            }
+
+            if (decimal.Round(value, MaxDoseDecimals) != value)
+            {
+                throw new RequestValidationException($"dose accepts at most {MaxDoseDecimals} decimals.", "dose");
+            }
+
+            return value < DoseUpperBound
+                ? value / 1.0000000000000000000000000000m
+                : throw new RequestValidationException("dose must be less than 1000000000.", "dose");
+        }
+
+        // MedicationAdministration.DoseUnit: free text, trimmed, 1 to FieldLengths.MeasurementUnit characters. Kept as written
+        // (no unit catalog, no conversion).
+        private static string DoseUnit(string? value)
+        {
+            var text = value?.Trim();
+            if (string.IsNullOrEmpty(text))
+            {
+                throw new RequestValidationException("doseUnit is required.", "doseUnit");
+            }
+
+            return text.Length <= FieldLengths.MeasurementUnit
+                ? text
+                : throw new RequestValidationException($"doseUnit cannot exceed {FieldLengths.MeasurementUnit} characters.", "doseUnit");
         }
 
         private static PatientIdentifierType DocumentType(PatientIdentifierType value) =>
