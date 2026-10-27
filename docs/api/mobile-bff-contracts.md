@@ -112,8 +112,9 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 
 > **Implementados:** `POST /api/mobile/emergencies`, `GET /api/mobile/emergencies/{id}` (V1, ver
 > [ADR-008](../adr/ADR-008-prehospital-emergency.md)), `POST /api/mobile/emergencies/{id}/identify/document`,
-> `POST /api/mobile/emergencies/{id}/vital-signs`, `POST /api/mobile/emergencies/{id}/procedures` y
-> `GET /api/mobile/catalogs/procedures`.
+> `POST /api/mobile/emergencies/{id}/vital-signs`, `POST /api/mobile/emergencies/{id}/procedures`,
+> `POST /api/mobile/emergencies/{id}/medication-administrations`, `GET /api/mobile/catalogs/procedures` y
+> `GET /api/mobile/catalogs/medications`.
 > **El resto siguen siendo contratos previstos** y pueden evolucionar mediante revisión arquitectónica.
 
 - **Usuarios:** personal clínico autenticado: un `ClinicalStaff` activo, vinculado a la cuenta y con al menos una
@@ -121,8 +122,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 - **Autorización:** todos los endpoints de `/api/mobile/emergencies` exigen el permiso `Emergencies.Operate` (rol
   Paramedic; Administrator lo tiene por tener todos) para entrar al módulo, además del permiso clínico de cada acción
   (abrir: `Encounters.Create`; leer: `Encounters.Read`; identificar por documento: `Patients.Read` + `Patients.Identify`;
-  signos vitales: `VitalSigns.Write`; procedimientos y su catálogo: `Procedures.Write`; previstos: los de
-  medicamentos, etc.). Nunca
+  signos vitales: `VitalSigns.Write`; procedimientos y su catálogo: `Procedures.Write`; medicamentos administrados:
+  `MedicationAdministrations.Write`; catálogo de medicamentos: `Medications.Read`). Nunca
   se comprueba un rol. Doctor, Nurse y Receptionist no tienen `Emergencies.Operate`: `403`.
 - **Acceso al caso concreto:** una emergencia es un `ClinicalEncounter` de tipo `Prehospital` **sin clínica**
   (`clinicId = null`) mientras no llega al hospital. La clínica base del paramédico no es el lugar de la emergencia y
@@ -132,9 +133,9 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
   código `NN-…` generado por el servidor) y se vincula a un `Patient` después. Al llegar, el hospital la recibe
   (`POST /api/web/transfers/{id}/receive`) y la **misma** atención pasa a tener la clínica destino.
 - **Registros clínicos:** signos vitales, procedimientos y medicamentos se **agregan** al episodio; no se editan ni se borran desde la app (las correcciones se definirán con el Rol 2).
-- **Hora del evento:** la apertura lleva `startedAt` y cada registro lleva la hora en que ocurrió en campo (`recordedAt` en los signos vitales, `performedAt` en los procedimientos), distinta de la hora en que llega al servidor, para soportar envío diferido.
-- **Idempotencia:** implementada en la apertura, en la identificación por documento, en los signos vitales y en los
-  procedimientos; los demás `POST` la usarán igual. Cada `POST` lleva un
+- **Hora del evento:** la apertura lleva `startedAt` y cada registro lleva la hora en que ocurrió en campo (`recordedAt` en los signos vitales, `performedAt` en los procedimientos, `administeredAt` en los medicamentos), distinta de la hora en que llega al servidor, para soportar envío diferido.
+- **Idempotencia:** implementada en la apertura, en la identificación por documento, en los signos vitales, en los
+  procedimientos y en los medicamentos administrados; los demás `POST` la usarán igual. Cada `POST` lleva un
   `clientRequestId` (`Guid` generado en el dispositivo una vez por operación y **reutilizado en cada reintento**). El
   servidor guarda un recibo por (usuario, operación, `clientRequestId`) con el hash SHA-256 del contenido lógico:
   - misma clave y mismo contenido → la **misma** respuesta (`200`, sin crear nada);
@@ -151,7 +152,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 | `POST` | `/api/mobile/emergencies/{id}/vital-signs` | Registra una toma de signos vitales | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/procedures` | Registra un procedimiento realizado | Implementado |
 | `GET` | `/api/mobile/catalogs/procedures` | Catálogo fijo de procedimientos prehospitalarios | Implementado |
-| `POST` | `/api/mobile/emergencies/{id}/medications` | Registra un medicamento administrado | Previsto |
+| `POST` | `/api/mobile/emergencies/{id}/medication-administrations` | Registra un medicamento administrado (sin prescripción) | Implementado |
+| `GET` | `/api/mobile/catalogs/medications` | Medicamentos activos del catálogo | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/transfer` | Inicia el traslado a un establecimiento | Previsto |
 
 ### Flujo previsto
@@ -162,7 +164,7 @@ POST /emergencies/{id}/identify/document   identifica al paciente por documento 
 POST /emergencies/{id}/identify    identifica al paciente (huella vía Device API, manual)
 POST /emergencies/{id}/vital-signs ┐ (signos vitales: implementado)
 POST /emergencies/{id}/procedures  ├ registros durante la atención (0..n veces; procedimientos: implementado)
-POST /emergencies/{id}/medications ┘
+POST /emergencies/{id}/medication-administrations ┘ (medicamentos: implementado)
 POST /emergencies/{id}/transfer    traslado → lo recibe el hospital en Web BFF
                                    (POST /api/web/transfers/{id}/receive)
 ```
@@ -518,24 +520,113 @@ canónica y la entrada del catálogo, así que un reintento responde exactamente
 
 ---
 
-### `POST /api/mobile/emergencies/{id}/medications`
+### `GET /api/mobile/catalogs/medications` — Implementado
 
-**Body (forma propuesta):**
+Permisos: `Emergencies.Operate` + `Medications.Read`, y ser personal clínico activo. Doctor, Nurse y Receptionist: `403`.
+
+Los medicamentos **activos** del catálogo global (`Medication`), ordenados por nombre y luego por concentración. Un
+medicamento inactivo no aparece. No se devuelve `status`.
+
+```json
+[
+  {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "code": "DEV-PARACETAMOL-500",
+    "name": "Paracetamol",
+    "presentation": "Tableta",
+    "concentration": "500 mg",
+    "defaultRoute": "Oral"
+  }
+]
+```
+
+- `id` es la identidad del medicamento (`code`, `presentation`, `concentration` y `defaultRoute` pueden ser `null`).
+- `defaultRoute` es el nombre de `MedicationRoute`: solo una **sugerencia** para preseleccionar la vía en la app.
+
+### `POST /api/mobile/emergencies/{id}/medication-administrations` — Implementado
+
+Permisos: `Emergencies.Operate` + `MedicationAdministrations.Write`, y acceso a la emergencia (mientras no tenga
+clínica, una asignación activa del usuario). Registra **una dosis ya administrada** sobre la **misma** emergencia, NN o
+identificada, en **una sola transacción** (todo o nada):
+
+- una `MedicationAdministration` (`MedicationAdministration.Record`) en estado `Completed`, **sin prescripción**
+  (`prescriptionId` y `prescriptionDetailId` son `null`: el paramédico no prescribe y no hace falta `Prescriptions.Write`),
+  con el personal autenticado como `administeredByStaffId`;
+- una auditoría `Create` de `MedicationAdministration`;
+- el paso de la atención de `Created` a `InProgress` si es el primer registro clínico;
+- el recibo de idempotencia.
+
+**Body:**
 
 ```json
 {
   "clientRequestId": "00000000-0000-0000-0000-000000000000",
-  "recordedAt": "2026-01-01T00:00:00Z",
-  "medicationCode": "…",
-  "dose": "…",
-  "route": "…",
-  "notes": "…"
+  "medicationId": "00000000-0000-0000-0000-000000000000",
+  "dose": 500,
+  "doseUnit": "mg",
+  "route": "Oral",
+  "administeredAt": "2026-01-01T00:00:00Z",
+  "notes": "Con agua"
 }
 ```
 
-Registra lo **administrado** por el paramédico. SCI-PH no prescribe.
+- `clientRequestId`: obligatorio, distinto de `Guid.Empty`. Propio de la dosis: la app lo genera una vez por dosis y
+  lo conserva en los reintentos.
+- `medicationId`: obligatorio, un medicamento del catálogo. Inexistente: `404`. **Inactivo: `409`** (se comprueba en
+  cada envío, porque puede desactivarse después de que la app cargó el catálogo).
+- `dose`: número `> 0`, con **máximo 3 decimales** y **menor que 1 000 000 000** (la columna es `numeric(12,3)`): fuera de
+  eso, `400` (`field: dose`), nunca un redondeo ni un desbordamiento en la base de datos. No hay reglas clínicas de dosis.
+- `doseUnit`: obligatorio, **texto libre** de 1 a 24 caracteres tras recortar espacios (`400`, `field: doseUnit`). Se
+  guarda tal como se escribió: no hay catálogo de unidades ni conversión. La lista de unidades de la app
+  (mg, mcg, g, mL, UI, gotas, inhalaciones, Otra) es solo una ayuda de interfaz, no una regla.
+- `route`: obligatorio, el **nombre exacto** de `MedicationRoute`: `Oral`, `Intravenous`, `Intramuscular`,
+  `Subcutaneous`, `Inhalation`, `Topical`, `Sublingual`, `Rectal`, `Nasal`, `Ophthalmic`, `Otic`, `Transdermal` u
+  `Other`. Un número u otro texto: `400`. No tiene que coincidir con `defaultRoute`.
+- `administeredAt`: obligatorio. ISO-8601 con `Z` o un offset explícito; sin offset, `400`. Se normaliza a UTC. Misma
+  ventana que los signos vitales y los procedimientos: desde el **inicio de la emergencia** hasta **5 minutos después**
+  de la hora del servidor, ambos límites incluidos; fuera, `400` (`field: administeredAt`).
+- `notes`: opcional. Se recorta; vacío = sin notas. Máximo 4000 caracteres (`400`, `field: notes`).
+- **No se aceptan** `prescriptionId`, `prescriptionDetailId`, `medicationName`, `name`, `presentation`,
+  `concentration`, `defaultRoute`, `staffId`, `patientId`, `clinicId`, `status`, `administeredAtUtc` ni ningún otro
+  campo: `400`.
 
-**Respuestas previstas:** `201 Created`, `400`, `401`, `403`, `404`, `409`.
+**Respuesta** (`201 Created` la primera vez, sin `Location`; `200 OK` en un reintento). Se construye con la petición
+canónica y el nombre del medicamento, así que un reintento responde exactamente lo mismo:
+
+```json
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "encounterId": "00000000-0000-0000-0000-000000000000",
+  "medicationId": "00000000-0000-0000-0000-000000000000",
+  "medicationName": "Paracetamol",
+  "dose": 500,
+  "doseUnit": "mg",
+  "route": "Oral",
+  "administeredAtUtc": "2026-01-01T00:00:00+00:00",
+  "notes": "Con agua"
+}
+```
+
+| Estado | Cuándo |
+|---|---|
+| `201` | Primera dosis con ese `clientRequestId` |
+| `200` | Reintento con el mismo `clientRequestId` y la misma dosis: nada nuevo, sin otra auditoría |
+| `400` | Dosis `<= 0`, con más de 3 decimales o `>= 1 000 000 000`; unidad vacía o de más de 24; vía desconocida o numérica; hora sin offset, inválida o fuera de rango; notas de más de 4000; campos que sobran (incluida la prescripción); `clientRequestId` o `medicationId` vacíos |
+| `401` | Sin token válido |
+| `403` | Sin `Emergencies.Operate` (Doctor, Nurse, Receptionist) o sin `MedicationAdministrations.Write`; sin asignación a la emergencia (otro paramédico) |
+| `404` | La emergencia no existe o no es prehospitalaria; el medicamento no existe |
+| `409` | El medicamento está inactivo; el `clientRequestId` ya se usó con otro medicamento, dosis, unidad, vía, hora, notas o emergencia; la emergencia ya no admite registros (`Transferred`, `Closed`, `Cancelled`) o cambió durante la operación (cierre, despacho del traslado o identificación concurrentes) |
+
+- **Idempotencia:** operación `prehospital-emergency.medication-administration.v1`, clave (usuario, operación,
+  `clientRequestId`); el recibo apunta a la `MedicationAdministration`. El hash usa la emergencia, el medicamento, la
+  dosis en forma canónica (`500` y `500.0` son lo mismo), la unidad recortada, el nombre de la vía, `administeredAt` en
+  UTC y las notas recortadas. Duplicar una dosis podría representar una sobredosis ficticia: dos envíos simultáneos de
+  la misma dosis la registran una sola vez y ambos responden sin error, con el mismo `id`.
+- Un reintento se responde aunque la hora, el estado o el medicamento (desactivado después) hayan cambiado: la dosis era
+  válida cuando se registró. El acceso sí se vuelve a comprobar.
+- Dos dosis con distinto `clientRequestId` son dos dosis, aunque sean iguales y a la misma hora.
+- Las notas no se registran en logs ni aparecen en los errores.
+- El camino Web (`POST /api/web/encounters/{id}/medication-administrations`) no cambia: sigue exigiendo la clínica.
 
 ---
 
