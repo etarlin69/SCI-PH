@@ -113,9 +113,9 @@ public class MockParamedicApiService : IParamedicApiService
 
         emergency.Procedures.Add(new ProcedureDto
         {
-            RecordedAt = dto.RecordedAt,
+            PerformedAt = dto.PerformedAt,
             ProcedureCode = dto.ProcedureCode,
-            Notes = dto.Notes
+            Outcome = dto.Outcome
         });
     }
 

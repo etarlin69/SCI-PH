@@ -10,11 +10,13 @@ public static class ParamedicServiceCollectionExtensions
 {
     public static IServiceCollection AddParamedicFeature(this IServiceCollection services)
     {
-        // Abrir y leer la emergencia: Mobile BFF real. Identificación, registros, catálogo y huella: todavía mocks.
+        // Emergencia, identificación por documento, signos vitales, procedimientos y su catálogo: Mobile BFF real.
+        // Huella, medicamentos y su catálogo: todavía mocks.
         services.AddSingleton<MockParamedicApiService>();
         services.AddSingleton<IParamedicApiService, HttpParamedicApiService>();
         services.AddSingleton<IFingerprintReaderService, MockFingerprintReaderService>();
-        services.AddSingleton<IParamedicCatalogService, MockParamedicCatalogService>();
+        services.AddSingleton<MockParamedicCatalogService>();
+        services.AddSingleton<IParamedicCatalogService, HttpParamedicCatalogService>();
 
         // ViewModels
         services.AddTransient<NewEmergencyViewModel>();

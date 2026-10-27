@@ -32,17 +32,20 @@
                                     BackgroundColor="Transparent"
                                     TextColor="{StaticResource SciText}" />
                         </Border>
+                        <Label Text="{Binding SelectedProcedureDescription}"
+                               IsVisible="{Binding HasSelectedProcedureDescription}"
+                               Style="{StaticResource SciSubtitle}" />
                     </VerticalStackLayout>
 
                     <VerticalStackLayout Spacing="6">
-                        <Label Text="Notas (opcional)" Style="{StaticResource SciFieldLabel}" />
+                        <Label Text="Resultado (opcional)" Style="{StaticResource SciFieldLabel}" />
                         <Border Style="{StaticResource SciField}">
-                            <Editor Text="{Binding Notes}"
-                                    Placeholder="Detalles relevantes del procedimiento"
+                            <Editor Text="{Binding Outcome}"
+                                    Placeholder="Resultado del procedimiento"
                                     Style="{StaticResource SciEditor}"
                                     AutoSize="TextChanges"
                                     MinimumHeightRequest="80"
-                                    MaxLength="500" />
+                                    MaxLength="4000" />
                         </Border>
                     </VerticalStackLayout>
 

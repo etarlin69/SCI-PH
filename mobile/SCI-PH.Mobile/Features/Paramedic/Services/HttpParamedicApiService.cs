@@ -10,9 +10,9 @@ namespace SCI_PH.Mobile.Features.Paramedic.Services;
 
 /// <summary>
 /// Servicio híbrido del área paramédica. REAL (Mobile BFF, con el cliente autenticado): abrir la emergencia, leerla,
-/// identificar al paciente por documento y registrar signos vitales. Sigue en MOCK: identificación por huella,
-/// procedimientos y medicamentos; trabajan sobre el id REAL que devuelve el servidor, sin crear otra emergencia. Los
-/// fallos de las llamadas reales llegan como <see cref="MobileApiException"/>.
+/// identificar al paciente por documento, registrar signos vitales y procedimientos. Sigue en MOCK: identificación por
+/// huella y medicamentos; trabajan sobre el id REAL que devuelve el servidor, sin crear otra emergencia. Los fallos de
+/// las llamadas reales llegan como <see cref="MobileApiException"/>.
 /// </summary>
 public sealed class HttpParamedicApiService : IParamedicApiService
 {
@@ -80,7 +80,14 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         await _client.PostAsync<VitalSignsRequest, VitalSignsResponse>($"{Emergencies}/{emergencyId}/vital-signs", request);
     }
 
-    public Task RegisterProcedureAsync(Guid emergencyId, RegisterProcedureDto dto) => _mock.RegisterProcedureAsync(emergencyId, dto);
+    // Un procedimiento ya realizado: un código del catálogo del servidor, su hora y el resultado si lo hay. 201 (nuevo) o 200
+    // (reintento con la misma clave y los mismos datos): en ambos casos quedó registrado una sola vez. El nombre, la
+    // descripción y el sistema de códigos los pone el servidor. 400/403/404/409 y el resto llegan como MobileApiException.
+    public async Task RegisterProcedureAsync(Guid emergencyId, RegisterProcedureDto dto)
+    {
+        var request = new ProcedureRequest(dto.ClientRequestId, dto.ProcedureCode, ToUtc(dto.PerformedAt), dto.Outcome);
+        await _client.PostAsync<ProcedureRequest, ProcedureResponse>($"{Emergencies}/{emergencyId}/procedures", request);
+    }
 
     public Task RegisterMedicationAsync(Guid emergencyId, RegisterMedicationDto dto) => _mock.RegisterMedicationAsync(emergencyId, dto);
 
@@ -122,6 +129,15 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Glasgow);
 
     private sealed record VitalSignsResponse(Guid EncounterId, DateTimeOffset RecordedAtUtc);
+
+    // Contrato exacto del procedimiento: sin resultado, el campo no se envía.
+    private sealed record ProcedureRequest(
+        Guid ClientRequestId,
+        string ProcedureCode,
+        DateTimeOffset PerformedAt,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Outcome);
+
+    private sealed record ProcedureResponse(Guid Id, Guid EncounterId, string Code);
 
     private sealed record EmergencyResponse(
         Guid Id,
