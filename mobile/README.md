@@ -145,7 +145,8 @@ El Mobile BFF local corre con `dotnet run --project src/Presentation/SCI-PH.Mobi
 | Signos vitales | Una toma **real** de 1 a 7 valores con los límites de plausibilidad del Domain (`VitalSignLimits`; no son umbrales clínicos). Registrada → Procedimientos. |
 | Procedimientos | Un procedimiento **real** ya realizado, elegido del catálogo fijo del servidor, con su resultado opcional. Registrado → Medicamentos. |
 | Medicamentos | Una dosis **real** ya administrada (SCI-PH no prescribe), del catálogo de medicamentos activos. Registrada → confirmación y formulario listo para otra dosis. "Continuar" → Observaciones. |
-| Observaciones | Una observación **real** (nota `Prehospital`, hasta 4000 caracteres en la app) con hora automática. Registrada → confirmación y editor listo para otra. "Continuar" → aviso de transferencia pendiente. |
+| Observaciones | Una observación **real** (nota `Prehospital`, hasta 4000 caracteres en la app) con hora automática. Registrada → confirmación y editor listo para otra. "Continuar" → Traslado. |
+| Traslado | Destino (clínicas activas), solicitar, iniciar y cancelar el traslado **real**. En traslado se vuelve a las pantallas clínicas para seguir registrando. El estado se restaura desde el servidor. La recepción la hace el hospital. |
 
 Se entra con la sesión real del personal clínico. `HttpParamedicApiService` es híbrido:
 
@@ -160,6 +161,7 @@ Se entra con la sesión real del personal clínico. `HttpParamedicApiService` es
 | Registrar un medicamento administrado (`POST /api/mobile/emergencies/{id}/medication-administrations`) | **REAL**: una dosis, sin prescripción, sobre la misma emergencia |
 | Catálogo de medicamentos (`GET /api/mobile/catalogs/medications`) | **REAL** (`HttpParamedicCatalogService`): solo medicamentos activos |
 | Registrar una observación (`POST /api/mobile/emergencies/{id}/notes`) | **REAL**: una nota `Prehospital` sobre la misma emergencia |
+| Traslado (`POST …/transfers`, `…/transfers/{transferId}/start`, `…/cancel`) y destinos (`GET /api/mobile/catalogs/transfer-destinations`) | **REAL**: solicitar, iniciar y cancelar sobre un traslado concreto |
 | Identificar por huella | Mock (`MockParamedicApiService`, `MockFingerprintReaderService`, que alterna sin coincidencia / identificado) sobre el id **real** |
 
 - **Reintentos:** un error de red deja la pantalla como estaba. El siguiente intento lleva el mismo `clientRequestId`,
@@ -193,10 +195,15 @@ Se entra con la sesión real del personal clínico. `HttpParamedicApiService` es
   primer intento de guardar, se muestra como solo lectura y se conserva, con su `clientRequestId`, ante errores de red,
   respuestas perdidas, `400`, `403`, `404` y `409`. Registrada (`201`, o `200` si era un reintento): confirmación, la nota
   en la lista de la sesión, editor limpio y nueva clave y hora para la siguiente. Las notas no se editan: una corrección
-  es otra nota. "Continuar" sigue siendo un aviso (transferencia pendiente).
+  es otra nota. "Continuar" lleva al Traslado.
+- **Traslado:** se elige una clínica activa (nombre, tipo y lugar) y se solicita con su `clientRequestId`, conservado en
+  los reintentos. "Iniciar traslado" y "Cancelar traslado" actúan sobre ese traslado concreto y repetirlos es seguro. En
+  traslado, la atención sigue a cargo del paramédico: la pantalla ofrece volver a signos vitales, procedimientos,
+  medicamentos y observaciones. Cada vez que se abre, la pantalla se reconstruye con el `activeTransfer` de la
+  emergencia. Cuando el hospital recibe al paciente, la app ya no puede registrar (`409`). No hay botón de recepción.
 - **Ubicación:** fuera de V1. La app no la toma ni la envía (`IDeviceLocationService` queda para cuando exista ese
   contrato).
-- **Pendiente:** transferencia.
+- **Pendiente:** cierre del traslado (`Complete`) y llegada física como evento propio.
 
 ## Patient (estado actual)
 
@@ -269,10 +276,10 @@ no firma con claves propias y no publica nada.
 ## Pendiente
 
 - QR y verificación facial reales del paciente (con el Rol 8).
-- Conectar el resto del área paramédica (identificación por huella, traslado) al Mobile BFF; la apertura, la lectura,
-  la identificación por documento, los signos vitales, los procedimientos y los medicamentos ya son reales.
+- Conectar la identificación por huella al Mobile BFF; el resto del área paramédica (apertura, lectura, identificación
+  por documento, signos vitales, procedimientos, medicamentos, observaciones y traslado) ya es real.
 - Ubicación de la emergencia (contrato y almacenamiento por definir; ver ADR-008).
-- Huella real (Device API), pantalla de transferencia, modo sin conexión.
+- Huella real (Device API), modo sin conexión, cierre del traslado (`Complete`) y llegada física.
 - Contratos e integración de historial, resultados, documentos y asistente del paciente.
 - Converger PatientTheme con SciPhTheme.
 - CI de iOS y Mac Catalyst (requiere runners macOS).

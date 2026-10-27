@@ -1,6 +1,6 @@
 # ADR-008: Emergencia prehospitalaria: acceso sin clínica e idempotencia
 
-- **Estado:** Aceptado (implementado en los PR #25 a #29 y en el de `feature/mobile-prehospital-notes`)
+- **Estado:** Aceptado (implementado en los PR #25 a #30 y en el de `feature/mobile-prehospital-transfer-handoff`)
 - **Fecha:** 2026-10-23
 - **Relacionado:** [ADR-005](ADR-005-clinical-model.md), [ADR-006](ADR-006-identity-security.md),
   [contratos del Mobile BFF](../api/mobile-bff-contracts.md#paramedic-workflow)
@@ -37,7 +37,7 @@ reconocer el reintento: cada reintento creaba otra atención NN.
 - `EnsureClinic` **no se reemplazó globalmente**: los caminos del hospital (Web BFF) mantienen su regla, y una atención
   sin clínica sigue siendo invisible para ellos. El servicio se conecta uno a uno en los caminos móviles: ya lo usan la
   identificación (decisión 6), los signos vitales (decisión 7), los procedimientos (decisión 8), los medicamentos
-  administrados (decisión 9) y las observaciones (decisión 10); falta el traslado.
+  administrados (decisión 9), las observaciones (decisión 10) y el traslado (decisión 11).
 
 ### 3. Recibos de idempotencia: infraestructura técnica reutilizable
 
@@ -185,23 +185,46 @@ app no la envía y el contrato no la acepta: un campo `location` se rechaza con 
 - `ClinicalNote.Write` fija `CreatedAtUtc` con `DateTimeOffset.UtcNow` y no con `TimeProvider`. No afecta al hash, a la
   respuesta ni al reintento; en pruebas no se compara con un valor exacto (P2, sin cambio de Domain).
 
+### 11. Traslado y entrega (handoff)
+
+- El destino es una `Clinic` activa (sin restricción de tipo), listada en `GET /api/mobile/catalogs/transfer-destinations`
+  (`Transfers.Manage`, no `Clinics.Manage`).
+- El paramédico **solicita** (`ClinicalTransfer.Request` sin clínica de origen; `Created -> InProgress` si aún no
+  empezó), **inicia** (`Dispatch`: `InTransit`, atención `Transferred`) o **cancela** (`Requested` o `InTransit`; desde
+  `InTransit` la atención vuelve a `InProgress`) desde el Mobile BFF. Las horas son siempre del servidor. Inicio y
+  cancelación apuntan a un `transferId` concreto y son idempotentes por estado; la solicitud usa un recibo
+  (`prehospital-emergency.transfer-request.v1`).
+- **`Transferred` con `ClinicId == null` representa el transporte prehospitalario activo** (traslado `InTransit`,
+  paciente todavía a cargo del paramédico). El camino prehospitalario de Application acepta en ese estado los signos
+  vitales, procedimientos, medicamentos y observaciones (`PrehospitalRecordableStatuses`: `Created`, `InProgress`,
+  `Transferred`). `EncounterRecordService.RecordableStatuses` del Web **no cambia**. No hace falta cambiar el Domain:
+  ningún registro clínico comprueba el estado de la atención en el Domain.
+- **La recepción del hospital termina la responsabilidad prehospitalaria.** El Web BFF existente (`ReceiveAsync`, que
+  solo exige la clínica destino) pasa el traslado a `Received` y la atención a `Received` con `ClinicId` = destino. Toda
+  escritura móvil exige `ClinicId == null`: después de la recepción, `409` para el paramédico que participó **aunque
+  también esté afiliado a la clínica destino**, y `403` para cualquier otro.
+- El Web no puede despachar ni cancelar un traslado sin clínica de origen (sin cambios): por eso la cancelación
+  prehospitalaria vive en el móvil.
+- `GET /api/mobile/emergencies/{id}` incluye `activeTransfer` (`Requested` o `InTransit`) para que la app restaure su
+  pantalla de traslado.
+- Fuera de alcance: `ClinicalTransfer.Complete` (no se llama ni se expone) y un evento separado de llegada física.
+
 ## Consecuencias
 
 - La primera vertical real del paramédico (abrir y leer la emergencia) funciona sin inventar una clínica.
 - Una migración clínica (`AddClinicalIdempotencyReceipts`); ninguna de Identity. La identificación por documento no
   añade migraciones. Los recibos se acumulan y no se
   purgan todavía: la retención queda pendiente.
-- Tras la llegada al hospital, el paramédico de otra base deja de leer la emergencia, porque se aplica la regla de
-  clínica. El acceso posterior al traslado se decidirá con la vertical de traslado.
+- Tras la recepción en el hospital, el paramédico de otra base deja de leer la emergencia (regla de clínica) y ningún
+  paramédico puede seguir escribiendo desde el móvil (decisión 11).
 - `startedAt` puede estar hasta 5 minutos en el futuro, y el Domain exige que las horas clínicas posteriores no sean
   anteriores al inicio. Los signos vitales, los procedimientos, los medicamentos y las observaciones móviles lo
   resuelven con el mismo margen (decisiones 7 a 10).
 - El catálogo de procedimientos es una lista fija del servidor: añadir un procedimiento exige un cambio de código y un
   despliegue, hasta que exista un catálogo administrado.
-- `Transferred` sigue sin admitir registros, así que el paramédico no puede registrar procedimientos, medicamentos ni
-  observaciones durante el transporte una vez despachado el traslado; queda bloqueado hasta el diseño del traslado y la
-  entrega (handoff).
+- En el Web, `Transferred` sigue sin admitir registros; en el móvil, `Transferred` sin clínica sí los admite porque es
+  el transporte en curso (decisión 11).
 - Un medicamento desactivado justo entre la comprobación y el guardado puede quedar administrado (`Medication` no tiene
   token de concurrencia); se acepta porque la dosis se dio con el catálogo vigente un instante antes.
-- Solicitar y despachar un traslado de una atención sin clínica todavía no está expuesto (`TransferService` exige
-  clínica de origen); llegará con la vertical de traslado usando `IEncounterAccessService`.
+- Solicitar, iniciar y cancelar un traslado sin clínica de origen solo es posible desde el móvil; el `TransferService`
+  del Web mantiene su regla de clínica de origen. `Complete` y la llegada física quedan como trabajo futuro.

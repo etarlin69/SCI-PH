@@ -114,7 +114,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 > [ADR-008](../adr/ADR-008-prehospital-emergency.md)), `POST /api/mobile/emergencies/{id}/identify/document`,
 > `POST /api/mobile/emergencies/{id}/vital-signs`, `POST /api/mobile/emergencies/{id}/procedures`,
 > `POST /api/mobile/emergencies/{id}/medication-administrations`, `POST /api/mobile/emergencies/{id}/notes`,
-> `GET /api/mobile/catalogs/procedures` y `GET /api/mobile/catalogs/medications`.
+> los traslados (`POST …/transfers`, `…/transfers/{transferId}/start` y `…/cancel`), `GET /api/mobile/catalogs/procedures`,
+> `GET /api/mobile/catalogs/medications` y `GET /api/mobile/catalogs/transfer-destinations`.
 > **El resto siguen siendo contratos previstos** y pueden evolucionar mediante revisión arquitectónica.
 
 - **Usuarios:** personal clínico autenticado: un `ClinicalStaff` activo, vinculado a la cuenta y con al menos una
@@ -124,7 +125,7 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
   (abrir: `Encounters.Create`; leer: `Encounters.Read`; identificar por documento: `Patients.Read` + `Patients.Identify`;
   signos vitales: `VitalSigns.Write`; procedimientos y su catálogo: `Procedures.Write`; medicamentos administrados:
   `MedicationAdministrations.Write`; catálogo de medicamentos: `Medications.Read`; observaciones:
-  `ClinicalNotes.Write`). Nunca
+  `ClinicalNotes.Write`; traslado y sus destinos: `Transfers.Manage`). Nunca
   se comprueba un rol. Doctor, Nurse y Receptionist no tienen `Emergencies.Operate`: `403`.
 - **Acceso al caso concreto:** una emergencia es un `ClinicalEncounter` de tipo `Prehospital` **sin clínica**
   (`clinicId = null`) mientras no llega al hospital. La clínica base del paramédico no es el lugar de la emergencia y
@@ -147,7 +148,7 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 | Método | Ruta | Descripción | Estado |
 |---|---|---|---|
 | `POST` | `/api/mobile/emergencies` | Abre una emergencia | Implementado |
-| `GET` | `/api/mobile/emergencies/{id}` | Datos básicos de la emergencia | Implementado (sin registros todavía) |
+| `GET` | `/api/mobile/emergencies/{id}` | Datos básicos de la emergencia y su traslado activo | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/identify/document` | Identifica al paciente NN por cédula o pasaporte | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/identify` | Vincula la emergencia a un paciente (huella, manual) | Previsto |
 | `POST` | `/api/mobile/emergencies/{id}/vital-signs` | Registra una toma de signos vitales | Implementado |
@@ -156,7 +157,10 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 | `POST` | `/api/mobile/emergencies/{id}/medication-administrations` | Registra un medicamento administrado (sin prescripción) | Implementado |
 | `GET` | `/api/mobile/catalogs/medications` | Medicamentos activos del catálogo | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/notes` | Registra una observación (nota `Prehospital`) | Implementado |
-| `POST` | `/api/mobile/emergencies/{id}/transfer` | Inicia el traslado a un establecimiento | Previsto |
+| `GET` | `/api/mobile/catalogs/transfer-destinations` | Clínicas activas de destino | Implementado |
+| `POST` | `/api/mobile/emergencies/{id}/transfers` | Solicita el traslado a una clínica | Implementado |
+| `POST` | `/api/mobile/emergencies/{id}/transfers/{transferId}/start` | Inicia ese traslado (en camino) | Implementado |
+| `POST` | `/api/mobile/emergencies/{id}/transfers/{transferId}/cancel` | Cancela ese traslado | Implementado |
 
 ### Flujo previsto
 
@@ -168,8 +172,9 @@ POST /emergencies/{id}/vital-signs ┐ (signos vitales: implementado)
 POST /emergencies/{id}/procedures  ├ registros durante la atención (0..n veces; procedimientos: implementado)
 POST /emergencies/{id}/medication-administrations │ (medicamentos: implementado)
 POST /emergencies/{id}/notes       ┘ (observaciones: implementado)
-POST /emergencies/{id}/transfer    traslado → lo recibe el hospital en Web BFF
-                                   (POST /api/web/transfers/{id}/receive)
+POST /emergencies/{id}/transfers   solicita el traslado (implementado)
+POST /emergencies/{id}/transfers/{transferId}/start   inicia el traslado; se sigue registrando en camino
+POST /api/web/transfers/{id}/receive   el hospital lo recibe (Web BFF): fin de la atención prehospitalaria
 ```
 
 ---
@@ -238,8 +243,9 @@ Permisos: `Emergencies.Operate` + `Encounters.Read`. Mientras la emergencia no t
 asignación activa del usuario a ella. Cuando el hospital la recibe, se aplica la regla de clínica de cualquier atención
 (un paramédico de otra base deja de leerla).
 
-Devuelve la misma forma que el `POST`; `patient` es `null` mientras la emergencia no esté identificada. Los registros
-clínicos (signos vitales, procedimientos, medicamentos, traslado) se añadirán con sus endpoints.
+Devuelve la misma forma que el `POST`; `patient` es `null` mientras la emergencia no esté identificada.
+`activeTransfer` es el traslado `Requested` o `InTransit` de la emergencia (misma forma que la respuesta de
+`POST …/transfers`) o `null`; los clientes que no lo conocen lo ignoran.
 
 `status` es el estado de la atención: `Created`, `InProgress`, `Transferred`, `Received`, `InEvolution`, `Closed` o
 `Cancelled`.
@@ -420,7 +426,7 @@ responde exactamente lo mismo:
 | `401` | Sin token válido |
 | `403` | Sin `Emergencies.Operate` o `VitalSigns.Write` (Doctor, Nurse, Receptionist); sin asignación a la emergencia (otro paramédico) |
 | `404` | La emergencia no existe o no es prehospitalaria |
-| `409` | El `clientRequestId` ya se usó con otra toma o en otra emergencia; la emergencia ya no admite registros (`Transferred`, `Closed`, `Cancelled`) o cambió durante la operación |
+| `409` | El `clientRequestId` ya se usó con otra toma o en otra emergencia; la emergencia ya no admite registros (`Closed`, `Cancelled`, o ya recibida por el hospital; en `Transferred` sin clínica sí los admite) o cambió durante la operación |
 
 - **Idempotencia:** operación `prehospital-emergency.vital-signs.v1`, clave (usuario, operación, `clientRequestId`); el
   recibo apunta a la emergencia. El hash usa la emergencia, `recordedAt` en UTC y los pares tipo/valor presentes en un
@@ -511,7 +517,7 @@ canónica y la entrada del catálogo, así que un reintento responde exactamente
 | `401` | Sin token válido |
 | `403` | Sin `Emergencies.Operate` (Doctor, Nurse, Receptionist) o sin `Procedures.Write`; sin asignación a la emergencia (otro paramédico) |
 | `404` | La emergencia no existe o no es prehospitalaria |
-| `409` | El `clientRequestId` ya se usó con otro procedimiento, hora, resultado o emergencia; la emergencia ya no admite registros (`Transferred`, `Closed`, `Cancelled`) o cambió durante la operación (cierre, despacho del traslado o identificación concurrentes) |
+| `409` | El `clientRequestId` ya se usó con otro procedimiento, hora, resultado o emergencia; la emergencia ya no admite registros (`Closed`, `Cancelled`, o ya recibida por el hospital; en `Transferred` sin clínica sí los admite) o cambió durante la operación (cierre, despacho del traslado o identificación concurrentes) |
 
 - **Idempotencia:** operación `prehospital-emergency.procedure.v1`, clave (usuario, operación, `clientRequestId`); el
   recibo apunta al `ClinicalProcedure`. El hash usa la emergencia, el código, `performedAt` en UTC y el `outcome`
@@ -618,7 +624,7 @@ canónica y el nombre del medicamento, así que un reintento responde exactament
 | `401` | Sin token válido |
 | `403` | Sin `Emergencies.Operate` (Doctor, Nurse, Receptionist) o sin `MedicationAdministrations.Write`; sin asignación a la emergencia (otro paramédico) |
 | `404` | La emergencia no existe o no es prehospitalaria; el medicamento no existe |
-| `409` | El medicamento está inactivo; el `clientRequestId` ya se usó con otro medicamento, dosis, unidad, vía, hora, notas o emergencia; la emergencia ya no admite registros (`Transferred`, `Closed`, `Cancelled`) o cambió durante la operación (cierre, despacho del traslado o identificación concurrentes) |
+| `409` | El medicamento está inactivo; el `clientRequestId` ya se usó con otro medicamento, dosis, unidad, vía, hora, notas o emergencia; la emergencia ya no admite registros (`Closed`, `Cancelled`, o ya recibida por el hospital; en `Transferred` sin clínica sí los admite) o cambió durante la operación (cierre, despacho del traslado o identificación concurrentes) |
 
 - **Idempotencia:** operación `prehospital-emergency.medication-administration.v1`, clave (usuario, operación,
   `clientRequestId`); el recibo apunta a la `MedicationAdministration`. El hash usa la emergencia, el medicamento, la
@@ -691,7 +697,7 @@ creación:
 | `401` | Sin token válido |
 | `403` | Sin `Emergencies.Operate` (Doctor, Nurse, Receptionist) o sin `ClinicalNotes.Write`; sin asignación a la emergencia (otro paramédico) |
 | `404` | La emergencia no existe o no es prehospitalaria |
-| `409` | El `clientRequestId` ya se usó con otro texto, hora o emergencia; la emergencia ya no admite registros (`Transferred`, `Closed`, `Cancelled`) o cambió durante la operación (cierre, despacho del traslado o identificación concurrentes) |
+| `409` | El `clientRequestId` ya se usó con otro texto, hora o emergencia; la emergencia ya no admite registros (`Closed`, `Cancelled`, o ya recibida por el hospital; en `Transferred` sin clínica sí los admite) o cambió durante la operación (cierre, despacho del traslado o identificación concurrentes) |
 
 - **Idempotencia:** operación `prehospital-emergency.note.v1`, clave (usuario, operación, `clientRequestId`); el recibo
   apunta a la `ClinicalNote`. El hash usa la emergencia, `occurredAt` en UTC y el texto recortado (`Z` u otro offset del
@@ -706,19 +712,87 @@ creación:
 
 ---
 
-### `POST /api/mobile/emergencies/{id}/transfer`
+### Traslado y entrega (handoff) — Implementado
 
-Inicia el traslado del paciente a un establecimiento. El traslado aparece en `GET /api/web/transfers` del establecimiento destino.
+El destino es una **clínica** (`Clinic`) activa de la red. El paramédico solicita, inicia y, si hace falta, cancela el
+traslado desde la app; **la recepción la hace el hospital** con el Web BFF existente
+(`GET /api/web/transfers/incoming`, `POST /api/web/transfers/{id}/receive`), sin cambios.
 
-**Body (forma propuesta):**
+| Etapa | Atención (`status`, `clinicId`) | Traslado | Quién registra | Responsable |
+|---|---|---|---|---|
+| En escena | `Created` / `InProgress`, sin clínica | — | Paramédico asignado | Paramédico |
+| Solicitado | `InProgress`, sin clínica | `Requested` | Paramédico asignado | Paramédico (el hospital lo ve entrante) |
+| **En traslado** | **`Transferred`, sin clínica** | **`InTransit`** | **Paramédico asignado** | Paramédico (el hospital puede recibirlo) |
+| Entregado | `Received`, clínica = destino | `Received` | Personal del destino (Web) | Hospital |
+
+- **`Transferred` sin clínica es el transporte prehospitalario activo:** los signos vitales, procedimientos,
+  medicamentos y observaciones del móvil se siguen aceptando en ese estado. El Web mantiene sus reglas (no registra en
+  `Transferred`).
+- **La recepción termina la responsabilidad prehospitalaria:** con la clínica asignada, **toda escritura móvil se
+  rechaza**: `409` para el paramédico que participó (aunque también esté afiliado a la clínica destino) y `403` para
+  cualquier otro usuario.
+- No hay evento separado de "llegada física" todavía, y `Complete` del traslado queda pendiente: el flujo termina en
+  `Received`.
+
+#### `GET /api/mobile/catalogs/transfer-destinations`
+
+Permisos: `Emergencies.Operate` + `Transfers.Manage`, y ser personal clínico activo (no `Clinics.Manage`). Todas las
+clínicas **activas**, sin restringir por tipo, por nombre, municipio e id:
+
+```json
+[ { "id": "…", "name": "Hospital Central", "type": "Hospital", "municipality": "Distrito Nacional", "province": "Santo Domingo" } ]
+```
+
+#### `POST /api/mobile/emergencies/{id}/transfers`
+
+Permisos: `Emergencies.Operate` + `Transfers.Manage`, y la regla de escritura prehospitalaria (asignación, sin clínica).
+Crea en **una transacción** un `ClinicalTransfer` `Requested` **sin clínica de origen**, su auditoría `Create`, el paso
+`Created -> InProgress` si la atención aún no empezó (la solicitud cuenta como inicio) y el recibo de idempotencia. La
+hora (`requestedAtUtc`) es la del servidor.
+
+```json
+{ "clientRequestId": "…", "destinationClinicId": "…", "reason": "Trauma mayor", "notes": "…" }
+```
+
+- `destinationClinicId`: obligatorio. No existe: `404`. Inactiva: `409`.
+- `reason`: opcional, hasta 500 caracteres. `notes`: opcional, hasta 4000. Ambos se recortan; vacío = sin valor.
+- **No se aceptan** `originClinicId`, `requestedAtUtc`, `requestedByStaffId`, `sentAtUtc`, `receivedAtUtc`, `status`,
+  `staffId`, `patientId`, `clinicId`, `ambulanceId` ni ningún otro campo: `400`.
+- `409` si la atención ya está en traslado o cerrada, o si ya tiene un traslado activo (también lo impide un índice
+  único).
+- **Idempotencia:** `prehospital-emergency.transfer-request.v1`; el hash usa la emergencia, el destino, el motivo y las
+  notas recortados; el recibo apunta al traslado. `201` la primera vez; `200` con el **mismo** traslado (en su estado
+  actual) en un reintento; `409` si la clave llega con otros datos. Dos envíos simultáneos con la misma clave crean uno
+  solo; con claves distintas, uno recibe `409`.
+
+**Respuesta** (también `activeTransfer` del `GET` de la emergencia, y la de `start` y `cancel`):
 
 ```json
 {
-  "clientRequestId": "00000000-0000-0000-0000-000000000000",
-  "destinationFacilityId": "00000000-0000-0000-0000-000000000000",
-  "estimatedArrivalAt": "2026-01-01T00:30:00Z",
-  "notes": "…"
+  "id": "…", "encounterId": "…", "status": "Requested",
+  "destination": { "id": "…", "name": "Hospital Central", "type": "Hospital", "municipality": "Distrito Nacional", "province": "Santo Domingo" },
+  "requestedAtUtc": "2026-01-01T00:00:00+00:00", "sentAtUtc": null, "cancelledAtUtc": null
 }
 ```
 
-**Respuestas previstas:** `201 Created`, `400`, `401`, `403`, `404`, `409` (ya existe un traslado activo).
+#### `POST /api/mobile/emergencies/{id}/transfers/{transferId}/start`
+
+Permisos: los mismos. Sin body. **Sobre ese traslado de esa emergencia** (otro: `404`). `Requested`:
+`ClinicalTransfer.Dispatch` por el actor a la hora del servidor (`InTransit`) y la atención pasa a `Transferred`, con
+su auditoría `Transfer`, en una transacción (`200`). `InTransit`: reintento, `200` con el mismo traslado y sin escribir
+nada. `Cancelled`, `Received` o `Completed`: `409`.
+
+#### `POST /api/mobile/emergencies/{id}/transfers/{transferId}/cancel`
+
+Permisos: los mismos. Sin body. **Sobre ese traslado de esa emergencia** (otro: `404`), nunca "el activo": un reintento
+tardío de la cancelación de un traslado anterior no cancela uno nuevo. `Requested`: solo el traslado pasa a `Cancelled`.
+`InTransit`: además la atención vuelve de `Transferred` a `InProgress`. Ambos con auditoría `Transfer` y la hora del
+servidor (`200`). `Cancelled`: reintento, `200` sin escribir nada. `Received` o `Completed`: `409`. Cambiar de destino =
+cancelar y solicitar de nuevo.
+
+- **Idempotencia de `start` y `cancel`:** por estado y por `transferId`, sin `clientRequestId`.
+- **Concurrencia:** el estado del traslado y el `Status`/`PatientId` de la atención son tokens de concurrencia: un
+  inicio, una cancelación, una recepción, una identificación o un registro simultáneos se resuelven con un ganador y un
+  `409` para el otro, sin escrituras parciales.
+- **Auditoría:** `Create` en la solicitud y `Transfer` (estados antes y después) en el inicio y la cancelación; la
+  recepción conserva la auditoría del Web. Llevan el actor, la atención y el `PatientId` (o `null` si es NN).
