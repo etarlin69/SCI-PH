@@ -144,7 +144,8 @@ El Mobile BFF local corre con `dotnet run --project src/Presentation/SCI-PH.Mobi
 | Identificar paciente | Huella, documento (cédula o pasaporte) o continuar como paciente no identificado (NN), las tres desde el inicio. |
 | Signos vitales | Una toma **real** de 1 a 7 valores con los límites de plausibilidad del Domain (`VitalSignLimits`; no son umbrales clínicos). Registrada → Procedimientos. |
 | Procedimientos | Un procedimiento **real** ya realizado, elegido del catálogo fijo del servidor, con su resultado opcional. Registrado → Medicamentos. |
-| Medicamentos | Una dosis **real** ya administrada (SCI-PH no prescribe), del catálogo de medicamentos activos. Registrada → confirmación y formulario listo para otra dosis. |
+| Medicamentos | Una dosis **real** ya administrada (SCI-PH no prescribe), del catálogo de medicamentos activos. Registrada → confirmación y formulario listo para otra dosis. "Continuar" → Observaciones. |
+| Observaciones | Una observación **real** (nota `Prehospital`, hasta 4000 caracteres en la app) con hora automática. Registrada → confirmación y editor listo para otra. "Continuar" → aviso de transferencia pendiente. |
 
 Se entra con la sesión real del personal clínico. `HttpParamedicApiService` es híbrido:
 
@@ -158,6 +159,7 @@ Se entra con la sesión real del personal clínico. `HttpParamedicApiService` es
 | Catálogo de procedimientos (`GET /api/mobile/catalogs/procedures`) | **REAL** (`HttpParamedicCatalogService`): catálogo fijo del servidor (`SCI-PH-PREHOSP`) |
 | Registrar un medicamento administrado (`POST /api/mobile/emergencies/{id}/medication-administrations`) | **REAL**: una dosis, sin prescripción, sobre la misma emergencia |
 | Catálogo de medicamentos (`GET /api/mobile/catalogs/medications`) | **REAL** (`HttpParamedicCatalogService`): solo medicamentos activos |
+| Registrar una observación (`POST /api/mobile/emergencies/{id}/notes`) | **REAL**: una nota `Prehospital` sobre la misma emergencia |
 | Identificar por huella | Mock (`MockParamedicApiService`, `MockFingerprintReaderService`, que alterna sin coincidencia / identificado) sobre el id **real** |
 
 - **Reintentos:** un error de red deja la pantalla como estaba. El siguiente intento lleva el mismo `clientRequestId`,
@@ -185,7 +187,13 @@ Se entra con la sesión real del personal clínico. `HttpParamedicApiService` es
   inhalaciones) o se escribe con "Otra" (1 a 24 caracteres); el servidor acepta cualquier unidad válida. Cada dosis tiene
   su propio `clientRequestId` y su hora (`administeredAt`), conservados ante errores de red, respuestas perdidas, `400`,
   `403`, `404` y `409`. Registrada (`201`, o `200` si era un reintento): confirmación, formulario limpio y nueva clave
-  para la siguiente dosis, sin salir de la pantalla. "Continuar a transferencia" sigue siendo un aviso (pendiente).
+  para la siguiente dosis, sin salir de la pantalla. "Continuar a observaciones" lleva a Observaciones.
+- **Observaciones:** texto libre obligatorio (hasta 4000 caracteres en la app; el servidor admite 8000) con contador. El
+  tipo (`Prehospital`) y el autor los pone el servidor. La hora (`occurredAt`) es automática y no editable: se fija en el
+  primer intento de guardar, se muestra como solo lectura y se conserva, con su `clientRequestId`, ante errores de red,
+  respuestas perdidas, `400`, `403`, `404` y `409`. Registrada (`201`, o `200` si era un reintento): confirmación, la nota
+  en la lista de la sesión, editor limpio y nueva clave y hora para la siguiente. Las notas no se editan: una corrección
+  es otra nota. "Continuar" sigue siendo un aviso (transferencia pendiente).
 - **Ubicación:** fuera de V1. La app no la toma ni la envía (`IDeviceLocationService` queda para cuando exista ese
   contrato).
 - **Pendiente:** transferencia.

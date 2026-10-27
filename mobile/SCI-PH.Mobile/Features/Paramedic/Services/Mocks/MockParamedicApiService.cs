@@ -139,6 +139,14 @@ public class MockParamedicApiService : IParamedicApiService
         });
     }
 
+    // Solo para cumplir la interfaz: la app registra las observaciones en el servidor (HttpParamedicApiService).
+    public async Task RegisterNoteAsync(Guid emergencyId, RegisterNoteDto dto)
+    {
+        await Task.Delay(SimulatedDelayMs);
+        GetOrThrow(emergencyId);
+        _processedRequests.Add(dto.ClientRequestId);
+    }
+
     private EmergencyDto GetOrThrow(Guid id) =>
         _emergencies.TryGetValue(id, out var e)
             ? e

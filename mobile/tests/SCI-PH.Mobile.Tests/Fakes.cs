@@ -97,4 +97,6 @@ internal sealed class RecordingParamedicApi : IParamedicApiService
     public Task RegisterProcedureAsync(Guid emergencyId, RegisterProcedureDto dto) => Task.CompletedTask;
 
     public Task RegisterMedicationAsync(Guid emergencyId, RegisterMedicationDto dto) => Task.CompletedTask;
+
+    public Task RegisterNoteAsync(Guid emergencyId, RegisterNoteDto dto) => Task.CompletedTask;
 }

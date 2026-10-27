@@ -13,4 +13,5 @@ public interface IParamedicApiService
     Task RegisterVitalsAsync(Guid emergencyId, RegisterVitalsDto dto);
     Task RegisterProcedureAsync(Guid emergencyId, RegisterProcedureDto dto);
     Task RegisterMedicationAsync(Guid emergencyId, RegisterMedicationDto dto);
+    Task RegisterNoteAsync(Guid emergencyId, RegisterNoteDto dto);
 }

@@ -5,7 +5,7 @@ using System.Net;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SCI_PH.Mobile.Common.Api;
-using SCI_PH.Mobile.Common.Dialogs;
+using SCI_PH.Mobile.Common.Navigation;
 using SCI_PH.Mobile.Common.ViewModels;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 using SCI_PH.Mobile.Features.Paramedic.Models.Enums;
@@ -39,7 +39,7 @@ public partial class MedicationsViewModel : BaseViewModel
 
     private readonly IParamedicApiService _api;
     private readonly IParamedicCatalogService _catalog;
-    private readonly IAppDialogService _dialogs;
+    private readonly IAppNavigator _navigator;
 
     // Una dosis = una clave y una hora, generadas en el primer intento de guardar y conservadas en cada reintento (error de
     // red, respuesta perdida, 400/403/404/409) para que el servidor no registre la misma dosis dos veces. Se renuevan solo
@@ -47,11 +47,11 @@ public partial class MedicationsViewModel : BaseViewModel
     private Guid? _clientRequestId;
     private DateTime? _administeredAt;
 
-    public MedicationsViewModel(IParamedicApiService api, IParamedicCatalogService catalog, IAppDialogService dialogs)
+    public MedicationsViewModel(IParamedicApiService api, IParamedicCatalogService catalog, IAppNavigator navigator)
     {
         _api = api;
         _catalog = catalog;
-        _dialogs = dialogs;
+        _navigator = navigator;
     }
 
     /// <summary>Los 13 valores de MedicationRoute del servidor.</summary>
@@ -267,16 +267,12 @@ public partial class MedicationsViewModel : BaseViewModel
         }
     }
 
-    // Transferencia aún no existe: se informa con un diálogo en lugar de navegar.
+    // Siguiente paso del flujo: las observaciones, sobre la misma emergencia.
     [RelayCommand]
-    private async Task ContinueAsync()
-    {
-        // TODO: navegar a Transferencia (ParamedicRoutes.Transfer).
-        await _dialogs.ShowAsync(
-            "Medicamentos",
-            $"Administraciones registradas: {SavedCount}\nSiguiente paso: transferencia (pendiente).",
-            "OK");
-    }
+    private Task ContinueAsync() =>
+        _navigator.GoToAsync(
+            ParamedicRoutes.Notes,
+            new Dictionary<string, object> { ["EmergencyId"] = EmergencyId });
 
     // ---- Helpers ----
     private void ClearForm()

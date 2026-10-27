@@ -113,8 +113,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 > **Implementados:** `POST /api/mobile/emergencies`, `GET /api/mobile/emergencies/{id}` (V1, ver
 > [ADR-008](../adr/ADR-008-prehospital-emergency.md)), `POST /api/mobile/emergencies/{id}/identify/document`,
 > `POST /api/mobile/emergencies/{id}/vital-signs`, `POST /api/mobile/emergencies/{id}/procedures`,
-> `POST /api/mobile/emergencies/{id}/medication-administrations`, `GET /api/mobile/catalogs/procedures` y
-> `GET /api/mobile/catalogs/medications`.
+> `POST /api/mobile/emergencies/{id}/medication-administrations`, `POST /api/mobile/emergencies/{id}/notes`,
+> `GET /api/mobile/catalogs/procedures` y `GET /api/mobile/catalogs/medications`.
 > **El resto siguen siendo contratos previstos** y pueden evolucionar mediante revisión arquitectónica.
 
 - **Usuarios:** personal clínico autenticado: un `ClinicalStaff` activo, vinculado a la cuenta y con al menos una
@@ -123,7 +123,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
   Paramedic; Administrator lo tiene por tener todos) para entrar al módulo, además del permiso clínico de cada acción
   (abrir: `Encounters.Create`; leer: `Encounters.Read`; identificar por documento: `Patients.Read` + `Patients.Identify`;
   signos vitales: `VitalSigns.Write`; procedimientos y su catálogo: `Procedures.Write`; medicamentos administrados:
-  `MedicationAdministrations.Write`; catálogo de medicamentos: `Medications.Read`). Nunca
+  `MedicationAdministrations.Write`; catálogo de medicamentos: `Medications.Read`; observaciones:
+  `ClinicalNotes.Write`). Nunca
   se comprueba un rol. Doctor, Nurse y Receptionist no tienen `Emergencies.Operate`: `403`.
 - **Acceso al caso concreto:** una emergencia es un `ClinicalEncounter` de tipo `Prehospital` **sin clínica**
   (`clinicId = null`) mientras no llega al hospital. La clínica base del paramédico no es el lugar de la emergencia y
@@ -133,9 +134,9 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
   código `NN-…` generado por el servidor) y se vincula a un `Patient` después. Al llegar, el hospital la recibe
   (`POST /api/web/transfers/{id}/receive`) y la **misma** atención pasa a tener la clínica destino.
 - **Registros clínicos:** signos vitales, procedimientos y medicamentos se **agregan** al episodio; no se editan ni se borran desde la app (las correcciones se definirán con el Rol 2).
-- **Hora del evento:** la apertura lleva `startedAt` y cada registro lleva la hora en que ocurrió en campo (`recordedAt` en los signos vitales, `performedAt` en los procedimientos, `administeredAt` en los medicamentos), distinta de la hora en que llega al servidor, para soportar envío diferido.
+- **Hora del evento:** la apertura lleva `startedAt` y cada registro lleva la hora en que ocurrió en campo (`recordedAt` en los signos vitales, `performedAt` en los procedimientos, `administeredAt` en los medicamentos, `occurredAt` en las observaciones), distinta de la hora en que llega al servidor, para soportar envío diferido.
 - **Idempotencia:** implementada en la apertura, en la identificación por documento, en los signos vitales, en los
-  procedimientos y en los medicamentos administrados; los demás `POST` la usarán igual. Cada `POST` lleva un
+  procedimientos, en los medicamentos administrados y en las observaciones; los demás `POST` la usarán igual. Cada `POST` lleva un
   `clientRequestId` (`Guid` generado en el dispositivo una vez por operación y **reutilizado en cada reintento**). El
   servidor guarda un recibo por (usuario, operación, `clientRequestId`) con el hash SHA-256 del contenido lógico:
   - misma clave y mismo contenido → la **misma** respuesta (`200`, sin crear nada);
@@ -154,6 +155,7 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 | `GET` | `/api/mobile/catalogs/procedures` | Catálogo fijo de procedimientos prehospitalarios | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/medication-administrations` | Registra un medicamento administrado (sin prescripción) | Implementado |
 | `GET` | `/api/mobile/catalogs/medications` | Medicamentos activos del catálogo | Implementado |
+| `POST` | `/api/mobile/emergencies/{id}/notes` | Registra una observación (nota `Prehospital`) | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/transfer` | Inicia el traslado a un establecimiento | Previsto |
 
 ### Flujo previsto
@@ -164,7 +166,8 @@ POST /emergencies/{id}/identify/document   identifica al paciente por documento 
 POST /emergencies/{id}/identify    identifica al paciente (huella vía Device API, manual)
 POST /emergencies/{id}/vital-signs ┐ (signos vitales: implementado)
 POST /emergencies/{id}/procedures  ├ registros durante la atención (0..n veces; procedimientos: implementado)
-POST /emergencies/{id}/medication-administrations ┘ (medicamentos: implementado)
+POST /emergencies/{id}/medication-administrations │ (medicamentos: implementado)
+POST /emergencies/{id}/notes       ┘ (observaciones: implementado)
 POST /emergencies/{id}/transfer    traslado → lo recibe el hospital en Web BFF
                                    (POST /api/web/transfers/{id}/receive)
 ```
@@ -627,6 +630,79 @@ canónica y el nombre del medicamento, así que un reintento responde exactament
 - Dos dosis con distinto `clientRequestId` son dos dosis, aunque sean iguales y a la misma hora.
 - Las notas no se registran en logs ni aparecen en los errores.
 - El camino Web (`POST /api/web/encounters/{id}/medication-administrations`) no cambia: sigue exigiendo la clínica.
+
+---
+
+### `POST /api/mobile/emergencies/{id}/notes` — Implementado
+
+Permisos: `Emergencies.Operate` + `ClinicalNotes.Write`, y acceso a la emergencia (mientras no tenga clínica, una
+asignación activa del usuario). Registra **una observación** del paramédico sobre la **misma** emergencia, NN o
+identificada, en **una sola transacción** (todo o nada):
+
+- una `ClinicalNote` (`ClinicalNote.Write`) de tipo **`Prehospital`, fijado por el servidor**, con el personal
+  autenticado como autor;
+- una auditoría `Create` de `ClinicalNote` (**sin el texto de la nota**);
+- el paso de la atención de `Created` a `InProgress` si es el primer registro clínico;
+- el recibo de idempotencia.
+
+Las notas son **inmutables**: no se editan ni se borran; una corrección es otra nota.
+
+**Body:**
+
+```json
+{
+  "clientRequestId": "00000000-0000-0000-0000-000000000000",
+  "occurredAt": "2026-01-01T00:00:00Z",
+  "content": "Paciente consciente, orientado, sin dolor torácico."
+}
+```
+
+- `clientRequestId`: obligatorio, distinto de `Guid.Empty`. Propio de la nota: la app lo genera una vez por nota y lo
+  conserva en los reintentos.
+- `occurredAt`: obligatorio. ISO-8601 con `Z` o un offset explícito; sin offset, `400`. Se normaliza a UTC. Misma ventana
+  que los demás registros: desde el **inicio de la emergencia** hasta **5 minutos después** de la hora del servidor,
+  ambos límites incluidos; fuera, `400` (`field: occurredAt`). En la app es **automática y no editable**: la hora del
+  primer intento de guardar.
+- `content`: obligatorio. Se recorta; vacío o solo espacios, `400` (`field: content`). **Máximo 8000 caracteres** en el
+  servidor (`400`); la app limita a **4000** como decisión de UX móvil, no como regla clínica. El texto no aparece en
+  los errores ni en los logs.
+- **No se aceptan** `type`, `noteType`, `authorStaffId`, `patientId`, `clinicId`, `createdAtUtc`, `encounterId` ni
+  ningún otro campo: `400`.
+
+**Respuesta** (`201 Created` la primera vez, sin `Location`; `200 OK` en un reintento). Se construye con la petición
+canónica, así que un reintento responde exactamente lo mismo. No incluye el autor (siempre es quien llama) ni la hora de
+creación:
+
+```json
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "encounterId": "00000000-0000-0000-0000-000000000000",
+  "type": "Prehospital",
+  "content": "Paciente consciente, orientado, sin dolor torácico.",
+  "occurredAtUtc": "2026-01-01T00:00:00+00:00"
+}
+```
+
+| Estado | Cuándo |
+|---|---|
+| `201` | Primera nota con ese `clientRequestId` |
+| `200` | Reintento con el mismo `clientRequestId` y la misma nota: nada nuevo, sin otra auditoría |
+| `400` | Texto vacío o de más de 8000 caracteres; hora sin offset, inválida o fuera de rango; campos que sobran; `clientRequestId` vacío |
+| `401` | Sin token válido |
+| `403` | Sin `Emergencies.Operate` (Doctor, Nurse, Receptionist) o sin `ClinicalNotes.Write`; sin asignación a la emergencia (otro paramédico) |
+| `404` | La emergencia no existe o no es prehospitalaria |
+| `409` | El `clientRequestId` ya se usó con otro texto, hora o emergencia; la emergencia ya no admite registros (`Transferred`, `Closed`, `Cancelled`) o cambió durante la operación (cierre, despacho del traslado o identificación concurrentes) |
+
+- **Idempotencia:** operación `prehospital-emergency.note.v1`, clave (usuario, operación, `clientRequestId`); el recibo
+  apunta a la `ClinicalNote`. El hash usa la emergencia, `occurredAt` en UTC y el texto recortado (`Z` u otro offset del
+  mismo instante, o el texto con otros espacios alrededor, son lo mismo). Una nota es inmutable, así que duplicarla
+  sería un registro clínico falso: dos envíos simultáneos de la misma nota la registran una sola vez y ambos responden
+  sin error, con el mismo `id`.
+- Un reintento se responde aunque la hora o el estado hayan cambiado después, pero el acceso se vuelve a comprobar.
+- Dos notas con distinto `clientRequestId` son dos notas, aunque tengan el mismo texto.
+- `CreatedAtUtc` lo fija el Domain con su propio reloj; no forma parte del hash, de la respuesta ni de la comparación de
+  un reintento.
+- El camino Web (`POST /api/web/encounters/{id}/notes`) no cambia: sigue exigiendo la clínica y rechazando horas futuras.
 
 ---
 

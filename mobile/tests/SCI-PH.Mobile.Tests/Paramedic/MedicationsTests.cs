@@ -12,19 +12,20 @@ namespace SCI_PH.Mobile.Tests.Paramedic;
 
 // Medicamentos REALES sobre la emergencia real: el catálogo de activos del servidor (GET api/mobile/catalogs/medications)
 // y una dosis ya administrada por envío (POST api/mobile/emergencies/{id}/medication-administrations), sin prescripción,
-// con su propia clave y su hora, conservadas en los reintentos. Tras registrar, la pantalla queda lista para otra dosis.
+// con su propia clave y su hora, conservadas en los reintentos. Tras registrar, la pantalla queda lista para otra dosis;
+// "Continuar" lleva a las observaciones.
 public class MedicationsTests
 {
     private readonly FakeMedicationsBff _bff = new();
     private readonly MockParamedicApiService _mock = new();
-    private readonly FakeDialogs _dialogs = new();
+    private readonly FakeNavigator _navigator = new();
     private readonly Guid _emergencyId = Guid.NewGuid();
 
     public MedicationsTests() => _mock.Adopt(new EmergencyDto { Id = _emergencyId });
 
     private HttpParamedicApiService Service() => new(_bff.Client(), _mock);
 
-    private MedicationsViewModel ViewModel() => new(Service(), new HttpParamedicCatalogService(_bff.Client()), _dialogs) { EmergencyId = _emergencyId };
+    private MedicationsViewModel ViewModel() => new(Service(), new HttpParamedicCatalogService(_bff.Client()), _navigator) { EmergencyId = _emergencyId };
 
     private JsonElement Body(int index) => JsonDocument.Parse(_bff.Bodies[index]).RootElement;
 
@@ -246,7 +247,7 @@ public class MedicationsTests
         Assert.Equal(((MedicationCatalogItemDto?)null, "", (string?)null, "", (MedicationRouteOption?)null),
             (vm.SelectedMedication, vm.Dose, vm.SelectedDoseUnit, vm.Notes, vm.SelectedRoute));
         Assert.Equal(1, vm.SavedCount);
-        Assert.Empty(_dialogs.Shown);
+        Assert.Empty(_navigator.Navigations);
 
         Fill(vm, FakeMedicationsBff.Paracetamol, "250");
         await Task.Delay(20);
@@ -332,7 +333,7 @@ public class MedicationsTests
         Assert.Equal(1, _bff.Recorded);
 
         await vm.ContinueCommand.ExecuteAsync(null);
-        Assert.Single(_dialogs.Shown);
+        Assert.Equal(ParamedicRoutes.Notes, Assert.Single(_navigator.Navigations).Route);
     }
 
     [Fact]
