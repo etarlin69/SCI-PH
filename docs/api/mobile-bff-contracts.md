@@ -111,8 +111,9 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 ## Paramedic Workflow
 
 > **Implementados:** `POST /api/mobile/emergencies`, `GET /api/mobile/emergencies/{id}` (V1, ver
-> [ADR-008](../adr/ADR-008-prehospital-emergency.md)), `POST /api/mobile/emergencies/{id}/identify/document` y
-> `POST /api/mobile/emergencies/{id}/vital-signs`.
+> [ADR-008](../adr/ADR-008-prehospital-emergency.md)), `POST /api/mobile/emergencies/{id}/identify/document`,
+> `POST /api/mobile/emergencies/{id}/vital-signs`, `POST /api/mobile/emergencies/{id}/procedures` y
+> `GET /api/mobile/catalogs/procedures`.
 > **El resto siguen siendo contratos previstos** y pueden evolucionar mediante revisión arquitectónica.
 
 - **Usuarios:** personal clínico autenticado: un `ClinicalStaff` activo, vinculado a la cuenta y con al menos una
@@ -120,7 +121,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 - **Autorización:** todos los endpoints de `/api/mobile/emergencies` exigen el permiso `Emergencies.Operate` (rol
   Paramedic; Administrator lo tiene por tener todos) para entrar al módulo, además del permiso clínico de cada acción
   (abrir: `Encounters.Create`; leer: `Encounters.Read`; identificar por documento: `Patients.Read` + `Patients.Identify`;
-  signos vitales: `VitalSigns.Write`; previstos: los de procedimientos, medicamentos, etc.). Nunca
+  signos vitales: `VitalSigns.Write`; procedimientos y su catálogo: `Procedures.Write`; previstos: los de
+  medicamentos, etc.). Nunca
   se comprueba un rol. Doctor, Nurse y Receptionist no tienen `Emergencies.Operate`: `403`.
 - **Acceso al caso concreto:** una emergencia es un `ClinicalEncounter` de tipo `Prehospital` **sin clínica**
   (`clinicId = null`) mientras no llega al hospital. La clínica base del paramédico no es el lugar de la emergencia y
@@ -130,9 +132,9 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
   código `NN-…` generado por el servidor) y se vincula a un `Patient` después. Al llegar, el hospital la recibe
   (`POST /api/web/transfers/{id}/receive`) y la **misma** atención pasa a tener la clínica destino.
 - **Registros clínicos:** signos vitales, procedimientos y medicamentos se **agregan** al episodio; no se editan ni se borran desde la app (las correcciones se definirán con el Rol 2).
-- **Hora del evento:** la apertura lleva `startedAt` y cada registro llevará `recordedAt` (hora en que ocurrió en campo), distinta de la hora en que llega al servidor, para soportar envío diferido.
-- **Idempotencia:** implementada en la apertura, en la identificación por documento y en los signos vitales; los
-  demás `POST` la usarán igual. Cada `POST` lleva un
+- **Hora del evento:** la apertura lleva `startedAt` y cada registro lleva la hora en que ocurrió en campo (`recordedAt` en los signos vitales, `performedAt` en los procedimientos), distinta de la hora en que llega al servidor, para soportar envío diferido.
+- **Idempotencia:** implementada en la apertura, en la identificación por documento, en los signos vitales y en los
+  procedimientos; los demás `POST` la usarán igual. Cada `POST` lleva un
   `clientRequestId` (`Guid` generado en el dispositivo una vez por operación y **reutilizado en cada reintento**). El
   servidor guarda un recibo por (usuario, operación, `clientRequestId`) con el hash SHA-256 del contenido lógico:
   - misma clave y mismo contenido → la **misma** respuesta (`200`, sin crear nada);
@@ -147,7 +149,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 | `POST` | `/api/mobile/emergencies/{id}/identify/document` | Identifica al paciente NN por cédula o pasaporte | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/identify` | Vincula la emergencia a un paciente (huella, manual) | Previsto |
 | `POST` | `/api/mobile/emergencies/{id}/vital-signs` | Registra una toma de signos vitales | Implementado |
-| `POST` | `/api/mobile/emergencies/{id}/procedures` | Registra un procedimiento realizado | Previsto |
+| `POST` | `/api/mobile/emergencies/{id}/procedures` | Registra un procedimiento realizado | Implementado |
+| `GET` | `/api/mobile/catalogs/procedures` | Catálogo fijo de procedimientos prehospitalarios | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/medications` | Registra un medicamento administrado | Previsto |
 | `POST` | `/api/mobile/emergencies/{id}/transfer` | Inicia el traslado a un establecimiento | Previsto |
 
@@ -158,7 +161,7 @@ POST /emergencies                  abre el episodio (paciente aún desconocido)
 POST /emergencies/{id}/identify/document   identifica al paciente por documento (implementado)
 POST /emergencies/{id}/identify    identifica al paciente (huella vía Device API, manual)
 POST /emergencies/{id}/vital-signs ┐ (signos vitales: implementado)
-POST /emergencies/{id}/procedures  ├ registros durante la atención (0..n veces)
+POST /emergencies/{id}/procedures  ├ registros durante la atención (0..n veces; procedimientos: implementado)
 POST /emergencies/{id}/medications ┘
 POST /emergencies/{id}/transfer    traslado → lo recibe el hospital en Web BFF
                                    (POST /api/web/transfers/{id}/receive)
@@ -427,22 +430,91 @@ responde exactamente lo mismo:
 
 ---
 
-### `POST /api/mobile/emergencies/{id}/procedures`
+### `GET /api/mobile/catalogs/procedures` — Implementado
 
-**Body (forma propuesta):**
+Permisos: `Emergencies.Operate` + `Procedures.Write` (el catálogo solo sirve para registrar un procedimiento y no tiene
+datos de pacientes; no existe `Procedures.Read`), y ser personal clínico activo. Doctor, Nurse y Receptionist: `403`.
+
+**Catálogo fijo controlado por el servidor**, propio del prototipo SCI-PH (sistema de códigos `SCI-PH-PREHOSP`,
+[ADR-008](../adr/ADR-008-prehospital-emergency.md), decisión 8). No es texto libre ni, todavía, un catálogo
+administrable: podrá sustituirse por un catálogo administrado o una terminología estándar. Los códigos son estables.
+
+```json
+[
+  { "code": "IMMOBILIZATION", "name": "Inmovilización", "description": "Inmovilización de columna o de extremidades para el traslado." },
+  { "code": "HEMORRHAGE-CONTROL", "name": "Control de hemorragia", "description": "Compresión directa, vendaje compresivo o torniquete." },
+  { "code": "OXYGEN-THERAPY", "name": "Oxigenoterapia", "description": "Administración de oxígeno suplementario." },
+  { "code": "PERIPHERAL-IV-ACCESS", "name": "Acceso venoso periférico", "description": "Canalización de una vía venosa periférica." },
+  { "code": "CPR", "name": "Reanimación cardiopulmonar", "description": "Compresiones torácicas y ventilación." }
+]
+```
+
+### `POST /api/mobile/emergencies/{id}/procedures` — Implementado
+
+Permisos: `Emergencies.Operate` + `Procedures.Write`, y acceso a la emergencia (mientras no tenga clínica, una
+asignación activa del usuario). Registra **un procedimiento ya realizado** sobre la **misma** emergencia, NN o
+identificada, en **una sola transacción** (todo o nada):
+
+- un `ClinicalProcedure` en estado `Completed` (`ClinicalProcedure.RecordCompleted`), con el nombre, la descripción, el
+  sistema (`SCI-PH-PREHOSP`) y el código del catálogo, el personal autenticado y `performedAtUtc = completedAtUtc`;
+- una auditoría `Create` de `ClinicalProcedure`;
+- el paso de la atención de `Created` a `InProgress` si es el primer registro clínico;
+- el recibo de idempotencia.
+
+**Body:**
 
 ```json
 {
   "clientRequestId": "00000000-0000-0000-0000-000000000000",
-  "recordedAt": "2026-01-01T00:00:00Z",
-  "procedureCode": "…",
-  "notes": "…"
+  "procedureCode": "OXYGEN-THERAPY",
+  "performedAt": "2026-01-01T00:00:00Z",
+  "outcome": "SpO2 97 % tras 5 minutos"
 }
 ```
 
-`procedureCode` referenciará un catálogo que administrará el área de Administración (Rol 5).
+- `clientRequestId`: obligatorio, distinto de `Guid.Empty`. Propio del procedimiento: la app lo genera una vez por
+  procedimiento y lo conserva en los reintentos.
+- `procedureCode`: obligatorio, un `code` del catálogo, con coincidencia exacta. Fuera del catálogo (o vacío): `400`
+  (`field: procedureCode`).
+- `performedAt`: obligatorio, el único instante del procedimiento ya completado. ISO-8601 con `Z` o un offset explícito;
+  sin offset, `400`. Se normaliza a UTC. Misma ventana que los signos vitales: desde el **inicio de la emergencia**
+  hasta **5 minutos después** de la hora del servidor, ambos límites incluidos; fuera, `400` (`field: performedAt`).
+- `outcome`: opcional, el **resultado** del procedimiento escrito por el paramédico. Se recorta; vacío = sin resultado.
+  Máximo 4000 caracteres; con más, `400` (`field: outcome`).
+- **No se aceptan** `name`, `description`, `codeSystem`, `notes`, `staffId`, `patientId`, `clinicId`, `completedAt`,
+  `status` ni ningún otro campo: `400`. Todo eso lo ponen el servidor, el catálogo y el Domain.
 
-**Respuestas previstas:** `201 Created`, `400`, `401`, `403`, `404`, `409`.
+**Respuesta** (`201 Created` la primera vez, sin `Location`; `200 OK` en un reintento). Se construye con la petición
+canónica y la entrada del catálogo, así que un reintento responde exactamente lo mismo:
+
+```json
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "encounterId": "00000000-0000-0000-0000-000000000000",
+  "code": "OXYGEN-THERAPY",
+  "name": "Oxigenoterapia",
+  "performedAtUtc": "2026-01-01T00:00:00+00:00",
+  "outcome": "SpO2 97 % tras 5 minutos"
+}
+```
+
+| Estado | Cuándo |
+|---|---|
+| `201` | Primer procedimiento con ese `clientRequestId` |
+| `200` | Reintento con el mismo `clientRequestId` y el mismo procedimiento: nada nuevo, sin otra auditoría |
+| `400` | Código vacío o fuera del catálogo; hora sin offset, inválida o fuera de rango; `outcome` demasiado largo; campos que sobran; `clientRequestId` vacío |
+| `401` | Sin token válido |
+| `403` | Sin `Emergencies.Operate` (Doctor, Nurse, Receptionist) o sin `Procedures.Write`; sin asignación a la emergencia (otro paramédico) |
+| `404` | La emergencia no existe o no es prehospitalaria |
+| `409` | El `clientRequestId` ya se usó con otro procedimiento, hora, resultado o emergencia; la emergencia ya no admite registros (`Transferred`, `Closed`, `Cancelled`) o cambió durante la operación (cierre, despacho del traslado o identificación concurrentes) |
+
+- **Idempotencia:** operación `prehospital-emergency.procedure.v1`, clave (usuario, operación, `clientRequestId`); el
+  recibo apunta al `ClinicalProcedure`. El hash usa la emergencia, el código, `performedAt` en UTC y el `outcome`
+  recortado (`Z` u otro offset del mismo instante, o el resultado con otros espacios, son lo mismo). Dos envíos
+  simultáneos del mismo procedimiento lo registran una sola vez y ambos responden sin error, con el mismo `id`.
+- Un reintento se responde aunque la hora o el estado hayan cambiado después, pero el acceso se vuelve a comprobar.
+- Dos procedimientos con distinto `clientRequestId` son dos procedimientos, aunque sean el mismo a la misma hora.
+- El `outcome` no se registra en logs ni aparece en los errores.
 
 ---
 

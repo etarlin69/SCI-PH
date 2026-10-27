@@ -23,14 +23,15 @@ namespace SCI_PH.Application.Features.Clinical
     // assigned to it (EncounterStaffAssignment, function Paramedic), which is what gives access to this concrete case
     // (IEncounterAccessService). On arrival, TransferService/ReceiveAtClinic sets the destination clinic on the SAME
     // encounter. The NN patient can then be identified by document on that same encounter (EncounterService), and readings
-    // of vital signs are recorded on it, identified or not. Opening, identifying and recording vital signs are idempotent
-    // per (user, operation, clientRequestId): see IIdempotencyStore.
+    // of vital signs and completed procedures are recorded on it, identified or not. Opening, identifying and recording are
+    // idempotent per (user, operation, clientRequestId): see IIdempotencyStore.
     public sealed class PrehospitalEmergencyService
     {
         // Server-controlled operation name of the idempotency receipts; a new version gets a new name.
         public const string OpenOperation = "prehospital-emergency.open.v1";
         public const string IdentifyByDocumentOperation = "prehospital-emergency.identify-document.v1";
         public const string RecordVitalSignsOperation = "prehospital-emergency.vital-signs.v1";
+        public const string RecordProcedureOperation = "prehospital-emergency.procedure.v1";
 
         // VitalSign.Value is numeric(8,2): a value with more decimals is rejected rather than rounded by the database.
         public const int MaxVitalSignDecimals = 2;
@@ -208,37 +209,14 @@ namespace SCI_PH.Application.Features.Clinical
                 return await ReplayVitalSignsAsync(actor, existing, requestHash, recordedAt, measurements, cancellationToken);
             }
 
-            var encounter = await _writes.FindEncounterAsync(emergencyId, cancellationToken);
-            if (encounter is null || encounter.Type != ClinicalEncounterType.Prehospital)
-            {
-                throw new ResourceNotFoundException("PrehospitalEmergency", emergencyId);
-            }
-
-            await _access.EnsureCanAccessAsync(
-                actor, new EncounterAccessTarget(encounter.Id, encounter.Type, encounter.ClinicId), cancellationToken);
-            if (encounter.PatientId is { } patientId
-                && !await _patientAccess.CanWriteAsync(patientId, Permissions.VitalSigns.Write, cancellationToken))
-            {
-                throw new AccessDeniedException("The current user cannot write this patient's clinical records.");
-            }
-
-            if (!EncounterRecordService.RecordableStatuses.Contains(encounter.Status))
-            {
-                throw new ResourceConflictException($"An encounter in status {encounter.Status} does not accept clinical records.");
-            }
-
-            // The status check above can be outdated by commit time; the store re-checks it inside the save.
-            _writes.EnsureEncounterUnchanged(encounter);
+            var encounter = await LoadForRecordingAsync(actor, emergencyId, Permissions.VitalSigns.Write, cancellationToken);
             var now = _time.GetUtcNow();
-            RecordedAt(recordedAt, encounter.StartedAtUtc, now);
+            DeviceClinicalTime(recordedAt, encounter.StartedAtUtc, now, "recordedAt");
             var vitalSigns = measurements
                 .Select(m => ClinicalInput.Apply(() => VitalSign.Record(encounter.Id, m.Type, m.Value, recordedAt, actor.StaffId)))
                 .ToList();
 
-            // The Domain never changes status before the start. An emergency opened with the device clock ahead (up to
-            // 5 minutes, accepted) starts "after" the server's now, so the transition time, a server timestamp, is not
-            // earlier than the start. The device's recordedAt is never changed.
-            EncounterRecordService.StartIfCreated(encounter, now > encounter.StartedAtUtc ? now : encounter.StartedAtUtc);
+            StartIfCreated(encounter, now);
             foreach (var vitalSign in vitalSigns)
             {
                 _writes.Add(vitalSign);
@@ -248,31 +226,149 @@ namespace SCI_PH.Application.Features.Clinical
             }
 
             _receipts.Add(new IdempotencyReceipt(key, requestHash, encounter.Id, now));
-            try
+            if (await SaveRecordAsync(key, cancellationToken) is { } winner)
             {
-                await _writes.SaveChangesAsync(cancellationToken);
-            }
-            catch (IdempotencyKeyCollisionException)
-            {
-                // A concurrent request with the same key committed first; this one wrote nothing.
-                var winner = await _receipts.FindAsync(key, cancellationToken)
-                    ?? throw new InvalidOperationException("The idempotency receipt that won the race was not found.");
                 return await ReplayVitalSignsAsync(actor, winner, requestHash, recordedAt, measurements, cancellationToken);
-            }
-            catch (ResourceConflictException)
-            {
-                // The encounter changed meanwhile (the same request starting it, or another one): a replay only if this
-                // same request is the one that committed.
-                if (await _receipts.FindAsync(key, cancellationToken) is { } winner)
-                {
-                    return await ReplayVitalSignsAsync(actor, winner, requestHash, recordedAt, measurements, cancellationToken);
-                }
-
-                throw;
             }
 
             return new RecordEmergencyVitalSignsResult(
                 new EmergencyVitalSignsSummary(encounter.Id, recordedAt, measurements), Created: true);
+        }
+
+        // The fixed prehospital procedure catalog. Only active clinical staff use it (same actor rule as every clinical
+        // endpoint, like the medication catalog); it holds no patient data.
+        public async Task<IReadOnlyList<PrehospitalProcedureCatalogItem>> ListProcedureCatalogAsync(CancellationToken cancellationToken)
+        {
+            await _actor.GetAsync(cancellationToken);
+            return PrehospitalProcedureCatalog.Entries;
+        }
+
+        // A procedure the paramedic already performed (ClinicalProcedure.RecordCompleted: performed and completed at the
+        // single instant performedAt), with its audit entry, the start of the encounter (Created -> InProgress, as the first
+        // reading of vital signs does) and the receipt, in one transaction. The name, description and code come from the
+        // server's catalog; outcome is the paramedic's free text with the result. Access, statuses, the clock window and
+        // the encounter's concurrency tokens are the same as for vital signs. Same key and same procedure again (also when
+        // it races the first one): the same answer, nothing new; access is still checked. Same key with another procedure,
+        // time, outcome or emergency: 409.
+        public async Task<RecordEmergencyProcedureResult> RecordProcedureAsync(
+            Guid emergencyId, RecordEmergencyProcedureRequest request, CancellationToken cancellationToken)
+        {
+            var clientRequestId = ClinicalInput.Id(request.ClientRequestId, "clientRequestId");
+            var entry = ProcedureCode(request.ProcedureCode);
+            var performedAt = request.PerformedAt.ToUniversalTime();
+            var outcome = Outcome(request.Outcome);
+            var actor = await _actor.GetAsync(cancellationToken);
+            var key = new IdempotencyKey(actor.IdentityUserId, RecordProcedureOperation, clientRequestId);
+            // The catalog code, the instant in UTC and the trimmed outcome (blank = none), never the raw JSON.
+            var requestHash = IdempotencyRequestHash.Compute(
+                emergencyId.ToString("D"), entry.Code, IdempotencyRequestHash.Instant(performedAt), outcome);
+
+            if (await _receipts.FindAsync(key, cancellationToken) is { } existing)
+            {
+                return await ReplayProcedureAsync(actor, existing, requestHash, emergencyId, entry, performedAt, outcome, cancellationToken);
+            }
+
+            var encounter = await LoadForRecordingAsync(actor, emergencyId, Permissions.Procedures.Write, cancellationToken);
+            var now = _time.GetUtcNow();
+            DeviceClinicalTime(performedAt, encounter.StartedAtUtc, now, "performedAt");
+            var procedure = ClinicalInput.Apply(() => ClinicalProcedure.RecordCompleted(
+                encounter.Id, entry.Name, actor.StaffId, performedAt, performedAt, outcome, entry.Description,
+                PrehospitalProcedureCatalog.CodeSystem, entry.Code));
+
+            StartIfCreated(encounter, now);
+            _writes.Add(procedure);
+            _writes.Add(ClinicalAuditEntry.Success(
+                actor.AuditActor, AuditActionType.Create, nameof(ClinicalProcedure), procedure.Id.ToString(), now,
+                new AuditContext(encounter.PatientId, encounter.Id)));
+            _receipts.Add(new IdempotencyReceipt(key, requestHash, procedure.Id, now));
+            if (await SaveRecordAsync(key, cancellationToken) is { } winner)
+            {
+                return await ReplayProcedureAsync(actor, winner, requestHash, emergencyId, entry, performedAt, outcome, cancellationToken);
+            }
+
+            return new RecordEmergencyProcedureResult(
+                new EmergencyProcedureSummary(procedure.Id, encounter.Id, entry.Code, entry.Name, performedAt, outcome), Created: true);
+        }
+
+        // Shared write check of the records on an emergency (vital signs, procedures). Only prehospital encounters are
+        // emergencies here. Access: the assignment while there is no clinic (IEncounterAccessService), plus the patient
+        // rule for the permission once the patient is identified; the shared recording check of EncounterRecordService is
+        // not used, so the Web records keep the clinic rule. The status check can be outdated by commit time, so the
+        // encounter's concurrency tokens (Status, PatientId) are re-checked inside the save: a concurrent close, dispatch
+        // or identification makes the record lose with a 409.
+        private async Task<ClinicalEncounter> LoadForRecordingAsync(
+            ClinicalActor actor, Guid emergencyId, string permission, CancellationToken cancellationToken)
+        {
+            var encounter = await _writes.FindEncounterAsync(emergencyId, cancellationToken);
+            if (encounter is null || encounter.Type != ClinicalEncounterType.Prehospital)
+            {
+                throw new ResourceNotFoundException("PrehospitalEmergency", emergencyId);
+            }
+
+            await _access.EnsureCanAccessAsync(
+                actor, new EncounterAccessTarget(encounter.Id, encounter.Type, encounter.ClinicId), cancellationToken);
+            if (encounter.PatientId is { } patientId && !await _patientAccess.CanWriteAsync(patientId, permission, cancellationToken))
+            {
+                throw new AccessDeniedException("The current user cannot write this patient's clinical records.");
+            }
+
+            if (!EncounterRecordService.RecordableStatuses.Contains(encounter.Status))
+            {
+                throw new ResourceConflictException($"An encounter in status {encounter.Status} does not accept clinical records.");
+            }
+
+            _writes.EnsureEncounterUnchanged(encounter);
+            return encounter;
+        }
+
+        // The Domain never changes status before the start. An emergency opened with the device clock ahead (up to
+        // 5 minutes, accepted) starts "after" the server's now, so the transition time, a server timestamp, is not
+        // earlier than the start. The device's time of the record is never changed.
+        private static void StartIfCreated(ClinicalEncounter encounter, DateTimeOffset now) =>
+            EncounterRecordService.StartIfCreated(encounter, now > encounter.StartedAtUtc ? now : encounter.StartedAtUtc);
+
+        // Saves the tracked record and its receipt. Returns the receipt of the request that committed instead when this one
+        // lost: a concurrent request with the same key committed first (this one wrote nothing), or the encounter changed
+        // meanwhile and the same request is the one that committed. Any other conflict is rethrown (409).
+        private async Task<IdempotencyReceipt?> SaveRecordAsync(IdempotencyKey key, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _writes.SaveChangesAsync(cancellationToken);
+                return null;
+            }
+            catch (IdempotencyKeyCollisionException)
+            {
+                return await _receipts.FindAsync(key, cancellationToken)
+                    ?? throw new InvalidOperationException("The idempotency receipt that won the race was not found.");
+            }
+            catch (ResourceConflictException)
+            {
+                if (await _receipts.FindAsync(key, cancellationToken) is { } winner)
+                {
+                    return winner;
+                }
+
+                throw;
+            }
+        }
+
+        // The receipt's resource is the recorded procedure; the emergency is the one of the request (the hash covers it).
+        // A replay re-checks access (ReadAsync) but not the clock or the status: the procedure was valid when recorded.
+        private async Task<RecordEmergencyProcedureResult> ReplayProcedureAsync(
+            ClinicalActor actor,
+            IdempotencyReceipt receipt,
+            string requestHash,
+            Guid emergencyId,
+            PrehospitalProcedureCatalogItem entry,
+            DateTimeOffset performedAt,
+            string? outcome,
+            CancellationToken cancellationToken)
+        {
+            EnsureSameRequest(receipt, requestHash);
+            var emergency = await ReadAsync(actor, emergencyId, cancellationToken);
+            return new RecordEmergencyProcedureResult(
+                new EmergencyProcedureSummary(receipt.ResourceId, emergency.Id, entry.Code, entry.Name, performedAt, outcome), Created: false);
         }
 
         // A replay re-checks access (ReadAsync) but not the clock or the status: the reading was valid when it was recorded.
@@ -288,17 +384,22 @@ namespace SCI_PH.Application.Features.Clinical
             return new RecordEmergencyVitalSignsResult(new EmergencyVitalSignsSummary(emergency.Id, recordedAt, measurements), Created: false);
         }
 
-        // The receipt's resource is the emergency it opened, identified or recorded on, read again with the current access rules.
+        // The receipt's resource is the emergency it opened, identified or recorded vital signs on, read again with the
+        // current access rules.
         private async Task<PrehospitalEmergencySummary> ReplayAsync(
             ClinicalActor actor, IdempotencyReceipt receipt, string requestHash, CancellationToken cancellationToken)
+        {
+            EnsureSameRequest(receipt, requestHash);
+            return await ReadAsync(actor, receipt.ResourceId, cancellationToken);
+        }
+
+        private static void EnsureSameRequest(IdempotencyReceipt receipt, string requestHash)
         {
             if (!string.Equals(receipt.RequestHash, requestHash, StringComparison.Ordinal))
             {
                 throw new ResourceConflictException(
                     "clientRequestId was already used with different data. Repeat the operation with a new request.");
             }
-
-            return await ReadAsync(actor, receipt.ResourceId, cancellationToken);
         }
 
         // Only prehospital encounters are emergencies here; any other id is not found. Access: IEncounterAccessService
@@ -361,17 +462,45 @@ namespace SCI_PH.Application.Features.Clinical
                 : throw new RequestValidationException("A reading needs at least one vital sign.");
         }
 
-        private static void RecordedAt(DateTimeOffset recordedAt, DateTimeOffset encounterStartedAtUtc, DateTimeOffset now)
+        // The device's time of a record: from the start of the emergency up to 5 minutes after the server's clock (the
+        // device skew already accepted for startedAt), both inclusive. The Web keeps its strict no-future rule.
+        private static void DeviceClinicalTime(DateTimeOffset value, DateTimeOffset encounterStartedAtUtc, DateTimeOffset now, string field)
         {
-            if (recordedAt < encounterStartedAtUtc)
+            if (value < encounterStartedAtUtc)
             {
-                throw new RequestValidationException("recordedAt cannot be earlier than the start of the emergency.", "recordedAt");
+                throw new RequestValidationException($"{field} cannot be earlier than the start of the emergency.", field);
             }
 
-            if (recordedAt > now + MaxStartAhead)
+            if (value > now + MaxStartAhead)
             {
-                throw new RequestValidationException("recordedAt cannot be more than 5 minutes in the future.", "recordedAt");
+                throw new RequestValidationException($"{field} cannot be more than 5 minutes in the future.", field);
             }
+        }
+
+        // The catalog entry of the code, matched exactly. A code outside the catalog is a 400: there is no free-text procedure.
+        private static PrehospitalProcedureCatalogItem ProcedureCode(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new RequestValidationException("procedureCode is required.", "procedureCode");
+            }
+
+            return PrehospitalProcedureCatalog.Find(value)
+                ?? throw new RequestValidationException("procedureCode is not in the prehospital procedure catalog.", "procedureCode");
+        }
+
+        // ClinicalProcedure.Outcome: trimmed, blank = none, at most FieldLengths.LongText characters. Never echoed in errors.
+        private static string? Outcome(string? value)
+        {
+            var text = value?.Trim();
+            if (string.IsNullOrEmpty(text))
+            {
+                return null;
+            }
+
+            return text.Length <= FieldLengths.LongText
+                ? text
+                : throw new RequestValidationException($"outcome cannot exceed {FieldLengths.LongText} characters.", "outcome");
         }
 
         private static PatientIdentifierType DocumentType(PatientIdentifierType value) =>

@@ -25,4 +25,15 @@ public static class ParamedicMessages
         "No se pudo registrar la toma: la solicitud ya se usó con otros datos o la emergencia ya no admite registros.";
 
     public const string RegisterVitalSignsFailed = "No se pudieron guardar los signos vitales. Intenta nuevamente.";
+
+    /// <summary>404: la emergencia ya no existe para este usuario (o no es una emergencia prehospitalaria).</summary>
+    public const string EmergencyNotFound = "No se encontró la emergencia. Vuelve a abrirla desde el inicio.";
+
+    public const string ProceduresCatalogFailed = "No se pudo cargar el catálogo de procedimientos.";
+
+    /// <summary>409: la clave del procedimiento ya se usó con otros datos, o la emergencia ya no admite registros.</summary>
+    public const string ProcedureConflict =
+        "No se pudo registrar el procedimiento: la solicitud ya se usó con otros datos o la emergencia ya no admite registros.";
+
+    public const string RegisterProcedureFailed = "No se pudo guardar el procedimiento. Intenta nuevamente.";
 }

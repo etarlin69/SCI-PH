@@ -3,7 +3,10 @@ using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 
 namespace SCI_PH.Mobile.Features.Paramedic.Services.Mocks;
 
-/// <summary>Catálogo SIMULADO solo para desarrollo; no representa el catálogo clínico real.</summary>
+/// <summary>
+/// Catálogo SIMULADO solo para desarrollo; no representa el catálogo clínico real. La app ya usa el catálogo real de
+/// procedimientos (<see cref="HttpParamedicCatalogService"/>); de aquí solo salen los medicamentos.
+/// </summary>
 public class MockParamedicCatalogService : IParamedicCatalogService
 {
     private const int SimulatedDelayMs = 300;

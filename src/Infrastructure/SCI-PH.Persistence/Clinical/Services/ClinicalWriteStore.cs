@@ -46,6 +46,8 @@ namespace SCI_PH.Persistence.Clinical.Services
 
         public void Add(Diagnosis diagnosis) => _clinical.Diagnoses.Add(diagnosis);
 
+        public void Add(ClinicalProcedure procedure) => _clinical.ClinicalProcedures.Add(procedure);
+
         // Its details are inserted with it (same graph, same transaction).
         public void Add(Prescription prescription) => _clinical.Prescriptions.Add(prescription);
 

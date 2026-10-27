@@ -36,8 +36,8 @@ public class RealEmergencyTests
 
         using var provider = services.BuildServiceProvider();
         Assert.IsType<HttpParamedicApiService>(provider.GetRequiredService<IParamedicApiService>());
-        // Catálogo y huella siguen siendo mocks.
-        Assert.IsType<MockParamedicCatalogService>(provider.GetRequiredService<IParamedicCatalogService>());
+        // Catálogo de procedimientos real (el de medicamentos sigue en mock dentro del mismo servicio); huella mock.
+        Assert.IsType<HttpParamedicCatalogService>(provider.GetRequiredService<IParamedicCatalogService>());
         Assert.IsType<MockFingerprintReaderService>(provider.GetRequiredService<IFingerprintReaderService>());
     }
 
@@ -80,9 +80,9 @@ public class RealEmergencyTests
         var service = Service();
         var emergency = await service.CreateEmergencyAsync(new CreateEmergencyDto { ChiefComplaint = "Dolor" });
 
-        // Signos vitales ya son reales (VitalSignsTests); la huella, los procedimientos y los medicamentos siguen en mock.
+        // Signos vitales y procedimientos ya son reales (VitalSignsTests, ProceduresTests); la huella y los medicamentos
+        // siguen en mock.
         var identified = await service.IdentifyAsync(emergency.Id, new IdentifyEmergencyDto { Method = IdentificationMethod.Fingerprint, PatientId = Guid.NewGuid() });
-        await service.RegisterProcedureAsync(emergency.Id, new RegisterProcedureDto { ProcedureCode = "PROC-001" });
         await service.RegisterMedicationAsync(emergency.Id, new RegisterMedicationDto { MedicationCode = "MED-001" });
 
         Assert.Equal(emergency.Id, identified.Id);

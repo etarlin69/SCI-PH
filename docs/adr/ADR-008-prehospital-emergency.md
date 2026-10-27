@@ -1,6 +1,6 @@
 # ADR-008: Emergencia prehospitalaria: acceso sin clínica e idempotencia
 
-- **Estado:** Aceptado (implementado en los PR #25 y #26 y en el de `feature/mobile-vital-signs`)
+- **Estado:** Aceptado (implementado en los PR #25, #26 y #27 y en el de `feature/mobile-prehospital-interventions`)
 - **Fecha:** 2026-10-23
 - **Relacionado:** [ADR-005](ADR-005-clinical-model.md), [ADR-006](ADR-006-identity-security.md),
   [contratos del Mobile BFF](../api/mobile-bff-contracts.md#paramedic-workflow)
@@ -36,7 +36,8 @@ reconocer el reintento: cada reintento creaba otra atención NN.
 - `ClinicalActor` no hace consultas: la búsqueda de la asignación está en el read store.
 - `EnsureClinic` **no se reemplazó globalmente**: los caminos del hospital (Web BFF) mantienen su regla, y una atención
   sin clínica sigue siendo invisible para ellos. El servicio se conecta uno a uno en los caminos móviles: ya lo usan la
-  identificación (decisión 6) y los signos vitales (decisión 7); faltan procedimientos, medicamentos y traslado.
+  identificación (decisión 6), los signos vitales (decisión 7) y los procedimientos (decisión 8); faltan medicamentos y
+  traslado.
 
 ### 3. Recibos de idempotencia: infraestructura técnica reutilizable
 
@@ -113,6 +114,32 @@ app no la envía y el contrato no la acepta: un campo `location` se rechaza con 
   del servidor) es `max(ahora, inicio)`.
 - Temperatura con hasta 2 decimales (la columna es `numeric(8,2)`): con más, `400`, nunca un redondeo silencioso.
 
+### 8. Procedimientos prehospitalarios
+
+- `POST /api/mobile/emergencies/{id}/procedures` registra **un procedimiento ya realizado** con
+  `ClinicalProcedure.RecordCompleted` (sin cambios en el Domain): el procedimiento, su auditoría `Create`,
+  `Created -> InProgress` si es el primer registro y el recibo (`prehospital-emergency.procedure.v1`, recurso: el
+  `ClinicalProcedure`), en una transacción. El acceso, los estados que admiten registros, la ventana de hora y los tokens
+  de concurrencia de la atención son los mismos que en los signos vitales (decisión 7), en un camino compartido.
+- **Catálogo de procedimientos prehospitalarios: catálogo fijo controlado por el servidor**, propio del prototipo
+  SCI-PH (`PrehospitalProcedureCatalog`, `CodeSystem = "SCI-PH-PREHOSP"`), expuesto en
+  `GET /api/mobile/catalogs/procedures`. El cliente solo envía `procedureCode`; el servidor resuelve el nombre, la
+  descripción, el sistema y el código. **No es texto libre**: un código fuera del catálogo es un `400`
+  (`field: procedureCode`). **Todavía no es un catálogo administrable**: no hay entidad, tabla ni migración, y no hay
+  CRUD de administración. Podrá sustituirse después por un catálogo administrado o una terminología estándar con otro
+  sistema de códigos; los procedimientos ya registrados conservan su `CodeSystem` y su `Code`, así que un código nunca
+  se reutiliza con otro significado.
+- El catálogo se protege con `Emergencies.Operate` + `Procedures.Write`: no contiene datos de pacientes y solo sirve para
+  registrar un procedimiento; no existe un permiso `Procedures.Read`. Además exige personal clínico activo, como el
+  catálogo de medicamentos.
+- **Hora:** un solo instante, `performedAt` (`PerformedAtUtc = CompletedAtUtc`), con offset explícito y la ventana de
+  la decisión 7 (desde el inicio de la emergencia hasta 5 minutos después de la hora del servidor). Esta vertical no
+  registra procedimientos planificados ni en curso.
+- **Texto libre:** `outcome` es el resultado que escribe el paramédico (`ClinicalProcedure.Outcome`, máx. 4000). La
+  `Description` del procedimiento viene del catálogo, nunca del cliente.
+- El hash de idempotencia usa la emergencia, el código, `performedAt` en UTC y el `outcome` recortado (vacío = sin
+  resultado). Un reintento se responde desde el recibo y la petición canónica, comprobando de nuevo el acceso.
+
 ## Consecuencias
 
 - La primera vertical real del paramédico (abrir y leer la emergencia) funciona sin inventar una clínica.
@@ -122,7 +149,11 @@ app no la envía y el contrato no la acepta: un campo `location` se rechaza con 
 - Tras la llegada al hospital, el paramédico de otra base deja de leer la emergencia, porque se aplica la regla de
   clínica. El acceso posterior al traslado se decidirá con la vertical de traslado.
 - `startedAt` puede estar hasta 5 minutos en el futuro, y el Domain exige que las horas clínicas posteriores no sean
-  anteriores al inicio. Los signos vitales móviles lo resuelven con el mismo margen (decisión 7); las próximas
-  verticales (procedimientos, medicamentos) deben tenerlo en cuenta.
+  anteriores al inicio. Los signos vitales y los procedimientos móviles lo resuelven con el mismo margen (decisiones 7
+  y 8); la próxima vertical (medicamentos) debe tenerlo en cuenta.
+- El catálogo de procedimientos es una lista fija del servidor: añadir un procedimiento exige un cambio de código y un
+  despliegue, hasta que exista un catálogo administrado.
+- `Transferred` sigue sin admitir registros, así que el paramédico no puede registrar procedimientos durante el
+  transporte una vez despachado el traslado; se decidirá con la vertical de traslado.
 - Solicitar y despachar un traslado de una atención sin clínica todavía no está expuesto (`TransferService` exige
   clínica de origen); llegará con la vertical de traslado usando `IEncounterAccessService`.

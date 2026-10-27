@@ -27,6 +27,8 @@ namespace SCI_PH.Application.Abstractions.Clinical
 
         void Add(Diagnosis diagnosis);
 
+        void Add(ClinicalProcedure procedure);
+
         // With its details (one aggregate).
         void Add(Prescription prescription);
 

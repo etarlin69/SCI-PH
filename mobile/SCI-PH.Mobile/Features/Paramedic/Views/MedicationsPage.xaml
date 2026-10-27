@@ -16,6 +16,9 @@
                 <Label Text="Medicamentos administrados" Style="{StaticResource SciTitle}" />
                 <Label Text="Registra lo que ya se administró al paciente. SCI-PH no prescribe ni sugiere dosis."
                        Style="{StaticResource SciSubtitle}" />
+                <!-- Medicamentos sigue en mock (MockParamedicApiService): nada de esta pantalla llega todavía al servidor. -->
+                <Label Text="Simulación: los medicamentos todavía no se guardan en SCI-PH."
+                       TextColor="{StaticResource SciDanger}" FontSize="13" FontAttributes="Bold" />
             </VerticalStackLayout>
 
             <!-- Formulario -->
