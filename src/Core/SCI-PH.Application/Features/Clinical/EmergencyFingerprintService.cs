@@ -171,9 +171,16 @@ namespace SCI_PH.Application.Features.Clinical
                 throw new ResourceConflictException($"A fingerprint session in status {session.Status} cannot be confirmed.");
             }
 
-            var patientId = await _reads.GetActiveBiometricReferencePatientIdAsync(session.MatchedBiometricReferenceId!.Value, cancellationToken)
-                ?? throw new ResourceConflictException("The fingerprint reference of the candidate is no longer active.");
+            var reference = await _writes.FindBiometricReferenceAsync(session.MatchedBiometricReferenceId!.Value, cancellationToken);
+            if (reference is not { Status: BiometricReferenceStatus.Active })
+            {
+                throw new ResourceConflictException("The fingerprint reference of the candidate is no longer active.");
+            }
 
+            var patientId = reference.PatientId;
+            // The reference must still be active when the identification commits: a revocation committed after this check
+            // makes the whole save lose on its Status token (409), so a revoked reference never identifies.
+            _writes.EnsureBiometricReferenceUnchanged(reference);
             // Tracked only: written by the SaveChangesAsync of IdentifyPatientAsync, in the same transaction.
             _sessions.Update(session with { Status = FingerprintSessionStatus.Confirmed, ConfirmedAtUtc = now }, FingerprintSessionStatus.Matched);
             // The receipt's resource is the emergency, as for the identification by document: a replay returns it.

@@ -41,6 +41,15 @@ namespace SCI_PH.Application.Abstractions.Clinical
         // One result of an identification method (here: what a fingerprint reader reported).
         void Add(IdentificationAttempt attempt);
 
+        void Add(PatientBiometricReference reference);
+
+        Task<PatientBiometricReference?> FindBiometricReferenceAsync(Guid referenceId, CancellationToken cancellationToken);
+
+        // Like EnsureEncounterUnchanged for a reference that is only read: the next SaveChangesAsync re-checks its Status
+        // (concurrency token), so a reference revoked after it was loaded makes the whole save fail with a
+        // ResourceConflictException instead of using it.
+        void EnsureBiometricReferenceUnchanged(PatientBiometricReference reference);
+
         void Add(ClinicalAuditEntry auditEntry);
 
         // A clinical record only inserts rows, so the encounter's concurrency tokens (Status, PatientId) would not be

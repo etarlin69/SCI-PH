@@ -36,6 +36,15 @@ namespace SCI_PH.Application.Abstractions.Clinical
         // The patient of the biometric reference while it is still active; null once it was revoked (or never existed).
         Task<Guid?> GetActiveBiometricReferencePatientIdAsync(Guid biometricReferenceId, CancellationToken cancellationToken);
 
+        // The patient has an ACTIVE fingerprint reference of this provider whose subject reference starts with the prefix
+        // (one reader's references, see FingerprintReferences.ReaderPrefix).
+        Task<bool> HasActiveFingerprintReferenceAsync(
+            Guid patientId, string provider, string subjectReferencePrefix, CancellationToken cancellationToken);
+
+        // The patient's fingerprint references (active and revoked), newest first. The subject reference is for
+        // Application only (to name the reader); it never leaves it.
+        Task<IReadOnlyList<FingerprintReferenceRow>> ListFingerprintReferencesAsync(Guid patientId, CancellationToken cancellationToken);
+
         Task<EncounterRow?> GetEncounterAsync(Guid encounterId, CancellationToken cancellationToken);
 
         // The staff member has an open (not unassigned) EncounterStaffAssignment on the encounter.

@@ -10,12 +10,16 @@ namespace SCI_PH.Persistence.Configurations.Clinical.Patients
 {
     internal sealed class PatientBiometricReferenceConfiguration : IEntityTypeConfiguration<PatientBiometricReference>
     {
+        public const string ActiveSubjectIndexName = "UX_PatientBiometricReferences_ActiveSubject";
+
         public void Configure(EntityTypeBuilder<PatientBiometricReference> builder)
         {
             const string status = nameof(PatientBiometricReference.Status);
             const string revokedAt = nameof(PatientBiometricReference.RevokedAtUtc);
 
             builder.HasKey(x => x.Id);
+            // Concurrency token: a use of the reference (a fingerprint confirmation) loses against its revocation.
+            builder.Property(x => x.Status).IsConcurrencyToken();
             // Target of IdentificationAttempt's composite key: the matched reference must belong to the matched patient.
             builder.HasAlternateKey(x => new { x.Id, x.PatientId });
             builder.Property(x => x.Provider).HasMaxLength(FieldLengths.ProviderName);
@@ -25,7 +29,11 @@ namespace SCI_PH.Persistence.Configurations.Clinical.Patients
             builder.HasOne(x => x.Patient).WithMany(x => x.BiometricReferences).HasForeignKey(x => x.PatientId);
             builder.HasOne<ClinicalStaff>().WithMany().HasForeignKey(x => x.RegisteredByStaffId);
 
-            builder.HasIndex(x => new { x.Provider, x.Modality, x.SubjectReference }).IsUnique();
+            // Unique among ACTIVE references only: a revoked reference stays as history and its sensor slot can be used again.
+            builder.HasIndex(x => new { x.Provider, x.Modality, x.SubjectReference })
+                .IsUnique()
+                .HasDatabaseName(ActiveSubjectIndexName)
+                .HasFilter(Is(status, BiometricReferenceStatus.Active));
 
             builder.ToTable(table =>
             {

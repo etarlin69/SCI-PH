@@ -50,7 +50,7 @@ namespace SCI_PH.Application
         }
 
         // Casos de uso clínicos (pacientes, atenciones, admisión, registros clínicos, medicación, traslados y emergencia
-        // prehospitalaria, con su identificación por huella). Requiere AddAccountSecurity (IPatientAccessAuthorizer), AddJwtSecurity (ICurrentUser) y
+        // prehospitalaria, con su identificación por huella, y el enrolamiento de huellas). Requiere AddAccountSecurity (IPatientAccessAuthorizer), AddJwtSecurity (ICurrentUser) y
         // AddPersistence (stores clínicos y recibos de idempotencia).
         public static IServiceCollection AddClinicalWorkflows(this IServiceCollection services)
         {
@@ -65,6 +65,7 @@ namespace SCI_PH.Application
             services.AddScoped<IEncounterAccessService, EncounterAccessService>();
             services.AddScoped<PrehospitalEmergencyService>();
             services.AddScoped<EmergencyFingerprintService>();
+            services.AddScoped<FingerprintEnrollmentService>();
 
             return services;
         }
@@ -75,6 +76,7 @@ namespace SCI_PH.Application
         {
             services.AddScoped<DeviceAuthenticationService>();
             services.AddScoped<FingerprintReaderService>();
+            services.AddScoped<FingerprintEnrollmentReaderService>();
 
             return services;
         }
