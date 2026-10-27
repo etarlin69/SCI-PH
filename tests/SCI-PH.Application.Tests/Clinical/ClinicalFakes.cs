@@ -67,6 +67,7 @@ namespace SCI_PH.Application.Tests.Clinical
         public List<VitalSign> VitalSigns { get; } = [];
         public List<ClinicalNote> Notes { get; } = [];
         public List<Diagnosis> Diagnoses { get; } = [];
+        public List<ClinicalProcedure> Procedures { get; } = [];
         public List<Medication> Medications { get; } = [];
         public List<Prescription> Prescriptions { get; } = [];
         public List<MedicationAdministration> Administrations { get; } = [];
@@ -196,6 +197,7 @@ namespace SCI_PH.Application.Tests.Clinical
         public void Add(VitalSign vitalSign) => _pending.Add(vitalSign);
         public void Add(ClinicalNote note) => _pending.Add(note);
         public void Add(Diagnosis diagnosis) => _pending.Add(diagnosis);
+        public void Add(ClinicalProcedure procedure) => _pending.Add(procedure);
         public void Add(Prescription prescription) => _pending.Add(prescription);
         public void Add(MedicationAdministration administration) => _pending.Add(administration);
         public void Add(ClinicalAuditEntry auditEntry) => _pending.Add(auditEntry);
@@ -219,6 +221,7 @@ namespace SCI_PH.Application.Tests.Clinical
             VitalSigns.AddRange(_pending.OfType<VitalSign>());
             Notes.AddRange(_pending.OfType<ClinicalNote>());
             Diagnoses.AddRange(_pending.OfType<Diagnosis>());
+            Procedures.AddRange(_pending.OfType<ClinicalProcedure>());
             Prescriptions.AddRange(_pending.OfType<Prescription>());
             Administrations.AddRange(_pending.OfType<MedicationAdministration>());
             Transfers.AddRange(_pending.OfType<ClinicalTransfer>());

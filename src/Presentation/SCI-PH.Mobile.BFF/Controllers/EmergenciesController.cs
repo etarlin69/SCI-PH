@@ -77,5 +77,24 @@ namespace SCI_PH.Mobile.BFF.Controllers
             var result = await _emergencies.RecordVitalSignsAsync(id, request, cancellationToken);
             return result.Created ? StatusCode(StatusCodes.Status201Created, result.Reading) : Ok(result.Reading);
         }
+
+        // One completed procedure of the catalog (GET api/mobile/catalogs/procedures). 201 the first time (no Location: there
+        // is no endpoint that reads a single procedure); 200 with the same procedure when the same clientRequestId is
+        // retried with the same data; 409 when that clientRequestId was used with different data or the emergency no
+        // longer accepts records.
+        [HttpPost("{id:guid}/procedures")]
+        [Authorize(Policy = Permissions.Procedures.Write)]
+        [ProducesResponseType<EmergencyProcedureSummary>(StatusCodes.Status201Created)]
+        [ProducesResponseType<EmergencyProcedureSummary>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> RecordProcedure(
+            Guid id, RecordEmergencyProcedureRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _emergencies.RecordProcedureAsync(id, request, cancellationToken);
+            return result.Created ? StatusCode(StatusCodes.Status201Created, result.Procedure) : Ok(result.Procedure);
+        }
     }
 }
