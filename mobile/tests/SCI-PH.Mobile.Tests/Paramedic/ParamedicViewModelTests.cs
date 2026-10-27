@@ -73,7 +73,7 @@ public class ParamedicViewModelTests
     public async Task TheParamedicStepsNavigateThroughTheNavigatorWithTheEmergency()
     {
         var api = new RecordingParamedicApi();
-        var catalog = new MockParamedicCatalogService();
+        var catalog = new EmptyParamedicCatalog();
         var navigator = new FakeNavigator();
         var dialogs = new FakeDialogs();
         var emergencyId = Guid.NewGuid();

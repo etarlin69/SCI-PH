@@ -1,11 +1,14 @@
+using SCI_PH.Mobile.Features.Paramedic.Models.Enums;
+
 namespace SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 
-/// <summary>Medicamento administrado, tal como lo devuelve el GET de la emergencia.</summary>
+/// <summary>Dosis registrada en la emergencia (solo la conserva el servicio simulado; el GET real aún no la devuelve).</summary>
 public class MedicationDto
 {
-    public DateTime RecordedAt { get; set; }
-    public string MedicationCode { get; set; } = string.Empty;
-    public string Dose { get; set; } = string.Empty;
-    public string Route { get; set; } = string.Empty;
+    public DateTime AdministeredAt { get; set; }
+    public Guid MedicationId { get; set; }
+    public decimal Dose { get; set; }
+    public string DoseUnit { get; set; } = string.Empty;
+    public MedicationRoute Route { get; set; }
     public string? Notes { get; set; }
 }

@@ -10,7 +10,7 @@ using SCI_PH.Mobile.Features.Paramedic.ViewModels;
 namespace SCI_PH.Mobile.Tests.Paramedic;
 
 // Signos vitales REALES (POST api/mobile/emergencies/{id}/vital-signs) sobre la emergencia real: una toma por envío,
-// con su propia clave y su hora, conservadas en los reintentos. Medicamentos sigue en mock.
+// con su propia clave y su hora, conservadas en los reintentos.
 public class VitalSignsTests
 {
     private readonly FakeVitalSignsBff _bff = new();
@@ -182,15 +182,5 @@ public class VitalSignsTests
         Assert.Equal(ParamedicMessages.VitalSignsConflict, vm.ErrorMessage);
         Assert.Empty(_navigator.Navigations);
         Assert.Equal(Body(0).GetProperty("clientRequestId").GetGuid(), Body(1).GetProperty("clientRequestId").GetGuid());
-    }
-
-    [Fact]
-    public async Task MedicationsStayMock()
-    {
-        var service = Service();
-
-        await service.RegisterMedicationAsync(_emergencyId, new RegisterMedicationDto { MedicationCode = "MED-001" });
-
-        Assert.Empty(_bff.Paths);
     }
 }

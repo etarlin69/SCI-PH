@@ -11,7 +11,7 @@ namespace SCI_PH.Mobile.Tests.Paramedic;
 
 // Procedimientos REALES sobre la emergencia real: el catálogo fijo del servidor (GET api/mobile/catalogs/procedures) y un
 // procedimiento ya realizado por envío (POST api/mobile/emergencies/{id}/procedures), con su propia clave y su hora,
-// conservadas en los reintentos. Medicamentos sigue en mock.
+// conservadas en los reintentos.
 public class ProceduresTests
 {
     private readonly FakeProceduresBff _bff = new();
@@ -23,7 +23,7 @@ public class ProceduresTests
 
     private HttpParamedicApiService Service() => new(_bff.Client(), _mock);
 
-    private HttpParamedicCatalogService Catalog() => new(_bff.Client(), new MockParamedicCatalogService());
+    private HttpParamedicCatalogService Catalog() => new(_bff.Client());
 
     private ProceduresViewModel ViewModel() => new(Service(), Catalog(), _navigator) { EmergencyId = _emergencyId };
 

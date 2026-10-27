@@ -36,4 +36,18 @@ public static class ParamedicMessages
         "No se pudo registrar el procedimiento: la solicitud ya se usó con otros datos o la emergencia ya no admite registros.";
 
     public const string RegisterProcedureFailed = "No se pudo guardar el procedimiento. Intenta nuevamente.";
+
+    public const string MedicationsCatalogFailed = "No se pudo cargar el catálogo de medicamentos.";
+
+    /// <summary>404: la emergencia o el medicamento ya no existen para este usuario.</summary>
+    public const string MedicationOrEmergencyNotFound =
+        "No se encontró la emergencia o el medicamento. Vuelve a cargar el catálogo o abre la emergencia desde el inicio.";
+
+    /// <summary>409: el medicamento ya no está activo, la clave se usó con otros datos o la emergencia no admite registros.</summary>
+    public const string MedicationAdministrationConflict =
+        "No se pudo registrar la dosis: el medicamento ya no está activo, la solicitud ya se usó con otros datos o la emergencia ya no admite registros.";
+
+    public const string RegisterMedicationFailed = "No se pudo guardar el medicamento. Intenta nuevamente.";
+
+    public const string MedicationRecorded = "Dosis registrada. Puedes registrar otra.";
 }
