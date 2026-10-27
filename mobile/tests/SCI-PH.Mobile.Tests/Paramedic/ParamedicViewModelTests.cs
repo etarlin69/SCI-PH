@@ -38,20 +38,21 @@ public class ParamedicViewModelTests
     public async Task AnEmergencyCanContinueAsUnidentifiedWithoutReadingTheFingerprint()
     {
         var api = new RecordingParamedicApi();
-        var fingerprint = new CountingFingerprintReader();
+        var fingerprint = new CountingFingerprintService();
         var navigator = new FakeNavigator();
         var emergencyId = Guid.NewGuid();
         var vm = new IdentifyPatientViewModel(api, fingerprint, navigator) { EmergencyId = emergencyId };
 
-        // Las tres vías se ofrecen desde el inicio; el aviso de huella sin coincidencia no aparece.
+        // Las tres vías se ofrecen desde el inicio; no hay lectura de huella ni aviso hasta pedirla.
         Assert.True(vm.CanIdentify);
-        Assert.False(vm.ShowFallback);
+        Assert.False(vm.ShowFingerprintPanel);
+        Assert.False(vm.HasFingerprintMessage);
         Assert.True(vm.ContinueWithoutIdentifyingCommand.CanExecute(null));
 
         await vm.ContinueWithoutIdentifyingCommand.ExecuteAsync(null);
 
-        Assert.Equal(0, fingerprint.Reads);
-        Assert.Equal(0, api.IdentifyCalls);
+        Assert.Equal(0, fingerprint.Calls);
+        Assert.Equal(0, api.IdentifyByDocumentCalls);
         var (route, parameters) = Assert.Single(navigator.Navigations);
         Assert.Equal(ParamedicRoutes.VitalSigns, route);
         Assert.Equal(emergencyId, parameters!["EmergencyId"]);
@@ -60,13 +61,13 @@ public class ParamedicViewModelTests
     [Fact]
     public void TheDocumentFormOpensWithoutReadingTheFingerprint()
     {
-        var fingerprint = new CountingFingerprintReader();
+        var fingerprint = new CountingFingerprintService();
         var vm = new IdentifyPatientViewModel(new RecordingParamedicApi(), fingerprint, new FakeNavigator());
 
         vm.OpenDocumentFormCommand.Execute(null);
 
         Assert.True(vm.ShowDocumentForm);
-        Assert.Equal(0, fingerprint.Reads);
+        Assert.Equal(0, fingerprint.Calls);
     }
 
     [Fact]

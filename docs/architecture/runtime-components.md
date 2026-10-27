@@ -41,7 +41,7 @@ Backend de la aplicación web. Atiende dos áreas: **Hospital** (recepción, mé
 Backend de la app móvil. Atiende dos flujos: **Patient** (acceso mediante QR y verificación facial 1:1, perfil, historial, documentos e IA) y **Paramedic** (`/api/mobile/emergencies`: emergencias, identificación, signos vitales, procedimientos, medicamentos y traslados).
 
 ### Device API
-Recibe peticiones de los dispositivos ESP32 con sensor de huella R307: identificación por huella para emergencias y heartbeat del dispositivo. La autenticación del dispositivo es distinta de la de usuarios y se definirá en un ADR.
+Recibe peticiones de los dispositivos ESP32 con sensor de huella R307: identificación por huella para emergencias (el sensor compara; el dispositivo recoge su sesión y envía el resultado, sin recibir datos clínicos, [ADR-009](../adr/ADR-009-fingerprint-identification.md)) y heartbeat del dispositivo. La autenticación del dispositivo es distinta de la de usuarios ([ADR-007](../adr/ADR-007-device-authentication.md)).
 
 ### PostgreSQL
 Una sola base física (`sciph_dev` en desarrollo) con dos schemas:

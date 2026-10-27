@@ -29,6 +29,13 @@ namespace SCI_PH.Application.Abstractions.Clinical
 
         Task<IReadOnlyList<PatientRow>> FindPatientsByNameAsync(string term, int limit, CancellationToken cancellationToken);
 
+        // The ACTIVE fingerprint reference with exactly this provider and subject reference (unique index), or null.
+        Task<BiometricReferenceRow?> FindActiveFingerprintReferenceAsync(
+            string provider, string subjectReference, CancellationToken cancellationToken);
+
+        // The patient of the biometric reference while it is still active; null once it was revoked (or never existed).
+        Task<Guid?> GetActiveBiometricReferencePatientIdAsync(Guid biometricReferenceId, CancellationToken cancellationToken);
+
         Task<EncounterRow?> GetEncounterAsync(Guid encounterId, CancellationToken cancellationToken);
 
         // The staff member has an open (not unassigned) EncounterStaffAssignment on the encounter.

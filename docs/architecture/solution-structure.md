@@ -20,7 +20,7 @@ SCI-PH.sln
 │   ├── SCI-PH.Application.Tests
 │   └── SCI-PH.IntegrationTests
 ├── tools/
-│   └── SCI-PH.Device.Simulator   Consola que envía heartbeats al Device API (local-containers.md)
+│   └── SCI-PH.Device.Simulator   Consola que simula un dispositivo: heartbeats o lector de huella (local-containers.md)
 └── docs/
 ```
 

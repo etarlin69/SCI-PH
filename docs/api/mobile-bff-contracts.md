@@ -114,7 +114,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 > [ADR-008](../adr/ADR-008-prehospital-emergency.md)), `POST /api/mobile/emergencies/{id}/identify/document`,
 > `POST /api/mobile/emergencies/{id}/vital-signs`, `POST /api/mobile/emergencies/{id}/procedures`,
 > `POST /api/mobile/emergencies/{id}/medication-administrations`, `POST /api/mobile/emergencies/{id}/notes`,
-> los traslados (`POST …/transfers`, `…/transfers/{transferId}/start` y `…/cancel`), `GET /api/mobile/catalogs/procedures`,
+> los traslados (`POST …/transfers`, `…/transfers/{transferId}/start` y `…/cancel`), la identificación por huella
+> (`…/identify/fingerprint/sessions` y `GET /api/mobile/devices/fingerprint-readers`), `GET /api/mobile/catalogs/procedures`,
 > `GET /api/mobile/catalogs/medications` y `GET /api/mobile/catalogs/transfer-destinations`.
 > **El resto siguen siendo contratos previstos** y pueden evolucionar mediante revisión arquitectónica.
 
@@ -122,7 +123,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
   afiliación activa. El rol y sus permisos los define el Rol 3.
 - **Autorización:** todos los endpoints de `/api/mobile/emergencies` exigen el permiso `Emergencies.Operate` (rol
   Paramedic; Administrator lo tiene por tener todos) para entrar al módulo, además del permiso clínico de cada acción
-  (abrir: `Encounters.Create`; leer: `Encounters.Read`; identificar por documento: `Patients.Read` + `Patients.Identify`;
+  (abrir: `Encounters.Create`; leer: `Encounters.Read`; identificar por documento o por huella, y los lectores de huella:
+  `Patients.Read` + `Patients.Identify`;
   signos vitales: `VitalSigns.Write`; procedimientos y su catálogo: `Procedures.Write`; medicamentos administrados:
   `MedicationAdministrations.Write`; catálogo de medicamentos: `Medications.Read`; observaciones:
   `ClinicalNotes.Write`; traslado y sus destinos: `Transfers.Manage`). Nunca
@@ -136,8 +138,9 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
   (`POST /api/web/transfers/{id}/receive`) y la **misma** atención pasa a tener la clínica destino.
 - **Registros clínicos:** signos vitales, procedimientos y medicamentos se **agregan** al episodio; no se editan ni se borran desde la app (las correcciones se definirán con el Rol 2).
 - **Hora del evento:** la apertura lleva `startedAt` y cada registro lleva la hora en que ocurrió en campo (`recordedAt` en los signos vitales, `performedAt` en los procedimientos, `administeredAt` en los medicamentos, `occurredAt` en las observaciones), distinta de la hora en que llega al servidor, para soportar envío diferido.
-- **Idempotencia:** implementada en la apertura, en la identificación por documento, en los signos vitales, en los
-  procedimientos, en los medicamentos administrados y en las observaciones; los demás `POST` la usarán igual. Cada `POST` lleva un
+- **Idempotencia:** implementada en la apertura, en la identificación por documento, en la sesión de huella y su
+  confirmación, en los signos vitales, en los procedimientos, en los medicamentos administrados, en las observaciones y
+  en la solicitud de traslado; los demás `POST` la usarán igual. Cada `POST` lleva un
   `clientRequestId` (`Guid` generado en el dispositivo una vez por operación y **reutilizado en cada reintento**). El
   servidor guarda un recibo por (usuario, operación, `clientRequestId`) con el hash SHA-256 del contenido lógico:
   - misma clave y mismo contenido → la **misma** respuesta (`200`, sin crear nada);
@@ -150,7 +153,11 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 | `POST` | `/api/mobile/emergencies` | Abre una emergencia | Implementado |
 | `GET` | `/api/mobile/emergencies/{id}` | Datos básicos de la emergencia y su traslado activo | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/identify/document` | Identifica al paciente NN por cédula o pasaporte | Implementado |
-| `POST` | `/api/mobile/emergencies/{id}/identify` | Vincula la emergencia a un paciente (huella, manual) | Previsto |
+| `GET` | `/api/mobile/devices/fingerprint-readers` | Lectores de huella activos | Implementado |
+| `POST` | `/api/mobile/emergencies/{id}/identify/fingerprint/sessions` | Abre una lectura de huella con un lector | Implementado |
+| `GET` | `/api/mobile/emergencies/{id}/identify/fingerprint/sessions/{sessionId}` | Estado de la lectura (y el candidato) | Implementado |
+| `POST` | `/api/mobile/emergencies/{id}/identify/fingerprint/sessions/{sessionId}/confirm` | Confirma el candidato e identifica | Implementado |
+| `POST` | `/api/mobile/emergencies/{id}/identify/fingerprint/sessions/{sessionId}/cancel` | Cancela la lectura | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/vital-signs` | Registra una toma de signos vitales | Implementado |
 | `POST` | `/api/mobile/emergencies/{id}/procedures` | Registra un procedimiento realizado | Implementado |
 | `GET` | `/api/mobile/catalogs/procedures` | Catálogo fijo de procedimientos prehospitalarios | Implementado |
@@ -167,7 +174,8 @@ Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculad
 ```
 POST /emergencies                  abre el episodio (paciente aún desconocido)
 POST /emergencies/{id}/identify/document   identifica al paciente por documento (implementado)
-POST /emergencies/{id}/identify    identifica al paciente (huella vía Device API, manual)
+POST /emergencies/{id}/identify/fingerprint/sessions   lectura de huella (implementado): el lector compara, el
+                                   paramédico confirma (…/{sessionId}/confirm)
 POST /emergencies/{id}/vital-signs ┐ (signos vitales: implementado)
 POST /emergencies/{id}/procedures  ├ registros durante la atención (0..n veces; procedimientos: implementado)
 POST /emergencies/{id}/medication-administrations │ (medicamentos: implementado)
@@ -315,7 +323,7 @@ documento sale **enmascarado** (`primaryIdentifier`); el número enviado nunca s
 | `401` | Sin token válido |
 | `403` | Sin `Emergencies.Operate`, `Patients.Read` o `Patients.Identify`; sin asignación a la emergencia; la cuenta no es `ClinicalStaff` activo o no tiene afiliación activa. Se responde antes de buscar el documento |
 | `404` | Ningún paciente tiene ese documento en el alcance de plataforma (la emergencia sigue NN), o la emergencia no existe o no es prehospitalaria |
-| `409` | La emergencia ya está identificada (por otra solicitud, aunque sea el mismo paciente), o el `clientRequestId` ya se usó con otro documento, tipo o emergencia |
+| `409` | La emergencia ya está identificada (por otra solicitud, aunque sea el mismo paciente), ya fue recibida por el hospital (también para un paramédico afiliado a esa clínica), o el `clientRequestId` ya se usó con otro documento, tipo o emergencia |
 
 - **Idempotencia:** operación `prehospital-emergency.identify-document.v1`, clave (usuario, operación,
   `clientRequestId`). El hash usa el id de la emergencia, el tipo y el número **normalizado**: otra forma de escribir el
@@ -328,25 +336,103 @@ documento sale **enmascarado** (`primaryIdentifier`); el número enviado nunca s
 
 ---
 
-### `POST /api/mobile/emergencies/{id}/identify`
+### Identificación por huella — Implementado
 
-Vincula la emergencia con un paciente por huella o de forma manual. La identificación por documento tiene su propio
-endpoint (`/identify/document`, arriba).
+Diseño en [ADR-009](../adr/ADR-009-fingerprint-identification.md). El paramédico elige un lector (ESP32 + R307) y abre una
+**sesión** sobre la emergencia NN; el lector la recoge del Device API, compara la huella **en el sensor** y envía el
+resultado; la app consulta la sesión y, si hay coincidencia, muestra el candidato. **Solo la confirmación del paramédico
+identifica la emergencia**, con el caso de uso de identificación de siempre (misma atención, código NN conservado,
+auditoría `Identify`, `IdentifiedByStaffId` = el paramédico). La app nunca envía ni recibe el id del paciente.
 
-**Body (forma propuesta):**
+- Permisos: `Emergencies.Operate` + `Patients.Read` + `Patients.Identify`, personal clínico activo, y la regla de
+  escritura prehospitalaria: el paramédico asignado y **solo antes de que el hospital reciba la emergencia** (después:
+  `409` para el paramédico que participó, aunque esté afiliado a la clínica destino; `403` para cualquier otro).
+- La sesión vence a los **90 s** (esperando al lector y esperando la confirmación). Una por emergencia activa
+  (`Pending`/`Matched`) y una `Pending` por lector. Una sesión vencida se comporta como `Expired`.
+- Una referencia biométrica es de **un** lector: un paciente enrolado en otro lector no se reconoce. Cualquier lector
+  activo con el scope de huella puede elegirse (no hay relación lector–ambulancia).
+- Sin coincidencia, con mala lectura, con el lector en error o vencida, la emergencia sigue NN: el documento y continuar
+  como NN siguen disponibles.
+
+#### `GET /api/mobile/devices/fingerprint-readers`
+
+Lectores **activos** con el scope `Device.Fingerprint.Identify`, por nombre. Nunca la clave, su hash ni los scopes.
+`lastSeenAtUtc` es el último contacto registrado, no un estado "en línea".
+
+```json
+[ { "id": "…", "code": "ESP32-AMB-01", "name": "Ambulancia 1", "lastSeenAtUtc": "2026-10-27T12:00:00+00:00" } ]
+```
+
+#### `POST /api/mobile/emergencies/{id}/identify/fingerprint/sessions`
+
+```json
+{ "clientRequestId": "…", "deviceId": "…" }
+```
+
+Crea en **una transacción** una sesión `Pending` (hora del servidor; vence a los 90 s), su auditoría `Create` y el recibo.
+
+| Estado | Cuándo |
+|---|---|
+| `201` | Sesión abierta |
+| `200` | El mismo `clientRequestId` con la misma emergencia y el mismo lector: la misma sesión (en su estado actual) |
+| `400` | `clientRequestId` o `deviceId` vacíos o ausentes, o campos que sobran (`patientId`…) |
+| `403` | Sin permisos, sin asignación, o la emergencia ya es de una clínica y el usuario no participó |
+| `404` | La emergencia no existe o no es prehospitalaria; el lector no existe, está revocado o no tiene el scope de huella |
+| `409` | Emergencia ya identificada, cancelada o cerrada; recibida por el hospital; ya tiene una sesión activa; el lector está ocupado con otra; o la clave se usó con otra emergencia o lector |
+
+- **Idempotencia:** operación `prehospital-emergency.fingerprint-session.v1`; el hash usa la emergencia y el lector;
+  el recibo apunta a la sesión. Dos aperturas simultáneas con la misma clave abren una sola sesión.
+
+**Respuesta** (también la del `GET` y la de `cancel`):
 
 ```json
 {
-  "clientRequestId": "00000000-0000-0000-0000-000000000000",
-  "method": "Fingerprint | Manual",
-  "patientId": "00000000-0000-0000-0000-000000000000"
+  "id": "…", "status": "Matched", "readerId": "…", "expiresAtUtc": "2026-10-27T12:01:30+00:00",
+  "failure": null,
+  "candidate": { "displayName": "Ana Pérez", "dateOfBirth": "1985-03-14" }
 }
 ```
 
-- `Fingerprint`: la identificación la resuelve `POST /api/device/fingerprint/identify` (Device API); aquí solo se vincula el resultado (`patientId`).
-- Los campos exactos de `Manual` (paciente no identificable) se definirán con el Rol 2.
+- `status`: `Pending`, `Matched`, `NoMatch`, `Failed`, `Expired`, `Cancelled` o `Confirmed`.
+- `failure`: `LowQuality` o `SensorError` cuando `Failed`; si no, `null`.
+- `candidate`: solo con `Matched` y mientras la referencia siga activa; solo nombre y fecha de nacimiento (nunca el id
+  del paciente, sus documentos ni la referencia biométrica). Un `Matched` sin candidato (referencia revocada) no se
+  puede confirmar.
 
-**Respuestas previstas:** `200 OK`, `400`, `401`, `403`, `404` (emergencia o paciente inexistente), `409` (ya identificada).
+#### `GET /api/mobile/emergencies/{id}/identify/fingerprint/sessions/{sessionId}`
+
+El estado de la sesión, **solo para el paramédico que la abrió** y en su emergencia (`404` para cualquier otra
+combinación). Una sesión `Pending` o `Matched` vencida se cierra como `Expired` al leerla. La app consulta cada segundo
+mientras está `Pending` y deja de hacerlo al cambiar de estado o al salir de la pantalla.
+
+#### `POST /api/mobile/emergencies/{id}/identify/fingerprint/sessions/{sessionId}/confirm`
+
+```json
+{ "clientRequestId": "…" }
+```
+
+Sin paciente: el servidor lo toma de la referencia de la sesión. Comprueba de nuevo que la sesión sea de esa emergencia
+y de ese paramédico, esté `Matched` y no vencida, que la referencia siga activa, que la emergencia siga NN y sin clínica.
+En **una transacción**: la identificación de la emergencia (auditoría `Identify`), la sesión `Confirmed` y el recibo.
+
+| Estado | Cuándo |
+|---|---|
+| `200` | La emergencia identificada (misma forma que `GET /api/mobile/emergencies/{id}`); también al repetir el mismo `clientRequestId` (sin otra auditoría) |
+| `400` | `clientRequestId` vacío o ausente, campos que sobran (`patientId`…) |
+| `403` / `404` | Como en la apertura; `404` también para una sesión de otra emergencia o de otro paramédico |
+| `409` | La sesión no está `Matched` o venció; la referencia se revocó; la emergencia ya fue identificada (por documento u otra sesión) o recibida por el hospital; o la clave se usó con otra sesión |
+
+- **Idempotencia:** operación `prehospital-emergency.fingerprint-confirm.v1`; el hash usa la emergencia y la sesión; el
+  recibo apunta a la **emergencia** (como la identificación por documento), así que un reintento la devuelve.
+- **Concurrencia:** contra otra identificación gana una sola (`PatientId` es token de concurrencia; la otra recibe
+  `409` y nunca sobrescribe al paciente); contra la recepción del hospital o la cancelación, `409`. Dos confirmaciones
+  simultáneas: una identificación y una auditoría.
+
+#### `POST /api/mobile/emergencies/{id}/identify/fingerprint/sessions/{sessionId}/cancel`
+
+Sin cuerpo. `Pending` o `Matched` → `Cancelled`, con una auditoría `Update` solo en esa transición (`200`). Si el resultado
+del lector llega mientras tanto, se cancela desde el estado que ganó. Ya terminada sin identificar (`Cancelled`,
+`Expired`, `NoMatch`, `Failed`): `200` con ese estado y sin escribir nada. `Confirmed`: `409`.
 
 ---
 

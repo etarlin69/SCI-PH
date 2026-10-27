@@ -47,6 +47,9 @@ namespace SCI_PH.Persistence.Identity.Services
                 .Select(d => d.ToSummary())
                 .ToArray();
 
+        public async Task<DeviceSummary?> FindAsync(Guid id, CancellationToken cancellationToken) =>
+            (await _db.DeviceCredentials.AsNoTracking().SingleOrDefaultAsync(d => d.Id == id, cancellationToken))?.ToSummary();
+
         public async Task<string?> ReplaceSecretAsync(Guid id, string secretHash, CancellationToken cancellationToken)
         {
             var device = await _db.DeviceCredentials.SingleOrDefaultAsync(d => d.Id == id, cancellationToken);

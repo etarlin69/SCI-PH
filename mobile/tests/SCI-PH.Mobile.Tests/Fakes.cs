@@ -46,15 +46,30 @@ internal sealed class FakeDialogs : IAppDialogService
     }
 }
 
-/// <summary>Cuenta las lecturas para comprobar que un flujo no exige la huella.</summary>
-internal sealed class CountingFingerprintReader : IFingerprintReaderService
+/// <summary>Cuenta las llamadas de huella para comprobar que un flujo no la exige (y falla si se usa).</summary>
+internal sealed class CountingFingerprintService : IFingerprintIdentificationService
 {
-    public int Reads { get; private set; }
+    public int Calls { get; private set; }
 
-    public Task<FingerprintIdentifyResultDto> ReadAsync()
+    public Task<IReadOnlyList<FingerprintReaderDto>> GetReadersAsync(CancellationToken cancellationToken = default) =>
+        Unexpected<IReadOnlyList<FingerprintReaderDto>>();
+
+    public Task<FingerprintSessionDto> OpenSessionAsync(Guid emergencyId, Guid clientRequestId, Guid readerId, CancellationToken cancellationToken = default) =>
+        Unexpected<FingerprintSessionDto>();
+
+    public Task<FingerprintSessionDto> GetSessionAsync(Guid emergencyId, Guid sessionId, CancellationToken cancellationToken = default) =>
+        Unexpected<FingerprintSessionDto>();
+
+    public Task<EmergencyDto> ConfirmAsync(Guid emergencyId, Guid sessionId, Guid clientRequestId, CancellationToken cancellationToken = default) =>
+        Unexpected<EmergencyDto>();
+
+    public Task<FingerprintSessionDto> CancelAsync(Guid emergencyId, Guid sessionId, CancellationToken cancellationToken = default) =>
+        Unexpected<FingerprintSessionDto>();
+
+    private Task<T> Unexpected<T>()
     {
-        Reads++;
-        return Task.FromResult(new FingerprintIdentifyResultDto { Found = false });
+        Calls++;
+        throw new InvalidOperationException("The fingerprint was not expected in this flow (test).");
     }
 }
 
@@ -64,8 +79,6 @@ internal sealed class RecordingParamedicApi : IParamedicApiService
     public int TransientFailuresLeft { get; set; }
 
     public List<CreateEmergencyDto> CreateRequests { get; } = [];
-
-    public int IdentifyCalls { get; private set; }
 
     public Task<EmergencyDto> CreateEmergencyAsync(CreateEmergencyDto dto)
     {
@@ -80,12 +93,6 @@ internal sealed class RecordingParamedicApi : IParamedicApiService
     }
 
     public Task<EmergencyDto?> GetEmergencyAsync(Guid id) => Task.FromResult<EmergencyDto?>(null);
-
-    public Task<EmergencyDto> IdentifyAsync(Guid emergencyId, IdentifyEmergencyDto dto)
-    {
-        IdentifyCalls++;
-        return Task.FromResult(new EmergencyDto { Id = emergencyId });
-    }
 
     public int IdentifyByDocumentCalls { get; private set; }
 

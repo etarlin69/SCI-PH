@@ -147,6 +147,8 @@ namespace SCI_PH.Application.Features.Clinical
         // and writes nothing, not even a receipt, so the same document can be tried again once the patient exists.
         // Same key and same payload again (also when it races the first one): the identified emergency, nothing new.
         // Same key with another payload (document, type or emergency): 409. Already identified by another request: 409.
+        // Like every mobile write, only before the handoff (LoadForIdentificationAsync): once a clinic received the
+        // emergency, 409 for the paramedics who took part, also when affiliated with that clinic.
         public async Task<PrehospitalEmergencySummary> IdentifyByDocumentAsync(
             Guid emergencyId, IdentifyEmergencyByDocumentRequest request, CancellationToken cancellationToken)
         {
@@ -164,6 +166,7 @@ namespace SCI_PH.Application.Features.Clinical
             }
 
             // Access to the emergency before the lookup: an unassigned user learns nothing about who holds a document.
+            await LoadForIdentificationAsync(actor, emergencyId, cancellationToken);
             var emergency = await ReadAsync(actor, emergencyId, cancellationToken);
             var patientId = await _reads.FindPatientIdByPlatformIdentifierAsync(documentType, documentNumber, cancellationToken)
                 ?? throw new ResourceNotFoundException(nameof(Patient), "No patient was found with this document.");
@@ -679,6 +682,23 @@ namespace SCI_PH.Application.Features.Clinical
         private async Task<ClinicalEncounter> LoadForPrehospitalWriteAsync(
             ClinicalActor actor, Guid emergencyId, string permission, CancellationToken cancellationToken)
         {
+            var encounter = await LoadForIdentificationAsync(actor, emergencyId, cancellationToken);
+            if (encounter.PatientId is { } patientId && !await _patientAccess.CanWriteAsync(patientId, permission, cancellationToken))
+            {
+                throw new AccessDeniedException("The current user cannot write this patient's clinical records.");
+            }
+
+            return encounter;
+        }
+
+        // The prehospital write rule without the patient rule, as the identification of the NN patient needs it (by document
+        // or by fingerprint, see EmergencyFingerprintService): 404 for anything but a prehospital encounter; once a clinic
+        // received it, 409 for the paramedics who took part and 403 for anyone else; before, the assignment. The encounter
+        // is TRACKED, so EncounterService.IdentifyPatientAsync later works on this same instance and its original Status
+        // and PatientId: a reception or identification committed after this check makes the identification lose (409).
+        internal async Task<ClinicalEncounter> LoadForIdentificationAsync(
+            ClinicalActor actor, Guid emergencyId, CancellationToken cancellationToken)
+        {
             var encounter = await _writes.FindEncounterAsync(emergencyId, cancellationToken);
             if (encounter is null || encounter.Type != ClinicalEncounterType.Prehospital)
             {
@@ -698,11 +718,6 @@ namespace SCI_PH.Application.Features.Clinical
 
             await _access.EnsureCanAccessAsync(
                 actor, new EncounterAccessTarget(encounter.Id, encounter.Type, encounter.ClinicId), cancellationToken);
-            if (encounter.PatientId is { } patientId && !await _patientAccess.CanWriteAsync(patientId, permission, cancellationToken))
-            {
-                throw new AccessDeniedException("The current user cannot write this patient's clinical records.");
-            }
-
             return encounter;
         }
 
@@ -821,7 +836,7 @@ namespace SCI_PH.Application.Features.Clinical
             return await ReadAsync(actor, receipt.ResourceId, cancellationToken);
         }
 
-        private static void EnsureSameRequest(IdempotencyReceipt receipt, string requestHash)
+        internal static void EnsureSameRequest(IdempotencyReceipt receipt, string requestHash)
         {
             if (!string.Equals(receipt.RequestHash, requestHash, StringComparison.Ordinal))
             {
@@ -832,7 +847,7 @@ namespace SCI_PH.Application.Features.Clinical
 
         // Only prehospital encounters are emergencies here; any other id is not found. Access: IEncounterAccessService
         // (assignment while there is no clinic), plus the patient rule once the patient is identified.
-        private async Task<PrehospitalEmergencySummary> ReadAsync(ClinicalActor actor, Guid emergencyId, CancellationToken cancellationToken)
+        internal async Task<PrehospitalEmergencySummary> ReadAsync(ClinicalActor actor, Guid emergencyId, CancellationToken cancellationToken)
         {
             var encounter = await _reads.GetEncounterAsync(emergencyId, cancellationToken);
             if (encounter is null || encounter.Type != ClinicalEncounterType.Prehospital)

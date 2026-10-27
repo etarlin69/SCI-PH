@@ -9,8 +9,8 @@ using SCI_PH.Mobile.Features.Paramedic.ViewModels;
 
 namespace SCI_PH.Mobile.Tests.Paramedic;
 
-// Identificación por documento REAL (POST api/mobile/emergencies/{id}/identify/document) sobre la emergencia real; la
-// huella sigue en mock y "continuar sin identificar" no llama al servidor.
+// Identificación por documento REAL (POST api/mobile/emergencies/{id}/identify/document) sobre la emergencia real; ni el
+// documento ni "continuar sin identificar" usan la huella (FingerprintIdentificationTests), y continuar no llama al servidor.
 public class DocumentIdentificationTests
 {
     private static readonly Guid PatientId = Guid.NewGuid();
@@ -30,9 +30,9 @@ public class DocumentIdentificationTests
 
     private HttpParamedicApiService Service() => new(_bff.Client(), _mock);
 
-    private IdentifyPatientViewModel ViewModel(IFingerprintReaderService? fingerprint = null)
+    private IdentifyPatientViewModel ViewModel()
     {
-        var vm = new IdentifyPatientViewModel(Service(), fingerprint ?? new CountingFingerprintReader(), _navigator) { EmergencyId = _emergencyId };
+        var vm = new IdentifyPatientViewModel(Service(), new CountingFingerprintService(), _navigator) { EmergencyId = _emergencyId };
         vm.OpenDocumentFormCommand.Execute(null);
         return vm;
     }
@@ -202,31 +202,15 @@ public class DocumentIdentificationTests
     }
 
     [Fact]
-    public async Task TheFingerprintStaysMockAndNeverCallsTheServer()
-    {
-        var vm = ViewModel(new FoundFingerprintReader());
-
-        await vm.IdentifyByFingerprintCommand.ExecuteAsync(null);
-
-        Assert.True(vm.IsIdentified);
-        Assert.Empty(_bff.Paths);
-    }
-
-    [Fact]
     public async Task ContinuingWithoutIdentifyingMakesNoIdentificationCall()
     {
         var api = new RecordingParamedicApi();
-        var vm = new IdentifyPatientViewModel(api, new CountingFingerprintReader(), _navigator) { EmergencyId = _emergencyId };
+        var fingerprint = new CountingFingerprintService();
+        var vm = new IdentifyPatientViewModel(api, fingerprint, _navigator) { EmergencyId = _emergencyId };
 
         await vm.ContinueWithoutIdentifyingCommand.ExecuteAsync(null);
 
-        Assert.Equal((0, 0), (api.IdentifyCalls, api.IdentifyByDocumentCalls));
+        Assert.Equal((0, 0), (fingerprint.Calls, api.IdentifyByDocumentCalls));
         Assert.Equal(_emergencyId, Assert.Single(_navigator.Navigations).Parameters!["EmergencyId"]);
-    }
-
-    private sealed class FoundFingerprintReader : IFingerprintReaderService
-    {
-        public Task<FingerprintIdentifyResultDto> ReadAsync() =>
-            Task.FromResult(new FingerprintIdentifyResultDto { Found = true, PatientId = Guid.NewGuid(), DisplayName = "Paciente Ficticio" });
     }
 }

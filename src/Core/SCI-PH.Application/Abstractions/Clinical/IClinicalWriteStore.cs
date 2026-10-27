@@ -38,6 +38,9 @@ namespace SCI_PH.Application.Abstractions.Clinical
 
         void Add(ClinicalTransfer transfer);
 
+        // One result of an identification method (here: what a fingerprint reader reported).
+        void Add(IdentificationAttempt attempt);
+
         void Add(ClinicalAuditEntry auditEntry);
 
         // A clinical record only inserts rows, so the encounter's concurrency tokens (Status, PatientId) would not be

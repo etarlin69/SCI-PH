@@ -19,6 +19,52 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
             BeginAsync(connectionString, encounterId,
                 $"""UPDATE clinical."ClinicalEncounters" SET "Status" = {to} WHERE "Id" = @id AND "Status" = {from}""");
 
+        // Another writer receives the transfer at the destination (as TransferService.ReceiveAsync) in a transaction that
+        // the caller commits.
+        public static async Task<(NpgsqlConnection Connection, NpgsqlTransaction Receive)> BeginReceiveAsync(
+            string connectionString, Guid transferId, Guid encounterId, Guid clinicId, Guid staffId)
+        {
+            var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync();
+            var transaction = await connection.BeginTransactionAsync();
+            await using (var transfer = new NpgsqlCommand(
+                """UPDATE clinical."ClinicalTransfers" SET "Status" = 3, "ReceivedAtUtc" = GREATEST(now(), "SentAtUtc"), "ReceivedByStaffId" = @staff WHERE "Id" = @id AND "Status" = 2""",
+                connection, transaction))
+            {
+                transfer.Parameters.AddWithValue("id", transferId);
+                transfer.Parameters.AddWithValue("staff", staffId);
+                Assert.Equal(1, await transfer.ExecuteNonQueryAsync());
+            }
+
+            await using (var encounter = new NpgsqlCommand(
+                """UPDATE clinical."ClinicalEncounters" SET "Status" = 4, "ClinicId" = @clinic WHERE "Id" = @id AND "Status" = 3""",
+                connection, transaction))
+            {
+                encounter.Parameters.AddWithValue("id", encounterId);
+                encounter.Parameters.AddWithValue("clinic", clinicId);
+                Assert.Equal(1, await encounter.ExecuteNonQueryAsync());
+            }
+
+            return (connection, transaction);
+        }
+
+        // Another writer identifies the NN encounter (as EncounterService.IdentifyPatientAsync) in a transaction that the caller
+        // commits.
+        public static async Task<(NpgsqlConnection Connection, NpgsqlTransaction Identify)> BeginIdentifyAsync(string connectionString, Guid encounterId, Guid patientId, Guid staffId)
+        {
+            var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync();
+            var transaction = await connection.BeginTransactionAsync();
+            await using var update = new NpgsqlCommand(
+                """UPDATE clinical."ClinicalEncounters" SET "PatientId" = @patient, "IdentifiedByStaffId" = @staff, "IdentifiedAtUtc" = GREATEST(now(), "StartedAtUtc") WHERE "Id" = @id AND "PatientId" IS NULL""",
+                connection, transaction);
+            update.Parameters.AddWithValue("id", encounterId);
+            update.Parameters.AddWithValue("patient", patientId);
+            update.Parameters.AddWithValue("staff", staffId);
+            Assert.Equal(1, await update.ExecuteNonQueryAsync());
+            return (connection, transaction);
+        }
+
         private static async Task<(NpgsqlConnection, NpgsqlTransaction)> BeginAsync(string connectionString, Guid encounterId, string sql)
         {
             var connection = new NpgsqlConnection(connectionString);

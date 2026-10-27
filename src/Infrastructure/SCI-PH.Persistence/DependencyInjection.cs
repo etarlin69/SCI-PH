@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using SCI_PH.Application.Abstractions.Biometrics;
 using SCI_PH.Application.Abstractions.Clinical;
 using SCI_PH.Application.Abstractions.Idempotency;
 using SCI_PH.Application.Abstractions.Security;
@@ -69,6 +70,7 @@ namespace SCI_PH.Persistence
             services.AddScoped<IClinicalOrganizationStore, ClinicalOrganizationStore>();
             services.AddScoped<IClinicalWriteStore, ClinicalWriteStore>();
             services.AddScoped<IIdempotencyStore, ClinicalIdempotencyStore>();
+            services.AddScoped<IFingerprintSessionStore, FingerprintSessionStore>();
             services.AddScoped<IdentitySeeder>();
             services.AddOptions<IdentityBootstrapOptions>().Bind(configuration.GetSection(IdentityBootstrapOptions.SectionName));
             services.AddScoped<IdentityDevelopmentAccountSeeder>();

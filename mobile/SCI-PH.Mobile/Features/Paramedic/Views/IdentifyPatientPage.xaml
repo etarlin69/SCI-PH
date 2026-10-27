@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Paramedic.ViewModels"
+             xmlns:dto="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Models.Dtos"
              x:Class="SCI_PH.Mobile.Features.Paramedic.Views.IdentifyPatientPage"
              x:DataType="vm:IdentifyPatientViewModel"
              Style="{StaticResource SciPage}"
@@ -32,22 +33,53 @@
             <Border Style="{StaticResource SciCard}" IsVisible="{Binding CanIdentify}">
                 <VerticalStackLayout Spacing="14">
                     <Label Text="Lectura de huella" Style="{StaticResource SciFieldLabel}" />
-                    <Label Text="Pide al paciente colocar el dedo en el lector y presiona el botón."
+                    <Label Text="Elige el lector, pide al paciente colocar el dedo y confirma el candidato."
                            Style="{StaticResource SciSubtitle}" />
                     <Button Text="Identificar por huella"
                             Command="{Binding IdentifyByFingerprintCommand}"
                             Style="{StaticResource SciPrimaryButton}" />
-                </VerticalStackLayout>
-            </Border>
 
-            <!-- Aviso: sin coincidencia -->
-            <Border Style="{StaticResource SciBadgeWarning}" IsVisible="{Binding ShowFallback}">
-                <VerticalStackLayout Spacing="6">
-                    <Label Text="No se encontró un paciente con esa huella."
-                           TextColor="{StaticResource SciWarning}"
-                           FontAttributes="Bold" />
-                    <Label Text="Puedes reintentar, identificar con documento o continuar sin identificar."
-                           TextColor="{StaticResource SciWarning}" FontSize="13" />
+                    <!-- Lector y lectura (el estado lo da el servidor) -->
+                    <VerticalStackLayout Spacing="12" IsVisible="{Binding ShowFingerprintPanel}">
+                        <VerticalStackLayout Spacing="6" IsVisible="{Binding CanChooseReader}">
+                            <Label Text="Lector" Style="{StaticResource SciFieldLabel}" />
+                            <Border Style="{StaticResource SciField}">
+                                <Picker ItemsSource="{Binding Readers}"
+                                        ItemDisplayBinding="{Binding DisplayName, x:DataType=dto:FingerprintReaderDto}"
+                                        SelectedItem="{Binding SelectedReader}"
+                                        BackgroundColor="Transparent"
+                                        TextColor="{StaticResource SciText}" />
+                            </Border>
+                            <Button Text="Iniciar lectura"
+                                    Command="{Binding StartFingerprintReadingCommand}"
+                                    Style="{StaticResource SciSecondaryButton}" />
+                        </VerticalStackLayout>
+
+                        <ActivityIndicator IsRunning="{Binding IsWaitingForReader}"
+                                           IsVisible="{Binding IsWaitingForReader}"
+                                           Color="{StaticResource SciPrimary}" />
+
+                        <Label Text="{Binding FingerprintMessage}"
+                               IsVisible="{Binding HasFingerprintMessage}"
+                               TextColor="{StaticResource SciWarning}"
+                               FontAttributes="Bold" />
+
+                        <!-- Candidato: solo se identifica al confirmar -->
+                        <VerticalStackLayout Spacing="8" IsVisible="{Binding HasCandidate}">
+                            <Label Text="Coincidencia encontrada" Style="{StaticResource SciFieldLabel}" />
+                            <Label Text="{Binding CandidateName}" Style="{StaticResource SciTitle}" />
+                            <Label Text="{Binding CandidateBirthDate, StringFormat='Fecha de nacimiento: {0}'}"
+                                   Style="{StaticResource SciSubtitle}" />
+                            <Button Text="Confirmar identidad"
+                                    Command="{Binding ConfirmFingerprintCommand}"
+                                    Style="{StaticResource SciPrimaryButton}" />
+                        </VerticalStackLayout>
+
+                        <Button Text="Cancelar lectura"
+                                Command="{Binding CancelFingerprintCommand}"
+                                IsVisible="{Binding HasActiveFingerprint}"
+                                Style="{StaticResource SciSecondaryButton}" />
+                    </VerticalStackLayout>
                 </VerticalStackLayout>
             </Border>
 

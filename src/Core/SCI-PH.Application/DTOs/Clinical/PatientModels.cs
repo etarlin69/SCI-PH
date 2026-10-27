@@ -53,4 +53,7 @@ namespace SCI_PH.Application.DTOs.Clinical
         PatientIdentifierRow? PrimaryIdentifier);
 
     public sealed record PatientIdentifierRow(PatientIdentifierType Type, string NormalizedValue);
+
+    // A patient's biometric reference; never its provider subject reference outside the read store.
+    public sealed record BiometricReferenceRow(Guid Id, Guid PatientId);
 }

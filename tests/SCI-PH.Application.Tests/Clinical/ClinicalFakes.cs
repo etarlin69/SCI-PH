@@ -1,11 +1,14 @@
+using SCI_PH.Application.Abstractions.Biometrics;
 using SCI_PH.Application.Abstractions.Clinical;
 using SCI_PH.Application.Abstractions.Idempotency;
 using SCI_PH.Application.Abstractions.Security;
+using SCI_PH.Application.Common.Errors;
 using SCI_PH.Application.Common.Security;
 using SCI_PH.Application.DTOs.Clinical;
 using SCI_PH.Application.DTOs.Security;
 using SCI_PH.Application.Features.Authorization;
 using SCI_PH.Application.Features.Clinical;
+using SCI_PH.Application.Features.Devices;
 using SCI_PH.Domain.Entities.Auditing;
 using SCI_PH.Domain.Entities.Encounters;
 using SCI_PH.Domain.Entities.Medications;
@@ -53,7 +56,9 @@ namespace SCI_PH.Application.Tests.Clinical
 
     // In-memory clinical store: writes become visible only after SaveChangesAsync, like a transaction. It also holds the
     // idempotency receipts, committed by the same SaveChangesAsync (as ClinicalWriteStore + ClinicalIdempotencyStore).
-    internal sealed class FakeClinicalStore : IClinicalReadStore, IClinicalWriteStore, IIdempotencyStore
+    // It also holds the fingerprint sessions (as FingerprintSessionStore): an update commits only while the stored status
+    // is still the expected one, and the unique active-session rules are checked on save, as the indexes would.
+    internal sealed class FakeClinicalStore : IClinicalReadStore, IClinicalWriteStore, IIdempotencyStore, IFingerprintSessionStore
     {
         private readonly List<object> _pending = [];
 
@@ -76,7 +81,55 @@ namespace SCI_PH.Application.Tests.Clinical
         public Dictionary<Guid, ClinicStatus> Clinics { get; } = [];
         public HashSet<Guid> GuardedEncounters { get; } = [];
         public List<ClinicalAuditEntry> Audit { get; } = [];
+        public List<PatientBiometricReference> BiometricReferences { get; } = [];
+        public List<IdentificationAttempt> Attempts { get; } = [];
+        public List<FingerprintSession> Sessions { get; } = [];
         public int SaveCount { get; private set; }
+
+        public Task<BiometricReferenceRow?> FindActiveFingerprintReferenceAsync(
+            string provider, string subjectReference, CancellationToken cancellationToken) =>
+            Task.FromResult(BiometricReferences
+                .Where(r => r.Modality == BiometricModality.Fingerprint && r.Provider == provider
+                    && r.SubjectReference == subjectReference && r.Status == BiometricReferenceStatus.Active)
+                .Select(r => new BiometricReferenceRow(r.Id, r.PatientId))
+                .SingleOrDefault());
+
+        public Task<Guid?> GetActiveBiometricReferencePatientIdAsync(Guid biometricReferenceId, CancellationToken cancellationToken) =>
+            Task.FromResult(BiometricReferences
+                .Where(r => r.Id == biometricReferenceId && r.Status == BiometricReferenceStatus.Active)
+                .Select(r => (Guid?)r.PatientId)
+                .SingleOrDefault());
+
+        public void Add(IdentificationAttempt attempt) => _pending.Add(attempt);
+
+        public Task<FingerprintSession?> FindAsync(Guid sessionId, CancellationToken cancellationToken) =>
+            Task.FromResult(Sessions.SingleOrDefault(x => x.Id == sessionId));
+
+        public Task<FingerprintSession?> FindPendingForReaderAsync(Guid deviceCredentialId, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult(Sessions.SingleOrDefault(x =>
+                x.DeviceCredentialId == deviceCredentialId && x.Status == FingerprintSessionStatus.Pending && x.ExpiresAtUtc > now));
+
+        public Task ExpireDueAsync(FingerprintSessionScope scope, DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            for (var i = 0; i < Sessions.Count; i++)
+            {
+                var x = Sessions[i];
+                if (x.IsDue(now) && (x.Id == scope.SessionId || x.ClinicalEncounterId == scope.ClinicalEncounterId
+                    || x.DeviceCredentialId == scope.DeviceCredentialId))
+                {
+                    Sessions[i] = x with { Status = FingerprintSessionStatus.Expired };
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public void Add(FingerprintSession session) => _pending.Add(session);
+
+        public void Update(FingerprintSession session, FingerprintSessionStatus expectedStatus) =>
+            _pending.Add(new SessionUpdate(session, expectedStatus));
+
+        private sealed record SessionUpdate(FingerprintSession Session, FingerprintSessionStatus ExpectedStatus);
 
         public Task<bool> PatientExistsAsync(Guid patientId, CancellationToken cancellationToken) =>
             Task.FromResult(Patients.Any(p => p.Id == patientId));
@@ -232,6 +285,7 @@ namespace SCI_PH.Application.Tests.Clinical
                 throw new IdempotencyKeyCollisionException(new InvalidOperationException("unique violation (fake)"));
             }
 
+            CommitSessions();
             Receipts.AddRange(_pending.OfType<IdempotencyReceipt>());
             Assignments.AddRange(_pending.OfType<EncounterStaffAssignment>());
             Patients.AddRange(_pending.OfType<Patient>());
@@ -245,9 +299,34 @@ namespace SCI_PH.Application.Tests.Clinical
             Administrations.AddRange(_pending.OfType<MedicationAdministration>());
             Transfers.AddRange(_pending.OfType<ClinicalTransfer>());
             Audit.AddRange(_pending.OfType<ClinicalAuditEntry>());
+            Attempts.AddRange(_pending.OfType<IdentificationAttempt>());
             _pending.Clear();
             SaveCount++;
             return Task.CompletedTask;
+        }
+
+        // Status token and unique active-session indexes: any violation discards the whole save.
+        private void CommitSessions()
+        {
+            var updates = _pending.OfType<SessionUpdate>().ToList();
+            var added = _pending.OfType<FingerprintSession>().ToList();
+            if (updates.Any(u => Sessions.Single(x => x.Id == u.Session.Id).Status != u.ExpectedStatus))
+            {
+                _pending.Clear();
+                throw new ResourceConflictException("The record was changed by another operation. Reload it and try again.");
+            }
+
+            var after = Sessions.Where(x => updates.All(u => u.Session.Id != x.Id))
+                .Concat(updates.Select(u => u.Session)).Concat(added).ToList();
+            if (after.Where(x => x.IsActive).GroupBy(x => x.ClinicalEncounterId).Any(g => g.Count() > 1)
+                || after.Where(x => x.Status == FingerprintSessionStatus.Pending).GroupBy(x => x.DeviceCredentialId).Any(g => g.Count() > 1))
+            {
+                _pending.Clear();
+                throw new ResourceConflictException("The emergency or the reader already has an active fingerprint session.");
+            }
+
+            Sessions.Clear();
+            Sessions.AddRange(after);
         }
 
         private TransferRow ToRow(ClinicalTransfer t)
@@ -287,6 +366,30 @@ namespace SCI_PH.Application.Tests.Clinical
             Triages.Where(t => t.ClinicalEncounterId == e.Id).OrderByDescending(t => t.PerformedAtUtc).Select(t => (TriagePriority?)t.Priority).FirstOrDefault());
     }
 
+    // Device credentials as the readers list sees them (no keys). Only the reads the fingerprint identification uses.
+    internal sealed class FakeReaders : IDeviceCredentialStore
+    {
+        public List<DeviceSummary> Devices { get; } = [];
+
+        public DeviceSummary Add(string code, DeviceCredentialStatus status = DeviceCredentialStatus.Active, params string[] scopes)
+        {
+            var device = new DeviceSummary(Guid.NewGuid(), code, $"Lector {code}", scopes.Length == 0 ? [DeviceScopes.FingerprintIdentify] : scopes,
+                status, null, ClinicalHarness.Start, null, null, status == DeviceCredentialStatus.Revoked ? ClinicalHarness.Start : null);
+            Devices.Add(device);
+            return device;
+        }
+
+        public Task<IReadOnlyList<DeviceSummary>> ListAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<DeviceSummary>>(Devices);
+
+        public Task<DeviceSummary?> FindAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(Devices.SingleOrDefault(d => d.Id == id));
+
+        public Task<Guid?> AddAsync(NewDeviceCredential credential, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<StoredDeviceCredential?> FindByCodeAsync(string deviceCode, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<string?> ReplaceSecretAsync(Guid id, string secretHash, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<bool> RevokeAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task RecordSeenAsync(Guid id, string? firmwareVersion, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
     internal static class ClinicalTestExtensions
     {
         public static PatientRow ToTestRow(this Patient patient)
@@ -317,6 +420,8 @@ namespace SCI_PH.Application.Tests.Clinical
             Medications = new MedicationService(Actor, Store, Store, access, Time);
             Transfers = new TransferService(Actor, Store, Store, access, Time);
             Emergencies = new PrehospitalEmergencyService(Actor, encounterAccess, Store, Store, Store, access, Encounters, Time);
+            Fingerprints = new EmergencyFingerprintService(Actor, Emergencies, Encounters, Store, Store, Store, Store, Readers, Time);
+            ReaderSide = new FingerprintReaderService(Store, Store, Store, Time);
         }
 
         public FakeCurrentUser User { get; }
@@ -331,6 +436,9 @@ namespace SCI_PH.Application.Tests.Clinical
         public MedicationService Medications { get; }
         public TransferService Transfers { get; }
         public PrehospitalEmergencyService Emergencies { get; }
+        public FakeReaders Readers { get; } = new();
+        public EmergencyFingerprintService Fingerprints { get; }
+        public FingerprintReaderService ReaderSide { get; }
 
         public static ClinicalHarness ForRole(string role, int clinics = 1)
         {
@@ -340,6 +448,8 @@ namespace SCI_PH.Application.Tests.Clinical
         }
 
         public Guid ClinicId => Staff.FindByIdentityUserAsync(User.UserId!.Value, CancellationToken.None).Result!.ActiveClinicIds.First();
+
+        public Guid StaffId => Staff.FindByIdentityUserAsync(User.UserId!.Value, CancellationToken.None).Result!.StaffId;
 
         public Patient SeedPatient()
         {
