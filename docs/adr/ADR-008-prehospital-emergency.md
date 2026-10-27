@@ -207,6 +207,8 @@ app no la envía y el contrato no la acepta: un campo `location` se rechaza con 
   prehospitalaria vive en el móvil.
 - `GET /api/mobile/emergencies/{id}` incluye `activeTransfer` (`Requested` o `InTransit`) para que la app restaure su
   pantalla de traslado.
+- La identificación del paciente desde el móvil (por documento y por huella) sigue la misma regla: solo sin clínica
+  ([ADR-009](ADR-009-fingerprint-identification.md), decisión 9).
 - Fuera de alcance: `ClinicalTransfer.Complete` (no se llama ni se expone) y un evento separado de llegada física.
 
 ## Consecuencias

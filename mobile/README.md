@@ -141,7 +141,7 @@ El Mobile BFF local corre con `dotnet run --project src/Presentation/SCI-PH.Mobi
 | Pantalla | Qué hace |
 |---|---|
 | Nueva emergencia | Motivo de consulta. Abre la emergencia **real** en el Mobile BFF; los reintentos reutilizan `clientRequestId`, `startedAt` y el motivo. |
-| Identificar paciente | Huella, documento (cédula o pasaporte) o continuar como paciente no identificado (NN), las tres desde el inicio. |
+| Identificar paciente | Huella **real** (lector elegido, lectura, candidato y confirmación), documento (cédula o pasaporte) o continuar como paciente no identificado (NN), las tres desde el inicio. |
 | Signos vitales | Una toma **real** de 1 a 7 valores con los límites de plausibilidad del Domain (`VitalSignLimits`; no son umbrales clínicos). Registrada → Procedimientos. |
 | Procedimientos | Un procedimiento **real** ya realizado, elegido del catálogo fijo del servidor, con su resultado opcional. Registrado → Medicamentos. |
 | Medicamentos | Una dosis **real** ya administrada (SCI-PH no prescribe), del catálogo de medicamentos activos. Registrada → confirmación y formulario listo para otra dosis. "Continuar" → Observaciones. |
@@ -162,7 +162,7 @@ Se entra con la sesión real del personal clínico. `HttpParamedicApiService` es
 | Catálogo de medicamentos (`GET /api/mobile/catalogs/medications`) | **REAL** (`HttpParamedicCatalogService`): solo medicamentos activos |
 | Registrar una observación (`POST /api/mobile/emergencies/{id}/notes`) | **REAL**: una nota `Prehospital` sobre la misma emergencia |
 | Traslado (`POST …/transfers`, `…/transfers/{transferId}/start`, `…/cancel`) y destinos (`GET /api/mobile/catalogs/transfer-destinations`) | **REAL**: solicitar, iniciar y cancelar sobre un traslado concreto |
-| Identificar por huella | Mock (`MockParamedicApiService`, `MockFingerprintReaderService`, que alterna sin coincidencia / identificado) sobre el id **real** |
+| Identificar por huella (`GET /api/mobile/devices/fingerprint-readers`, `…/identify/fingerprint/sessions`, `…/{sessionId}`, `…/confirm`, `…/cancel`) | **REAL** (`HttpFingerprintIdentificationService`): la app abre una lectura con el lector elegido, consulta su estado y confirma el candidato; nunca genera ni envía un id de paciente |
 
 - **Reintentos:** un error de red deja la pantalla como estaba. El siguiente intento lleva el mismo `clientRequestId`,
   `startedAt` y motivo, así que si el servidor ya la había creado devuelve la misma emergencia (`200`).
@@ -172,7 +172,15 @@ Se entra con la sesión real del personal clínico. `HttpParamedicApiService` es
 - **Identificación por documento:** solo Cédula (`NationalId`) y Pasaporte (`Passport`); el número va tal como se
   escribió (lo normaliza el servidor). Tiene su propio `clientRequestId`, que se conserva ante errores de red, `404` y
   `409`. Sin coincidencia: "No se encontró un paciente con ese documento." y se puede corregir, reintentar o continuar
-  sin identificar. La huella sigue en mock.
+  sin identificar.
+- **Identificación por huella:** la app NO habla con el ESP32/R307. Se elige un lector activo (si hay uno solo, queda
+  elegido) y "Iniciar lectura" abre una sesión con su propio `clientRequestId` (conservado en los reintentos). Mientras
+  el lector captura, la app consulta la sesión cada segundo y deja de hacerlo al cambiar de estado o al salir de la
+  pantalla (se reanuda al volver). Con coincidencia muestra solo nombre y fecha de nacimiento, y la emergencia se
+  identifica **solo al confirmar** (con su propio `clientRequestId`). Sin coincidencia, lectura insuficiente, lector no
+  disponible o lectura vencida (90 s), lo dice y el documento y continuar como NN siguen disponibles; sin conexión al
+  consultar, sigue intentando hasta que la lectura vence. Identificar por documento o continuar como NN cancela una
+  lectura en curso.
 - **Signos vitales:** cada toma tiene su propio `clientRequestId` y su hora (`recordedAt`, UTC con offset), generados
   al primer intento de guardar y conservados ante errores de red, respuestas perdidas, `400`, `403` y `409`; solo
   viajan los valores capturados (la unidad la pone el servidor). Registrada (`201`, o `200` si era un reintento) →
@@ -276,10 +284,11 @@ no firma con claves propias y no publica nada.
 ## Pendiente
 
 - QR y verificación facial reales del paciente (con el Rol 8).
-- Conectar la identificación por huella al Mobile BFF; el resto del área paramédica (apertura, lectura, identificación
-  por documento, signos vitales, procedimientos, medicamentos, observaciones y traslado) ya es real.
+- Todo el área paramédica (apertura, lectura, identificación por documento y por huella, signos vitales,
+  procedimientos, medicamentos, observaciones y traslado) ya es real.
 - Ubicación de la emergencia (contrato y almacenamiento por definir; ver ADR-008).
-- Huella real (Device API), modo sin conexión, cierre del traslado (`Complete`) y llegada física.
+- Enrolamiento de huellas, firmware real del ESP32/R307, modo sin conexión, cierre del traslado (`Complete`) y llegada
+  física.
 - Contratos e integración de historial, resultados, documentos y asistente del paciente.
 - Converger PatientTheme con SciPhTheme.
 - CI de iOS y Mac Catalyst (requiere runners macOS).

@@ -95,9 +95,9 @@ ejecutes a la vez el stack completo y los servicios con `dotnet run`: usan los m
 
 ## Simulador de dispositivo
 
-`tools/SCI-PH.Device.Simulator` envía heartbeats al Device API con credenciales de un dispositivo registrado
-(`POST /api/web/admin/devices`); la clave se lee de variables de entorno y no se imprime. Solo envía datos técnicos
-del dispositivo (versión de firmware), nunca datos clínicos:
+`tools/SCI-PH.Device.Simulator` simula un dispositivo registrado (`POST /api/web/admin/devices`) contra el Device API;
+la clave se lee de variables de entorno y no se imprime. Solo envía datos técnicos, nunca datos clínicos. Por defecto
+envía heartbeats:
 
 ```bash
 DEVICE_ID=<id> DEVICE_KEY=<clave> dotnet run --project tools/SCI-PH.Device.Simulator
@@ -105,6 +105,23 @@ DEVICE_ID=<id> DEVICE_KEY=<clave> dotnet run --project tools/SCI-PH.Device.Simul
 
 Opcionales: `DEVICE_API_BASE_URL` (por defecto `http://localhost:5139`), `DEVICE_FIRMWARE_VERSION` y
 `DEVICE_HEARTBEAT_INTERVAL_SECONDS`.
+
+Con `DEVICE_MODE=fingerprint` simula un lector R307 (scope `Device.Fingerprint.Identify`, ADR-009): consulta su sesión
+pendiente, espera la "captura" y envía el resultado del sensor. El slot no se imprime.
+
+```bash
+DEVICE_MODE=fingerprint FINGERPRINT_OUTCOME=Match FINGERPRINT_SLOT=1 DEVICE_ID=<id> DEVICE_KEY=<clave> \
+  dotnet run --project tools/SCI-PH.Device.Simulator
+```
+
+- `FINGERPRINT_OUTCOME`: `Match` (por defecto; exige `FINGERPRINT_SLOT`, entero no negativo), `NoMatch`, `LowQuality`
+  o `SensorError`.
+- `FINGERPRINT_POLL_INTERVAL_SECONDS` (por defecto 2), `FINGERPRINT_RESULT_DELAY_SECONDS` (captura simulada, por
+  defecto 1), `FINGERPRINT_REPEAT_RESULT=true` (repite el mismo resultado, como tras una respuesta perdida) y
+  `FINGERPRINT_ONCE=true` (sale tras el primer resultado: código 0 si se aceptó).
+- Para que un `Match` tenga candidato, en Development se puede sembrar la referencia del paciente con
+  `ClinicalDevelopmentSeed:FingerprintReferences` (`PatientId`, `DeviceCredentialId` y `Slot`; User Secrets, nunca el
+  repositorio). Solo Development: no hay semilla biométrica de producción.
 
 ## CI
 

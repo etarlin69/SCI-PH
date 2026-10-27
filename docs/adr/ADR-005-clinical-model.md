@@ -110,6 +110,8 @@ superior. El detalle de cada entidad está en [clinical-entities.md](../architec
   huella, manual) con resultado `Success`/`Failure`, motivo de fallo, dispositivo y actor. Un éxito exige
   paciente; el identificador o la referencia biométrica coincidente deben pertenecer a ese paciente (FK
   compuesta). Un intento exitoso **no** vincula la atención por sí solo.
+- La identificación por huella en emergencias usa ambas entidades sin cambiarlas: referencias `R307` por lector y
+  slot, un intento por resultado del lector y la confirmación del paramédico ([ADR-009](ADR-009-fingerprint-identification.md)).
 
 ### 10. Auditoría
 
