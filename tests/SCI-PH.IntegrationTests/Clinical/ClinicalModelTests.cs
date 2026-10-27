@@ -9,6 +9,7 @@ using SCI_PH.Domain.Entities.Organizations;
 using SCI_PH.Domain.Entities.Patients;
 using SCI_PH.Domain.Enums.Auditing;
 using SCI_PH.Domain.ValueObjects;
+using SCI_PH.Persistence.Clinical.Biometrics;
 using SCI_PH.Persistence.Clinical.Idempotency;
 using SCI_PH.Persistence.Contexts;
 
@@ -46,10 +47,12 @@ namespace SCI_PH.IntegrationTests.Clinical
             using var context = CreateContext();
             var entities = context.Model.GetEntityTypes().ToList();
 
-            Assert.Equal(29, entities.Count);
+            Assert.Equal(30, entities.Count);
             Assert.All(entities, entity => Assert.Equal(ClinicalDbContext.Schema, entity.GetSchema()));
-            var technical = Assert.Single(entities, entity => !entity.ClrType.Namespace!.StartsWith("SCI_PH.Domain.Entities", StringComparison.Ordinal));
-            Assert.Equal(typeof(IdempotencyReceiptEntry), technical.ClrType);
+            // Technical state committed with the clinical rows, not Domain entities.
+            var technical = entities.Where(entity => !entity.ClrType.Namespace!.StartsWith("SCI_PH.Domain.Entities", StringComparison.Ordinal))
+                .Select(entity => entity.ClrType).OrderBy(type => type.Name).ToList();
+            Assert.Equal([typeof(FingerprintIdentificationSessionEntry), typeof(IdempotencyReceiptEntry)], technical);
         }
 
         [Fact]

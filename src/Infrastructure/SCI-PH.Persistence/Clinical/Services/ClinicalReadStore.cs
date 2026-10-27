@@ -95,6 +95,22 @@ namespace SCI_PH.Persistence.Clinical.Services
                 .ToListAsync(cancellationToken);
         }
 
+        public Task<BiometricReferenceRow?> FindActiveFingerprintReferenceAsync(
+            string provider, string subjectReference, CancellationToken cancellationToken) =>
+            _clinical.PatientBiometricReferences.AsNoTracking()
+                .Where(r => r.Modality == BiometricModality.Fingerprint
+                    && r.Provider == provider
+                    && r.SubjectReference == subjectReference
+                    && r.Status == BiometricReferenceStatus.Active)
+                .Select(r => new BiometricReferenceRow(r.Id, r.PatientId))
+                .SingleOrDefaultAsync(cancellationToken);
+
+        public Task<Guid?> GetActiveBiometricReferencePatientIdAsync(Guid biometricReferenceId, CancellationToken cancellationToken) =>
+            _clinical.PatientBiometricReferences.AsNoTracking()
+                .Where(r => r.Id == biometricReferenceId && r.Status == BiometricReferenceStatus.Active)
+                .Select(r => (Guid?)r.PatientId)
+                .SingleOrDefaultAsync(cancellationToken);
+
         public async Task<EncounterRow?> GetEncounterAsync(Guid encounterId, CancellationToken cancellationToken) =>
             (await ToRowsAsync(_clinical.ClinicalEncounters.Where(e => e.Id == encounterId), 1, cancellationToken)).SingleOrDefault();
 

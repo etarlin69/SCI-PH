@@ -2,11 +2,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using SCI_PH.Application.Common.Biometrics;
 using SCI_PH.Application.Common.Security;
 using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Organizations;
+using SCI_PH.Domain.Entities.Patients;
 using SCI_PH.Domain.Enums.Medications;
 using SCI_PH.Domain.Enums.Organizations;
+using SCI_PH.Domain.Enums.Patients;
 using SCI_PH.Persistence.Contexts;
 using SCI_PH.Persistence.Identity.Models;
 
@@ -81,6 +84,7 @@ namespace SCI_PH.Persistence.Clinical.Seed
             }
 
             await SeedMedicationsAsync(cancellationToken);
+            await SeedFingerprintReferencesAsync(cancellationToken);
             await _clinical.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Clinical development seed applied to clinic {ClinicId}.", clinic.Id);
         }
@@ -95,6 +99,29 @@ namespace SCI_PH.Persistence.Clinical.Seed
             foreach (var (code, name, presentation, concentration, route) in _demoMedications.Where(m => !existing.Contains(m.Code)))
             {
                 _clinical.Medications.Add(Medication.Register(name, presentation, concentration, code, route));
+            }
+        }
+
+        // A reference to an unknown patient is skipped. The subject reference is never logged.
+        private async Task SeedFingerprintReferencesAsync(CancellationToken cancellationToken)
+        {
+            foreach (var entry in _options.FingerprintReferences)
+            {
+                if (entry.Slot < 0 || entry.DeviceCredentialId == Guid.Empty
+                    || !await _clinical.Patients.AnyAsync(p => p.Id == entry.PatientId, cancellationToken))
+                {
+                    _logger.LogWarning("Clinical development seed: a fingerprint reference was skipped (unknown patient or invalid reader/slot).");
+                    continue;
+                }
+
+                var subject = FingerprintReferences.SubjectReference(entry.DeviceCredentialId, entry.Slot);
+                if (!await _clinical.PatientBiometricReferences.AnyAsync(
+                    r => r.Provider == FingerprintReferences.Provider && r.Modality == BiometricModality.Fingerprint && r.SubjectReference == subject,
+                    cancellationToken))
+                {
+                    _clinical.PatientBiometricReferences.Add(PatientBiometricReference.Register(
+                        entry.PatientId, BiometricModality.Fingerprint, FingerprintReferences.Provider, subject));
+                }
             }
         }
 

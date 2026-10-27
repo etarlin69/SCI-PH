@@ -8,6 +8,7 @@ using SCI_PH.Domain.Entities.Encounters;
 using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Patients;
 using SCI_PH.Domain.Entities.Transport;
+using SCI_PH.Persistence.Configurations.Clinical.Biometrics;
 using SCI_PH.Persistence.Configurations.Clinical.Idempotency;
 using SCI_PH.Persistence.Contexts;
 
@@ -22,7 +23,9 @@ namespace SCI_PH.Persistence.Clinical.Services
         {
             ["UX_PatientIdentifiers_ActiveValue"] = "An active identifier with this value already belongs to another patient.",
             ["IX_ClinicalEncounters_TemporaryPatientCode"] = "The temporary patient code is already in use; retry the operation.",
-            ["UX_ClinicalTransfers_ActivePerEncounter"] = "The encounter already has an active transfer."
+            ["UX_ClinicalTransfers_ActivePerEncounter"] = "The encounter already has an active transfer.",
+            [FingerprintIdentificationSessionConfiguration.ActivePerEncounterIndexName] = "The emergency already has an active fingerprint session.",
+            [FingerprintIdentificationSessionConfiguration.PendingPerReaderIndexName] = "The fingerprint reader is busy with another session."
         };
 
         private readonly ClinicalDbContext _clinical;
@@ -57,6 +60,8 @@ namespace SCI_PH.Persistence.Clinical.Services
             _clinical.ClinicalTransfers.SingleOrDefaultAsync(t => t.Id == transferId, cancellationToken);
 
         public void Add(ClinicalTransfer transfer) => _clinical.ClinicalTransfers.Add(transfer);
+
+        public void Add(IdentificationAttempt attempt) => _clinical.IdentificationAttempts.Add(attempt);
 
         public void Add(ClinicalAuditEntry auditEntry) => _clinical.ClinicalAuditEntries.Add(auditEntry);
 
