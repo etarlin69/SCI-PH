@@ -6,7 +6,9 @@ using SCI_PH.Persistence;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+// Errores esperados (validación, no encontrado, conflicto) como ProblemDetails con mensajes genéricos; el resto sigue a
+// UseExceptionHandler.
+builder.Services.AddControllers(options => options.Filters.Add<RequestExceptionFilter>());
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 

@@ -6,7 +6,6 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Npgsql;
 using SCI_PH.Application.Common.Security;
 using SCI_PH.Application.DTOs.Clinical;
 using SCI_PH.Application.Features.Clinical;
@@ -462,7 +461,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             var started = await InTransitAsync(paramedic, opened.Id, hospital.Id);
             var (url, body) = Records(opened.Id, Guid.Empty).Last();
 
-            var (connection, receive) = await BeginReceiveAsync(host.ConnectionString, started.Id, opened.Id, hospital.Id, paramedic.StaffId!.Value);
+            var (connection, receive) = await ClinicalRace.BeginReceiveAsync(host.ConnectionString, started.Id, opened.Id, hospital.Id, paramedic.StaffId!.Value);
             await using (connection)
             {
                 var request = paramedic.Client.PostAsJsonAsync(url, body);
@@ -487,7 +486,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             var opened = await OpenAsync(paramedic);
             var started = await InTransitAsync(paramedic, opened.Id, hospital.Id);
 
-            var (connection, receive) = await BeginReceiveAsync(host.ConnectionString, started.Id, opened.Id, hospital.Id, paramedic.StaffId!.Value);
+            var (connection, receive) = await ClinicalRace.BeginReceiveAsync(host.ConnectionString, started.Id, opened.Id, hospital.Id, paramedic.StaffId!.Value);
             await using (connection)
             {
                 var request = CancelAsync(paramedic, opened.Id, started.Id);
@@ -520,7 +519,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 ? StartAsync(paramedic, opened.Id, requested!.Id)
                 : RequestAsync(paramedic, opened.Id, RequestJson(hospital.Id, key));
 
-            var (connection, identify) = await BeginIdentifyAsync(host.ConnectionString, opened.Id, patient.Id, paramedic.StaffId!.Value);
+            var (connection, identify) = await ClinicalRace.BeginIdentifyAsync(host.ConnectionString, opened.Id, patient.Id, paramedic.StaffId!.Value);
             await using (connection)
             {
                 var request = Step();
@@ -534,50 +533,6 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             Assert.Equal(1, await TransfersAsync(host, opened.Id));
             Assert.Equal(1, await host.Web.DbAsync(db => db.ClinicalAuditEntries.CountAsync(a => a.ClinicalEncounterId == opened.Id
                 && a.EntityName == nameof(ClinicalTransfer) && a.PatientId == patient.Id)));
-        }
-
-        // Another writer receives the transfer at the destination (as TransferService.ReceiveAsync) in a transaction that
-        // the caller commits.
-        private static async Task<(NpgsqlConnection, NpgsqlTransaction)> BeginReceiveAsync(
-            string connectionString, Guid transferId, Guid encounterId, Guid clinicId, Guid staffId)
-        {
-            var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync();
-            var transaction = await connection.BeginTransactionAsync();
-            await using (var transfer = new NpgsqlCommand(
-                """UPDATE clinical."ClinicalTransfers" SET "Status" = 3, "ReceivedAtUtc" = GREATEST(now(), "SentAtUtc"), "ReceivedByStaffId" = @staff WHERE "Id" = @id AND "Status" = 2""",
-                connection, transaction))
-            {
-                transfer.Parameters.AddWithValue("id", transferId);
-                transfer.Parameters.AddWithValue("staff", staffId);
-                Assert.Equal(1, await transfer.ExecuteNonQueryAsync());
-            }
-
-            await using (var encounter = new NpgsqlCommand(
-                """UPDATE clinical."ClinicalEncounters" SET "Status" = 4, "ClinicId" = @clinic WHERE "Id" = @id AND "Status" = 3""",
-                connection, transaction))
-            {
-                encounter.Parameters.AddWithValue("id", encounterId);
-                encounter.Parameters.AddWithValue("clinic", clinicId);
-                Assert.Equal(1, await encounter.ExecuteNonQueryAsync());
-            }
-
-            return (connection, transaction);
-        }
-
-        private static async Task<(NpgsqlConnection, NpgsqlTransaction)> BeginIdentifyAsync(string connectionString, Guid encounterId, Guid patientId, Guid staffId)
-        {
-            var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync();
-            var transaction = await connection.BeginTransactionAsync();
-            await using var update = new NpgsqlCommand(
-                """UPDATE clinical."ClinicalEncounters" SET "PatientId" = @patient, "IdentifiedByStaffId" = @staff, "IdentifiedAtUtc" = GREATEST(now(), "StartedAtUtc") WHERE "Id" = @id AND "PatientId" IS NULL""",
-                connection, transaction);
-            update.Parameters.AddWithValue("id", encounterId);
-            update.Parameters.AddWithValue("patient", patientId);
-            update.Parameters.AddWithValue("staff", staffId);
-            Assert.Equal(1, await update.ExecuteNonQueryAsync());
-            return (connection, transaction);
         }
 
         private static async Task<JsonElement> AssertProblemAsync(HttpResponseMessage response, HttpStatusCode expected)
