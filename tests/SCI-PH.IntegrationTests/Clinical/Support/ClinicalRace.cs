@@ -65,6 +65,21 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
             return (connection, transaction);
         }
 
+        // Another writer revokes the biometric reference (as PatientBiometricReference.Revoke) in a transaction that the
+        // caller commits.
+        public static async Task<(NpgsqlConnection Connection, NpgsqlTransaction Revoke)> BeginRevokeReferenceAsync(string connectionString, Guid referenceId)
+        {
+            var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync();
+            var transaction = await connection.BeginTransactionAsync();
+            await using var update = new NpgsqlCommand(
+                """UPDATE clinical."PatientBiometricReferences" SET "Status" = 2, "RevokedAtUtc" = GREATEST(now(), "CreatedAtUtc") WHERE "Id" = @id AND "Status" = 1""",
+                connection, transaction);
+            update.Parameters.AddWithValue("id", referenceId);
+            Assert.Equal(1, await update.ExecuteNonQueryAsync());
+            return (connection, transaction);
+        }
+
         private static async Task<(NpgsqlConnection, NpgsqlTransaction)> BeginAsync(string connectionString, Guid encounterId, string sql)
         {
             var connection = new NpgsqlConnection(connectionString);
