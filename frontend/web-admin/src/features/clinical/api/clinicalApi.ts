@@ -6,6 +6,9 @@ import type {
     ClinicalNote,
     ClinicalTransfer,
     CloseEncounterRequest,
+    FingerprintEnroller,
+    FingerprintEnrollment,
+    PatientFingerprint,
     CreateClinicalNoteRequest,
     CreateDiagnosisRequest,
     CreateEncounterRequest,
@@ -36,6 +39,15 @@ export interface ClinicalApi {
 
     searchPatients(request: PatientSearchRequest, signal?: AbortSignal): Promise<PatientSummary[]>;
     registerPatient(request: RegisterPatientRequest): Promise<PatientSummary>;
+    getPatient(patientId: Guid, signal?: AbortSignal): Promise<PatientSummary>;
+
+    /** Huella digital (Biometrics.Manage). Lectores que registran e identifican. */
+    listFingerprintEnrollers(signal?: AbortSignal): Promise<FingerprintEnroller[]>;
+    listPatientFingerprints(patientId: Guid, signal?: AbortSignal): Promise<PatientFingerprint[]>;
+    /** clientRequestId: uno por intento, conservado en los reintentos. */
+    openFingerprintEnrollment(patientId: Guid, request: { clientRequestId: Guid; deviceId: Guid }): Promise<FingerprintEnrollment>;
+    getFingerprintEnrollment(patientId: Guid, enrollmentId: Guid, signal?: AbortSignal): Promise<FingerprintEnrollment>;
+    cancelFingerprintEnrollment(patientId: Guid, enrollmentId: Guid): Promise<FingerprintEnrollment>;
 
     /** Atenciones abiertas de la clínica activa (ni Closed ni Cancelled, ni en traslado). */
     listActiveEncounters(signal?: AbortSignal): Promise<ClinicalEncounterSummary[]>;
@@ -111,6 +123,12 @@ const KNOWN_DETAILS: [RegExp, string][] = [
     [/changed by another operation/i, 'Otro usuario modificó este registro. Recarga e inténtalo de nuevo.'],
     [/identifier with this value already belongs/i, 'Ya existe un paciente con ese identificador.'],
     [/needs at least 3 characters/i, 'Escribe al menos 3 caracteres para buscar por nombre.'],
+    [/already has an active fingerprint on this reader/i, 'El paciente ya tiene una huella activa en este lector.'],
+    [/already has a pending fingerprint enrollment/i, 'Ya hay un registro de huella en curso para este paciente.'],
+    [/busy with another enrollment/i, 'El lector está ocupado con otro registro. Inténtalo en unos minutos.'],
+    [/No active enrollment reader/i, 'El lector ya no está disponible. Elige otro.'],
+    [/cannot manage this patient's fingerprints/i, 'No puedes gestionar las huellas de este paciente.'],
+    [/completed fingerprint enrollment cannot be cancelled/i, 'El registro ya se completó; no se puede cancelar.'],
 ];
 
 /**

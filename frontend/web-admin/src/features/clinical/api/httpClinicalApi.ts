@@ -6,6 +6,9 @@ import type {
     ClinicalNote,
     ClinicalTransfer,
     Diagnosis,
+    FingerprintEnroller,
+    FingerprintEnrollment,
+    PatientFingerprint,
     Medication,
     MedicationAdministration,
     PatientSummary,
@@ -46,6 +49,28 @@ export const httpClinicalApi: ClinicalApi = {
         apiRequest<PatientSummary[]>(`${BASE}/patients/search`, { method: 'POST', body: request, signal }),
 
     registerPatient: (request) => apiRequest<PatientSummary>(`${BASE}/patients`, { method: 'POST', body: request }),
+
+    getPatient: (patientId, signal) => apiRequest<PatientSummary>(`${BASE}/patients/${id(patientId)}`, { signal }),
+
+    listFingerprintEnrollers: (signal) => apiRequest<FingerprintEnroller[]>(`${BASE}/fingerprint-enrollers`, { signal }),
+
+    listPatientFingerprints: (patientId, signal) =>
+        apiRequest<PatientFingerprint[]>(`${BASE}/patients/${id(patientId)}/fingerprints`, { signal }),
+
+    // Solo clave y lector: el paciente va en la ruta y el personal sale de la sesión.
+    openFingerprintEnrollment: (patientId, { clientRequestId, deviceId }) =>
+        apiRequest<FingerprintEnrollment>(`${BASE}/patients/${id(patientId)}/fingerprints/enrollments`, {
+            method: 'POST',
+            body: { clientRequestId, deviceId },
+        }),
+
+    getFingerprintEnrollment: (patientId, enrollmentId, signal) =>
+        apiRequest<FingerprintEnrollment>(`${BASE}/patients/${id(patientId)}/fingerprints/enrollments/${id(enrollmentId)}`, { signal }),
+
+    cancelFingerprintEnrollment: (patientId, enrollmentId) =>
+        apiRequest<FingerprintEnrollment>(`${BASE}/patients/${id(patientId)}/fingerprints/enrollments/${id(enrollmentId)}/cancel`, {
+            method: 'POST',
+        }),
 
     listActiveEncounters: (signal) =>
         apiRequest<ClinicalEncounterSummary[]>(`${BASE}/encounters`, { query: { clinicId: clinicIdForRequest() }, signal }),

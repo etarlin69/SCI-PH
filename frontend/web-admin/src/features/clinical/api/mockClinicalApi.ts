@@ -237,6 +237,32 @@ export const mockClinicalApi: ClinicalApi = {
         return delay({ staffId: 'mock-staff-1', clinics: [CLINIC] }, signal);
     },
 
+    // Huella: solo existe con backend real (ADR-010). En simulación no hay lectores y no se registra nada.
+    getPatient(patientId, signal) {
+        const patient = patients.find((p) => p.id === patientId);
+        return patient ? delay(patient, signal) : Promise.reject(new ClinicalApiError(404, 'El paciente no existe.'));
+    },
+
+    listFingerprintEnrollers(signal) {
+        return delay([], signal);
+    },
+
+    listPatientFingerprints(_patientId, signal) {
+        return delay([], signal);
+    },
+
+    async openFingerprintEnrollment() {
+        throw new ClinicalApiError(409, 'El registro de huella necesita el backend real.');
+    },
+
+    async getFingerprintEnrollment() {
+        throw new ClinicalApiError(404, 'El registro de huella necesita el backend real.');
+    },
+
+    async cancelFingerprintEnrollment() {
+        throw new ClinicalApiError(404, 'El registro de huella necesita el backend real.');
+    },
+
     registerPatient(request) {
         const patient: PatientSummary = {
             id: newId(),

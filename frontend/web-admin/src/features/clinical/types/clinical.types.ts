@@ -344,3 +344,37 @@ export interface ClinicalTransfer {
     /** Prioridad del triage prehospitalario, si existe. */
     latestTriagePriority: TriagePriority | null;
 }
+
+// ---- Huella digital (ADR-010) ----
+
+/** Lector donde se puede registrar una huella: activo, que registra e identifica. Sin claves ni scopes. */
+export interface FingerprintEnroller {
+    id: Guid;
+    code: string;
+    name: string;
+    lastSeenAtUtc: string | null;
+}
+
+export type BiometricReferenceStatus = 'Active' | 'Revoked';
+
+/** Referencia de huella del paciente. Nunca incluye el slot ni la referencia interna del sensor. */
+export interface PatientFingerprint {
+    id: Guid;
+    status: BiometricReferenceStatus;
+    /** null si la referencia no nombra un lector conocido. available: el lector sigue activo y puede identificar. */
+    reader: { code: string; name: string; available: boolean } | null;
+    registeredAtUtc: string;
+    revokedAtUtc: string | null;
+}
+
+export type FingerprintEnrollmentStatus = 'Pending' | 'Enrolled' | 'Failed' | 'Expired' | 'Cancelled';
+
+export interface FingerprintEnrollment {
+    id: Guid;
+    status: FingerprintEnrollmentStatus;
+    readerId: Guid;
+    expiresAtUtc: string;
+    /** Solo con Failed. */
+    failure: 'Failed' | 'LowQuality' | 'SensorError' | null;
+    biometricReferenceId: Guid | null;
+}
