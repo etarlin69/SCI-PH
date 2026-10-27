@@ -173,6 +173,25 @@ namespace SCI_PH.Application.Tests.Clinical
             Task.FromResult(Transfers.Any(t => t.ClinicalEncounterId == encounterId
                 && ClinicalTransfer.ActiveStatuses.Contains(t.Status)));
 
+        public Task<Guid?> FindActiveTransferIdAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            Task.FromResult(Transfers.Where(t => t.ClinicalEncounterId == encounterId && ClinicalTransfer.ActiveStatuses.Contains(t.Status))
+                .Select(t => (Guid?)t.Id).SingleOrDefault());
+
+        // Transfer destinations: the clinics of Clinics with a name, a type and a place (see SeedDestination).
+        public Dictionary<Guid, (string Name, ClinicType Type, string Municipality, string Province)> ClinicDetails { get; } = [];
+
+        public Task<IReadOnlyList<TransferDestinationRow>> ListTransferDestinationsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<TransferDestinationRow>>(Clinics.Keys.Select(Destination)
+                .Where(d => d.Status == ClinicStatus.Active).OrderBy(d => d.Name).ThenBy(d => d.Municipality).ThenBy(d => d.Id).ToList());
+
+        public Task<TransferDestinationRow?> GetTransferDestinationAsync(Guid clinicId, CancellationToken cancellationToken) =>
+            Task.FromResult(Clinics.ContainsKey(clinicId) ? Destination(clinicId) : null);
+
+        private TransferDestinationRow Destination(Guid clinicId) =>
+            ClinicDetails.TryGetValue(clinicId, out var d)
+                ? new TransferDestinationRow(clinicId, d.Name, d.Type, d.Municipality, d.Province, Clinics[clinicId])
+                : new TransferDestinationRow(clinicId, $"Clinic {clinicId:N}", ClinicType.Hospital, "Municipio", "Provincia", Clinics[clinicId]);
+
         public Task<TransferRow?> GetTransferAsync(Guid transferId, CancellationToken cancellationToken) =>
             Task.FromResult(Transfers.SingleOrDefault(t => t.Id == transferId) is { } t ? ToRow(t) : null);
 

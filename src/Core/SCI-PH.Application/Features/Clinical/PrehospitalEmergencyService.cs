@@ -12,10 +12,13 @@ using SCI_PH.Domain.Entities.Auditing;
 using SCI_PH.Domain.Entities.Encounters;
 using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Patients;
+using SCI_PH.Domain.Entities.Transport;
 using SCI_PH.Domain.Enums.Auditing;
 using SCI_PH.Domain.Enums.Encounters;
 using SCI_PH.Domain.Enums.Medications;
+using SCI_PH.Domain.Enums.Organizations;
 using SCI_PH.Domain.Enums.Patients;
+using SCI_PH.Domain.Enums.Transport;
 using SCI_PH.Domain.Exceptions;
 
 namespace SCI_PH.Application.Features.Clinical
@@ -36,6 +39,12 @@ namespace SCI_PH.Application.Features.Clinical
         public const string RecordProcedureOperation = "prehospital-emergency.procedure.v1";
         public const string RecordMedicationAdministrationOperation = "prehospital-emergency.medication-administration.v1";
         public const string RecordNoteOperation = "prehospital-emergency.note.v1";
+        public const string RequestTransferOperation = "prehospital-emergency.transfer-request.v1";
+
+        // Statuses in which the paramedic records care in the field: also Transferred, which without clinic means on the
+        // way to the hospital (an InTransit transfer). The Web keeps EncounterRecordService.RecordableStatuses.
+        public static IReadOnlyCollection<ClinicalEncounterStatus> PrehospitalRecordableStatuses { get; } =
+            [ClinicalEncounterStatus.Created, ClinicalEncounterStatus.InProgress, ClinicalEncounterStatus.Transferred];
 
         // VitalSign.Value is numeric(8,2): a value with more decimals is rejected rather than rounded by the database.
         public const int MaxVitalSignDecimals = 2;
@@ -186,8 +195,238 @@ namespace SCI_PH.Application.Features.Clinical
             return await ReadAsync(actor, emergency.Id, cancellationToken);
         }
 
-        public async Task<PrehospitalEmergencySummary> GetAsync(Guid emergencyId, CancellationToken cancellationToken) =>
-            await ReadAsync(await _actor.GetAsync(cancellationToken), emergencyId, cancellationToken);
+        // The emergency with its active transfer (Requested or InTransit), so the app can restore its transfer screen.
+        public async Task<PrehospitalEmergencySummary> GetAsync(Guid emergencyId, CancellationToken cancellationToken)
+        {
+            var emergency = await ReadAsync(await _actor.GetAsync(cancellationToken), emergencyId, cancellationToken);
+            return emergency with { ActiveTransfer = await ActiveTransferAsync(emergency.Id, cancellationToken) };
+        }
+
+        // Active clinics of the network a paramedic can take the patient to (no restriction by type). Only active clinical
+        // staff use it (same actor rule as the other catalogs).
+        public async Task<IReadOnlyList<TransferDestinationSummary>> ListTransferDestinationsAsync(CancellationToken cancellationToken)
+        {
+            await _actor.GetAsync(cancellationToken);
+            return (await _reads.ListTransferDestinationsAsync(cancellationToken)).Select(d => d.ToSummary()).ToList();
+        }
+
+        // The paramedic decides where to take the patient: a Requested ClinicalTransfer without origin clinic (care outside a
+        // clinic), its Create audit entry, the start of the encounter (Created -> InProgress: the request counts as the start
+        // of the care) and the receipt, in one transaction. The time and the staff come from the server. The destination
+        // must exist (404) and be active (409); the emergency must still be in the field, not already on its way (409), and
+        // have no other active transfer (409, also enforced by a unique index). The destination clinic sees it among its
+        // incoming transfers. Same key and same request again: the same transfer (in its current state); access is still
+        // checked. Same key with another destination, reason, notes or emergency: 409.
+        public async Task<RequestEmergencyTransferResult> RequestTransferAsync(
+            Guid emergencyId, RequestEmergencyTransferRequest request, CancellationToken cancellationToken)
+        {
+            var clientRequestId = ClinicalInput.Id(request.ClientRequestId, "clientRequestId");
+            var destinationId = ClinicalInput.Id(request.DestinationClinicId, "destinationClinicId");
+            var reason = OptionalText(request.Reason, FieldLengths.ShortText, "reason");
+            var notes = OptionalLongText(request.Notes, "notes");
+            var actor = await _actor.GetAsync(cancellationToken);
+            var key = new IdempotencyKey(actor.IdentityUserId, RequestTransferOperation, clientRequestId);
+            var requestHash = IdempotencyRequestHash.Compute(emergencyId.ToString("D"), destinationId.ToString("D"), reason, notes);
+
+            if (await _receipts.FindAsync(key, cancellationToken) is { } existing)
+            {
+                return await ReplayTransferRequestAsync(actor, existing, requestHash, emergencyId, cancellationToken);
+            }
+
+            var encounter = await LoadForPrehospitalWriteAsync(actor, emergencyId, Permissions.Transfers.Manage, cancellationToken);
+            if (encounter.Status is not (ClinicalEncounterStatus.Created or ClinicalEncounterStatus.InProgress))
+            {
+                throw new ResourceConflictException($"An emergency in status {encounter.Status} cannot request a transfer.");
+            }
+
+            _writes.EnsureEncounterUnchanged(encounter);
+            var destination = await _reads.GetTransferDestinationAsync(destinationId, cancellationToken)
+                ?? throw new ResourceNotFoundException("Clinic", destinationId);
+            if (destination.Status != ClinicStatus.Active)
+            {
+                throw new ResourceConflictException("The destination clinic is not active.");
+            }
+
+            if (await _reads.HasActiveTransferAsync(encounter.Id, cancellationToken))
+            {
+                // The same request may have committed it between the receipt lookup above and this check: then it is a replay.
+                if (await _receipts.FindAsync(key, cancellationToken) is { } committed)
+                {
+                    return await ReplayTransferRequestAsync(actor, committed, requestHash, emergencyId, cancellationToken);
+                }
+
+                throw new ResourceConflictException("The emergency already has an active transfer.");
+            }
+
+            var now = _time.GetUtcNow();
+            var transfer = ClinicalInput.Apply(() => ClinicalTransfer.Request(
+                encounter.Id, destination.Id, now, originClinicId: null, reason: reason, notes: notes));
+            StartIfCreated(encounter, now);
+            _writes.Add(transfer);
+            _writes.Add(ClinicalAuditEntry.Success(
+                actor.AuditActor, AuditActionType.Create, nameof(ClinicalTransfer), transfer.Id.ToString(), now,
+                new AuditContext(encounter.PatientId, encounter.Id)));
+            _receipts.Add(new IdempotencyReceipt(key, requestHash, transfer.Id, now));
+            if (await SaveRecordAsync(key, cancellationToken) is { } winner)
+            {
+                return await ReplayTransferRequestAsync(actor, winner, requestHash, emergencyId, cancellationToken);
+            }
+
+            // Read back as stored, so the first answer, a replay and the emergency's activeTransfer are the same (the database
+            // keeps microseconds).
+            return new RequestEmergencyTransferResult(await TransferSummaryAsync(transfer.Id, cancellationToken), Created: true);
+        }
+
+        // The ambulance leaves with the patient (ClinicalTransfer.Dispatch: Requested -> InTransit, sent by the actor at the
+        // server's time) and the encounter goes Transferred, in one transaction with its Transfer audit entry. Still without
+        // clinic, so the paramedic keeps documenting on the way. Scoped to this transfer of this emergency (404 otherwise):
+        // an InTransit transfer is a replay (200, nothing written); a cancelled, received or completed one is a 409.
+        public async Task<EmergencyTransferSummary> StartTransferAsync(Guid emergencyId, Guid transferId, CancellationToken cancellationToken)
+        {
+            var actor = await _actor.GetAsync(cancellationToken);
+            var (encounter, transfer) = await LoadTransferAsync(actor, emergencyId, transferId, cancellationToken);
+            if (transfer.Status == ClinicalTransferStatus.InTransit)
+            {
+                return await TransferSummaryAsync(transfer.Id, cancellationToken);
+            }
+
+            if (transfer.Status != ClinicalTransferStatus.Requested)
+            {
+                throw new ResourceConflictException($"A {transfer.Status} transfer cannot be started.");
+            }
+
+            var now = _time.GetUtcNow();
+            var previousStatus = encounter.Status;
+            TransferConflict(() => transfer.Dispatch(actor.StaffId, now));
+            TransferConflict(() => encounter.ChangeStatus(ClinicalEncounterStatus.Transferred, NotBeforeStart(encounter, now)));
+            AddTransferAudit(actor, encounter, transfer, ClinicalTransferStatus.Requested, previousStatus, now);
+            return await SaveTransferStepAsync(transfer.Id, ClinicalTransferStatus.InTransit, cancellationToken);
+        }
+
+        // The transfer is called off (ClinicalTransfer.Cancel at the server's time), so a wrong destination can be corrected
+        // with a new request. Requested: only the transfer changes. InTransit: the encounter also returns Transferred ->
+        // InProgress (the Domain transition of a cancelled transfer). Scoped to this transfer of this emergency (404
+        // otherwise), never "the active one": a late retry for an older transfer cannot cancel a newer one. A cancelled
+        // transfer is a replay (200, nothing written); a received or completed one is a 409.
+        public async Task<EmergencyTransferSummary> CancelTransferAsync(Guid emergencyId, Guid transferId, CancellationToken cancellationToken)
+        {
+            var actor = await _actor.GetAsync(cancellationToken);
+            var (encounter, transfer) = await LoadTransferAsync(actor, emergencyId, transferId, cancellationToken);
+            if (transfer.Status == ClinicalTransferStatus.Cancelled)
+            {
+                return await TransferSummaryAsync(transfer.Id, cancellationToken);
+            }
+
+            if (transfer.Status is not (ClinicalTransferStatus.Requested or ClinicalTransferStatus.InTransit))
+            {
+                throw new ResourceConflictException($"A {transfer.Status} transfer cannot be cancelled.");
+            }
+
+            var now = _time.GetUtcNow();
+            var previousTransfer = transfer.Status;
+            var previousStatus = encounter.Status;
+            TransferConflict(() => transfer.Cancel(now));
+            if (previousTransfer == ClinicalTransferStatus.InTransit)
+            {
+                TransferConflict(() => encounter.ChangeStatus(ClinicalEncounterStatus.InProgress, NotBeforeStart(encounter, now)));
+            }
+            else
+            {
+                // The encounter does not change, but a concurrent handoff or identification must still win cleanly.
+                _writes.EnsureEncounterUnchanged(encounter);
+            }
+
+            AddTransferAudit(actor, encounter, transfer, previousTransfer, previousStatus, now);
+            return await SaveTransferStepAsync(transfer.Id, ClinicalTransferStatus.Cancelled, cancellationToken);
+        }
+
+        // The emergency (prehospital write rule, Transfers.Manage) and THIS transfer of it; a transfer of another emergency
+        // is reported as not found.
+        private async Task<(ClinicalEncounter Encounter, ClinicalTransfer Transfer)> LoadTransferAsync(
+            ClinicalActor actor, Guid emergencyId, Guid transferId, CancellationToken cancellationToken)
+        {
+            var encounter = await LoadForPrehospitalWriteAsync(actor, emergencyId, Permissions.Transfers.Manage, cancellationToken);
+            var transfer = await _writes.FindTransferAsync(transferId, cancellationToken);
+            if (transfer is null || transfer.ClinicalEncounterId != encounter.Id)
+            {
+                throw new ResourceNotFoundException(nameof(ClinicalTransfer), transferId);
+            }
+
+            return (encounter, transfer);
+        }
+
+        // Same audit shape as the Web transfer steps: the transfer and encounter status before and after.
+        private void AddTransferAudit(
+            ClinicalActor actor, ClinicalEncounter encounter, ClinicalTransfer transfer, ClinicalTransferStatus previousTransfer,
+            ClinicalEncounterStatus previousStatus, DateTimeOffset now) =>
+            _writes.Add(ClinicalAuditEntry.Success(
+                actor.AuditActor, AuditActionType.Transfer, nameof(ClinicalTransfer), transfer.Id.ToString(), now,
+                new AuditContext(encounter.PatientId, encounter.Id, ChangesJson: JsonSerializer.Serialize(new
+                {
+                    transfer = new[] { previousTransfer.ToString(), transfer.Status.ToString() },
+                    encounterStatus = new[] { previousStatus.ToString(), encounter.Status.ToString() }
+                }))));
+
+        // Saves a transfer step. Lost a race (the transfer or the encounter changed meanwhile): a replay when the transfer
+        // already is in the target status (the same step won), otherwise the 409.
+        private async Task<EmergencyTransferSummary> SaveTransferStepAsync(
+            Guid transferId, ClinicalTransferStatus target, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _writes.SaveChangesAsync(cancellationToken);
+            }
+            catch (ResourceConflictException)
+            {
+                if ((await _reads.GetTransferAsync(transferId, cancellationToken))?.Status != target)
+                {
+                    throw;
+                }
+            }
+
+            return await TransferSummaryAsync(transferId, cancellationToken);
+        }
+
+        // The receipt's resource is the requested transfer, returned in its current state; access is checked again.
+        private async Task<RequestEmergencyTransferResult> ReplayTransferRequestAsync(
+            ClinicalActor actor, IdempotencyReceipt receipt, string requestHash, Guid emergencyId, CancellationToken cancellationToken)
+        {
+            EnsureSameRequest(receipt, requestHash);
+            await ReadAsync(actor, emergencyId, cancellationToken);
+            return new RequestEmergencyTransferResult(await TransferSummaryAsync(receipt.ResourceId, cancellationToken), Created: false);
+        }
+
+        private async Task<EmergencyTransferSummary?> ActiveTransferAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            await _reads.FindActiveTransferIdAsync(encounterId, cancellationToken) is { } transferId
+                ? await TransferSummaryAsync(transferId, cancellationToken)
+                : null;
+
+        private async Task<EmergencyTransferSummary> TransferSummaryAsync(Guid transferId, CancellationToken cancellationToken)
+        {
+            var row = await _reads.GetTransferAsync(transferId, cancellationToken)
+                ?? throw new ResourceNotFoundException(nameof(ClinicalTransfer), transferId);
+            var destination = await _reads.GetTransferDestinationAsync(row.DestinationClinic.Id, cancellationToken)
+                ?? throw new InvalidOperationException("The destination clinic of a transfer was not found.");
+            return new EmergencyTransferSummary(
+                row.Id, row.EncounterId, row.Status, destination.ToSummary(), row.RequestedAtUtc, row.SentAtUtc, row.CancelledAtUtc);
+        }
+
+        // Transfer and encounter state rules hit by a valid request are conflicts with the current state (409).
+        private static void TransferConflict(Action domainCall)
+        {
+            try
+            {
+                domainCall();
+            }
+            catch (Exception exception) when (exception is InvalidClinicalTransferException or InvalidClinicalEncounterStateException)
+            {
+                throw new ResourceConflictException(exception.Message, exception);
+            }
+        }
+
+        // A server timestamp for a status change, never before the start (the device clock may have started it ahead).
+        private static DateTimeOffset NotBeforeStart(ClinicalEncounter encounter, DateTimeOffset now) =>
+            now > encounter.StartedAtUtc ? now : encounter.StartedAtUtc;
 
         // One reading of 1 to 7 vital signs, all or nothing: the measurements, one audit entry per measurement, the start of
         // the encounter (Created -> InProgress, as the first Web record does) and the receipt, in one transaction. Works on
@@ -412,19 +651,49 @@ namespace SCI_PH.Application.Features.Clinical
                 new EmergencyNoteSummary(note.Id, encounter.Id, ClinicalNoteType.Prehospital, content, occurredAt), Created: true);
         }
 
-        // Shared write check of the records on an emergency (vital signs, procedures, medication administrations, notes). Only prehospital encounters are
-        // emergencies here. Access: the assignment while there is no clinic (IEncounterAccessService), plus the patient
-        // rule for the permission once the patient is identified; the shared recording check of EncounterRecordService is
-        // not used, so the Web records keep the clinic rule. The status check can be outdated by commit time, so the
-        // encounter's concurrency tokens (Status, PatientId) are re-checked inside the save: a concurrent close, dispatch
-        // or identification makes the record lose with a 409.
+        // Shared write check of the records on an emergency (vital signs, procedures, medication administrations, notes):
+        // the prehospital write rule (LoadForPrehospitalWriteAsync) and the statuses of the care in the field, Transferred
+        // included (on the way to the hospital, still without clinic); the shared recording check of EncounterRecordService
+        // is not used, so the Web records keep their rules. The status check can be outdated by commit time, so the
+        // encounter's concurrency tokens (Status, PatientId) are re-checked inside the save: a concurrent close, dispatch,
+        // reception or identification makes the record lose with a 409.
         private async Task<ClinicalEncounter> LoadForRecordingAsync(
+            ClinicalActor actor, Guid emergencyId, string permission, CancellationToken cancellationToken)
+        {
+            var encounter = await LoadForPrehospitalWriteAsync(actor, emergencyId, permission, cancellationToken);
+            if (!PrehospitalRecordableStatuses.Contains(encounter.Status))
+            {
+                throw new ResourceConflictException($"An encounter in status {encounter.Status} does not accept clinical records.");
+            }
+
+            _writes.EnsureEncounterUnchanged(encounter);
+            return encounter;
+        }
+
+        // Every prehospital write of the mobile app (records and transfer steps). Only prehospital encounters are
+        // emergencies here (404 otherwise). The care in the field ends at the handoff: once a clinic received the emergency
+        // (ClinicId set by ReceiveAtClinic), no mobile write is accepted, even from a paramedic also affiliated with that
+        // clinic: a 409 for the paramedics who took part, the 403 of a foreign case for anyone else. While there is no
+        // clinic: the assignment (IEncounterAccessService), plus the patient rule for the permission once the patient is
+        // identified.
+        private async Task<ClinicalEncounter> LoadForPrehospitalWriteAsync(
             ClinicalActor actor, Guid emergencyId, string permission, CancellationToken cancellationToken)
         {
             var encounter = await _writes.FindEncounterAsync(emergencyId, cancellationToken);
             if (encounter is null || encounter.Type != ClinicalEncounterType.Prehospital)
             {
                 throw new ResourceNotFoundException("PrehospitalEmergency", emergencyId);
+            }
+
+            if (encounter.ClinicId is not null)
+            {
+                if (await _reads.HasActiveStaffAssignmentAsync(encounter.Id, actor.StaffId, cancellationToken))
+                {
+                    throw new ResourceConflictException(
+                        "The emergency was handed off to the receiving clinic; it no longer accepts prehospital records.");
+                }
+
+                throw new AccessDeniedException("The current user is not assigned to this prehospital encounter.");
             }
 
             await _access.EnsureCanAccessAsync(
@@ -434,12 +703,6 @@ namespace SCI_PH.Application.Features.Clinical
                 throw new AccessDeniedException("The current user cannot write this patient's clinical records.");
             }
 
-            if (!EncounterRecordService.RecordableStatuses.Contains(encounter.Status))
-            {
-                throw new ResourceConflictException($"An encounter in status {encounter.Status} does not accept clinical records.");
-            }
-
-            _writes.EnsureEncounterUnchanged(encounter);
             return encounter;
         }
 
@@ -447,7 +710,7 @@ namespace SCI_PH.Application.Features.Clinical
         // 5 minutes, accepted) starts "after" the server's now, so the transition time, a server timestamp, is not
         // earlier than the start. The device's time of the record is never changed.
         private static void StartIfCreated(ClinicalEncounter encounter, DateTimeOffset now) =>
-            EncounterRecordService.StartIfCreated(encounter, now > encounter.StartedAtUtc ? now : encounter.StartedAtUtc);
+            EncounterRecordService.StartIfCreated(encounter, NotBeforeStart(encounter, now));
 
         // Saves the tracked record and its receipt. Returns the receipt of the request that committed instead when this one
         // lost: a concurrent request with the same key committed first (this one wrote nothing), or the encounter changed
@@ -659,7 +922,10 @@ namespace SCI_PH.Application.Features.Clinical
 
         // Optional free text of a record (procedure outcome, administration notes): trimmed, blank = none, at most
         // FieldLengths.LongText characters. Never echoed in errors.
-        private static string? OptionalLongText(string? value, string field)
+        private static string? OptionalLongText(string? value, string field) => OptionalText(value, FieldLengths.LongText, field);
+
+        // Optional free text: trimmed, blank = none, at most maxLength characters. Never echoed in errors.
+        private static string? OptionalText(string? value, int maxLength, string field)
         {
             var text = value?.Trim();
             if (string.IsNullOrEmpty(text))
@@ -667,9 +933,9 @@ namespace SCI_PH.Application.Features.Clinical
                 return null;
             }
 
-            return text.Length <= FieldLengths.LongText
+            return text.Length <= maxLength
                 ? text
-                : throw new RequestValidationException($"{field} cannot exceed {FieldLengths.LongText} characters.", field);
+                : throw new RequestValidationException($"{field} cannot exceed {maxLength} characters.", field);
         }
 
         // ClinicalNote.Content: required, trimmed, 1 to FieldLengths.NoteContent characters. Never echoed in errors.
