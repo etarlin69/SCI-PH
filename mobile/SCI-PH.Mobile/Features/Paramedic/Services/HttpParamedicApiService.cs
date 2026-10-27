@@ -10,9 +10,9 @@ namespace SCI_PH.Mobile.Features.Paramedic.Services;
 
 /// <summary>
 /// Servicio híbrido del área paramédica. REAL (Mobile BFF, con el cliente autenticado): abrir la emergencia, leerla,
-/// identificar al paciente por documento, registrar signos vitales, procedimientos y medicamentos administrados. Sigue en
-/// MOCK: identificación por huella, que trabaja sobre el id REAL que devuelve el servidor, sin crear otra emergencia. Los
-/// fallos de las llamadas reales llegan como <see cref="MobileApiException"/>.
+/// identificar al paciente por documento, registrar signos vitales, procedimientos, medicamentos administrados y
+/// observaciones. Sigue en MOCK: identificación por huella, que trabaja sobre el id REAL que devuelve el servidor, sin
+/// crear otra emergencia. Los fallos de las llamadas reales llegan como <see cref="MobileApiException"/>.
 /// </summary>
 public sealed class HttpParamedicApiService : IParamedicApiService
 {
@@ -100,6 +100,15 @@ public sealed class HttpParamedicApiService : IParamedicApiService
             $"{Emergencies}/{emergencyId}/medication-administrations", request);
     }
 
+    // Una observación: su hora y su texto. El tipo (Prehospital) y el autor los pone el servidor. 201 (nueva) o 200
+    // (reintento con la misma clave y los mismos datos): en ambos casos quedó registrada una sola vez. 400/403/404/409 y el
+    // resto llegan como MobileApiException.
+    public async Task RegisterNoteAsync(Guid emergencyId, RegisterNoteDto dto)
+    {
+        var request = new NoteRequest(dto.ClientRequestId, ToUtc(dto.OccurredAt), dto.Content);
+        await _client.PostAsync<NoteRequest, NoteResponse>($"{Emergencies}/{emergencyId}/notes", request);
+    }
+
     private static DateTimeOffset ToUtc(DateTime value) =>
         new(value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(value, DateTimeKind.Utc) : value.ToUniversalTime());
 
@@ -159,6 +168,11 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Notes);
 
     private sealed record MedicationAdministrationResponse(Guid Id, Guid EncounterId, Guid MedicationId);
+
+    // Contrato exacto de la nota: sin tipo, autor ni paciente.
+    private sealed record NoteRequest(Guid ClientRequestId, DateTimeOffset OccurredAt, string Content);
+
+    private sealed record NoteResponse(Guid Id, Guid EncounterId, string Type);
 
     private sealed record EmergencyResponse(
         Guid Id,

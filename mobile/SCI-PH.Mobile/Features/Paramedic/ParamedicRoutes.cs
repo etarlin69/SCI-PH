@@ -14,5 +14,6 @@ public static class ParamedicRoutes
     public const string VitalSigns = "VitalSigns";
     public const string Procedures = "Procedures";
     public const string Medications = "Medications";
+    public const string Notes = "Notes";
     // Próxima: Transfer
 }

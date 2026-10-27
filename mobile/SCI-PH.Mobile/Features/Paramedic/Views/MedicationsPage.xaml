@@ -141,8 +141,7 @@
                 </VerticalStackLayout>
             </Border>
 
-            <!-- Transferencia: todavía no existe (diálogo informativo). -->
-            <Button Text="Continuar a transferencia"
+            <Button Text="Continuar a observaciones"
                     Command="{Binding ContinueCommand}"
                     Style="{StaticResource SciSecondaryButton}" />
 

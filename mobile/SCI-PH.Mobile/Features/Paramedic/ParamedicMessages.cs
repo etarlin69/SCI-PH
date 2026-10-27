@@ -50,4 +50,15 @@ public static class ParamedicMessages
     public const string RegisterMedicationFailed = "No se pudo guardar el medicamento. Intenta nuevamente.";
 
     public const string MedicationRecorded = "Dosis registrada. Puedes registrar otra.";
+
+    /// <summary>409: la clave de la observación ya se usó con otro texto u hora, o la emergencia ya no admite registros.</summary>
+    public const string NoteConflict =
+        "No se pudo registrar la observación: la solicitud ya se usó con otros datos o la emergencia ya no admite registros.";
+
+    public const string RegisterNoteFailed = "No se pudo guardar la observación. Intenta nuevamente.";
+
+    public const string NoteRecorded = "Observación registrada. Puedes agregar otra.";
+
+    /// <summary>Hora de la observación antes del primer intento de guardar: se fija automáticamente.</summary>
+    public const string NoteTimePending = "Se registrará con la hora al guardar.";
 }
