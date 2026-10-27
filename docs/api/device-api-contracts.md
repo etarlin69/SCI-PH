@@ -4,7 +4,7 @@
 - **Proyecto:** `SCI-PH.Device.API`
 - **Prefijo:** `/api/device`
 - **Formato:** JSON compacto (el ESP32 tiene memoria limitada). Los errores se devuelven como `application/problem+json` (ProblemDetails), con mensajes genéricos.
-- **Autenticación:** de **dispositivo**, no de usuario ([ADR-007](../adr/ADR-007-device-authentication.md)): cabeceras `X-Device-Id` (código) y `X-Device-Key` (clave entregada una sola vez al registrar el dispositivo), solo sobre HTTPS y nunca en la URL. Cada endpoint exige un scope (`Device.Heartbeat`, `Device.Fingerprint.Identify`). **El dispositivo se identifica solo por su credencial, nunca por un campo del cuerpo.** Ninguna credencial de dispositivo se guarda en el repositorio.
+- **Autenticación:** de **dispositivo**, no de usuario ([ADR-007](../adr/ADR-007-device-authentication.md)): cabeceras `X-Device-Id` (código) y `X-Device-Key` (clave entregada una sola vez al registrar el dispositivo), solo sobre HTTPS y nunca en la URL. Cada endpoint exige un scope (`Device.Heartbeat`, `Device.Fingerprint.Identify`, `Device.Fingerprint.Enroll`). **El dispositivo se identifica solo por su credencial, nunca por un campo del cuerpo.** Ninguna credencial de dispositivo se guarda en el repositorio.
 - **Ningún dato clínico al dispositivo:** el Device API nunca devuelve pacientes, ids de paciente, nombres, fechas de nacimiento, datos de la emergencia, registros clínicos, documentos ni historia.
 
 ## Endpoints
@@ -14,6 +14,8 @@
 | `POST` | `/api/device/heartbeat` | Señal periódica de que el dispositivo está activo | `Device.Heartbeat` | Implementado |
 | `GET` | `/api/device/fingerprint/sessions/pending` | La captura que debe hacer este lector, si la hay | `Device.Fingerprint.Identify` | Implementado |
 | `POST` | `/api/device/fingerprint/sessions/{sessionId}/result` | Lo que el sensor comparó para esa sesión | `Device.Fingerprint.Identify` | Implementado |
+| `GET` | `/api/device/fingerprint/enrollments/pending` | El registro de huella que debe hacer este lector, si lo hay | `Device.Fingerprint.Enroll` | Implementado |
+| `POST` | `/api/device/fingerprint/enrollments/{enrollmentId}/result` | Qué hizo el sensor al registrar la huella | `Device.Fingerprint.Enroll` | Implementado |
 
 ---
 
@@ -79,6 +81,46 @@ scope. `429`: límite de peticiones.
 
 Dos resultados simultáneos para la misma sesión: uno se acepta y el otro recibe `409` (token de concurrencia sobre el
 estado de la sesión); nunca hay dos intentos.
+
+---
+
+## Registro de huellas (enrolamiento)
+
+Diseño en [ADR-010](../adr/ADR-010-fingerprint-enrollment.md). El personal del hospital abre un registro en el Web con un
+lector que tiene `Device.Fingerprint.Enroll` y `Device.Fingerprint.Identify`; el lector lo recoge, guarda la plantilla
+**en su sensor**, en un slot libre que **elige él**, e informa el slot. SCI-PH crea entonces la referencia del paciente
+(`R307`, `r307:device:<id>:slot:<n>`). La plantilla nunca sale del sensor y el lector nunca recibe datos del paciente.
+
+| Método | Ruta | Descripción | Scope | Estado |
+|---|---|---|---|---|
+| `GET` | `/api/device/fingerprint/enrollments/pending` | El registro que debe hacer este lector, si lo hay | `Device.Fingerprint.Enroll` | Implementado |
+| `POST` | `/api/device/fingerprint/enrollments/{enrollmentId}/result` | Qué hizo el sensor para ese registro | `Device.Fingerprint.Enroll` | Implementado |
+
+### `GET /api/device/fingerprint/enrollments/pending`
+
+**`200 OK`:** `{ "enrollmentId": "…", "expiresAtUtc": "…" }` (solo esto; nunca paciente, nombre, fecha de nacimiento,
+historia, referencia ni slot esperado). **`204`:** nada pendiente. `401` / `403` / `429` como en los demás endpoints.
+
+### `POST /api/device/fingerprint/enrollments/{enrollmentId}/result`
+
+```json
+{ "outcome": "Enrolled", "slot": 3 }
+```
+
+- `outcome`: `Enrolled`, `Failed`, `LowQuality` o `SensorError`. `slot`: entero no negativo, obligatorio con `Enrolled` y
+  prohibido con los demás (su rango depende del sensor y no se fija aquí). Ningún otro campo (`deviceId`, `template`,
+  `patientId`…): `400`.
+
+| Estado | Cuándo | Qué hace el lector |
+|---|---|---|
+| `204` | Aceptado; también al repetir **exactamente** el mismo resultado (respuesta perdida) | Conserva el slot |
+| `400` | Cuerpo inválido | Borra el slot que escribió |
+| `404` | El registro no existe o es de otro lector (no se distingue) | Borra el slot |
+| `409` | El slot ya es una referencia activa de este lector (el registro sigue `Pending`: puede usar otro slot), el paciente ya tiene una huella activa en este lector, ya se aceptó **otro** resultado, o el registro venció o se canceló | Borra el slot |
+| sin respuesta, timeout, 5xx, 429 | Incierto | **No** borra: reintenta el mismo resultado hasta que el registro venza; si vence sin 204, borra el slot |
+
+Dos resultados simultáneos: uno se acepta y el otro recibe `409`; nunca dos referencias. El registro vence a los 120 s
+(duración del prototipo; el tiempo real del R307 está pendiente de verificar).
 
 ---
 

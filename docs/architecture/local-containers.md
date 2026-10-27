@@ -119,7 +119,16 @@ DEVICE_MODE=fingerprint FINGERPRINT_OUTCOME=Match FINGERPRINT_SLOT=1 DEVICE_ID=<
 - `FINGERPRINT_POLL_INTERVAL_SECONDS` (por defecto 2), `FINGERPRINT_RESULT_DELAY_SECONDS` (captura simulada, por
   defecto 1), `FINGERPRINT_REPEAT_RESULT=true` (repite el mismo resultado, como tras una respuesta perdida) y
   `FINGERPRINT_ONCE=true` (sale tras el primer resultado: código 0 si se aceptó).
-- Para que un `Match` tenga candidato, en Development se puede sembrar la referencia del paciente con
+- Con `DEVICE_MODE=enroll` simula un lector que **registra** huellas (scope `Device.Fingerprint.Enroll`, ADR-010): consulta
+  su registro pendiente, guarda la plantilla en el primer slot libre de su "sensor" (un archivo JSON de slots ocupados,
+  `SIMULATOR_SLOTS_FILE`, por defecto en la carpeta temporal) y lo informa. Conserva el slot solo tras un 204; ante una
+  respuesta incierta reintenta el mismo resultado y, ante un rechazo o el vencimiento, borra el slot (compensación).
+  Opcionales: `ENROLL_OUTCOME` (`Enrolled` por defecto, `Failed`, `LowQuality`, `SensorError`), `ENROLL_SLOT` (slot fijo),
+  `ENROLL_FIRST_SLOT` (por defecto 1), `ENROLL_LOSE_FIRST_RESPONSE=true` (simula una respuesta perdida),
+  `ENROLL_CHANGED_REPLAY=true` (envía después otro resultado, que debe dar 409), y los mismos `FINGERPRINT_*` de retardo,
+  repetición, intervalo y `FINGERPRINT_ONCE`.
+- Para que un `Match` tenga candidato, el paciente debe estar registrado en ese lector (registro desde el Web con el modo
+  `enroll`); en Development también se puede sembrar la referencia del paciente con
   `ClinicalDevelopmentSeed:FingerprintReferences` (`PatientId`, `DeviceCredentialId` y `Slot`; User Secrets, nunca el
   repositorio). Solo Development: no hay semilla biométrica de producción.
 

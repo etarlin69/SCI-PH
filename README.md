@@ -127,6 +127,7 @@ Para levantar todo (PostgreSQL, migraciones, BFFs, Device API y web-admin) en co
   - [ADR-007 Autenticación de dispositivos](docs/adr/ADR-007-device-authentication.md)
   - [ADR-008 Emergencia prehospitalaria: acceso sin clínica e idempotencia](docs/adr/ADR-008-prehospital-emergency.md)
   - [ADR-009 Identificación por huella en la emergencia prehospitalaria](docs/adr/ADR-009-fingerprint-identification.md)
+  - [ADR-010 Registro (enrolamiento) de huellas](docs/adr/ADR-010-fingerprint-enrollment.md)
 - Contratos de API (previstos)
   - [Web BFF](docs/api/web-bff-contracts.md)
   - [Mobile BFF](docs/api/mobile-bff-contracts.md)

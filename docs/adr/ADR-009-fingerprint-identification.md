@@ -101,15 +101,18 @@ sin que el servidor lo supiera.
 
 ### 10. Referencias sembradas hasta el enrolamiento
 
-- El enrolamiento no existe todavía. Las referencias se crean solo en Development (opción
-  `ClinicalDevelopmentSeed:FingerprintReferences`: paciente existente, id del lector y slot) y en los tests. Nunca una
-  semilla biométrica de producción ni una clave de dispositivo en el código.
+- Hasta el enrolamiento, las referencias se creaban solo en Development (opción
+  `ClinicalDevelopmentSeed:FingerprintReferences`) y en los tests; la opción sigue disponible solo en Development. Nunca
+  una semilla biométrica de producción ni una clave de dispositivo en el código. El enrolamiento real está en
+  [ADR-010](ADR-010-fingerprint-enrollment.md), que además protege la referencia en la confirmación (token de
+  concurrencia: una revocación concurrente hace perder la confirmación con 409) y limita la unicidad de
+  `SubjectReference` a las referencias activas.
 
 ## Consecuencias
 
 - La identificación por huella es real de punta a punta con el simulador (`tools/SCI-PH.Device.Simulator`, modo
   `fingerprint`); el firmware real del ESP32/R307 es otro trabajo (Rol 9).
-- Quedan fuera: el enrolamiento (consentimiento, quién enrola, borrado del slot en el sensor), la verificación facial,
+- Quedan fuera: el enrolamiento (ahora en ADR-010; el borrado del slot en el sensor sigue pendiente), la verificación facial,
   la relación lector–ambulancia, la sincronización de plantillas entre lectores y la detección de dedos falsos (depende
   del hardware).
 - Una sesión `Matched` cuya referencia se revoca deja de tener candidato y no se puede confirmar; la app la cancela para
