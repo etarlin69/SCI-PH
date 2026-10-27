@@ -10,9 +10,9 @@ namespace SCI_PH.Mobile.Features.Paramedic.Services;
 
 /// <summary>
 /// Servicio híbrido del área paramédica. REAL (Mobile BFF, con el cliente autenticado): abrir la emergencia, leerla,
-/// identificar al paciente por documento, registrar signos vitales y procedimientos. Sigue en MOCK: identificación por
-/// huella y medicamentos; trabajan sobre el id REAL que devuelve el servidor, sin crear otra emergencia. Los fallos de
-/// las llamadas reales llegan como <see cref="MobileApiException"/>.
+/// identificar al paciente por documento, registrar signos vitales, procedimientos y medicamentos administrados. Sigue en
+/// MOCK: identificación por huella, que trabaja sobre el id REAL que devuelve el servidor, sin crear otra emergencia. Los
+/// fallos de las llamadas reales llegan como <see cref="MobileApiException"/>.
 /// </summary>
 public sealed class HttpParamedicApiService : IParamedicApiService
 {
@@ -89,7 +89,16 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         await _client.PostAsync<ProcedureRequest, ProcedureResponse>($"{Emergencies}/{emergencyId}/procedures", request);
     }
 
-    public Task RegisterMedicationAsync(Guid emergencyId, RegisterMedicationDto dto) => _mock.RegisterMedicationAsync(emergencyId, dto);
+    // Una dosis ya administrada, sin prescripción: el medicamento (id del catálogo), la dosis, la unidad, la vía (nombre del
+    // enum), su hora y las notas si las hay. 201 (nueva) o 200 (reintento con la misma clave y los mismos datos): en ambos
+    // casos quedó registrada una sola vez. 400/403/404/409 y el resto llegan como MobileApiException.
+    public async Task RegisterMedicationAsync(Guid emergencyId, RegisterMedicationDto dto)
+    {
+        var request = new MedicationAdministrationRequest(
+            dto.ClientRequestId, dto.MedicationId, dto.Dose, dto.DoseUnit, dto.Route, ToUtc(dto.AdministeredAt), dto.Notes);
+        await _client.PostAsync<MedicationAdministrationRequest, MedicationAdministrationResponse>(
+            $"{Emergencies}/{emergencyId}/medication-administrations", request);
+    }
 
     private static DateTimeOffset ToUtc(DateTime value) =>
         new(value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(value, DateTimeKind.Utc) : value.ToUniversalTime());
@@ -138,6 +147,18 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Outcome);
 
     private sealed record ProcedureResponse(Guid Id, Guid EncounterId, string Code);
+
+    // Contrato exacto de la dosis: sin prescripción ni datos del medicamento; sin notas, el campo no se envía.
+    private sealed record MedicationAdministrationRequest(
+        Guid ClientRequestId,
+        Guid MedicationId,
+        decimal Dose,
+        string DoseUnit,
+        MedicationRoute Route,
+        DateTimeOffset AdministeredAt,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Notes);
+
+    private sealed record MedicationAdministrationResponse(Guid Id, Guid EncounterId, Guid MedicationId);
 
     private sealed record EmergencyResponse(
         Guid Id,

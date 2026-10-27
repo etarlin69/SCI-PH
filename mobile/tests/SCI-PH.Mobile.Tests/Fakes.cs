@@ -5,6 +5,15 @@ using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 
 namespace SCI_PH.Mobile.Tests;
 
+/// <summary>Catálogos vacíos, para ViewModels cuyo test no los carga.</summary>
+internal sealed class EmptyParamedicCatalog : IParamedicCatalogService
+{
+    public Task<IReadOnlyList<CatalogItemDto>> GetProceduresAsync() => Task.FromResult<IReadOnlyList<CatalogItemDto>>([]);
+
+    public Task<IReadOnlyList<MedicationCatalogItemDto>> GetMedicationsAsync() =>
+        Task.FromResult<IReadOnlyList<MedicationCatalogItemDto>>([]);
+}
+
 /// <summary>Registra cada navegación en lugar de usar Shell.</summary>
 internal sealed class FakeNavigator : IAppNavigator
 {

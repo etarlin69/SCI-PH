@@ -96,5 +96,25 @@ namespace SCI_PH.Mobile.BFF.Controllers
             var result = await _emergencies.RecordProcedureAsync(id, request, cancellationToken);
             return result.Created ? StatusCode(StatusCodes.Status201Created, result.Procedure) : Ok(result.Procedure);
         }
+
+        // One dose already given, of an active medication of the catalog (GET api/mobile/catalogs/medications), without
+        // prescription. 201 the first time (no Location: there is no endpoint that reads a single administration); 200 with
+        // the same administration when the same clientRequestId is retried with the same data; 404 for an unknown
+        // medication; 409 for an inactive medication, a clientRequestId used with different data or an emergency that no
+        // longer accepts records.
+        [HttpPost("{id:guid}/medication-administrations")]
+        [Authorize(Policy = Permissions.MedicationAdministrations.Write)]
+        [ProducesResponseType<EmergencyMedicationAdministrationSummary>(StatusCodes.Status201Created)]
+        [ProducesResponseType<EmergencyMedicationAdministrationSummary>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> RecordMedicationAdministration(
+            Guid id, RecordEmergencyMedicationAdministrationRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _emergencies.RecordMedicationAdministrationAsync(id, request, cancellationToken);
+            return result.Created ? StatusCode(StatusCodes.Status201Created, result.Administration) : Ok(result.Administration);
+        }
     }
 }

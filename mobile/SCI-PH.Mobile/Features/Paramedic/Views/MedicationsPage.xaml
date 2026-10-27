@@ -16,9 +16,6 @@
                 <Label Text="Medicamentos administrados" Style="{StaticResource SciTitle}" />
                 <Label Text="Registra lo que ya se administró al paciente. SCI-PH no prescribe ni sugiere dosis."
                        Style="{StaticResource SciSubtitle}" />
-                <!-- Medicamentos sigue en mock (MockParamedicApiService): nada de esta pantalla llega todavía al servidor. -->
-                <Label Text="Simulación: los medicamentos todavía no se guardan en SCI-PH."
-                       TextColor="{StaticResource SciDanger}" FontSize="13" FontAttributes="Bold" />
             </VerticalStackLayout>
 
             <!-- Formulario -->
@@ -30,7 +27,7 @@
                         <Border Style="{StaticResource SciField}">
                             <Picker Title="Selecciona un medicamento"
                                     ItemsSource="{Binding CatalogItems}"
-                                    ItemDisplayBinding="{Binding Name, x:DataType=dto:CatalogItemDto}"
+                                    ItemDisplayBinding="{Binding DisplayName, x:DataType=dto:MedicationCatalogItemDto}"
                                     SelectedItem="{Binding SelectedMedication}"
                                     BackgroundColor="Transparent"
                                     TextColor="{StaticResource SciText}" />
@@ -41,10 +38,32 @@
                         <Label Text="Dosis administrada" Style="{StaticResource SciFieldLabel}" />
                         <Border Style="{StaticResource SciField}">
                             <Entry Text="{Binding Dose}"
-                                   Placeholder="Ej. 500 mg"
+                                   Placeholder="Ej. 500 o 2,5"
+                                   Keyboard="Numeric"
                                    Style="{StaticResource SciEntry}"
-                                   MaxLength="50" />
+                                   MaxLength="20" />
                         </Border>
+                        <Label Text="{Binding DoseError}" IsVisible="{Binding HasDoseError}"
+                               TextColor="{StaticResource SciDanger}" FontSize="12" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Unidad" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Picker Title="Selecciona la unidad"
+                                    ItemsSource="{Binding DoseUnits}"
+                                    SelectedItem="{Binding SelectedDoseUnit}"
+                                    BackgroundColor="Transparent"
+                                    TextColor="{StaticResource SciText}" />
+                        </Border>
+                        <Border Style="{StaticResource SciField}" IsVisible="{Binding IsCustomDoseUnit}">
+                            <Entry Text="{Binding CustomDoseUnit}"
+                                   Placeholder="Escribe la unidad"
+                                   Style="{StaticResource SciEntry}"
+                                   MaxLength="24" />
+                        </Border>
+                        <Label Text="{Binding DoseUnitError}" IsVisible="{Binding HasDoseUnitError}"
+                               TextColor="{StaticResource SciDanger}" FontSize="12" />
                     </VerticalStackLayout>
 
                     <VerticalStackLayout Spacing="6">
@@ -52,6 +71,7 @@
                         <Border Style="{StaticResource SciField}">
                             <Picker Title="Selecciona la vía"
                                     ItemsSource="{Binding Routes}"
+                                    ItemDisplayBinding="{Binding Label, x:DataType=vm:MedicationRouteOption}"
                                     SelectedItem="{Binding SelectedRoute}"
                                     BackgroundColor="Transparent"
                                     TextColor="{StaticResource SciText}" />
@@ -66,7 +86,7 @@
                                     Style="{StaticResource SciEditor}"
                                     AutoSize="TextChanges"
                                     MinimumHeightRequest="80"
-                                    MaxLength="500" />
+                                    MaxLength="4000" />
                         </Border>
                     </VerticalStackLayout>
 
@@ -80,6 +100,13 @@
                                     IsVisible="{Binding CatalogLoadFailed}"
                                     Style="{StaticResource SciSecondaryButton}" />
                         </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Éxito -->
+                    <Border Style="{StaticResource SciBadgeSuccess}" IsVisible="{Binding HasSuccess}" HorizontalOptions="Start">
+                        <Label Text="{Binding SuccessMessage}"
+                               TextColor="{StaticResource SciSuccess}"
+                               FontAttributes="Bold" FontSize="13" />
                     </Border>
 
                     <!-- Loading -->
@@ -114,6 +141,7 @@
                 </VerticalStackLayout>
             </Border>
 
+            <!-- Transferencia: todavía no existe (diálogo informativo). -->
             <Button Text="Continuar a transferencia"
                     Command="{Binding ContinueCommand}"
                     Style="{StaticResource SciSecondaryButton}" />

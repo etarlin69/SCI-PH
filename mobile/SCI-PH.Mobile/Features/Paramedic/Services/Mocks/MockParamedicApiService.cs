@@ -130,9 +130,10 @@ public class MockParamedicApiService : IParamedicApiService
 
         emergency.Medications.Add(new MedicationDto
         {
-            RecordedAt = dto.RecordedAt,
-            MedicationCode = dto.MedicationCode,
+            AdministeredAt = dto.AdministeredAt,
+            MedicationId = dto.MedicationId,
             Dose = dto.Dose,
+            DoseUnit = dto.DoseUnit,
             Route = dto.Route,
             Notes = dto.Notes
         });

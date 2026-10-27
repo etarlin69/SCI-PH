@@ -1,6 +1,6 @@
 # ADR-008: Emergencia prehospitalaria: acceso sin clínica e idempotencia
 
-- **Estado:** Aceptado (implementado en los PR #25, #26 y #27 y en el de `feature/mobile-prehospital-interventions`)
+- **Estado:** Aceptado (implementado en los PR #25, #26, #27 y #28 y en el de `feature/mobile-prehospital-medications`)
 - **Fecha:** 2026-10-23
 - **Relacionado:** [ADR-005](ADR-005-clinical-model.md), [ADR-006](ADR-006-identity-security.md),
   [contratos del Mobile BFF](../api/mobile-bff-contracts.md#paramedic-workflow)
@@ -36,8 +36,8 @@ reconocer el reintento: cada reintento creaba otra atención NN.
 - `ClinicalActor` no hace consultas: la búsqueda de la asignación está en el read store.
 - `EnsureClinic` **no se reemplazó globalmente**: los caminos del hospital (Web BFF) mantienen su regla, y una atención
   sin clínica sigue siendo invisible para ellos. El servicio se conecta uno a uno en los caminos móviles: ya lo usan la
-  identificación (decisión 6), los signos vitales (decisión 7) y los procedimientos (decisión 8); faltan medicamentos y
-  traslado.
+  identificación (decisión 6), los signos vitales (decisión 7), los procedimientos (decisión 8) y los medicamentos
+  administrados (decisión 9); falta el traslado.
 
 ### 3. Recibos de idempotencia: infraestructura técnica reutilizable
 
@@ -140,6 +140,32 @@ app no la envía y el contrato no la acepta: un campo `location` se rechaza con 
 - El hash de idempotencia usa la emergencia, el código, `performedAt` en UTC y el `outcome` recortado (vacío = sin
   resultado). Un reintento se responde desde el recibo y la petición canónica, comprobando de nuevo el acceso.
 
+### 9. Medicamentos administrados
+
+- `POST /api/mobile/emergencies/{id}/medication-administrations` registra **una dosis ya administrada** con
+  `MedicationAdministration.Record` (sin cambios en el Domain): la administración, su auditoría `Create`,
+  `Created -> InProgress` si es el primer registro y el recibo (`prehospital-emergency.medication-administration.v1`,
+  recurso: la `MedicationAdministration`), en una transacción. El acceso, los estados, la ventana de hora y los tokens
+  de concurrencia son los del camino compartido de las decisiones 7 y 8.
+- **No requiere prescripción:** el paramédico no prescribe. `PrescriptionId` y `PrescriptionDetailId` quedan en `null`
+  (el Domain y la base de datos lo admiten) y el contrato rechaza ambos campos; no se usa `Prescriptions.Write`.
+- El camino Web (`MedicationService`) **no cambia** y mantiene la regla de clínica. La regla "medicamento inexistente:
+  `404`; inactivo: `409`" se comparte con él en un helper, sin cambiar su comportamiento.
+- **Catálogo:** `GET /api/mobile/catalogs/medications` (`Emergencies.Operate` + `Medications.Read`, personal clínico
+  activo) lista **solo los medicamentos activos**, por nombre y concentración, sin `status`. El `POST` vuelve a comprobar
+  el estado, porque un medicamento puede desactivarse después de que la app cargó la lista. La `defaultRoute` es una
+  sugerencia para preseleccionar la vía, no una restricción: se acepta cualquier `MedicationRoute`, por su nombre.
+- **Precisión de la dosis:** `> 0`, máximo 3 decimales y menor que `1 000 000 000`, validado en Application (`400`,
+  `field: dose`): la columna `numeric(12,3)` redondearía sin aviso los decimales de más y desbordaría con valores
+  mayores. Solo en este camino móvil; el Web queda igual.
+- **Unidad:** texto libre de 1 a 24 caracteres tras recortar, como en el Domain; no hay catálogo de unidades, enum ni
+  UCUM, y no se transforma. La lista de la app (mg, mcg, g, mL, UI, gotas, inhalaciones, Otra) es **solo ayuda de UX**,
+  no autoridad clínica.
+- **Hora:** `administeredAt` con offset explícito y la ventana de la decisión 7.
+- El hash de idempotencia usa la emergencia, el medicamento, la dosis canónica (`500 = 500.0`), la unidad recortada, la
+  vía, `administeredAt` en UTC y las notas recortadas. Un reintento se responde aunque el medicamento se haya
+  desactivado después (la dosis era válida al registrarse), comprobando de nuevo el acceso.
+
 ## Consecuencias
 
 - La primera vertical real del paramédico (abrir y leer la emergencia) funciona sin inventar una clínica.
@@ -149,11 +175,13 @@ app no la envía y el contrato no la acepta: un campo `location` se rechaza con 
 - Tras la llegada al hospital, el paramédico de otra base deja de leer la emergencia, porque se aplica la regla de
   clínica. El acceso posterior al traslado se decidirá con la vertical de traslado.
 - `startedAt` puede estar hasta 5 minutos en el futuro, y el Domain exige que las horas clínicas posteriores no sean
-  anteriores al inicio. Los signos vitales y los procedimientos móviles lo resuelven con el mismo margen (decisiones 7
-  y 8); la próxima vertical (medicamentos) debe tenerlo en cuenta.
+  anteriores al inicio. Los signos vitales, los procedimientos y los medicamentos móviles lo resuelven con el mismo
+  margen (decisiones 7, 8 y 9).
 - El catálogo de procedimientos es una lista fija del servidor: añadir un procedimiento exige un cambio de código y un
   despliegue, hasta que exista un catálogo administrado.
-- `Transferred` sigue sin admitir registros, así que el paramédico no puede registrar procedimientos durante el
-  transporte una vez despachado el traslado; se decidirá con la vertical de traslado.
+- `Transferred` sigue sin admitir registros, así que el paramédico no puede registrar procedimientos ni medicamentos
+  durante el transporte una vez despachado el traslado; se decidirá con la vertical de traslado.
+- Un medicamento desactivado justo entre la comprobación y el guardado puede quedar administrado (`Medication` no tiene
+  token de concurrencia); se acepta porque la dosis se dio con el catálogo vigente un instante antes.
 - Solicitar y despachar un traslado de una atención sin clínica todavía no está expuesto (`TransferService` exige
   clínica de origen); llegará con la vertical de traslado usando `IEncounterAccessService`.

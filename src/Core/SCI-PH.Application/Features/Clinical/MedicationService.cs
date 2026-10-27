@@ -147,12 +147,17 @@ namespace SCI_PH.Application.Features.Clinical
                 administration.AdministeredAtUtc, administration.AdministeredByStaffId, administration.Status, administration.Notes);
         }
 
-        // 404 for an unknown medication, 409 for one deactivated in the catalog.
-        private async Task<IReadOnlyDictionary<Guid, MedicationSummary>> LoadActiveMedicationsAsync(
-            IReadOnlyCollection<Guid> medicationIds, CancellationToken cancellationToken)
+        private Task<IReadOnlyDictionary<Guid, MedicationSummary>> LoadActiveMedicationsAsync(
+            IReadOnlyCollection<Guid> medicationIds, CancellationToken cancellationToken) =>
+            LoadActiveMedicationsAsync(_reads, medicationIds, cancellationToken);
+
+        // 404 for an unknown medication, 409 for one deactivated in the catalog. Shared with the prehospital
+        // administration (PrehospitalEmergencyService).
+        internal static async Task<IReadOnlyDictionary<Guid, MedicationSummary>> LoadActiveMedicationsAsync(
+            IClinicalReadStore reads, IReadOnlyCollection<Guid> medicationIds, CancellationToken cancellationToken)
         {
             var wanted = medicationIds.Distinct().ToList();
-            var found = (await _reads.FindMedicationsAsync(wanted, cancellationToken)).ToDictionary(m => m.Id);
+            var found = (await reads.FindMedicationsAsync(wanted, cancellationToken)).ToDictionary(m => m.Id);
             foreach (var id in wanted)
             {
                 if (!found.TryGetValue(id, out var medication))
