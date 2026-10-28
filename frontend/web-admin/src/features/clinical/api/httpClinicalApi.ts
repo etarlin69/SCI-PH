@@ -8,6 +8,9 @@ import type {
     Diagnosis,
     FingerprintEnroller,
     FingerprintEnrollment,
+    FaceEnrollmentResponse,
+    FaceVerificationResponse,
+    PatientFace,
     PatientFingerprint,
     Medication,
     MedicationAdministration,
@@ -28,6 +31,14 @@ import { clinicIdForRequest } from './clinicSelection';
 
 const BASE = '/api/web';
 const id = (value: string) => encodeURIComponent(value);
+
+// multipart/form-data con exactamente dos partes: la captura y su clave. Nada más (el servidor rechaza cualquier otra).
+const faceForm = (capture: Blob, clientRequestId: string) => {
+    const form = new FormData();
+    form.append('capture', capture, 'capture.jpg');
+    form.append('clientRequestId', clientRequestId);
+    return form;
+};
 
 // Solo los campos del contrato: el BFF rechaza miembros desconocidos (p. ej. `unit`, que fija el Domain).
 const toMeasurement = ({ type, value, measuredAtUtc }: VitalSignInput): VitalSignInput => ({ type, value, measuredAtUtc });
@@ -71,6 +82,18 @@ export const httpClinicalApi: ClinicalApi = {
         apiRequest<FingerprintEnrollment>(`${BASE}/patients/${id(patientId)}/fingerprints/enrollments/${id(enrollmentId)}/cancel`, {
             method: 'POST',
         }),
+
+    listPatientFaces: (patientId, signal) => apiRequest<PatientFace[]>(`${BASE}/patients/${id(patientId)}/faces`, { signal }),
+
+    // Solo la captura y su clave (multipart): paciente en la ruta; proveedor, umbral y referencia los decide el servidor.
+    enrollPatientFace: (patientId, capture, clientRequestId) =>
+        apiRequest<FaceEnrollmentResponse>(`${BASE}/patients/${id(patientId)}/faces/enroll`, { method: 'POST', body: faceForm(capture, clientRequestId) }),
+
+    verifyPatientFace: (patientId, capture, clientRequestId) =>
+        apiRequest<FaceVerificationResponse>(`${BASE}/patients/${id(patientId)}/faces/verify`, { method: 'POST', body: faceForm(capture, clientRequestId) }),
+
+    revokePatientFace: (patientId, referenceId, reason) =>
+        apiRequest<PatientFace>(`${BASE}/patients/${id(patientId)}/faces/${id(referenceId)}/revoke`, { method: 'POST', body: reason ? { reason } : {} }),
 
     // Solo el motivo (opcional): paciente y referencia van en la ruta; el personal y la fecha los pone el servidor.
     revokePatientFingerprint: (patientId, referenceId, reason) =>

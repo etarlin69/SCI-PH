@@ -105,7 +105,9 @@ superior. El detalle de cada entidad está en [clinical-entities.md](../architec
 ### 9. Biometría e intentos de identificación
 
 - `PatientBiometricReference` guarda solo la referencia del proveedor externo, su estado y revocación; nunca
-  imágenes, huellas ni plantillas.
+  imágenes, huellas ni plantillas. El esquema `clinical` no guarda imagen, embedding, plantilla ni vector; si un
+  proveedor necesita una plantilla (rostro, [ADR-012](ADR-012-face-verification.md)), la guarda en **su propio almacén
+  privado**, cifrada, y SCI-PH solo conserva la referencia opaca que ese proveedor devuelve.
 - `IdentificationAttempt` registra cualquier método (QR, cédula, pasaporte, código interno, teléfono, rostro,
   huella, manual) con resultado `Success`/`Failure`, motivo de fallo, dispositivo y actor. Un éxito exige
   paciente; el identificador o la referencia biométrica coincidente deben pertenecer a ese paciente (FK

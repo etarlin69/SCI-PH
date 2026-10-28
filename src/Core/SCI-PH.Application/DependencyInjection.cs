@@ -71,6 +71,15 @@ namespace SCI_PH.Application
             return services;
         }
 
+        // Assisted 1:1 face verification (ADR-012, Web BFF only). Requires a face provider and a capture normalizer
+        // (Infrastructure: AddFaceVerification).
+        public static IServiceCollection AddFaceVerificationWorkflow(this IServiceCollection services)
+        {
+            services.AddScoped<PatientFaceService>();
+
+            return services;
+        }
+
         // Autenticación de dispositivos y lado del lector de huella (solo Device API). Independiente de las cuentas humanas.
         // Requiere AddPersistence (credenciales de dispositivo, sesiones de huella y stores clínicos).
         public static IServiceCollection AddDeviceSecurity(this IServiceCollection services)

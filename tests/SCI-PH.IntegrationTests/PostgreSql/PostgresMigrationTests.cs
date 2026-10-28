@@ -39,8 +39,9 @@ namespace SCI_PH.IntegrationTests.PostgreSql
                 """));
             Assert.Equal(4, await ScalarAsync<long>(connection, "select count(*) from identity.\"__EFMigrationsHistory\""));
             // InitialClinical + EnforceSingleActiveTransferPerEncounter + AddClinicalIdempotencyReceipts
-            // + AddFingerprintIdentificationSessions + AddFingerprintEnrollmentSessions + AddFingerprintSlotDeletionJobs.
-            Assert.Equal(6, await ScalarAsync<long>(connection, "select count(*) from clinical.\"__EFMigrationsHistory\""));
+            // + AddFingerprintIdentificationSessions + AddFingerprintEnrollmentSessions + AddFingerprintSlotDeletionJobs
+            // + AddActiveFaceReferencePerPatientIndex.
+            Assert.Equal(7, await ScalarAsync<long>(connection, "select count(*) from clinical.\"__EFMigrationsHistory\""));
             Assert.Equal(0, await ScalarAsync<long>(connection,
                 "select count(*) from pg_index i join pg_class c on c.oid = i.indexrelid join pg_namespace n on n.oid = c.relnamespace where n.nspname in ('identity', 'clinical') and not i.indisvalid"));
 

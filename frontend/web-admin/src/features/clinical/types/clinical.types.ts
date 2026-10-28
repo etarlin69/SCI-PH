@@ -379,6 +379,36 @@ export interface PatientFingerprint {
 /** Motivo opcional de la revocación; solo queda en la auditoría. */
 export type FingerprintRevocationReason = 'PatientRequest' | 'EnrollmentError' | 'ReaderReplaced' | 'Other';
 
+/**
+ * Referencia facial del paciente (ADR-012): verificación 1:1 asistida. Nunca incluye la referencia del proveedor, la
+ * plantilla, el puntaje ni el umbral. provider: nombre estable del proveedor (la UI muestra una etiqueta).
+ */
+export interface PatientFace {
+    id: Guid;
+    status: BiometricReferenceStatus;
+    provider: string;
+    registeredAtUtc: string;
+    revokedAtUtc: string | null;
+}
+
+export type FaceEnrollmentOutcome = 'Enrolled' | 'NoFace' | 'MultipleFaces' | 'LowQuality';
+
+/** face: solo con Enrolled. Las demás respuestas no crean nada. */
+export interface FaceEnrollmentResponse {
+    outcome: FaceEnrollmentOutcome;
+    face: PatientFace | null;
+}
+
+export type FaceVerificationOutcome = 'Match' | 'NoMatch' | 'NoFace' | 'MultipleFaces' | 'LowQuality';
+
+/** Solo el resultado: nunca un puntaje ni un umbral. */
+export interface FaceVerificationResponse {
+    verificationId: Guid;
+    outcome: FaceVerificationOutcome;
+}
+
+export type FaceRevocationReason = 'PatientRequest' | 'EnrollmentError' | 'ReferenceOutdated' | 'Other';
+
 export type FingerprintEnrollmentStatus = 'Pending' | 'Enrolled' | 'Failed' | 'Expired' | 'Cancelled';
 
 export interface FingerprintEnrollment {

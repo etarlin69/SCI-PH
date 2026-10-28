@@ -4,9 +4,12 @@ using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using SCI_PH.Application.Abstractions.Biometrics;
 using SCI_PH.Application.Abstractions.Security;
 using SCI_PH.Application.Common.Security;
+using SCI_PH.Infrastructure.Biometrics.Face;
 using SCI_PH.Infrastructure.Email;
 using SCI_PH.Infrastructure.Security;
 using SCI_PH.Infrastructure.Web;
@@ -20,7 +23,7 @@ namespace SCI_PH.Infrastructure
             // Punto central para registrar las implementaciones de las abstracciones
             // definidas en Application (Application/Abstractions):
             // - Azure Blob Storage (IStorageService)
-            // - Verificación facial (IFaceVerificationService)
+            // - Verificación facial (IFaceVerificationService): AddFaceVerification, solo en el Web BFF
             // - OCR (IOcrService)
             // - QR (IQrService)
             // - IA (IAiAssistantService)
@@ -34,6 +37,28 @@ namespace SCI_PH.Infrastructure
 
         // Autenticación JWT de cuentas humanas para Web y Mobile BFF. El Device API no la usa:
         // los dispositivos tienen su propio esquema (AddDeviceAuthentication, ver ADR-007).
+        // Verificación facial 1:1 asistida (ADR-012): normalización de capturas (independiente del proveedor) y el proveedor
+        // elegido por configuración del servidor (FaceVerification:Provider): Fake fuera de Production, Disabled (503) en
+        // Production si no se configura otro; Fake configurado en Production impide arrancar.
+        public static IServiceCollection AddFaceVerification(this IServiceCollection services, IConfiguration configuration)
+        {
+            services.AddOptions<FaceVerificationOptions>()
+                .Bind(configuration.GetSection(FaceVerificationOptions.SectionName))
+                .ValidateOnStart();
+            services.AddSingleton<IValidateOptions<FaceVerificationOptions>, FaceVerificationOptionsValidator>();
+            services.AddSingleton<IFaceCaptureNormalizer, SkiaFaceCaptureNormalizer>();
+            services.AddSingleton<FakeFaceVerificationService>();
+            services.AddSingleton<IFaceVerificationService>(provider =>
+                provider.GetRequiredService<IOptions<FaceVerificationOptions>>().Value.Resolve(provider.GetRequiredService<IHostEnvironment>()) switch
+                {
+                    FaceVerificationOptions.FakeProvider => provider.GetRequiredService<FakeFaceVerificationService>(),
+                    FaceVerificationOptions.DisabledProvider => new DisabledFaceVerificationService(),
+                    var other => throw new InvalidOperationException($"FaceVerification:Provider '{other}' is not supported.")
+                });
+
+            return services;
+        }
+
         public static IServiceCollection AddJwtSecurity(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddOptions<JwtOptions>().Bind(configuration.GetSection(JwtOptions.SectionName)).ValidateOnStart();

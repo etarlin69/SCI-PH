@@ -23,6 +23,7 @@ export const CSRF_HEADER = 'X-SCIPH-CSRF';
 
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  /** JSON, o FormData (multipart/form-data: el navegador pone el Content-Type con su boundary). */
   body?: unknown;
   query?: Record<string, string | number | undefined | null>;
   /** Adjunta el Bearer y permite el refresh automático ante 401. Por defecto true. */
@@ -91,7 +92,8 @@ async function readBody(response: Response): Promise<unknown> {
 
 async function send(path: string, options: RequestOptions, token: string | null): Promise<Response> {
   const headers: Record<string, string> = { Accept: 'application/json, application/problem+json' };
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  const isForm = options.body instanceof FormData;
+  if (options.body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
   if (options.csrf) headers[CSRF_HEADER] = '1';
   if (options.auth !== false && token) headers.Authorization = `Bearer ${token}`;
 
@@ -99,7 +101,7 @@ async function send(path: string, options: RequestOptions, token: string | null)
     return await fetch(buildUrl(path, options.query), {
       method: options.method ?? 'GET',
       headers,
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body: isForm ? (options.body as FormData) : options.body !== undefined ? JSON.stringify(options.body) : undefined,
       credentials: 'include',
       cache: 'no-store',
       signal: options.signal,

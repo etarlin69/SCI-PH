@@ -164,6 +164,39 @@ la referencia interna (`SubjectReference`), plantillas, claves ni scopes.
 
 ---
 
+## Web Hospital — rostro (implementado)
+
+Verificación facial **1:1 asistida** de un paciente conocido ([ADR-012](../adr/ADR-012-face-verification.md)): solo
+contra la referencia facial activa de **ese** paciente, nunca una búsqueda entre pacientes. **Sin prueba de vida:** ayuda
+al personal presente; no es una autenticación ni una prueba legal de identidad. No identifica atenciones ni cambia nada
+clínico. Personal clínico activo que pueda ver al paciente (`Patients.Read`); sin atajo por rol. Nunca se devuelven la
+referencia del proveedor (`SubjectReference`), la plantilla, el puntaje ni el umbral.
+
+| Método | Ruta | Permiso | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/web/patients/{patientId}/faces` | `Biometrics.Manage` o `Patients.Identify` | — | `[PatientFace]`, más recientes primero |
+| `POST` | `/api/web/patients/{patientId}/faces/enroll` | `Biometrics.Manage` | multipart: `capture`, `clientRequestId` | 201 `{ outcome: Enrolled, face }` · 200 reintento o `{ outcome: NoFace\|MultipleFaces\|LowQuality, face: null }` · 400 · 403 · 404 · 409 · 503 |
+| `POST` | `/api/web/patients/{patientId}/faces/verify` | `Patients.Identify` | multipart: `capture`, `clientRequestId` | 200 `{ verificationId, outcome: Match\|NoMatch\|NoFace\|MultipleFaces\|LowQuality }` · 400 · 403 · 404 · 409 sin rostro activo · 503 |
+| `POST` | `/api/web/patients/{patientId}/faces/{referenceId}/revoke` | `Biometrics.Manage` | `{ reason? }` (opcional; sin cuerpo también) | 200 `PatientFace` (también si ya estaba revocado) · 400 · 403 · 404 |
+
+- `PatientFace`: `{ id, status: Active|Revoked, provider, registeredAtUtc, revokedAtUtc }`. `provider` es el nombre
+  estable del proveedor (la UI muestra una etiqueta).
+- **Captura:** `multipart/form-data` con exactamente `capture` (la imagen) y `clientRequestId`; cualquier otro campo
+  (`patientId`, `provider`, `threshold`, `referenceId`, otro archivo) es 400; JSON es 415. Máximo 2 MB; JPEG o PNG por
+  sus bytes y decodificación real; lado menor ≥ 480 px, ningún lado > 4096 px. El servidor aplica la orientación, quita
+  los metadatos y re-codifica; la imagen nunca se guarda.
+- **Registro:** una referencia facial activa por paciente (409 si ya existe, también con registros simultáneos). El mismo
+  `clientRequestId` con la misma imagen devuelve la misma referencia sin volver a llamar al proveedor; con otra imagen, 409.
+- **Verificación:** todos los resultados biométricos son 200. El mismo `clientRequestId` con la misma imagen devuelve el
+  resultado registrado sin llamar al proveedor; con otra imagen, 409. Se registra en la auditoría (`FaceVerification`).
+- **Revocación:** `reason`: `PatientRequest`, `EnrollmentError`, `ReferenceOutdated` u `Other` (solo en la auditoría).
+  Desde esa respuesta el rostro no se usa para verificar; la plantilla del proveedor se borra después (mejor esfuerzo).
+- **503:** el proveedor facial no está disponible; mensaje genérico, sin detalles internos.
+- La UI usa la cámara del equipo (`getUserMedia`, sin selector de archivos), la apaga en cuanto toma la foto y no guarda
+  la captura en el navegador. Muestra solo "Coincide", "No coincide" o la calidad; nunca un porcentaje.
+
+---
+
 ## Web Administration — contratos iniciales previstos
 
 > Los endpoints marcados **Implementado** existen; el resto son contratos previstos que pueden evolucionar

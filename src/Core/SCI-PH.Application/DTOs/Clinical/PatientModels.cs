@@ -57,6 +57,11 @@ namespace SCI_PH.Application.DTOs.Clinical
     // A patient's biometric reference; never its provider subject reference outside the read store.
     public sealed record BiometricReferenceRow(Guid Id, Guid PatientId);
 
+    // Read-store row of a face reference; SubjectReference (the provider's opaque key) stays inside Application.
+    public sealed record FaceReferenceRow(
+        Guid Id, string Provider, string SubjectReference, string? AlgorithmVersion, BiometricReferenceStatus Status,
+        DateTimeOffset CreatedAtUtc, DateTimeOffset? RevokedAtUtc);
+
     // Read-store row of a fingerprint reference; SubjectReference stays inside Application.
     public sealed record FingerprintReferenceRow(
         Guid Id, string Provider, string SubjectReference, BiometricReferenceStatus Status, DateTimeOffset CreatedAtUtc, DateTimeOffset? RevokedAtUtc);

@@ -43,7 +43,7 @@ Casos de uso y contratos que la aplicación necesita del exterior.
   | Carpeta | Abstracción prevista |
   |---|---|
   | `AI` | `IAiAssistantService` |
-  | `Biometrics` | `IFaceVerificationService`, `IFingerprintService` |
+  | `Biometrics` | `IFaceVerificationService` y `IFaceCaptureNormalizer` (implementadas, ADR-012), stores de huella (implementados), `IFingerprintService` (vacía) |
   | `Documents` | `IDocumentService` |
   | `OCR` | `IOcrService` |
   | `Persistence` | `IUnitOfWork` |

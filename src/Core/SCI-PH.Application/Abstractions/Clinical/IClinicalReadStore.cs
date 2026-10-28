@@ -45,6 +45,17 @@ namespace SCI_PH.Application.Abstractions.Clinical
         // Application only (to name the reader); it never leaves it.
         Task<IReadOnlyList<FingerprintReferenceRow>> ListFingerprintReferencesAsync(Guid patientId, CancellationToken cancellationToken);
 
+        // The patient's face references (active and revoked), newest first. The subject reference is for Application only
+        // (to ask its provider); it never leaves it.
+        Task<IReadOnlyList<FaceReferenceRow>> ListFaceReferencesAsync(Guid patientId, CancellationToken cancellationToken);
+
+        // The patient's ACTIVE face reference (at most one: unique index), or null.
+        Task<FaceReferenceRow?> FindActiveFaceReferenceAsync(Guid patientId, CancellationToken cancellationToken);
+
+        // ChangesJson of an audit entry of this entity and patient, or null: the record of an operation whose result a
+        // retried request must return without doing it again (a face verification).
+        Task<string?> GetAuditChangesAsync(Guid auditEntryId, string entityName, Guid patientId, CancellationToken cancellationToken);
+
         Task<EncounterRow?> GetEncounterAsync(Guid encounterId, CancellationToken cancellationToken);
 
         // The staff member has an open (not unassigned) EncounterStaffAssignment on the encounter.

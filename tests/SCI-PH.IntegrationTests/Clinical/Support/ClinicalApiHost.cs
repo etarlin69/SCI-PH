@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Logging;
 using SCI_PH.Application.DTOs.Security;
 using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Organizations;
@@ -16,12 +17,14 @@ using SCI_PH.Web.BFF.Controllers;
 namespace SCI_PH.IntegrationTests.Clinical.Support
 {
     // The real Web BFF over a migrated PostgreSQL database (Testcontainers): concurrency tokens, unique indexes,
-    // composite foreign keys and transactions behave as in production.
-    internal sealed class PostgresWebBffFactory(string connectionString) : BffFactory<AuthController>
+    // composite foreign keys and transactions behave as in production. Every log line is captured (Trace), so a test can
+    // check that nothing sensitive was written.
+    internal sealed class PostgresWebBffFactory(string connectionString, CapturingLoggerProvider logs) : BffFactory<AuthController>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             base.ConfigureWebHost(builder);
+            builder.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace).AddProvider(logs));
             builder.ConfigureTestServices(services => services.UsePostgresStores(connectionString));
         }
     }
@@ -35,10 +38,13 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
         private ClinicalApiHost(string connectionString)
         {
             ConnectionString = connectionString;
-            _factory = new PostgresWebBffFactory(connectionString);
+            _factory = new PostgresWebBffFactory(connectionString, Logs);
         }
 
         public string ConnectionString { get; }
+
+        // Log lines of the Web BFF.
+        public CapturingLoggerProvider Logs { get; } = new();
 
         public IServiceProvider Services => _factory.Services;
 

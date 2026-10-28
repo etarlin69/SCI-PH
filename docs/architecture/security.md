@@ -123,6 +123,8 @@ ESP32 ─► HTTPS + X-Device-Id + X-Device-Key ─► DeviceApiKey ─► princ
 | `GET /api/device/fingerprint/enrollments/pending`, `POST …/{enrollmentId}/result` | Dispositivo con `Device.Fingerprint.Enroll` | registro de huellas (ADR-010) |
 | `GET /api/device/fingerprint/deletions/pending`, `POST …/{deletionId}/result` | Dispositivo con `Device.Fingerprint.Enroll` | borrado del slot de una huella revocada (ADR-011); el lector recibe solo el slot, nunca el paciente |
 | `GET /api/web/fingerprint-enrollers`, `…/api/web/patients/{id}/fingerprints…` | `Biometrics.Manage` + personal clínico activo que vea al paciente | registro y revocación de huellas; sin atajo por rol |
+| `POST /api/web/patients/{id}/faces/enroll`, `…/faces/{referenceId}/revoke` | `Biometrics.Manage` + personal clínico activo que vea al paciente | registro y revocación del rostro (ADR-012) |
+| `POST /api/web/patients/{id}/faces/verify` | `Patients.Identify` + personal clínico activo que vea al paciente | verificación facial 1:1 asistida; no es autenticación (ADR-012) |
 
 Errores (ProblemDetails): 400 validación o enlace inválido, 401 sin credenciales o credenciales inválidas
 (siempre genérico), 403 sin permiso o CSRF rechazado, 409 conflicto (último administrador, duplicados),

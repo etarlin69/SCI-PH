@@ -127,6 +127,25 @@ namespace SCI_PH.Application.Tests.Clinical
                 .Select(r => new FingerprintReferenceRow(r.Id, r.Provider, r.SubjectReference, r.Status, r.CreatedAtUtc, r.RevokedAtUtc))
                 .ToList());
 
+        public Task<IReadOnlyList<FaceReferenceRow>> ListFaceReferencesAsync(Guid patientId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<FaceReferenceRow>>(BiometricReferences
+                .Where(r => r.PatientId == patientId && r.Modality == BiometricModality.Face)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .Select(ToFaceRow)
+                .ToList());
+
+        public Task<FaceReferenceRow?> FindActiveFaceReferenceAsync(Guid patientId, CancellationToken cancellationToken) =>
+            Task.FromResult(BiometricReferences
+                .Where(r => r.PatientId == patientId && r.Modality == BiometricModality.Face && r.Status == BiometricReferenceStatus.Active)
+                .Select(ToFaceRow)
+                .SingleOrDefault());
+
+        public Task<string?> GetAuditChangesAsync(Guid auditEntryId, string entityName, Guid patientId, CancellationToken cancellationToken) =>
+            Task.FromResult(Audit.SingleOrDefault(a => a.Id == auditEntryId && a.EntityName == entityName && a.PatientId == patientId)?.ChangesJson);
+
+        private static FaceReferenceRow ToFaceRow(PatientBiometricReference r) =>
+            new(r.Id, r.Provider, r.SubjectReference, r.AlgorithmVersion, r.Status, r.CreatedAtUtc, r.RevokedAtUtc);
+
         // ---- Enrollments (as FingerprintEnrollmentStore) ----
         public List<FingerprintEnrollment> Enrollments { get; } = [];
 
@@ -460,7 +479,10 @@ namespace SCI_PH.Application.Tests.Clinical
             var references = _pending.OfType<PatientBiometricReference>().ToList();
             if (updates.Any(u => Enrollments.Single(x => x.Id == u.Enrollment.Id).Status != u.ExpectedStatus)
                 || references.Any(r => BiometricReferences.Any(existing => existing.Status == BiometricReferenceStatus.Active
-                    && existing.Provider == r.Provider && existing.Modality == r.Modality && existing.SubjectReference == r.SubjectReference)))
+                    && existing.Provider == r.Provider && existing.Modality == r.Modality && existing.SubjectReference == r.SubjectReference))
+                // UX_PatientBiometricReferences_ActiveFacePerPatient: one ACTIVE face reference per patient.
+                || references.Any(r => r.Modality == BiometricModality.Face && BiometricReferences.Any(existing =>
+                    existing.PatientId == r.PatientId && existing.Modality == BiometricModality.Face && existing.Status == BiometricReferenceStatus.Active)))
             {
                 _pending.Clear();
                 throw new ResourceConflictException("The record was changed by another operation. Reload it and try again.");
@@ -577,6 +599,7 @@ namespace SCI_PH.Application.Tests.Clinical
             EnrollmentReaderSide = new FingerprintEnrollmentReaderService(Store, Store, Store, Store, Time);
             FingerprintRevocations = new FingerprintRevocationService(Actor, access, Store, Store, Store, Readers, Time);
             DeletionReaderSide = new FingerprintSlotDeletionReaderService(Store, Store, Time);
+            Faces = new PatientFaceService(Actor, access, Store, Store, Store, FaceProvider, new PassThroughCaptureNormalizer(), Time);
         }
 
         public FakeCurrentUser User { get; }
@@ -598,6 +621,8 @@ namespace SCI_PH.Application.Tests.Clinical
         public FingerprintEnrollmentReaderService EnrollmentReaderSide { get; }
         public FingerprintRevocationService FingerprintRevocations { get; }
         public FingerprintSlotDeletionReaderService DeletionReaderSide { get; }
+        public TestFaceProvider FaceProvider { get; } = new();
+        public PatientFaceService Faces { get; }
 
         public static ClinicalHarness ForRole(string role, int clinics = 1)
         {

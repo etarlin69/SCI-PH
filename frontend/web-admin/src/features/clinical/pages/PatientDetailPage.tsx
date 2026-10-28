@@ -4,15 +4,21 @@ import { Permissions, useAuth } from '../../../auth';
 import { Card, ErrorState, LoadingSpinner, PageHeader } from '../../../components/shared';
 import { clinicalApi, describeError } from '../api';
 import { EncounterSubject } from '../components/EncounterSubject';
+import { FaceCard } from '../components/FaceCard';
 import { FingerprintCard } from '../components/FingerprintCard';
 import type { PatientSummary } from '../types/clinical.types';
 
 type State = { status: 'loading' } | { status: 'error'; error: string } | { status: 'ready'; patient: PatientSummary };
 
-/** Detalle de un paciente (GET /api/web/patients/{id}, Patients.Read) con su huella digital (Biometrics.Manage). */
+/**
+ * Detalle de un paciente (GET /api/web/patients/{id}, Patients.Read) con su huella digital (Biometrics.Manage) y su rostro
+ * (registrar y revocar: Biometrics.Manage; verificar: Patients.Identify).
+ */
 export function PatientDetailPage() {
     const { patientId = '' } = useParams();
-    const canManageBiometrics = useAuth().can(Permissions.Biometrics.Manage);
+    const auth = useAuth();
+    const canManageBiometrics = auth.can(Permissions.Biometrics.Manage);
+    const canVerifyFace = auth.can(Permissions.Patients.Identify);
     const [state, setState] = useState<State>({ status: 'loading' });
 
     useEffect(() => {
@@ -38,6 +44,9 @@ export function PatientDetailPage() {
                         <EncounterSubject patient={state.patient} temporaryPatientCode={null} variant="full" />
                     </Card>
                     {canManageBiometrics && <FingerprintCard patientId={state.patient.id} />}
+                    {(canManageBiometrics || canVerifyFace) && (
+                        <FaceCard patientId={state.patient.id} canManage={canManageBiometrics} canVerify={canVerifyFace} />
+                    )}
                 </div>
             )}
         </div>
