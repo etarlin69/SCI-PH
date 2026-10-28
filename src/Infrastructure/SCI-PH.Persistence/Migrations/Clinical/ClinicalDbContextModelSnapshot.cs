@@ -1727,6 +1727,77 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                         });
                 });
 
+            modelBuilder.Entity("SCI_PH.Persistence.Clinical.Biometrics.FingerprintSlotDeletionJobEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("BiometricReferenceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeviceCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LastAttemptId")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("LastFailure")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Outcome")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ResultHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<int>("Status")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BiometricReferenceId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_FingerprintSlotDeletionJobs_Reference");
+
+                    b.HasIndex("DeviceCredentialId", "CreatedAtUtc")
+                        .HasDatabaseName("IX_FingerprintSlotDeletionJobs_PendingPerReader")
+                        .HasFilter("\"Status\" = 1");
+
+                    b.ToTable("FingerprintSlotDeletionJobs", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_FingerprintSlotDeletionJobs_Attempts", "(\"Attempts\" >= 0) AND ((\"LastAttemptId\" IS NULL) = (\"ResultHash\" IS NULL)) AND ((\"LastAttemptId\" IS NULL) = (\"LastAttemptAtUtc\" IS NULL)) AND (((\"Attempts\" = 0) AND (\"LastAttemptId\" IS NULL)) OR ((\"Attempts\" > 0) AND (\"LastAttemptId\" IS NOT NULL)))");
+
+                            t.HasCheckConstraint("CK_FingerprintSlotDeletionJobs_Dates", "(\"LastAttemptAtUtc\" >= \"CreatedAtUtc\") AND (\"CompletedAtUtc\" >= \"CreatedAtUtc\")");
+
+                            t.HasCheckConstraint("CK_FingerprintSlotDeletionJobs_LastFailure_Enum", "\"LastFailure\" IN (1)");
+
+                            t.HasCheckConstraint("CK_FingerprintSlotDeletionJobs_Lifecycle", "((\"Status\" = 1) AND (\"Outcome\" IS NULL) AND (\"CompletedAtUtc\" IS NULL)) OR ((\"Status\" = 2) AND (\"Outcome\" IS NOT NULL) AND (\"CompletedAtUtc\" IS NOT NULL) AND (\"LastAttemptId\" IS NOT NULL))");
+
+                            t.HasCheckConstraint("CK_FingerprintSlotDeletionJobs_Outcome_Enum", "\"Outcome\" IN (1, 2)");
+
+                            t.HasCheckConstraint("CK_FingerprintSlotDeletionJobs_ResultHash", "(\"ResultHash\" IS NULL) OR (length(\"ResultHash\") = 64)");
+
+                            t.HasCheckConstraint("CK_FingerprintSlotDeletionJobs_Status_Enum", "\"Status\" IN (1, 2)");
+                        });
+                });
+
             modelBuilder.Entity("SCI_PH.Persistence.Clinical.Idempotency.IdempotencyReceiptEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2229,6 +2300,15 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
                         .WithMany()
                         .HasForeignKey("RequestedByStaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SCI_PH.Persistence.Clinical.Biometrics.FingerprintSlotDeletionJobEntry", b =>
+                {
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.PatientBiometricReference", null)
+                        .WithMany()
+                        .HasForeignKey("BiometricReferenceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

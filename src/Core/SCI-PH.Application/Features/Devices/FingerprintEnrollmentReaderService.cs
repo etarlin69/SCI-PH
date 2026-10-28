@@ -19,7 +19,8 @@ namespace SCI_PH.Application.Features.Devices
     // sees its own enrollments and learns only which one to do and until when, never the patient. It stores the template
     // on its sensor FIRST, in a slot it chose, and then reports the slot: SCI-PH creates the reference only if the slot is
     // not an active reference of that reader already. The reader keeps the slot only after a 204; after a terminal
-    // rejection (404, 409) it must delete what it just stored. Errors are generic.
+    // rejection (404, 409) it must delete what it just stored. A slot whose revoked template this reader still has to delete
+    // (ADR-011) is not free: accepting it would let that deletion erase the new patient's template. Errors are generic.
     public sealed class FingerprintEnrollmentReaderService
     {
         private const string NotFound = "The enrollment was not found.";
@@ -28,17 +29,20 @@ namespace SCI_PH.Application.Features.Devices
         private readonly IFingerprintEnrollmentStore _enrollments;
         private readonly IClinicalReadStore _reads;
         private readonly IClinicalWriteStore _writes;
+        private readonly IFingerprintSlotDeletionStore _deletions;
         private readonly TimeProvider _time;
 
         public FingerprintEnrollmentReaderService(
             IFingerprintEnrollmentStore enrollments,
             IClinicalReadStore reads,
             IClinicalWriteStore writes,
+            IFingerprintSlotDeletionStore deletions,
             TimeProvider time)
         {
             _enrollments = enrollments;
             _reads = reads;
             _writes = writes;
+            _deletions = deletions;
             _time = time;
         }
 
@@ -52,8 +56,9 @@ namespace SCI_PH.Application.Features.Devices
         // creates the PatientBiometricReference (registered by the staff member who opened the enrollment) and its audit
         // entry; a failure records the reason. The same result again (a lost 204): accepted, nothing written. Another result
         // after that, or any result for an expired or cancelled enrollment: 409. A slot that is already an active reference of
-        // this reader, or a patient who already has an active fingerprint on it: 409 and the enrollment stays Pending (the
-        // reader discards its slot). An enrollment of another reader, or none: 404.
+        // this reader, a slot still waiting for the deletion of a revoked template, or a patient who already has an active
+        // fingerprint on it: 409 and the enrollment stays Pending (the reader discards its slot). An enrollment of another
+        // reader, or none: 404.
         public async Task SubmitResultAsync(
             Guid readerId, string readerCode, Guid enrollmentId, SubmitFingerprintEnrollmentResultRequest request, CancellationToken cancellationToken)
         {
@@ -87,8 +92,12 @@ namespace SCI_PH.Application.Features.Devices
             var resolved = enrollment with { ResolvedAtUtc = now, ResultHash = resultHash };
             if (outcome == FingerprintEnrollmentOutcome.Enrolled)
             {
+                // Order matters: the active reference is checked BEFORE the pending deletion. A revocation commits the Revoked
+                // status and its deletion job together, so once the first check no longer sees the reference as active, the
+                // second one (a later statement) already sees its job.
                 var subjectReference = FingerprintReferences.SubjectReference(readerId, slot!.Value);
                 if (await _reads.FindActiveFingerprintReferenceAsync(FingerprintReferences.Provider, subjectReference, cancellationToken) is not null
+                    || await _deletions.HasPendingForSubjectAsync(readerId, subjectReference, cancellationToken)
                     || await _reads.HasActiveFingerprintReferenceAsync(
                         enrollment.PatientId, FingerprintReferences.Provider, FingerprintReferences.ReaderPrefix(readerId), cancellationToken))
                 {

@@ -10,7 +10,6 @@ using SCI_PH.Application.Common.Security;
 using SCI_PH.Application.DTOs.Biometrics;
 using SCI_PH.Application.DTOs.Security;
 using SCI_PH.Domain.Entities.Auditing;
-using SCI_PH.Domain.Entities.Patients;
 using SCI_PH.Domain.Enums.Auditing;
 using SCI_PH.Domain.Enums.Patients;
 
@@ -36,6 +35,7 @@ namespace SCI_PH.Application.Features.Clinical
         private readonly IIdempotencyStore _receipts;
         private readonly IFingerprintEnrollmentStore _enrollments;
         private readonly IDeviceCredentialStore _readers;
+        private readonly IFingerprintSlotDeletionStore _deletions;
         private readonly TimeProvider _time;
 
         public FingerprintEnrollmentService(
@@ -46,6 +46,7 @@ namespace SCI_PH.Application.Features.Clinical
             IIdempotencyStore receipts,
             IFingerprintEnrollmentStore enrollments,
             IDeviceCredentialStore readers,
+            IFingerprintSlotDeletionStore deletions,
             TimeProvider time)
         {
             _actor = actor;
@@ -55,6 +56,7 @@ namespace SCI_PH.Application.Features.Clinical
             _receipts = receipts;
             _enrollments = enrollments;
             _readers = readers;
+            _deletions = deletions;
             _time = time;
         }
 
@@ -76,22 +78,13 @@ namespace SCI_PH.Application.Features.Clinical
                 .ToList();
         }
 
-        // The patient's fingerprint references (active and revoked), newest first, with the reader's code and name only.
+        // The patient's fingerprint references (active and revoked), newest first, with the reader's code and name only and,
+        // for a revoked one, the state of its physical cleanup (ADR-011).
         public async Task<IReadOnlyList<PatientFingerprintSummary>> ListPatientFingerprintsAsync(Guid patientId, CancellationToken cancellationToken)
         {
             await EnsurePatientAsync(await _actor.GetAsync(cancellationToken), patientId, cancellationToken);
-            var rows = await _reads.ListFingerprintReferencesAsync(patientId, cancellationToken);
-            var readers = (await _readers.ListAsync(cancellationToken)).ToDictionary(d => d.Id);
-            return rows.Select(row => new PatientFingerprintSummary(
-                    row.Id,
-                    row.Status,
-                    FingerprintReferences.ReaderOf(row.SubjectReference) is { } readerId && readers.TryGetValue(readerId, out var reader)
-                        ? new FingerprintReferenceReader(reader.DeviceCode, reader.Name, reader.Status == DeviceCredentialStatus.Active
-                            && reader.Scopes.Contains(DeviceScopes.FingerprintIdentify))
-                        : null,
-                    row.CreatedAtUtc,
-                    row.RevokedAtUtc))
-                .ToList();
+            return await PatientFingerprints.SummarizeAsync(
+                await _reads.ListFingerprintReferencesAsync(patientId, cancellationToken), _readers, _deletions, cancellationToken);
         }
 
         // A Pending enrollment of the patient on that reader (server time, expires after EnrollmentTtl), its Create audit
@@ -202,20 +195,9 @@ namespace SCI_PH.Application.Features.Clinical
             }
         }
 
-        // The patient exists (404) and the actor may see it and manage its biometrics (403), as when reading the patient.
-        private async Task EnsurePatientAsync(ClinicalActor actor, Guid patientId, CancellationToken cancellationToken)
-        {
-            if (!await _reads.PatientExistsAsync(patientId, cancellationToken))
-            {
-                throw new ResourceNotFoundException(nameof(Patient), patientId);
-            }
-
-            if (!await _patientAccess.CanReadAsync(patientId, Permissions.Patients.Read, cancellationToken)
-                || !await _patientAccess.CanWriteAsync(patientId, Permissions.Biometrics.Manage, cancellationToken))
-            {
-                throw new AccessDeniedException("The current user cannot manage this patient's fingerprints.");
-            }
-        }
+        // The actor is resolved first (active clinical staff), then the patient rule of PatientFingerprints.
+        private Task EnsurePatientAsync(ClinicalActor actor, Guid patientId, CancellationToken cancellationToken) =>
+            PatientFingerprints.EnsureCanManageAsync(_reads, _patientAccess, patientId, cancellationToken);
 
         private async Task<FingerprintEnrollment> OwnAsync(Guid patientId, Guid enrollmentId, CancellationToken cancellationToken)
         {
