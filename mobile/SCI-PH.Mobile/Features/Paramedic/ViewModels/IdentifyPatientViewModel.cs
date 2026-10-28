@@ -329,8 +329,8 @@ public partial class IdentifyPatientViewModel : BaseViewModel
                 ApplySession(session);
                 if (session is { Status: FingerprintSessionStatus.Matched, HasCandidate: false })
                 {
-                    // Coincidencia sin candidato que confirmar (referencia revocada): se suelta la sesión para poder
-                    // leer de nuevo sin esperar a que venza.
+                    // Coincidencia sin candidato que confirmar (referencia revocada o lector que ya no es válido): se
+                    // suelta la sesión para poder leer de nuevo sin esperar a que venza.
                     await CancelOnServerQuietlyAsync(session.Id);
                 }
 
@@ -366,7 +366,14 @@ public partial class IdentifyPatientViewModel : BaseViewModel
     {
         try
         {
-            ApplySession(await _fingerprints.GetSessionAsync(EmergencyId, sessionId));
+            var session = await _fingerprints.GetSessionAsync(EmergencyId, sessionId);
+            ApplySession(session);
+            if (session is { Status: FingerprintSessionStatus.Matched, HasCandidate: false })
+            {
+                // Coincidencia que ya no se puede confirmar (la referencia se revocó o el lector ya no es válido): se suelta
+                // en el servidor, como en la consulta, para poder leer de nuevo sin esperar a que venza.
+                await CancelOnServerQuietlyAsync(session.Id);
+            }
         }
         catch (Exception)
         {
@@ -404,7 +411,7 @@ public partial class IdentifyPatientViewModel : BaseViewModel
                 ApplyIdentified(confirmedName);
                 break;
             default:
-                // Matched sin candidato (la referencia se revocó) cuenta como sin coincidencia.
+                // Matched sin candidato (la referencia se revocó o el lector ya no es válido) cuenta como sin coincidencia.
                 EndFingerprintSession(session switch
                 {
                     { Status: FingerprintSessionStatus.Failed, Failure: FingerprintFailure.LowQuality } => ParamedicMessages.FingerprintLowQuality,

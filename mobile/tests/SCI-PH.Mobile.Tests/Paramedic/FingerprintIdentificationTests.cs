@@ -244,6 +244,45 @@ public class FingerprintIdentificationTests
         Assert.Single(keys);
     }
 
+    // La coincidencia ya no se puede confirmar (el lector dejó de ser válido tras leer): 409 con el mensaje seguro, la sesión
+    // vuelve sin candidato y se suelta en el servidor. Se puede leer de nuevo con otra clave, ir por documento o seguir NN.
+    [Fact]
+    public async Task AMatchThatCanNoLongerBeConfirmedIsReleasedOnTheServer()
+    {
+        _bff.Script.Enqueue("Matched");
+        var vm = await ReadingAsync();
+        await RunPollingAsync(vm);
+        Assert.True(vm.HasCandidate);
+        var sessionId = Guid.Parse(_bff.Paths.Last().Split('/')[^1]);
+        _bff.WithdrawCandidates();
+
+        await vm.ConfirmFingerprintCommand.ExecuteAsync(null);
+
+        Assert.Equal(ParamedicMessages.FingerprintConfirmConflict, vm.ErrorMessage);
+        Assert.Equal(ParamedicMessages.FingerprintNoMatch, vm.FingerprintMessage);
+        Assert.Equal($"POST {SessionsPath}/{sessionId}/cancel", _bff.Paths.Last());
+        Assert.Equal("Cancelled", _bff.StatusOf(sessionId));
+        Assert.False(_bff.Identified);
+        Assert.False(vm.IsIdentified);
+        Assert.False(vm.HasCandidate);
+        Assert.False(vm.IsWaitingForReader);
+        Assert.True(vm.CanChooseReader);
+        Assert.False(vm.ConfirmFingerprintCommand.CanExecute(null));
+        Assert.DoesNotContain("revoked", vm.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+
+        Assert.True(vm.ContinueWithoutIdentifyingCommand.CanExecute(null));
+        vm.OpenDocumentFormCommand.Execute(null);
+        Assert.True(vm.ShowDocumentForm);
+        _gate.Free = false;
+        await vm.StartFingerprintReadingCommand.ExecuteAsync(null);
+        Assert.Equal(2, _bff.Opened);
+        Assert.True(vm.IsWaitingForReader);
+        var openKeys = _bff.Bodies.Where(b => b.Contains("deviceId", StringComparison.Ordinal))
+            .Select(b => JsonDocument.Parse(b).RootElement.GetProperty("clientRequestId").GetGuid()).Distinct();
+        Assert.Equal(2, openKeys.Count());
+        vm.StopFingerprintPolling();
+    }
+
     // Identificar por documento o continuar como NN suelta el lector: la lectura pendiente se cancela.
     [Fact]
     public async Task ContinuingAsNnWhileReadingCancelsTheSession()
