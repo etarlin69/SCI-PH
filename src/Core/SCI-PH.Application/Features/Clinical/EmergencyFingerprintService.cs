@@ -143,7 +143,10 @@ namespace SCI_PH.Application.Features.Clinical
         // session's reference (still active), the session becomes Confirmed and the receipt is written, all in the
         // transaction of EncounterService.IdentifyPatientAsync (with its Identify audit entry). A concurrent identification
         // (another session, a document), reception or cancellation wins on the encounter's or the session's concurrency
-        // token: 409, nothing written. Same key and same payload again: the identified emergency (200), nothing new.
+        // token: 409, nothing written. The session's reader must still be a fingerprint reader (ADR-009): checked last,
+        // just before the clinical commit; otherwise 409, nothing written and the session stays Matched (it can be
+        // cancelled or expire). Same key and same payload again: the identified emergency (200), nothing new; a replay of
+        // a rejected confirmation is evaluated again.
         public async Task<PrehospitalEmergencySummary> ConfirmAsync(
             Guid emergencyId, Guid sessionId, ConfirmFingerprintSessionRequest request, CancellationToken cancellationToken)
         {
@@ -181,6 +184,14 @@ namespace SCI_PH.Application.Features.Clinical
             // The reference must still be active when the identification commits: a revocation committed after this check
             // makes the whole save lose on its Status token (409), so a revoked reference never identifies.
             _writes.EnsureBiometricReferenceUnchanged(reference);
+            // The reader lives in the identity schema (another DbContext and connection, ADR-003): no lock can join it to the
+            // clinical transaction. This final read is the linearization point: a revocation committed before it rejects
+            // the confirmation; one committed after it (until the clinical commit, milliseconds) does not. Accepted limit.
+            if (!await IsCurrentReaderAsync(session.DeviceCredentialId, cancellationToken))
+            {
+                throw new ResourceConflictException(NotConfirmable);
+            }
+
             // Tracked only: written by the SaveChangesAsync of IdentifyPatientAsync, in the same transaction.
             _sessions.Update(session with { Status = FingerprintSessionStatus.Confirmed, ConfirmedAtUtc = now }, FingerprintSessionStatus.Matched);
             // The receipt's resource is the emergency, as for the identification by document: a replay returns it.
@@ -262,6 +273,13 @@ namespace SCI_PH.Application.Features.Clinical
         private static bool IsReader(DeviceSummary device) =>
             device.Status == DeviceCredentialStatus.Active && device.Scopes.Contains(DeviceScopes.FingerprintIdentify);
 
+        // Generic on purpose: the paramedic does not learn whether the reader was revoked, retired or is unknown.
+        private const string NotConfirmable = "The fingerprint match can no longer be confirmed. Open a new reading.";
+
+        // Whether the reader of a session is, now, still an active fingerprint reader (evaluated on every use).
+        private async Task<bool> IsCurrentReaderAsync(Guid readerId, CancellationToken cancellationToken) =>
+            await _readers.FindAsync(readerId, cancellationToken) is { } reader && IsReader(reader);
+
         // Only an NN emergency that is not cancelled or closed is identified here.
         private static void EnsureIdentifiable(ClinicalEncounter encounter)
         {
@@ -316,12 +334,14 @@ namespace SCI_PH.Application.Features.Clinical
                 await CandidateAsync(session, cancellationToken));
         }
 
-        // Name and date of birth of the matched patient while the session waits for the confirmation and the reference is
-        // still active; nothing else, and never the patient id.
+        // Name and date of birth of the matched patient while the session waits for the confirmation, the reference is still
+        // active and its reader is still a fingerprint reader (the CURRENT validity of the evidence, not the one at the
+        // match); nothing else, and never the patient id. Otherwise null, without saying why.
         private async Task<FingerprintCandidate?> CandidateAsync(FingerprintSession session, CancellationToken cancellationToken)
         {
             if (session is not { Status: FingerprintSessionStatus.Matched, MatchedBiometricReferenceId: { } referenceId }
                 || await _reads.GetActiveBiometricReferencePatientIdAsync(referenceId, cancellationToken) is not { } patientId
+                || !await IsCurrentReaderAsync(session.DeviceCredentialId, cancellationToken)
                 || await _reads.GetPatientAsync(patientId, cancellationToken) is not { } patient)
             {
                 return null;

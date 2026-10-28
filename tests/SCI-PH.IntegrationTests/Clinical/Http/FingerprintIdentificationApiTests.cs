@@ -828,5 +828,98 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             var encounter = await EncounterAsync(host, id);
             return (encounter.Status, encounter.ClinicId);
         }
+
+        // ---- The session's reader must still be a fingerprint reader when the paramedic confirms (ADR-009) ----
+
+        private static Task<int> ConfirmReceiptsAsync(MobileEmergencyHost host) =>
+            host.Web.DbAsync(db => db.IdempotencyReceipts.CountAsync(r => r.Operation == EmergencyFingerprintService.ConfirmOperation));
+
+        // CASE 2 (and CASE 1 on another emergency): the reader of a Matched session is revoked (committed) before the
+        // confirmation. The candidate disappears, Confirm is 409 every time with the same key, and nothing is written: the
+        // emergency stays NN, no Identify entry, no receipt, the session stays Matched and the reference Active. The
+        // paramedic cancels it and can go on with another reader or a document.
+        [SkippableFact]
+        public async Task AMatchCannotBeConfirmedOnceItsReaderIsRevoked()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var (host, _, paramedic, reader, readerClient) = await SetupAsync();
+            await using var _host = host;
+            var (_, reference) = await EnrolledPatientAsync(host, reader);
+            var emergency = await OpenEmergencyAsync(paramedic);
+            var sessionId = Id(await OpenedAsync(paramedic, emergency.Id, reader.Id));
+            Assert.Equal(HttpStatusCode.NoContent, (await SubmitAsync(readerClient, sessionId, "Match", Slot)).StatusCode);
+            Assert.Equal(JsonValueKind.Object, (await SessionAsync(paramedic, emergency.Id, sessionId)).GetProperty("candidate").ValueKind);
+
+            await host.RevokeReaderAsync(reader.Id);
+
+            var shown = await SessionAsync(paramedic, emergency.Id, sessionId);
+            Assert.Equal(("Matched", JsonValueKind.Null), (shown.GetProperty("status").GetString(), shown.GetProperty("candidate").ValueKind));
+            var key = Guid.NewGuid();
+            var first = await ConfirmAsync(paramedic, emergency.Id, sessionId, key);
+            var again = await ConfirmAsync(paramedic, emergency.Id, sessionId, key);
+            Assert.Equal((HttpStatusCode.Conflict, HttpStatusCode.Conflict), (first.StatusCode, again.StatusCode));
+            var detail = await first.Content.ReadAsStringAsync();
+            Assert.DoesNotContain("revoked", detail, StringComparison.OrdinalIgnoreCase);
+            Assert.Null((await EncounterAsync(host, emergency.Id)).PatientId);
+            Assert.Equal(0, await IdentifyAuditsAsync(host, emergency.Id));
+            Assert.Equal(0, await ConfirmReceiptsAsync(host));
+            Assert.Equal(FingerprintSessionStatus.Matched, (await StoredAsync(host, sessionId)).Status);
+            Assert.Equal(BiometricReferenceStatus.Active,
+                (await host.Web.DbAsync(db => db.PatientBiometricReferences.AsNoTracking().SingleAsync(r => r.Id == reference.Id))).Status);
+
+            Assert.Equal(HttpStatusCode.OK, (await CancelAsync(paramedic, emergency.Id, sessionId)).StatusCode);
+            var other = await host.ProvisionReaderAsync();
+            Assert.Equal(HttpStatusCode.Created, (await OpenAsync(paramedic, emergency.Id, other.Id)).StatusCode);
+            var document = await DocumentPatientAsync(host, "00176543210");
+            Assert.Equal(HttpStatusCode.OK, (await IdentifyByDocumentAsync(paramedic, emergency.Id, "00176543210")).StatusCode);
+            Assert.Equal(document.Id, (await EncounterAsync(host, emergency.Id)).PatientId);
+        }
+
+        // CASE 1 and CASE 3: with its reader active the match is confirmed, also when ANOTHER reader was revoked meanwhile.
+        [SkippableFact]
+        public async Task RevokingAnotherReaderDoesNotAffectTheConfirmation()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var (host, _, paramedic, reader, readerClient) = await SetupAsync();
+            await using var _host = host;
+            var (patient, _) = await EnrolledPatientAsync(host, reader);
+            var bystander = await host.ProvisionReaderAsync();
+            var emergency = await OpenEmergencyAsync(paramedic);
+            var sessionId = Id(await OpenedAsync(paramedic, emergency.Id, reader.Id));
+            await SubmitAsync(readerClient, sessionId, "Match", Slot);
+
+            await host.RevokeReaderAsync(bystander.Id);
+
+            Assert.Equal(JsonValueKind.Object, (await SessionAsync(paramedic, emergency.Id, sessionId)).GetProperty("candidate").ValueKind);
+            Assert.Equal(HttpStatusCode.OK, (await ConfirmAsync(paramedic, emergency.Id, sessionId)).StatusCode);
+            Assert.Equal(patient.Id, (await EncounterAsync(host, emergency.Id)).PatientId);
+            Assert.Equal(1, await IdentifyAuditsAsync(host, emergency.Id));
+        }
+
+        // CASE 4 (cross-context order B): the confirmation committed before the revocation is a valid identification, and
+        // its replay with the same key after the revocation returns the same success (never a retroactive error).
+        [SkippableFact]
+        public async Task AConfirmationCommittedBeforeTheRevocationReplaysAsTheSameSuccess()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var (host, _, paramedic, reader, readerClient) = await SetupAsync();
+            await using var _host = host;
+            var (patient, _) = await EnrolledPatientAsync(host, reader);
+            var emergency = await OpenEmergencyAsync(paramedic);
+            var sessionId = Id(await OpenedAsync(paramedic, emergency.Id, reader.Id));
+            await SubmitAsync(readerClient, sessionId, "Match", Slot);
+            var key = Guid.NewGuid();
+            var confirmed = await ConfirmAsync(paramedic, emergency.Id, sessionId, key);
+            Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+
+            await host.RevokeReaderAsync(reader.Id);
+            var replay = await ConfirmAsync(paramedic, emergency.Id, sessionId, key);
+
+            Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+            Assert.Equal(await confirmed.Content.ReadAsStringAsync(), await replay.Content.ReadAsStringAsync());
+            Assert.Equal(patient.Id, (await EncounterAsync(host, emergency.Id)).PatientId);
+            Assert.Equal(1, await IdentifyAuditsAsync(host, emergency.Id));
+            Assert.Equal(1, await ConfirmReceiptsAsync(host));
+        }
     }
 }
