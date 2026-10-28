@@ -80,6 +80,46 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
             return (connection, transaction);
         }
 
+        // Holds the row lock an UPDATE of the reference would take (FOR NO KEY UPDATE), without changing it, until the caller
+        // ends the transaction. Writers of the reference then queue on the row in arrival order (an insert that only references
+        // it, such as a deletion job, does not wait: FOR KEY SHARE does not conflict with this lock).
+        public static async Task<(NpgsqlConnection Connection, NpgsqlTransaction Hold)> HoldReferenceAsync(string connectionString, Guid referenceId)
+        {
+            var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync();
+            var transaction = await connection.BeginTransactionAsync();
+            await using var select = new NpgsqlCommand(
+                """SELECT 1 FROM clinical."PatientBiometricReferences" WHERE "Id" = @id FOR NO KEY UPDATE""", connection, transaction);
+            select.Parameters.AddWithValue("id", referenceId);
+            Assert.Equal(1, await select.ExecuteScalarAsync());
+            return (connection, transaction);
+        }
+
+        // Waits until at least `waiters` sessions of the database are waiting on a lock, while none of the requests finished.
+        public static async Task WaitUntilWaitingOnLocksAsync(string connectionString, int waiters, params Task<HttpResponseMessage>[] requests)
+        {
+            await using var monitor = new NpgsqlConnection(connectionString);
+            await monitor.OpenAsync();
+            var database = new NpgsqlConnectionStringBuilder(connectionString).Database;
+            for (var attempt = 0; attempt < 200 && !requests.Any(r => r.IsCompleted); attempt++)
+            {
+                await using var query = new NpgsqlCommand(
+                    "SELECT count(*) FROM pg_stat_activity WHERE datname = @db AND wait_event_type = 'Lock'", monitor);
+                query.Parameters.AddWithValue("db", database!);
+                if ((long)(await query.ExecuteScalarAsync())! >= waiters)
+                {
+                    return;
+                }
+
+                await Task.Delay(50);
+            }
+
+            var finished = requests.Where(r => r.IsCompleted).Select(r => r.Result.StatusCode.ToString()).ToList();
+            Assert.Fail(finished.Count > 0
+                ? $"A request finished before the lock was released ({string.Join(", ", finished)})."
+                : $"Fewer than {waiters} requests waited on the row.");
+        }
+
         private static async Task<(NpgsqlConnection, NpgsqlTransaction)> BeginAsync(string connectionString, Guid encounterId, string sql)
         {
             var connection = new NpgsqlConnection(connectionString);
