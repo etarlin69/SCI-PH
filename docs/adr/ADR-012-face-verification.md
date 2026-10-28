@@ -1,8 +1,8 @@
 # ADR-012: Verificación facial 1:1 asistida
 
 - **Estado:** Aceptado. PR 1/2 implementado (proveedor Fake, #36). PR 2/2 (proveedor local OpenCV, plantillas cifradas y
-  limpieza durable) implementado en `feature/biometric-face-opencv-provider`; **gate de licencias bloqueado** (ver
-  [componentes de terceros](../legal/face-opencv-third-party.md)).
+  limpieza durable) implementado en `feature/biometric-face-opencv-provider`, con runtime nativo Linux propio construido
+  desde source (ver [componentes de terceros](../legal/face-opencv-third-party.md)).
 - **Fecha:** 2026-10-28
 - **Relacionado:** [ADR-001](ADR-001-onion-architecture.md), [ADR-004](ADR-004-document-storage.md),
   [ADR-005](ADR-005-clinical-model.md) (decisión 9), [ADR-010](ADR-010-fingerprint-enrollment.md),
@@ -142,9 +142,18 @@ Nunca en auditoría, logs ni respuestas: bytes de imagen, base64, embedding, pla
 `FaceVerification:Provider=OpenCv` → `LocalOpenCvFaceVerificationService` (`Provider` `SCIPH-FaceOpenCV`,
 `AlgorithmVersion` `opencv-sface-2021dec-yunet-2023mar`), en proceso, sin nube. Solo el Web BFF lo registra.
 
-- **Runtime:** `OpenCvSharp5` 5.0.0.20261003 (managed, en Infrastructure) + `OpenCvSharp5.runtime.win` y
-  `OpenCvSharp5.official.runtime.linux-x64.headless` 5.0.0.20261003 (en el Web BFF). OpenCV 5.0.0. Versiones exactas, sin
-  `slim` (no trae `dnn`). Spike validado en Windows 10 y Ubuntu 24.04 (`aspnet:9.0`, sin GTK/X11).
+- **API administrada:** `OpenCvSharp5` 5.0.0.20261003, versión exacta; privada en Infrastructure y referenciada solo
+  por el Web BFF (y los tests). Su analizador Roslyn (no carga con el SDK 9: CS9057) se quita solo en esos proyectos, por
+  `NuGetPackageId`.
+- **Runtime nativo de producción (Linux x64):** OpenCV 5.0.0 + OpenCvSharpExtern **construidos desde source** con commits
+  fijados (`scripts/biometrics/build-opencv-linux.sh`, etapa `opencv-native` del Dockerfile): solo los módulos necesarios
+  (`core, imgproc, imgcodecs, dnn, objdetect` y los contrib que OpenCvSharpExtern exige), librerías compartidas con
+  `RPATH $ORIGIN`, sin FFmpeg, Tesseract, GStreamer, V4L, GTK/X11, videoio, highgui, text ni stitching. El script falla
+  si alguno aparece en la configuración, en las dependencias ELF o embebido, y genera un manifiesto. El paquete oficial
+  Linux de OpenCvSharp **no** se usa en producción.
+- **Windows:** `OpenCvSharp5.runtime.win` (NuGet) solo para desarrollo y tests; no se distribuye (si se distribuyera un
+  artefacto Windows, necesitaría su propio gate de licencias). Los tests en runners Linux usan el paquete oficial Linux
+  como dependencia **solo de test**.
 - **Modelos** (nunca en el repositorio): YuNet `face_detection_yunet_2023mar.onnx` (MIT) y SFace
   `face_recognition_sface_2021dec.onnx` FP32 (Apache-2.0), SHA-256 fijados en `FaceModels`. Se obtienen con
   `scripts/biometrics/fetch-face-models.{ps1,sh}` (URL fijada → temporal → SHA-256 → movimiento atómico) en `.models/face/`
@@ -190,8 +199,12 @@ Nunca en auditoría, logs ni respuestas: bytes de imagen, base64, embedding, pla
 
 - Tabla técnica `clinical.FaceTemplateDeletionJobs` (no es entidad del Domain): `Id`, `BiometricReferenceId` (FK única,
   `Restrict`), `Status` (`Pending`/`Completed`), `Outcome` (`Deleted`/`NotFound`), `Attempts`, `LastAttemptAtUtc`,
-  `LastFailure` (`ProviderUnavailable`/`ProviderMismatch`), `CreatedAtUtc`, `CompletedAtUtc`. `Status` y `Attempts` son
-  tokens de concurrencia. Sin `SubjectReference`, paciente ni proveedor duplicados.
+  `LastFailure` (`ProviderUnavailable`: se intentó y falló; `ProviderMismatch`: la referencia es de otro proveedor;
+  `ProviderDisabled`: no hay proveedor configurado), `CreatedAtUtc`, `CompletedAtUtc`. `Status` y `Attempts` son tokens de
+  concurrencia. Sin `SubjectReference`, paciente ni proveedor duplicados.
+- **Proveedor Disabled:** la revocación lógica se aplica igual; el job queda `Pending` con `ProviderDisabled`, **sin**
+  intento de borrado y **sin** incrementar `Attempts`; las pasadas lo omiten sin escribir nada (sin bucle activo). Cuando
+  se configura un proveedor, se procesa como cualquier otro.
 - `FaceTemplateCleanupService` (Application): intento inmediato tras la revocación y luego en cada pasada del
   `FaceTemplateCleanupWorker` (`BackgroundService` del Web BFF, `PeriodicTimer` de `Cleanup:IntervalSeconds` = 30, lotes de
   `BatchSize` = 50; solo con `Provider=OpenCv`). Reintentos tras 1, 2, 3, 5 y luego 10 minutos, sin límite; desde 5
@@ -207,7 +220,8 @@ Nunca en auditoría, logs ni respuestas: bytes de imagen, base64, embedding, pla
 
 - CI normal (Windows/Ubuntu): formato, sobre y claves (P0), calidad, servicio con analizador simulado, configuración fail
   fast, Disabled, almacén sobre Azurite (Testcontainers), reconciliación, limpieza durable (Application y PostgreSQL), y
-  **carga del runtime nativo** sin modelos (`Cv2.GetVersionString`, API facial presente).
+  **carga del runtime nativo** sin modelos (`Cv2.GetVersionString`, API facial presente). El build de la imagen (job de
+  contenedores) compila el runtime Linux propio y aplica su gate.
 - Opt-in `SCIPH_FACE_MODELS=1` (tras `fetch-face-models` y `fetch-face-fixtures`): pipeline real sobre caras
   **sintéticas** de Face Synthetics (misma identidad transformada → `Match`, otra → `NoMatch`, `NoFace`, `MultipleFaces`,
   `LowQuality`, pool concurrente). Face Synthetics: Microsoft Research Use of Data Agreement (no comercial); nunca se
@@ -215,8 +229,10 @@ Nunca en auditoría, logs ni respuestas: bytes de imagen, base64, embedding, pla
 
 ### 15. Despliegue
 
-- Imagen del Web BFF: runtime headless; etapa `face-models` que ejecuta el mismo script con verificación SHA-256
-  (`--build-arg FACE_MODELS=include|none`, por defecto `include`) y copia a `/app/models/face`; avisos de terceros en
+- Imagen del Web BFF: `dotnet publish -r linux-x64` (ningún asset nativo de Windows ni el runtime oficial de NuGet);
+  etapa `opencv-native` (runtime propio, ver §12) que copia a `/app` solo `libOpenCvSharpExtern.so` y las 16
+  `libopencv_*.so.500` que pide; etapa `face-models` que ejecuta el mismo script con verificación SHA-256
+  (`--build-arg FACE_MODELS=include|none`, por defecto `include`) y copia a `/app/models/face`; avisos y manifiesto en
   `/app/licenses/`. Secretos (claves, cadena de conexión) solo en runtime.
 - Configuración mínima (secretos fuera del repositorio):
   `FaceVerification__Provider=OpenCv`, `FaceVerification__OpenCv__Templates__ConnectionString=…`,
@@ -226,10 +242,13 @@ Nunca en auditoría, logs ni respuestas: bytes de imagen, base64, embedding, pla
 
 - Registro, verificación 1:1 y revocación de punta a punta con el proveedor Fake (PR 1) y con el proveedor local OpenCV
   (PR 2), con plantillas cifradas fuera del esquema clínico y limpieza durable.
-- El binario nativo Linux de OpenCvSharp incluye FFmpeg (LGPL-2.1) enlazado estáticamente aunque SCI-PH no lo usa: sus
-  obligaciones de redistribución están abiertas (gate de licencias bloqueado).
+- El runtime Linux propio se compila en el build de la imagen (más tiempo de build; la etapa queda en caché mientras no
+  cambie el script). Sus componentes de terceros quedan identificados por versión y licencia.
 - `Azure.Storage.Blobs` 12.29.x arrastra `Azure.Core` 1.55, que exige las abstracciones `Microsoft.Extensions.*` 10.0.3:
   Infrastructure las referencia en esa versión (el resto del host sigue en ASP.NET Core 9).
 - SkiaSharp (MIT) entra en Infrastructure (con su librería nativa para Linux sin dependencias).
 - Limitaciones aceptadas: sin liveness (una foto de una foto puede coincidir); umbral no calibrado para las webcams de
   SCI-PH; el Fake no reconoce caras; el login facial del paciente sigue simulado.
+- Seguimientos: estado de la limpieza durable en la tarjeta de rostro (P1; la seguridad ya depende de `Revoked`); health
+  check del proveedor (tras el PR #23); salida 139 de un arranque fallido (preexistente en develop, aparte); validación
+  manual con webcam (P2, demo).
