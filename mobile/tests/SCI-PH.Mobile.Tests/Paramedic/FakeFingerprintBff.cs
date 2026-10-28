@@ -65,6 +65,10 @@ internal sealed class FakeFingerprintBff : HttpMessageHandler
 
     public string? StatusOf(Guid sessionId) => _sessions.SingleOrDefault(s => s.Id == sessionId)?.Status;
 
+    // Como el servidor cuando el lector de la sesión deja de ser válido tras la coincidencia: la sesión sigue Matched, sin
+    // candidato, y la confirmación responde 409.
+    public void WithdrawCandidates() => _sessions.Where(s => s.Status == "Matched").ToList().ForEach(s => s.WithCandidate = false);
+
     public MobileApiClient Client() => new(new HttpClient(this) { BaseAddress = new Uri("http://sciph.test/") });
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

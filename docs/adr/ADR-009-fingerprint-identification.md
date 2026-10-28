@@ -108,6 +108,45 @@ sin que el servidor lo supiera.
   concurrencia: una revocación concurrente hace perder la confirmación con 409) y limita la unicidad de
   `SubjectReference` a las referencias activas.
 
+### 11. El lector de la sesión se revalida en la confirmación y al mostrar el candidato
+
+*(Añadida en `feature/biometric-device-revocation-hardening`, 2026-10-28.)*
+
+- **Problema:** el lector pudo ser válido al informar el `Match` y dejar de serlo después (revocado por la
+  administración, inexistente o sin `Device.Fingerprint.Identify`). Antes, una sesión `Matched` se confirmaba igual
+  durante sus 90 s.
+- **Regla:** la confirmación solo se completa si la emergencia sigue permitida (NN, sin clínica, acceso del paramédico),
+  la sesión es suya, está `Matched` y no vencida, la referencia sigue activa **y el lector de la sesión sigue siendo un
+  lector de huella válido**: `DeviceCredential` `Active` con `Device.Fingerprint.Identify` (la misma regla, `IsReader`,
+  que al listar lectores y abrir sesiones). Se consulta con `IDeviceCredentialStore.FindAsync`, sin SQL directo, sin
+  consultas de `ClinicalDbContext` al esquema identity y sin cambios en el Domain ni migración.
+- **Si no lo es:** `409` con un mensaje genérico (no distingue revocado, inexistente o sin scope); nada escrito: la
+  atención sigue NN, sin `PatientId`, sin auditoría `Identify` y sin recibo. La sesión **sigue `Matched`** (no se escribe
+  un estado clínico solo para representar el fallo de un dispositivo): el paramédico la cancela o vence sola. La
+  referencia biométrica no se toca.
+- **Idempotencia:** un reintento con la misma clave de una confirmación rechazada se evalúa de nuevo (otra vez `409`). Una
+  confirmación ya committed antes de la revocación es una identificación válida y su reintento sigue devolviendo la
+  emergencia identificada: nunca se convierte en un error retroactivo.
+- **El candidato es una vista de seguridad:** `GET` de la sesión reevalúa el lector en cada lectura. Si ya no es válido,
+  la sesión puede seguir `Matched` pero `candidate` es `null`, sin decir por qué (como con una referencia revocada).
+- **Orden y garantía entre contextos:** el lector vive en el esquema identity (`IdentityDbContext`, otra conexión;
+  [ADR-003](ADR-003-postgresql-two-contexts.md)) y no hay transacción común con la confirmación clínica. La comprobación
+  del lector es el **último** paso, justo antes de `EncounterService.IdentifyPatientAsync`, y es el punto de
+  linealización. **SCI-PH garantiza** que una confirmación se rechaza si la revocación del lector ya estaba committed
+  cuando se ejecuta esa comprobación final. **No garantiza** que una revocación que se confirma después de esa
+  comprobación (en los milisegundos hasta el commit clínico) gane sobre la confirmación: ese caso equivale a "la
+  confirmación terminó antes que la revocación". Es un límite aceptado: no se usan transacciones distribuidas, bloqueos
+  entre esquemas (`FOR SHARE` desde Clinical), outbox ni sellos de versión del lector. Revocar un lector es una medida
+  reactiva y una confirmación siempre es una decisión humana sobre un candidato.
+- **App (MAUI):** ante el `409` de la confirmación muestra el mensaje seguro, vuelve a consultar la sesión y, si la
+  encuentra `Matched` sin candidato, la cancela en el servidor en silencio (como ya hacía la consulta periódica). Así se
+  libera la sesión activa de la emergencia: se puede abrir otra lectura de inmediato, y documento y NN siguen
+  disponibles. Nunca muestra "lector revocado".
+- Sin otros efectos de la revocación de un lector: sus sesiones `Pending` y registros pendientes vencen solos (el lector
+  ya no se autentica), sus trabajos de borrado quedan `Pending` con limpieza `AttentionRequired`
+  ([ADR-011](ADR-011-fingerprint-revocation.md)) y sus referencias activas no cambian (ninguna sesión nueva puede usar
+  un lector revocado).
+
 ## Consecuencias
 
 - La identificación por huella es real de punta a punta con el simulador (`tools/SCI-PH.Device.Simulator`, modo

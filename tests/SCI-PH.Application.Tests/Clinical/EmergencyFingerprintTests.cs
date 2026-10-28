@@ -501,5 +501,122 @@ namespace SCI_PH.Application.Tests.Clinical
             await hospital.Encounters.IdentifyPatientAsync(s.Emergency.Id, new IdentifyEncounterPatientRequest(document.Id), None);
             Assert.Equal(document.Id, s.Emergency.PatientId);
         }
+
+        // ---- The session's reader must still be a fingerprint reader (ADR-009, revalidation at Confirm) ----
+
+        // What the reader became after the match: revoked, deleted, or without the Identify scope.
+        public static TheoryData<string> InvalidReaders => new() { "Revoked", "Missing", "WithoutIdentify" };
+
+        private static void InvalidateReader(Scenario s, string how)
+        {
+            var devices = s.Paramedic.Readers.Devices;
+            var index = devices.FindIndex(d => d.Id == s.Reader.Id);
+            switch (how)
+            {
+                case "Revoked":
+                    devices[index] = s.Reader with { Status = DeviceCredentialStatus.Revoked, RevokedAtUtc = ClinicalHarness.Start };
+                    break;
+                case "Missing":
+                    devices.RemoveAt(index);
+                    break;
+                default:
+                    devices[index] = s.Reader with { Scopes = [DeviceScopes.FingerprintEnroll] };
+                    break;
+            }
+        }
+
+        // The match was valid, but its reader no longer is: no candidate (without saying why), Confirm 409 every time with
+        // the same key, nothing written (no patient, no Identify entry, no receipt), the session and the reference unchanged.
+        // The session can still be cancelled, and the emergency identified by another reader or by document.
+        [Theory]
+        [MemberData(nameof(InvalidReaders))]
+        public async Task AMatchFromAReaderThatIsNoLongerValidCannotBeConfirmed(string how)
+        {
+            var s = await ScenarioAsync();
+            var matched = await MatchedAsync(s);
+            Assert.NotNull((await s.Paramedic.Fingerprints.GetSessionAsync(s.Emergency.Id, matched.Id, None)).Candidate);
+            var saves = s.Paramedic.Store.SaveCount;
+
+            InvalidateReader(s, how);
+
+            var shown = await s.Paramedic.Fingerprints.GetSessionAsync(s.Emergency.Id, matched.Id, None);
+            Assert.Equal((FingerprintSessionStatus.Matched, (FingerprintCandidate?)null), (shown.Status, shown.Candidate));
+            var key = Guid.NewGuid();
+            var first = await Assert.ThrowsAsync<ResourceConflictException>(() => ConfirmAsync(s, matched.Id, key));
+            var again = await Assert.ThrowsAsync<ResourceConflictException>(() => ConfirmAsync(s, matched.Id, key));
+            Assert.Equal(first.Message, again.Message);
+            Assert.DoesNotContain("revoked", first.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("scope", first.Message, StringComparison.OrdinalIgnoreCase);
+
+            Assert.Equal(saves, s.Paramedic.Store.SaveCount);
+            Assert.Null(s.Emergency.PatientId);
+            Assert.DoesNotContain(s.Paramedic.Store.Audit, a => a.Action == AuditActionType.Identify);
+            Assert.DoesNotContain(s.Paramedic.Store.Receipts, r => r.Key.Operation == EmergencyFingerprintService.ConfirmOperation);
+            Assert.Equal(FingerprintSessionStatus.Matched, Stored(s, matched.Id).Status);
+            Assert.Equal(BiometricReferenceStatus.Active, s.Reference.Status);
+
+            // Released by the paramedic (the app cancels it quietly): another reader can be used at once.
+            Assert.Equal(FingerprintSessionStatus.Cancelled, (await s.Paramedic.Fingerprints.CancelSessionAsync(s.Emergency.Id, matched.Id, None)).Status);
+            var other = s.Paramedic.Readers.Add("ESP32-AMB-02");
+            Assert.Equal(FingerprintSessionStatus.Pending, (await OpenAsync(s, readerId: other.Id)).Status);
+
+            // The document identification is untouched.
+            var document = s.Paramedic.SeedPatient();
+            var identified = await s.Paramedic.Emergencies.IdentifyByDocumentAsync(
+                s.Emergency.Id, new IdentifyEmergencyByDocumentRequest(Guid.NewGuid(), PatientIdentifierType.NationalId, "00112345678"), None);
+            Assert.Equal(document.Id, s.Emergency.PatientId);
+            Assert.NotNull(identified.Patient);
+        }
+
+        // Without any identification the emergency simply stays NN: the rejected confirmation changes nothing else.
+        [Fact]
+        public async Task AfterARejectedConfirmationTheEmergencyContinuesAsNN()
+        {
+            var s = await ScenarioAsync();
+            var matched = await MatchedAsync(s);
+            InvalidateReader(s, "Revoked");
+
+            await Assert.ThrowsAsync<ResourceConflictException>(() => ConfirmAsync(s, matched.Id));
+
+            var emergency = await s.Paramedic.Emergencies.GetAsync(s.Emergency.Id, None);
+            Assert.Null(emergency.Patient);
+            Assert.NotNull(s.Emergency.TemporaryPatientCode);
+            Assert.DoesNotContain(s.Emergency.Status, ClinicalEncounter.FinalStatuses);
+        }
+
+        // Only the session's own reader matters: revoking another reader changes nothing for it.
+        [Fact]
+        public async Task RevokingAnotherReaderDoesNotAffectTheConfirmation()
+        {
+            var s = await ScenarioAsync();
+            var other = s.Paramedic.Readers.Add("ESP32-AMB-02");
+            var matched = await MatchedAsync(s);
+            var index = s.Paramedic.Readers.Devices.FindIndex(d => d.Id == other.Id);
+            s.Paramedic.Readers.Devices[index] = other with { Status = DeviceCredentialStatus.Revoked };
+
+            Assert.NotNull((await s.Paramedic.Fingerprints.GetSessionAsync(s.Emergency.Id, matched.Id, None)).Candidate);
+            await ConfirmAsync(s, matched.Id);
+
+            Assert.Equal(s.Patient.Id, s.Emergency.PatientId);
+            Assert.Equal(FingerprintSessionStatus.Confirmed, Stored(s, matched.Id).Status);
+        }
+
+        // A confirmation committed while the reader was valid stays a success: its replay after a later revocation returns
+        // the identified emergency (never a retroactive error).
+        [Fact]
+        public async Task AConfirmationCommittedBeforeTheRevocationReplaysAsASuccess()
+        {
+            var s = await ScenarioAsync();
+            var matched = await MatchedAsync(s);
+            var key = Guid.NewGuid();
+            var confirmed = await ConfirmAsync(s, matched.Id, key);
+
+            InvalidateReader(s, "Revoked");
+            var replay = await ConfirmAsync(s, matched.Id, key);
+
+            Assert.Equal(confirmed, replay);
+            Assert.Equal(s.Patient.Id, s.Emergency.PatientId);
+            Assert.Single(s.Paramedic.Store.Audit, a => a.Action == AuditActionType.Identify);
+        }
     }
 }
