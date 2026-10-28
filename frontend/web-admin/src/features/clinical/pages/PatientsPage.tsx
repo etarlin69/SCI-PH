@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { Permissions, useAuth } from '../../../auth';
 import { Button, Card, EmptyState, ErrorState, Input, LoadingSpinner, PageHeader, Select } from '../../../components/shared';
@@ -21,7 +22,7 @@ type SearchState =
     | { status: 'error'; error: string }
     | { status: 'success'; results: PatientSummary[] };
 
-/** Pacientes: búsqueda (Patients.Read; identificadores en el cuerpo, enmascarados en la respuesta) y registro (Patients.Create). */
+/** Pacientes: búsqueda (Patients.Read; identificadores en el cuerpo, enmascarados en la respuesta), registro (Patients.Create) y acceso al detalle. */
 export function PatientsPage() {
     const canRegister = useAuth().can(Permissions.Patients.Create);
     const [searchBy, setSearchBy] = useState<PatientIdentifierType | 'Name'>('NationalId');
@@ -67,8 +68,15 @@ export function PatientsPage() {
                             ) : (
                                 <ul className="m-0 flex list-none flex-col gap-2 p-0">
                                     {search.results.map((p) => (
-                                        <li key={p.id} className="rounded-lg border border-line p-3">
+                                        <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line p-3">
                                             <EncounterSubject patient={p} temporaryPatientCode={null} variant="full" />
+                                            <Link
+                                                to={`/hospital/pacientes/${encodeURIComponent(p.id)}`}
+                                                className="text-sm font-medium text-primary-600 hover:underline"
+                                                aria-label={`Abrir ${p.displayName}`}
+                                            >
+                                                Abrir
+                                            </Link>
                                         </li>
                                     ))}
                                 </ul>

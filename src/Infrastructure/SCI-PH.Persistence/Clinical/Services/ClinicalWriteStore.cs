@@ -10,6 +10,7 @@ using SCI_PH.Domain.Entities.Patients;
 using SCI_PH.Domain.Entities.Transport;
 using SCI_PH.Persistence.Configurations.Clinical.Biometrics;
 using SCI_PH.Persistence.Configurations.Clinical.Idempotency;
+using SCI_PH.Persistence.Configurations.Clinical.Patients;
 using SCI_PH.Persistence.Contexts;
 
 namespace SCI_PH.Persistence.Clinical.Services
@@ -25,7 +26,10 @@ namespace SCI_PH.Persistence.Clinical.Services
             ["IX_ClinicalEncounters_TemporaryPatientCode"] = "The temporary patient code is already in use; retry the operation.",
             ["UX_ClinicalTransfers_ActivePerEncounter"] = "The encounter already has an active transfer.",
             [FingerprintIdentificationSessionConfiguration.ActivePerEncounterIndexName] = "The emergency already has an active fingerprint session.",
-            [FingerprintIdentificationSessionConfiguration.PendingPerReaderIndexName] = "The fingerprint reader is busy with another session."
+            [FingerprintIdentificationSessionConfiguration.PendingPerReaderIndexName] = "The fingerprint reader is busy with another session.",
+            [FingerprintEnrollmentSessionConfiguration.PendingPerPatientIndexName] = "The patient already has a pending fingerprint enrollment.",
+            [FingerprintEnrollmentSessionConfiguration.PendingPerReaderIndexName] = "The fingerprint reader is busy with another enrollment.",
+            [PatientBiometricReferenceConfiguration.ActiveSubjectIndexName] = "The biometric reference is already active."
         };
 
         private readonly ClinicalDbContext _clinical;
@@ -62,6 +66,17 @@ namespace SCI_PH.Persistence.Clinical.Services
         public void Add(ClinicalTransfer transfer) => _clinical.ClinicalTransfers.Add(transfer);
 
         public void Add(IdentificationAttempt attempt) => _clinical.IdentificationAttempts.Add(attempt);
+
+        public void Add(PatientBiometricReference reference) => _clinical.PatientBiometricReferences.Add(reference);
+
+        public Task<PatientBiometricReference?> FindBiometricReferenceAsync(Guid referenceId, CancellationToken cancellationToken) =>
+            _clinical.PatientBiometricReferences.SingleOrDefaultAsync(r => r.Id == referenceId, cancellationToken);
+
+        // Same mechanism as EnsureEncounterUnchanged: UPDATE ... SET "Status" = "Status" WHERE "Id" = ... AND "Status" =
+        // original, re-evaluated by PostgreSQL against the latest committed row, so a revocation committed meanwhile makes
+        // it match no row and the whole save rolls back.
+        public void EnsureBiometricReferenceUnchanged(PatientBiometricReference reference) =>
+            _clinical.Entry(reference).Property(r => r.Status).IsModified = true;
 
         public void Add(ClinicalAuditEntry auditEntry) => _clinical.ClinicalAuditEntries.Add(auditEntry);
 

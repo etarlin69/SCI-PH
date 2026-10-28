@@ -1275,6 +1275,7 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer");
 
                     b.Property<string>("SubjectReference")
@@ -1289,7 +1290,9 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.HasIndex("RegisteredByStaffId");
 
                     b.HasIndex("Provider", "Modality", "SubjectReference")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("UX_PatientBiometricReferences_ActiveSubject")
+                        .HasFilter("\"Status\" = 1");
 
                     b.ToTable("PatientBiometricReferences", "clinical", t =>
                         {
@@ -1580,6 +1583,75 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                             t.HasCheckConstraint("CK_ClinicalTransfers_Responsibles", "((\"SentAtUtc\" IS NULL) = (\"SentByStaffId\" IS NULL)) AND ((\"ReceivedAtUtc\" IS NULL) = (\"ReceivedByStaffId\" IS NULL))");
 
                             t.HasCheckConstraint("CK_ClinicalTransfers_Status_Enum", "\"Status\" IN (1, 2, 3, 4, 5)");
+                        });
+                });
+
+            modelBuilder.Entity("SCI_PH.Persistence.Clinical.Biometrics.FingerprintEnrollmentSessionEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BiometricReferenceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeviceCredentialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("FailureReason")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RequestedByStaffId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ResolvedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ResultHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<int>("Status")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BiometricReferenceId");
+
+                    b.HasIndex("DeviceCredentialId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_FingerprintEnrollmentSessions_PendingPerReader")
+                        .HasFilter("\"Status\" = 1");
+
+                    b.HasIndex("PatientId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_FingerprintEnrollmentSessions_PendingPerPatient")
+                        .HasFilter("\"Status\" = 1");
+
+                    b.HasIndex("RequestedByStaffId");
+
+                    b.ToTable("FingerprintEnrollmentSessions", "clinical", t =>
+                        {
+                            t.HasCheckConstraint("CK_FingerprintEnrollmentSessions_Dates", "(\"ExpiresAtUtc\" > \"CreatedAtUtc\") AND (\"ResolvedAtUtc\" >= \"CreatedAtUtc\")");
+
+                            t.HasCheckConstraint("CK_FingerprintEnrollmentSessions_FailureReason_Enum", "\"FailureReason\" IN (1, 2, 3, 4, 5, 6, 7)");
+
+                            t.HasCheckConstraint("CK_FingerprintEnrollmentSessions_Lifecycle", "((\"ResolvedAtUtc\" IS NULL) = (\"ResultHash\" IS NULL)) AND (((\"Status\" IN (1, 4, 5)) AND (\"ResolvedAtUtc\" IS NULL) AND (\"BiometricReferenceId\" IS NULL) AND (\"FailureReason\" IS NULL)) OR ((\"Status\" = 2) AND (\"ResolvedAtUtc\" IS NOT NULL) AND (\"BiometricReferenceId\" IS NOT NULL) AND (\"FailureReason\" IS NULL)) OR ((\"Status\" = 3) AND (\"ResolvedAtUtc\" IS NOT NULL) AND (\"BiometricReferenceId\" IS NULL) AND (\"FailureReason\" IS NOT NULL)))");
+
+                            t.HasCheckConstraint("CK_FingerprintEnrollmentSessions_ResultHash", "(\"ResultHash\" IS NULL) OR (length(\"ResultHash\") = 64)");
+
+                            t.HasCheckConstraint("CK_FingerprintEnrollmentSessions_Status_Enum", "\"Status\" IN (1, 2, 3, 4, 5)");
                         });
                 });
 
@@ -2119,6 +2191,26 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     b.Navigation("Encounter");
 
                     b.Navigation("OriginClinic");
+                });
+
+            modelBuilder.Entity("SCI_PH.Persistence.Clinical.Biometrics.FingerprintEnrollmentSessionEntry", b =>
+                {
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.PatientBiometricReference", null)
+                        .WithMany()
+                        .HasForeignKey("BiometricReferenceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SCI_PH.Domain.Entities.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SCI_PH.Domain.Entities.Organizations.ClinicalStaff", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedByStaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SCI_PH.Persistence.Clinical.Biometrics.FingerprintIdentificationSessionEntry", b =>

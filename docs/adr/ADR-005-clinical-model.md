@@ -112,6 +112,8 @@ superior. El detalle de cada entidad está en [clinical-entities.md](../architec
   compuesta). Un intento exitoso **no** vincula la atención por sí solo.
 - La identificación por huella en emergencias usa ambas entidades sin cambiarlas: referencias `R307` por lector y
   slot, un intento por resultado del lector y la confirmación del paramédico ([ADR-009](ADR-009-fingerprint-identification.md)).
+  El registro de huellas crea esas referencias desde el Web ([ADR-010](ADR-010-fingerprint-enrollment.md)); la unicidad
+  de la referencia del proveedor solo aplica a las activas, para conservar la historia de las revocadas.
 
 ### 10. Auditoría
 

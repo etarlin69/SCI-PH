@@ -34,6 +34,7 @@ const ProfilePage = page(() => import('../features/profile/pages/ProfilePage'));
 // Módulo hospitalario (Rol 4). Exportaciones con nombre: se adaptan a lazy().
 const ReceptionPage = page(() => import('../features/clinical/pages/ReceptionPage').then((m) => ({ default: m.ReceptionPage })));
 const PatientsPage = page(() => import('../features/clinical/pages/PatientsPage').then((m) => ({ default: m.PatientsPage })));
+const PatientDetailPage = page(() => import('../features/clinical/pages/PatientDetailPage').then((m) => ({ default: m.PatientDetailPage })));
 const EncounterDashboardPage = page(() =>
   import('../features/clinical/pages/EncounterDashboardPage').then((m) => ({ default: m.EncounterDashboardPage })),
 );
@@ -124,6 +125,7 @@ export function AppRoutes() {
           <Route index element={<HospitalIndex />} />
           <Route path="recepcion" element={guarded(H.reception, <ReceptionPage />)} />
           <Route path="pacientes" element={guarded(H.patients, <PatientsPage />)} />
+          <Route path="pacientes/:patientId" element={guarded(H.patients, <PatientDetailPage />)} />
           <Route path="atenciones" element={guarded(H.encounters, <EncounterDashboardPage />)} />
           <Route path="atenciones/:encounterId" element={guarded(H.encounters, <EncounterDashboardPage />)} />
           <Route path="atenciones/:encounterId/triage" element={guarded(H.triage, <TriagePage />)} />

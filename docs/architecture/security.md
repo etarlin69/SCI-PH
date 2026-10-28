@@ -119,6 +119,9 @@ ESP32 ─► HTTPS + X-Device-Id + X-Device-Key ─► DeviceApiKey ─► princ
 | `POST /api/mobile/auth/login`, `/mfa/verify`, `/refresh`, `/logout` | Anónimo | Tokens en el cuerpo |
 | `GET /api/mobile/auth/me`, `POST /change-password`, `/revoke-sessions` | Autenticado | |
 | `POST /api/device/heartbeat` | Dispositivo con `Device.Heartbeat` | |
+| `GET /api/device/fingerprint/sessions/pending`, `POST …/{sessionId}/result` | Dispositivo con `Device.Fingerprint.Identify` | identificación por huella (ADR-009) |
+| `GET /api/device/fingerprint/enrollments/pending`, `POST …/{enrollmentId}/result` | Dispositivo con `Device.Fingerprint.Enroll` | registro de huellas (ADR-010) |
+| `GET /api/web/fingerprint-enrollers`, `…/api/web/patients/{id}/fingerprints…` | `Biometrics.Manage` + personal clínico activo que vea al paciente | registro de huellas; sin atajo por rol |
 
 Errores (ProblemDetails): 400 validación o enlace inválido, 401 sin credenciales o credenciales inválidas
 (siempre genérico), 403 sin permiso o CSRF rechazado, 409 conflicto (último administrador, duplicados),

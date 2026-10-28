@@ -22,6 +22,7 @@ export const Permissions = {
   MedicationAdministrations: { Write: 'MedicationAdministrations.Write' },
   Transfers: { Read: 'Transfers.Read', Manage: 'Transfers.Manage' },
   Documents: { Read: 'Documents.Read', Upload: 'Documents.Upload' },
+  Biometrics: { Manage: 'Biometrics.Manage' },
 } as const;
 
 type ValuesOf<T> = T[keyof T];

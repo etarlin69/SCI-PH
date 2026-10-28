@@ -18,7 +18,8 @@ var deviceId = GetRequiredEnvironmentVariable("DEVICE_ID");
 var deviceKey = GetRequiredEnvironmentVariable("DEVICE_KEY");
 
 // heartbeat (default): periodic heartbeats. fingerprint: an R307 reader that polls for its capture job and reports
-// what the sensor matched (the sensor itself is simulated: no template ever leaves the device).
+// what the sensor matched. enroll: an R307 reader that polls for its enrollment job, stores the template in a free slot
+// of its (simulated) sensor and reports it. The sensor itself is simulated: no template ever leaves the device.
 var mode = GetEnvironmentVariable("DEVICE_MODE", "heartbeat").ToLowerInvariant();
 
 var firmwareVersion = GetEnvironmentVariable(
@@ -29,9 +30,9 @@ var heartbeatIntervalSeconds = GetPositiveIntegerEnvironmentVariable(
     "DEVICE_HEARTBEAT_INTERVAL_SECONDS",
     30);
 
-if (mode is not ("heartbeat" or "fingerprint"))
+if (mode is not ("heartbeat" or "fingerprint" or "enroll"))
 {
-    Console.Error.WriteLine("DEVICE_MODE must be heartbeat or fingerprint.");
+    Console.Error.WriteLine("DEVICE_MODE must be heartbeat, fingerprint or enroll.");
 
     return 1;
 }
@@ -75,6 +76,11 @@ Console.WriteLine("SCI-PH Device Simulator");
 Console.WriteLine($"Device: {deviceId}");
 Console.WriteLine($"Device API: {httpClient.BaseAddress}");
 Console.WriteLine($"Mode: {mode}");
+
+if (mode == "enroll")
+{
+    return await RunEnrollmentReaderAsync(httpClient, deviceId, cancellation.Token);
+}
 
 if (mode == "fingerprint")
 {
@@ -370,6 +376,231 @@ static async Task<bool> SubmitResultAsync(
 
         return false;
     }
+}
+
+
+// Enrollment reader (ADR-010): polls for the Pending enrollment of this device, stores the template in the lowest free
+// slot of its simulated sensor (a JSON file of occupied slots) and reports it. The slot is kept only after a 204. An
+// uncertain answer (no response, timeout, 5xx, 429) is retried with EXACTLY the same result until the enrollment
+// expires; a terminal rejection (400, 401, 403, 404, 409) or the expiry deletes the slot it just stored (compensation).
+// The slot number is never printed.
+static async Task<int> RunEnrollmentReaderAsync(HttpClient httpClient, string deviceId, CancellationToken cancellationToken)
+{
+    string[] outcomes = ["Enrolled", "Failed", "LowQuality", "SensorError"];
+    var outcome = GetEnvironmentVariable("ENROLL_OUTCOME", "Enrolled");
+    if (!outcomes.Contains(outcome))
+    {
+        Console.Error.WriteLine($"ENROLL_OUTCOME must be one of: {string.Join(", ", outcomes)}.");
+
+        return 1;
+    }
+
+    var firstSlot = GetNonNegativeIntegerEnvironmentVariable("ENROLL_FIRST_SLOT", 1);
+    int? fixedSlot = int.TryParse(Environment.GetEnvironmentVariable("ENROLL_SLOT"), out var parsedSlot) && parsedSlot >= 0 ? parsedSlot : null;
+    var slotsFile = GetEnvironmentVariable(
+        "SIMULATOR_SLOTS_FILE",
+        Path.Combine(Path.GetTempPath(), "sciph-device-simulator", $"{string.Concat(deviceId.Where(char.IsLetterOrDigit))}.slots.json"));
+    var pollSeconds = GetPositiveIntegerEnvironmentVariable("FINGERPRINT_POLL_INTERVAL_SECONDS", 2);
+    var captureDelaySeconds = GetNonNegativeIntegerEnvironmentVariable("FINGERPRINT_RESULT_DELAY_SECONDS", 1);
+    var repeatResult = GetBooleanEnvironmentVariable("FINGERPRINT_REPEAT_RESULT");
+    var loseFirstResponse = GetBooleanEnvironmentVariable("ENROLL_LOSE_FIRST_RESPONSE");
+    var changedReplay = GetBooleanEnvironmentVariable("ENROLL_CHANGED_REPLAY");
+    var once = GetBooleanEnvironmentVariable("FINGERPRINT_ONCE");
+
+    Console.WriteLine($"Enrollment outcome: {outcome}");
+    Console.WriteLine($"Occupied slots: {ReadSlots(slotsFile).Count} (simulated sensor memory)");
+    Console.WriteLine("Press Ctrl+C to stop.");
+    Console.WriteLine();
+
+    try
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var (status, job) = await GetPendingEnrollmentAsync(httpClient, cancellationToken);
+            if (status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                Console.Error.WriteLine($"[{Now()}] Device authentication failed ({(int)status} {status}).");
+                Console.Error.WriteLine("Check DEVICE_ID, DEVICE_KEY and the Device.Fingerprint.Enroll scope.");
+
+                return 2;
+            }
+
+            if (job is { } enrollment)
+            {
+                Console.WriteLine($"[{Now()}] Enrollment requested (enrollment {enrollment.Id.ToString()[..8]}).");
+                await Task.Delay(TimeSpan.FromSeconds(captureDelaySeconds), cancellationToken);
+
+                int? slot = null;
+                if (outcome == "Enrolled")
+                {
+                    var occupied = ReadSlots(slotsFile);
+                    // A real sensor never overwrites one of its occupied slots: a fixed slot is used only while free.
+                    slot = fixedSlot is { } wanted && !occupied.Contains(wanted)
+                        ? wanted
+                        : Enumerable.Range(firstSlot, int.MaxValue - firstSlot).First(candidate => !occupied.Contains(candidate));
+                    occupied.Add(slot.Value);
+                    WriteSlots(slotsFile, occupied);
+                    Console.WriteLine($"[{Now()}] Template stored on the sensor (provisional until the server accepts it).");
+                }
+
+                var accepted = await ReportEnrollmentAsync(
+                    httpClient, enrollment.Id, enrollment.ExpiresAtUtc, outcome, slot, loseFirstResponse, cancellationToken);
+                if (accepted && repeatResult)
+                {
+                    // A lost response: the same result again must be accepted without changing anything.
+                    accepted = await ReportEnrollmentAsync(
+                        httpClient, enrollment.Id, enrollment.ExpiresAtUtc, outcome, slot, loseFirstResponse: false, cancellationToken);
+                }
+
+                if (accepted && changedReplay)
+                {
+                    // Another result for an enrollment the server already resolved must be rejected (and change nothing).
+                    var changed = await SendEnrollmentResultAsync(httpClient, enrollment.Id, "Failed", null, cancellationToken);
+                    Console.WriteLine($"[{Now()}] Changed result answered {(int?)changed ?? 0} (expected 409).");
+                }
+
+                if (slot is { } stored && !accepted)
+                {
+                    var occupied = ReadSlots(slotsFile);
+                    occupied.Remove(stored);
+                    WriteSlots(slotsFile, occupied);
+                    Console.WriteLine($"[{Now()}] Slot discarded: the server did not accept the enrollment (compensation).");
+                }
+
+                if (once)
+                {
+                    return accepted ? 0 : 3;
+                }
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(pollSeconds), cancellationToken);
+        }
+    }
+    catch (OperationCanceledException)
+        when (cancellationToken.IsCancellationRequested)
+    {
+        // Normal shutdown requested by Ctrl+C.
+    }
+
+    Console.WriteLine();
+    Console.WriteLine("Simulator stopped.");
+
+    return 0;
+}
+
+
+// Retries an uncertain answer with the same result until the enrollment expires. True only after a 204.
+static async Task<bool> ReportEnrollmentAsync(
+    HttpClient httpClient,
+    Guid enrollmentId,
+    DateTimeOffset expiresAtUtc,
+    string outcome,
+    int? slot,
+    bool loseFirstResponse,
+    CancellationToken cancellationToken)
+{
+    var lose = loseFirstResponse;
+    while (DateTimeOffset.UtcNow < expiresAtUtc)
+    {
+        var status = await SendEnrollmentResultAsync(httpClient, enrollmentId, outcome, slot, cancellationToken);
+        if (lose)
+        {
+            // Simulated lost response: whatever the server answered, the device does not know it.
+            lose = false;
+            Console.WriteLine($"[{Now()}] Response lost (simulated); retrying the same result.");
+            continue;
+        }
+
+        if (status == HttpStatusCode.NoContent)
+        {
+            Console.WriteLine($"[{Now()}] Result {outcome} accepted.");
+
+            return true;
+        }
+
+        if (status is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
+            or HttpStatusCode.NotFound or HttpStatusCode.Conflict)
+        {
+            Console.Error.WriteLine($"[{Now()}] Result {outcome} rejected ({(int)status} {status}).");
+
+            return false;
+        }
+
+        Console.Error.WriteLine($"[{Now()}] Uncertain answer ({(int?)status ?? 0}); retrying the same result.");
+        await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+    }
+
+    Console.Error.WriteLine($"[{Now()}] The enrollment expired before the server confirmed it.");
+
+    return false;
+}
+
+
+// The status code, or null when there was no answer.
+static async Task<HttpStatusCode?> SendEnrollmentResultAsync(
+    HttpClient httpClient,
+    Guid enrollmentId,
+    string outcome,
+    int? slot,
+    CancellationToken cancellationToken)
+{
+    object body = slot is { } stored ? new { outcome, slot = stored } : new { outcome };
+    try
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            $"api/device/fingerprint/enrollments/{enrollmentId}/result", body, cancellationToken);
+        return response.StatusCode;
+    }
+    catch (HttpRequestException)
+    {
+        return null;
+    }
+    catch (TaskCanceledException)
+        when (!cancellationToken.IsCancellationRequested)
+    {
+        return null;
+    }
+}
+
+
+static async Task<(HttpStatusCode? Status, (Guid Id, DateTimeOffset ExpiresAtUtc)? Job)> GetPendingEnrollmentAsync(
+    HttpClient httpClient,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        using var response = await httpClient.GetAsync("api/device/fingerprint/enrollments/pending", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.OK)
+        {
+            using var pending = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+            return (response.StatusCode, (pending.RootElement.GetProperty("enrollmentId").GetGuid(),
+                pending.RootElement.GetProperty("expiresAtUtc").GetDateTimeOffset()));
+        }
+
+        return (response.StatusCode, null);
+    }
+    catch (HttpRequestException exception)
+    {
+        Console.Error.WriteLine($"[{Now()}] Unable to reach Device API: {exception.Message}");
+
+        return (null, null);
+    }
+    catch (TaskCanceledException)
+        when (!cancellationToken.IsCancellationRequested)
+    {
+        return (null, null);
+    }
+}
+
+
+static HashSet<int> ReadSlots(string file) =>
+    File.Exists(file) ? JsonSerializer.Deserialize<HashSet<int>>(File.ReadAllText(file)) ?? [] : [];
+
+
+static void WriteSlots(string file, HashSet<int> slots)
+{
+    Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+    File.WriteAllText(file, JsonSerializer.Serialize(slots.Order()));
 }
 
 

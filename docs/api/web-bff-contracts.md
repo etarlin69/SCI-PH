@@ -36,7 +36,7 @@ Reglas comunes:
 |---|---|---|---|---|
 | `GET` | `/api/web/clinical/context` | autenticado + ClinicalStaff | — | `{ staffId, clinics: [{ id, name }] }` |
 | `POST` | `/api/web/patients` | `Patients.Create` | `{ givenNames, familyNames, dateOfBirth?, sex, identifier?: { type, value, issuer? } }` | 201 `PatientSummary` + `Location` · 409 identificador duplicado |
-| `GET` | `/api/web/patients/{id}` | `Patients.Read` | — | `PatientSummary` |
+| `GET` | `/api/web/patients/{id}` | `Patients.Read` | — | `PatientSummary` (también lo usa el detalle del paciente) |
 | `POST` | `/api/web/patients/search` | `Patients.Read` | `{ identifierType?, value }` (identificador: match por `NormalizedValue`; sin tipo: nombre, mín. 3) | `PatientSummary[]` (identificador enmascarado `***1234`, salvo `InternalCode`) |
 | `GET` | `/api/web/encounters?clinicId=` | `Encounters.Read` | — | `EncounterSummary[]` abiertas (sin Closed/Cancelled/Transferred) |
 | `GET` | `/api/web/encounters/{id}` | `Encounters.Read` | — | `EncounterSummary` |
@@ -112,6 +112,39 @@ recepción desde el cliente.
   que se acaba de despachar). Cancelar un traslado `Requested` no toca la atención y no compite con cerrarla.
 - `ClinicalTransferSummary`: `{ id, encounterId, status, originClinic: { id, name }?, destinationClinic: { id, name }, ambulance: { id, code, callSign }?, requestedAtUtc, sentAtUtc, sentByStaffId, receivedAtUtc, receivedByStaffId, cancelledAtUtc, patient: PatientSummary?, temporaryPatientCode, reason, notes, latestTriagePriority, encounterStatus }`
   (identificador del paciente enmascarado).
+
+---
+
+## Web Hospital — huella digital (implementado)
+
+Registro (enrolamiento) de huellas de un paciente en un lector ([ADR-010](../adr/ADR-010-fingerprint-enrollment.md)).
+Permiso `Biometrics.Manage` **y** personal clínico activo que pueda ver al paciente (`Patients.Read`); sin atajo por
+rol. El lector guarda la plantilla en su sensor; SCI-PH solo guarda a qué paciente pertenece. Nunca se devuelven el slot,
+la referencia interna (`SubjectReference`), plantillas, claves ni scopes.
+
+| Método | Ruta | Request | Response |
+|---|---|---|---|
+| `GET` | `/api/web/fingerprint-enrollers` | — | `[{ id, code, name, lastSeenAtUtc }]`: lectores **activos** con `Device.Fingerprint.Enroll` **y** `Device.Fingerprint.Identify` |
+| `GET` | `/api/web/patients/{patientId}/fingerprints` | — | `[{ id, status: Active\|Revoked, reader: { code, name, available }?, registeredAtUtc, revokedAtUtc }]`, más recientes primero |
+| `POST` | `/api/web/patients/{patientId}/fingerprints/enrollments` | `{ clientRequestId, deviceId }` | 201 `FingerprintEnrollment` · 200 reintento · 400 · 403 · 404 paciente o lector no elegible · 409 |
+| `GET` | `/api/web/patients/{patientId}/fingerprints/enrollments/{enrollmentId}` | — | `FingerprintEnrollment` (404 si es de otro paciente) |
+| `POST` | `/api/web/patients/{patientId}/fingerprints/enrollments/{enrollmentId}/cancel` | — | 200 `FingerprintEnrollment` · 409 si ya está `Enrolled` |
+
+- `FingerprintEnrollment`: `{ id, status: Pending|Enrolled|Failed|Expired|Cancelled, readerId, expiresAtUtc, failure:
+  Failed|LowQuality|SensorError (solo Failed), biometricReferenceId (solo Enrolled) }`.
+- **Abrir:** una sesión `Pending` de 120 s (duración del prototipo), su auditoría y el recibo en una transacción. No se
+  aceptan `patientId`, `staffId`, `slot`, `subjectReference`, `provider`, `modality`, `status` ni fechas en el cuerpo
+  (400). 409 si el paciente ya tiene una huella activa en ese lector, si ya hay un registro pendiente del paciente o del
+  lector, o si la clave se usó con otro paciente o lector. Idempotencia: `fingerprint-enrollment.open.v1` (hash del
+  paciente y el lector; el recibo apunta a la sesión).
+- **Resultado** (lo informa el lector, ver el Device API): `Enrolled` crea la referencia (`RegisteredByStaffId` = quien
+  abrió el registro) en la misma transacción; `Failed`/`LowQuality`/`SensorError` terminan en `Failed`. Otro intento es
+  otro registro.
+- **Cancelar:** `Pending → Cancelled` (auditada una sola vez); ya `Cancelled`, `Expired` o `Failed`: 200 sin cambios;
+  `Enrolled`: 409 (la referencia no se toca; la revocación será otra operación).
+- **Vencimiento:** un registro `Pending` vencido se cierra como `Expired` al consultarlo o cancelarlo.
+- La UI (detalle del paciente, `/hospital/pacientes/{id}`) pide una confirmación operacional antes de abrir, consulta
+  cada segundo mientras está `Pending` y deja de hacerlo al terminar o al salir. No es un registro de consentimiento.
 
 ---
 

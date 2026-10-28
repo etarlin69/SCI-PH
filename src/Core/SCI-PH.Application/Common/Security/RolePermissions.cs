@@ -44,6 +44,7 @@ namespace SCI_PH.Application.Common.Security
                 [SecurityRoles.Receptionist] =
                 [
                     Patients.Read, Patients.Create, Patients.Update, Patients.Identify,
+                    Permissions.Biometrics.Manage,
                     Accounts.InvitePatient,
                     Encounters.Create,
                     Transfers.Read, Transfers.Manage,

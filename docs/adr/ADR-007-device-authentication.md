@@ -34,6 +34,8 @@ para personas y obligaría a guardar credenciales humanas en el firmware.
 - Implementado: `POST /api/device/heartbeat` (actualiza último contacto y firmware) y la identificación por huella
   (`GET /api/device/fingerprint/sessions/pending`, `POST …/{sessionId}/result`, scope `Device.Fingerprint.Identify`):
   el lector se identifica por su credencial y nunca recibe datos clínicos ([ADR-009](ADR-009-fingerprint-identification.md)).
+  El registro de huellas usa el scope `Device.Fingerprint.Enroll` (`GET /api/device/fingerprint/enrollments/pending`,
+  `POST …/{enrollmentId}/result`, [ADR-010](ADR-010-fingerprint-enrollment.md)).
 
 ## Consecuencias
 

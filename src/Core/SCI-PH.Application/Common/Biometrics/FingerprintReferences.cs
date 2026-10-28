@@ -14,12 +14,33 @@ namespace SCI_PH.Application.Common.Biometrics
         // A session waits this long for the reader and, once matched, for the paramedic's confirmation.
         public static readonly TimeSpan SessionTtl = TimeSpan.FromSeconds(90);
 
+        // Prototype enrollment session lifetime (ADR-010); the R307 timing (captures per enrollment) is pending verification.
+        public static readonly TimeSpan EnrollmentTtl = TimeSpan.FromSeconds(120);
+
         // The slot range of the sensor is not fixed here (not verified against the R307 documentation): any non-negative
         // slot is a valid reference format.
         public static string SubjectReference(Guid deviceCredentialId, int slot)
         {
             ArgumentOutOfRangeException.ThrowIfNegative(slot);
-            return string.Create(CultureInfo.InvariantCulture, $"r307:device:{deviceCredentialId:D}:slot:{slot}");
+            return string.Create(CultureInfo.InvariantCulture, $"{ReaderPrefix(deviceCredentialId)}{slot}");
+        }
+
+        // Every subject reference of one reader starts with this: a patient's references on a reader are found by it.
+        public static string ReaderPrefix(Guid deviceCredentialId) =>
+            string.Create(CultureInfo.InvariantCulture, $"r307:device:{deviceCredentialId:D}:slot:");
+
+        // The reader of a subject reference, or null when it does not follow this format.
+        public static Guid? ReaderOf(string subjectReference)
+        {
+            const string head = "r307:device:";
+            if (!subjectReference.StartsWith(head, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var rest = subjectReference.AsSpan(head.Length);
+            var separator = rest.IndexOf(':');
+            return separator > 0 && Guid.TryParseExact(rest[..separator], "D", out var id) ? id : null;
         }
     }
 }
