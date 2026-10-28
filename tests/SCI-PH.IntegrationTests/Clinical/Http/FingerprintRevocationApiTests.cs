@@ -356,8 +356,9 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             }
         }
 
-        // D20 (deterministic race, real Revoke endpoint): the revocation queues on the reference row first, then the
-        // paramedic's confirmation; when the row is released the revocation commits and the confirmation loses.
+        // D20 (deterministic race, real Revoke endpoint): the paramedic's confirmation passes all its checks (the reference is
+        // still Active) and waits on the encounter row; meanwhile the Revoke endpoint commits. When the encounter is released
+        // the confirmation's guard on the reference's Status finds it revoked and the whole confirmation loses.
         [SkippableFact]
         public async Task AConfirmationLosesAgainstTheRevokeEndpoint()
         {
@@ -370,16 +371,15 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 .GetProperty("id").GetGuid();
             await PostJsonAsync(s.ReaderClient, $"/api/device/fingerprint/sessions/{sessionId}/result", $$"""{"outcome":"Match","slot":{{Slot}}}""");
 
-            var (connection, hold) = await ClinicalRace.HoldReferenceAsync(s.Host.ConnectionString, referenceId);
+            var (connection, hold) = await ClinicalRace.HoldEncounterAsync(s.Host.ConnectionString, emergencyId);
             await using (connection)
             {
-                var revoke = RevokeAsync(s.Reception, s.Patient.Id, referenceId);
-                await ClinicalRace.WaitUntilWaitingOnLocksAsync(s.Host.ConnectionString, 1, revoke);
                 var confirm = paramedic.Client.PostAsJsonAsync($"{sessions}/{sessionId}/confirm", new { clientRequestId = Guid.NewGuid() });
-                await ClinicalRace.WaitUntilWaitingOnLocksAsync(s.Host.ConnectionString, 2, revoke, confirm);
+                await ClinicalRace.WaitUntilWaitingOnLocksAsync(s.Host.ConnectionString, 1, confirm);
+                Assert.Equal(HttpStatusCode.OK, (await RevokeAsync(s.Reception, s.Patient.Id, referenceId)).StatusCode);
+                Assert.False(confirm.IsCompleted);
                 await hold.RollbackAsync();
 
-                Assert.Equal(HttpStatusCode.OK, (await revoke).StatusCode);
                 await AssertProblemAsync(await confirm, HttpStatusCode.Conflict);
             }
 

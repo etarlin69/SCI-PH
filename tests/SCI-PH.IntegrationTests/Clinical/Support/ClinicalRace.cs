@@ -95,7 +95,22 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
             return (connection, transaction);
         }
 
+        // Holds the row lock an UPDATE of the encounter would take, without changing it, until the caller ends the
+        // transaction: a request that writes the encounter (an identification) waits there, after all its checks.
+        public static async Task<(NpgsqlConnection Connection, NpgsqlTransaction Hold)> HoldEncounterAsync(string connectionString, Guid encounterId)
+        {
+            var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync();
+            var transaction = await connection.BeginTransactionAsync();
+            await using var select = new NpgsqlCommand(
+                """SELECT 1 FROM clinical."ClinicalEncounters" WHERE "Id" = @id FOR NO KEY UPDATE""", connection, transaction);
+            select.Parameters.AddWithValue("id", encounterId);
+            Assert.Equal(1, await select.ExecuteScalarAsync());
+            return (connection, transaction);
+        }
+
         // Waits until at least `waiters` sessions of the database are waiting on a lock, while none of the requests finished.
+        // When several wait on the same row, PostgreSQL does not promise which one goes first once it is released.
         public static async Task WaitUntilWaitingOnLocksAsync(string connectionString, int waiters, params Task<HttpResponseMessage>[] requests)
         {
             await using var monitor = new NpgsqlConnection(connectionString);
