@@ -1,6 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <!-- The face provider's template format, cipher and quality gate are internal; their security tests live there. -->
+    <InternalsVisibleTo Include="SCI-PH.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\Core\SCI-PH.Application\SCI-PH.Application.csproj" />
     <ProjectReference Include="..\..\Core\SCI-PH.Domain\SCI-PH.Domain.csproj" />
   </ItemGroup>
@@ -13,12 +18,17 @@
     <PackageReference Include="MailKit" Version="4.18.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.9" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.9" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
     <!-- Face captures (ADR-012): decoding, orientation and re-encoding without metadata. MIT. The Linux native library
          without fontconfig/freetype dependencies is what the containers and CI need. -->
     <PackageReference Include="SkiaSharp" Version="3.119.2" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.2" />
+    <!-- Real face provider (ADR-012, PR 2): managed OpenCvSharp5 only (Apache-2.0; its analyzer is removed by
+         Directory.Build.targets). The native runtimes are referenced by the host that uses the provider (Web BFF), not here.
+         Templates: Azure Blob (Azurite in development). Azure.Core 1.55 (Blobs 12.29.x) needs the 10.0.3 abstractions above. -->
+    <PackageReference Include="OpenCvSharp5" Version="5.0.0.20261003" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.29.2" />
   </ItemGroup>
 
   <PropertyGroup>

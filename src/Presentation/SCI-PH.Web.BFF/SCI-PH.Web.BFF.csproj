@@ -10,6 +10,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.9" />
+    <!-- Native OpenCV for the real face provider (ADR-012): Windows x64 and Linux x64 HEADLESS (dnn included, no GTK/X11;
+         the slim profile has no dnn). Third-party components and notices: docs/legal/face-opencv-third-party.md. -->
+    <PackageReference Include="OpenCvSharp5.runtime.win" Version="5.0.0.20261003" />
+    <PackageReference Include="OpenCvSharp5.official.runtime.linux-x64.headless" Version="5.0.0.20261003" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.9">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

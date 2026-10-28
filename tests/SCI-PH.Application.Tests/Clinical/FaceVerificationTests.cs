@@ -163,11 +163,26 @@ namespace SCI_PH.Application.Tests.Clinical
             var s = Start();
 
             await Assert.ThrowsAsync<ResourceConflictException>(() => VerifyAsync(s, "face:A"));
-
-            // A face of another provider (a previous configuration) is not usable by this one.
-            s.Reception.Store.BiometricReferences.Add(PatientBiometricReference.Register(s.Patient.Id, BiometricModality.Face, "OTHER", "face:x"));
-            await Assert.ThrowsAsync<ResourceConflictException>(() => VerifyAsync(s, "face:A"));
             Assert.Empty(s.Reception.FaceProvider.Calls);
+        }
+
+        // Ownership: an active face of another provider, or of another algorithm version of this one, is never handed to the
+        // provider; it is a 503 (re-enrollment needed), not a "no face" and never a NoMatch.
+        [Fact]
+        public async Task AFaceOfAnotherProviderOrVersionIsNeverInterpreted()
+        {
+            var s = Start();
+            var other = PatientBiometricReference.Register(s.Patient.Id, BiometricModality.Face, "OTHER", "face:x", algorithmVersion: "test-v1");
+            s.Reception.Store.BiometricReferences.Add(other);
+            await Assert.ThrowsAsync<ExternalServiceUnavailableException>(() => VerifyAsync(s, "face:A"));
+
+            s.Reception.Store.BiometricReferences.Remove(other);
+            s.Reception.Store.BiometricReferences.Add(
+                PatientBiometricReference.Register(s.Patient.Id, BiometricModality.Face, "TEST-Face", "face:y", algorithmVersion: "test-v0"));
+            await Assert.ThrowsAsync<ExternalServiceUnavailableException>(() => VerifyAsync(s, "face:A"));
+
+            Assert.Empty(s.Reception.FaceProvider.Calls);
+            Assert.DoesNotContain(s.Reception.Store.Audit, a => a.EntityName == PatientFaceService.VerificationEntityName);
         }
 
         [Fact]

@@ -9,7 +9,10 @@ using Microsoft.Extensions.Options;
 using SCI_PH.Application.Abstractions.Biometrics;
 using SCI_PH.Application.Abstractions.Security;
 using SCI_PH.Application.Common.Security;
+using Azure.Storage.Blobs;
+using Microsoft.Extensions.Logging;
 using SCI_PH.Infrastructure.Biometrics.Face;
+using SCI_PH.Infrastructure.Biometrics.Face.OpenCv;
 using SCI_PH.Infrastructure.Email;
 using SCI_PH.Infrastructure.Security;
 using SCI_PH.Infrastructure.Web;
@@ -39,7 +42,9 @@ namespace SCI_PH.Infrastructure
         // los dispositivos tienen su propio esquema (AddDeviceAuthentication, ver ADR-007).
         // Verificación facial 1:1 asistida (ADR-012): normalización de capturas (independiente del proveedor) y el proveedor
         // elegido por configuración del servidor (FaceVerification:Provider): Fake fuera de Production, Disabled (503) en
-        // Production si no se configura otro; Fake configurado en Production impide arrancar.
+        // Production si no se configura otro; Fake configurado en Production impide arrancar. Con "OpenCv" (proveedor local
+        // real, ADR-012 PR 2) también registra su validación de arranque (modelos con hash fijado, claves, almacén) y su
+        // almacén de plantillas cifradas; sin "OpenCv" nada de eso se registra ni necesita modelos o claves.
         public static IServiceCollection AddFaceVerification(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddOptions<FaceVerificationOptions>()
@@ -53,10 +58,53 @@ namespace SCI_PH.Infrastructure
                 {
                     FaceVerificationOptions.FakeProvider => provider.GetRequiredService<FakeFaceVerificationService>(),
                     FaceVerificationOptions.DisabledProvider => new DisabledFaceVerificationService(),
+                    FaceVerificationOptions.OpenCvProvider => provider.GetRequiredService<LocalOpenCvFaceVerificationService>(),
                     var other => throw new InvalidOperationException($"FaceVerification:Provider '{other}' is not supported.")
                 });
 
+            var configured = configuration[$"{FaceVerificationOptions.SectionName}:{nameof(FaceVerificationOptions.Provider)}"];
+            if (string.Equals(configured, FaceVerificationOptions.OpenCvProvider, StringComparison.Ordinal))
+            {
+                services.AddOpenCvFaceProvider(configuration);
+            }
+
             return services;
+        }
+
+        private static void AddOpenCvFaceProvider(this IServiceCollection services, IConfiguration configuration)
+        {
+            services.AddOptions<OpenCvFaceOptions>()
+                .Bind(configuration.GetSection(OpenCvFaceOptions.SectionName))
+                .ValidateOnStart();
+            services.AddSingleton<IValidateOptions<OpenCvFaceOptions>, OpenCvFaceOptionsValidator>();
+            services.AddSingleton(provider => provider.GetRequiredService<IOptions<OpenCvFaceOptions>>().Value);
+            services.AddSingleton<IFaceTemplateStore>(provider =>
+            {
+                var templates = provider.GetRequiredService<OpenCvFaceOptions>().Templates;
+                return new BlobFaceTemplateStore(new BlobContainerClient(templates.ConnectionString, templates.Container));
+            });
+            // Disposed by the container at shutdown (every detector/recognizer pair).
+            services.AddSingleton(provider =>
+            {
+                var options = provider.GetRequiredService<OpenCvFaceOptions>();
+                var environment = provider.GetRequiredService<IHostEnvironment>();
+                var yuNet = OpenCvFaceSetup.Resolve(environment, options.YuNetModelPath);
+                var sFace = OpenCvFaceSetup.Resolve(environment, options.SFaceModelPath);
+                return new FaceEnginePool(() => new FaceEngine(yuNet, sFace, options), options.ResolveEngineCapacity());
+            });
+            services.AddSingleton(provider =>
+            {
+                var encryption = provider.GetRequiredService<OpenCvFaceOptions>().Encryption;
+                return new FaceTemplateCipher(encryption.ActiveKeyId!, OpenCvFaceSetup.LoadKeys(encryption));
+            });
+            services.AddSingleton(provider => new LocalOpenCvFaceVerificationService(
+                provider.GetRequiredService<FaceEnginePool>(),
+                provider.GetRequiredService<IFaceTemplateStore>(),
+                provider.GetRequiredService<FaceTemplateCipher>(),
+                provider.GetRequiredService<OpenCvFaceOptions>(),
+                provider.GetRequiredService<ILogger<LocalOpenCvFaceVerificationService>>()));
+            // The provider (native runtime + models) is built at startup, before any request; a failure stops the host.
+            services.AddHostedService<OpenCvFaceProviderStartup>();
         }
 
         public static IServiceCollection AddJwtSecurity(this IServiceCollection services, IConfiguration configuration)

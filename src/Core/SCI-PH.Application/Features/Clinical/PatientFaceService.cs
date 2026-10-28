@@ -27,6 +27,7 @@ namespace SCI_PH.Application.Features.Clinical
         public const string VerificationEntityName = "FaceVerification";
 
         private const string NoActiveFace = "The patient has no active face reference to verify against.";
+        private const string ProviderUnavailable = "The face verification service is not available. Try again later.";
 
         private readonly ICurrentClinicalActor _actor;
         private readonly IPatientAccessAuthorizer _patientAccess;
@@ -151,11 +152,17 @@ namespace SCI_PH.Application.Features.Clinical
 
             var row = await _reads.FindActiveFaceReferenceAsync(patientId, cancellationToken);
             var reference = row is null ? null : await _writes.FindBiometricReferenceAsync(row.Id, cancellationToken);
-            if (reference is not { Status: BiometricReferenceStatus.Active, Modality: BiometricModality.Face }
-                || reference.PatientId != patientId
-                || !string.Equals(reference.Provider, _faces.Provider, StringComparison.Ordinal))
+            if (reference is not { Status: BiometricReferenceStatus.Active, Modality: BiometricModality.Face } || reference.PatientId != patientId)
             {
                 throw new ResourceConflictException(NoActiveFace);
+            }
+
+            // Ownership: only a reference of THIS provider and algorithm version is ever handed to it. Another one (the Fake,
+            // a former provider, an unsupported version) needs a re-enrollment; it is never interpreted (503).
+            if (!string.Equals(reference.Provider, _faces.Provider, StringComparison.Ordinal)
+                || !string.Equals(reference.AlgorithmVersion, _faces.AlgorithmVersion, StringComparison.Ordinal))
+            {
+                throw new ExternalServiceUnavailableException(ProviderUnavailable);
             }
 
             var outcome = await _faces.VerifyAsync(reference.SubjectReference, capture, cancellationToken);
