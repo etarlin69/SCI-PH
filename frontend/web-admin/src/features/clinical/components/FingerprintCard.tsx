@@ -2,7 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Fingerprint } from 'lucide-react';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, LoadingSpinner, Select } from '../../../components/shared';
 import { clinicalApi, describeError } from '../api';
-import type { FingerprintEnroller, FingerprintEnrollment, Guid, PatientFingerprint } from '../types/clinical.types';
+import type {
+    FingerprintCleanupStatus,
+    FingerprintEnroller,
+    FingerprintEnrollment,
+    FingerprintRevocationReason,
+    Guid,
+    PatientFingerprint,
+} from '../types/clinical.types';
 
 /** Cada cuánto se consulta un registro en curso. */
 export const ENROLLMENT_POLL_MS = 1000;
@@ -17,6 +24,25 @@ const ENDED_MESSAGES: Record<'Failed' | 'LowQuality' | 'SensorError' | 'Expired'
     Cancelled: 'Registro cancelado.',
 };
 
+const REVOCATION_REASONS: { value: FingerprintRevocationReason; label: string }[] = [
+    { value: 'PatientRequest', label: 'Solicitud del paciente' },
+    { value: 'EnrollmentError', label: 'Error en el registro' },
+    { value: 'ReaderReplaced', label: 'Lector reemplazado' },
+    { value: 'Other', label: 'Otro' },
+];
+
+// La limpieza del lector es secundaria: la huella ya no identifica, sea cual sea su estado.
+const CLEANUP: Record<FingerprintCleanupStatus, { tone: 'info' | 'neutral' | 'danger'; label: string; hint?: string }> = {
+    Pending: { tone: 'info', label: 'Limpieza del lector pendiente', hint: 'El lector borrará su copia cuando se conecte.' },
+    Completed: { tone: 'neutral', label: 'Lector limpio' },
+    AttentionRequired: {
+        tone: 'danger',
+        label: 'Requiere atención',
+        hint: 'Lector no disponible o con fallos. La huella ya está desactivada en SCI-PH; la limpieza física requiere atención.',
+    },
+    NotRequired: { tone: 'neutral', label: 'Sin limpieza automática pendiente' },
+};
+
 type Loaded = { status: 'loading' } | { status: 'error'; error: string } | { status: 'ready'; fingerprints: PatientFingerprint[]; enrollers: FingerprintEnroller[] };
 
 /**
@@ -24,6 +50,8 @@ type Loaded = { status: 'loading' } | { status: 'error'; error: string } | { sta
  * y registro de una huella nueva en un lector que registra e identifica. El lector guarda la plantilla en su sensor;
  * SCI-PH solo guarda la referencia. Mientras el registro está pendiente se consulta cada segundo; la consulta se detiene
  * al terminar o al salir de la pantalla. No es un registro formal de consentimiento.
+ * Revocación (ADR-011): la huella queda desactivada en SCI-PH al confirmar; la limpieza del lector se muestra aparte y
+ * nunca la hace parecer válida. No hay botón de reintento: el lector reintenta solo.
  */
 export function FingerprintCard({ patientId }: { patientId: Guid }) {
     const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' });
@@ -32,6 +60,8 @@ export function FingerprintCard({ patientId }: { patientId: Guid }) {
     const [enrollment, setEnrollment] = useState<FingerprintEnrollment | null>(null);
     const [message, setMessage] = useState<{ tone: 'success' | 'warning' | 'danger'; text: string } | null>(null);
     const [busy, setBusy] = useState(false);
+    const [revoking, setRevoking] = useState<PatientFingerprint | null>(null);
+    const [reason, setReason] = useState<FingerprintRevocationReason | ''>('');
     // Clave del intento: se conserva en los reintentos de la apertura y se renueva al terminar el registro.
     const requestId = useRef<string | null>(null);
 
@@ -120,6 +150,32 @@ export function FingerprintCard({ patientId }: { patientId: Guid }) {
         }
     };
 
+    const askRevoke = (fingerprint: PatientFingerprint) => {
+        setReason('');
+        setRevoking(fingerprint);
+    };
+
+    const revoke = async () => {
+        const target = revoking;
+        setRevoking(null);
+        if (!target) return;
+        setBusy(true);
+        setMessage(null);
+        try {
+            const revoked = await clinicalApi.revokePatientFingerprint(patientId, target.id, reason || undefined);
+            // Revocada desde esta respuesta: se muestra así de inmediato, antes de recargar la lista.
+            setLoaded((current) =>
+                current.status === 'ready' ? { ...current, fingerprints: current.fingerprints.map((f) => (f.id === revoked.id ? revoked : f)) } : current,
+            );
+            setMessage({ tone: 'success', text: 'Huella desactivada en SCI-PH. Ya no sirve para identificar al paciente.' });
+            void load();
+        } catch (error) {
+            setMessage({ tone: 'danger', text: describeError(error) });
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const selectReader = (value: string) => {
         setReaderId(value);
         requestId.current = null;
@@ -144,10 +200,21 @@ export function FingerprintCard({ patientId }: { patientId: Guid }) {
                                             {f.revokedAtUtc && ` · revocada el ${formatDate(f.revokedAtUtc)}`}
                                         </span>
                                     </span>
-                                    <span className="flex gap-2">
+                                    <span className="flex flex-wrap items-center gap-2">
                                         <Badge tone={f.status === 'Active' ? 'success' : 'neutral'}>{f.status === 'Active' ? 'Activa' : 'Revocada'}</Badge>
                                         {f.status === 'Active' && f.reader && !f.reader.available && <Badge tone="warning">Lector no disponible</Badge>}
+                                        {f.status === 'Revoked' && f.cleanup && <Badge tone={CLEANUP[f.cleanup].tone}>{CLEANUP[f.cleanup].label}</Badge>}
+                                        {f.status === 'Active' && (
+                                            <Button variant="secondary" size="sm" disabled={busy} onClick={() => askRevoke(f)}>
+                                                Revocar huella
+                                            </Button>
+                                        )}
                                     </span>
+                                    {f.status === 'Revoked' && (
+                                        <span className="w-full text-xs text-ink-muted">
+                                            Huella desactivada en SCI-PH.{f.cleanup && CLEANUP[f.cleanup].hint ? ` ${CLEANUP[f.cleanup].hint}` : ''}
+                                        </span>
+                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -195,6 +262,26 @@ export function FingerprintCard({ patientId }: { patientId: Guid }) {
                 confirmLabel="Registrar"
                 onConfirm={start}
                 onCancel={() => setConfirming(false)}
+            />
+            <ConfirmDialog
+                open={revoking !== null}
+                tone="danger"
+                title="Revocar huella"
+                message={
+                    <div className="flex flex-col gap-3">
+                        <p className="m-0">La huella dejará de servir para identificar de inmediato. El lector borrará su copia cuando se conecte.</p>
+                        <Select
+                            label="Motivo (opcional)"
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value as FingerprintRevocationReason | '')}
+                            placeholder="Sin motivo"
+                            options={REVOCATION_REASONS}
+                        />
+                    </div>
+                }
+                confirmLabel="Revocar"
+                onConfirm={revoke}
+                onCancel={() => setRevoking(null)}
             />
         </Card>
     );

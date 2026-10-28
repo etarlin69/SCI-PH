@@ -8,6 +8,7 @@ import type {
     CloseEncounterRequest,
     FingerprintEnroller,
     FingerprintEnrollment,
+    FingerprintRevocationReason,
     PatientFingerprint,
     CreateClinicalNoteRequest,
     CreateDiagnosisRequest,
@@ -48,6 +49,8 @@ export interface ClinicalApi {
     openFingerprintEnrollment(patientId: Guid, request: { clientRequestId: Guid; deviceId: Guid }): Promise<FingerprintEnrollment>;
     getFingerprintEnrollment(patientId: Guid, enrollmentId: Guid, signal?: AbortSignal): Promise<FingerprintEnrollment>;
     cancelFingerprintEnrollment(patientId: Guid, enrollmentId: Guid): Promise<FingerprintEnrollment>;
+    /** La huella deja de identificar de inmediato; el lector borra su copia después. Repetirlo devuelve el estado actual. */
+    revokePatientFingerprint(patientId: Guid, referenceId: Guid, reason?: FingerprintRevocationReason): Promise<PatientFingerprint>;
 
     /** Atenciones abiertas de la clínica activa (ni Closed ni Cancelled, ni en traslado). */
     listActiveEncounters(signal?: AbortSignal): Promise<ClinicalEncounterSummary[]>;
@@ -129,6 +132,7 @@ const KNOWN_DETAILS: [RegExp, string][] = [
     [/No active enrollment reader/i, 'El lector ya no está disponible. Elige otro.'],
     [/cannot manage this patient's fingerprints/i, 'No puedes gestionar las huellas de este paciente.'],
     [/completed fingerprint enrollment cannot be cancelled/i, 'El registro ya se completó; no se puede cancelar.'],
+    [/^PatientBiometricReference .* was not found/i, 'La huella no existe para este paciente.'],
 ];
 
 /**

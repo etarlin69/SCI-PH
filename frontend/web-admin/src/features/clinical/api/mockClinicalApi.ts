@@ -263,6 +263,10 @@ export const mockClinicalApi: ClinicalApi = {
         throw new ClinicalApiError(404, 'El registro de huella necesita el backend real.');
     },
 
+    async revokePatientFingerprint() {
+        throw new ClinicalApiError(404, 'La revocación de huellas necesita el backend real.');
+    },
+
     registerPatient(request) {
         const patient: PatientSummary = {
             id: newId(),

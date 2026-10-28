@@ -57,7 +57,7 @@ function backend(answers: FingerprintEnrollment[]) {
     'GET /api/web/patients/p-1/fingerprints/enrollments/enr-1': (_req, n) => {
       const answer = answers[Math.min(n, answers.length - 1)];
       if (answer.status === 'Enrolled' && fingerprints.length === 0) {
-        fingerprints.push({ id: 'ref-1', status: 'Active', reader: { code: READER.code, name: READER.name, available: true }, registeredAtUtc: '2030-01-01T00:01:00Z', revokedAtUtc: null });
+        fingerprints.push({ id: 'ref-1', status: 'Active', reader: { code: READER.code, name: READER.name, available: true }, registeredAtUtc: '2030-01-01T00:01:00Z', revokedAtUtc: null, cleanup: null });
       }
       return json(200, answer);
     },
@@ -193,5 +193,108 @@ describe('detalle del paciente y huella digital', () => {
     expect(screen.queryByRole('heading', { name: 'Huella digital' })).not.toBeInTheDocument();
     expect(bff.calls('GET /api/web/fingerprint-enrollers')).toHaveLength(0);
     expect(bff.calls('GET /api/web/patients/p-1/fingerprints')).toHaveLength(0);
+  });
+});
+
+const ACTIVE: PatientFingerprint = {
+  id: 'ref-1',
+  status: 'Active',
+  reader: { code: READER.code, name: READER.name, available: true },
+  registeredAtUtc: '2030-01-01T00:01:00Z',
+  revokedAtUtc: null,
+  cleanup: null,
+};
+const revoked = (cleanup: PatientFingerprint['cleanup']): PatientFingerprint => ({ ...ACTIVE, status: 'Revoked', revokedAtUtc: '2030-01-02T00:00:00Z', cleanup });
+const REVOKE = 'POST /api/web/patients/p-1/fingerprints/ref-1/revoke';
+
+// Backend con una huella activa; la revocación responde lo indicado y la lista posterior refleja el estado guardado.
+function withActive(revokeAnswer: () => Response, afterRevoke: PatientFingerprint = revoked('Pending')) {
+  let current: PatientFingerprint = ACTIVE;
+  const routes: Record<string, (req: RecordedRequest, n: number) => Response> = {
+    ...backend([enrollment('Pending')]).routes,
+    'GET /api/web/patients/p-1/fingerprints': () => json(200, [current]),
+    [REVOKE]: () => {
+      const response = revokeAnswer();
+      if (response.ok) current = afterRevoke;
+      return response;
+    },
+  };
+  return routes;
+}
+
+async function confirmRevoke(reason?: string) {
+  const user = userEvent.setup();
+  const fingerprint = await card();
+  await user.click(await within(fingerprint).findByRole('button', { name: 'Revocar huella' }, WAIT));
+  const dialog = await screen.findByRole('alertdialog', {}, WAIT);
+  expect(within(dialog).getByText(/dejará de servir para identificar de inmediato\. El lector borrará su copia cuando se conecte/)).toBeInTheDocument();
+  if (reason) await user.selectOptions(within(dialog).getByRole('combobox', { name: /Motivo/ }), reason);
+  await user.click(within(dialog).getByRole('button', { name: 'Revocar' }));
+  return { user, fingerprint };
+}
+
+describe('revocación de la huella', () => {
+  it('una huella activa se revoca tras confirmar, con el motivo opcional como único dato enviado, y se ve Revocada al instante', async () => {
+    const { bff } = renderAs(RECEPTIONIST, withActive(() => json(200, revoked('Pending'))));
+    const { fingerprint } = await confirmRevoke('ReaderReplaced');
+
+    await waitFor(() => expect(bff.calls(REVOKE)).toHaveLength(1));
+    expect(bff.calls(REVOKE)[0].body).toEqual({ reason: 'ReaderReplaced' });
+    expect(await within(fingerprint).findByText('Revocada', {}, WAIT)).toBeInTheDocument();
+    expect(within(fingerprint).queryByText('Activa')).not.toBeInTheDocument();
+    expect(within(fingerprint).getByText(/Huella desactivada en SCI-PH\. Ya no sirve para identificar/)).toBeInTheDocument();
+    expect(within(fingerprint).getByText('Limpieza del lector pendiente')).toBeInTheDocument();
+    expect(within(fingerprint).getByText(/Huella desactivada en SCI-PH\. El lector borrará su copia/)).toBeInTheDocument();
+    expect(within(fingerprint).queryByRole('button', { name: 'Revocar huella' })).not.toBeInTheDocument();
+    expect(fingerprint.textContent).not.toMatch(/slot|r307|subjectReference/i);
+  });
+
+  it('sin motivo envía un cuerpo vacío; cancelar el diálogo no revoca nada', async () => {
+    const { bff } = renderAs(RECEPTIONIST, withActive(() => json(200, revoked('Pending'))));
+    const user = userEvent.setup();
+    const fingerprint = await card();
+
+    await user.click(await within(fingerprint).findByRole('button', { name: 'Revocar huella' }, WAIT));
+    await user.click(within(await screen.findByRole('alertdialog', {}, WAIT)).getByRole('button', { name: 'Cancelar' }));
+    expect(bff.calls(REVOKE)).toHaveLength(0);
+    expect(within(fingerprint).getByText('Activa')).toBeInTheDocument();
+
+    await confirmRevoke();
+    await waitFor(() => expect(bff.calls(REVOKE)).toHaveLength(1));
+    expect(bff.calls(REVOKE)[0].body).toEqual({});
+  });
+
+  it.each([
+    ['Pending', 'Limpieza del lector pendiente', /El lector borrará su copia cuando se conecte/],
+    ['Completed', 'Lector limpio', null],
+    ['AttentionRequired', 'Requiere atención', /Lector no disponible o con fallos\. La huella ya está desactivada en SCI-PH/],
+    ['NotRequired', 'Sin limpieza automática pendiente', null],
+  ] as const)('una huella revocada con limpieza %s lo muestra sin parecer válida y sin botón de reintento', async (cleanup, badge, hint) => {
+    const routes = { ...backend([enrollment('Pending')]).routes, 'GET /api/web/patients/p-1/fingerprints': () => json(200, [revoked(cleanup)]) };
+    renderAs(RECEPTIONIST, routes);
+    const fingerprint = await card();
+
+    expect(await within(fingerprint).findByText(badge, {}, WAIT)).toBeInTheDocument();
+    expect(within(fingerprint).getByText('Revocada')).toBeInTheDocument();
+    expect(within(fingerprint).queryByText('Activa')).not.toBeInTheDocument();
+    expect(within(fingerprint).getByText(/Huella desactivada en SCI-PH\./)).toBeInTheDocument();
+    if (hint) expect(within(fingerprint).getByText(hint)).toBeInTheDocument();
+    expect(within(fingerprint).queryByRole('button', { name: /Revocar huella|Reintentar/ })).not.toBeInTheDocument();
+  });
+
+  it('muestra los errores del BFF con mensajes seguros y la huella sigue activa', async () => {
+    renderAs(RECEPTIONIST, withActive(() => problem(404, 'Not found.', { detail: 'PatientBiometricReference ref-1 was not found.' })));
+    const { fingerprint } = await confirmRevoke();
+
+    expect(await within(fingerprint).findByText('La huella no existe para este paciente.', {}, WAIT)).toBeInTheDocument();
+    expect(within(fingerprint).getByText('Activa')).toBeInTheDocument();
+  });
+
+  it('sin Biometrics.Manage no hay huella ni revocación', async () => {
+    const { bff } = renderAs(DOCTOR, withActive(() => json(200, revoked('Pending'))));
+
+    expect(await screen.findByText('Ana Pérez', {}, WAIT)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Revocar huella' })).not.toBeInTheDocument();
+    expect(bff.calls(REVOKE)).toHaveLength(0);
   });
 });
