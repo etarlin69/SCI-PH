@@ -74,3 +74,11 @@
 # Fuera de las imágenes del backend y del front: app MAUI y herramientas locales.
 mobile/
 tools/
+
+
+# ------------------------------------------------------------
+# Biometric face models and fixtures (ADR-012)
+# ------------------------------------------------------------
+# Models enter the image only through the verified face-models stage; the Face Synthetics sample never does.
+.models
+.fixtures
