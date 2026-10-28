@@ -35,7 +35,7 @@ export function createFakeBff(routes: Record<string, Handler>) {
       method,
       path: url.pathname,
       headers,
-      body: typeof init.body === 'string' ? JSON.parse(init.body) : undefined,
+      body: typeof init.body === 'string' ? JSON.parse(init.body) : init.body instanceof FormData ? init.body : undefined,
       credentials: init.credentials,
     };
     requests.push(req);

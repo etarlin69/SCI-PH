@@ -267,6 +267,23 @@ export const mockClinicalApi: ClinicalApi = {
         throw new ClinicalApiError(404, 'La revocación de huellas necesita el backend real.');
     },
 
+    // Rostro: solo existe con backend real (ADR-012). En simulación no hay proveedor facial.
+    listPatientFaces(_patientId, signal) {
+        return delay([], signal);
+    },
+
+    async enrollPatientFace() {
+        throw new ClinicalApiError(409, 'La verificación facial necesita el backend real.');
+    },
+
+    async verifyPatientFace() {
+        throw new ClinicalApiError(409, 'La verificación facial necesita el backend real.');
+    },
+
+    async revokePatientFace() {
+        throw new ClinicalApiError(404, 'La verificación facial necesita el backend real.');
+    },
+
     registerPatient(request) {
         const patient: PatientSummary = {
             id: newId(),

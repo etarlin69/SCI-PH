@@ -9,6 +9,10 @@ import type {
     FingerprintEnroller,
     FingerprintEnrollment,
     FingerprintRevocationReason,
+    FaceEnrollmentResponse,
+    FaceRevocationReason,
+    FaceVerificationResponse,
+    PatientFace,
     PatientFingerprint,
     CreateClinicalNoteRequest,
     CreateDiagnosisRequest,
@@ -51,6 +55,13 @@ export interface ClinicalApi {
     cancelFingerprintEnrollment(patientId: Guid, enrollmentId: Guid): Promise<FingerprintEnrollment>;
     /** La huella deja de identificar de inmediato; el lector borra su copia después. Repetirlo devuelve el estado actual. */
     revokePatientFingerprint(patientId: Guid, referenceId: Guid, reason?: FingerprintRevocationReason): Promise<PatientFingerprint>;
+
+    /** Rostro (ADR-012): verificación 1:1 asistida. Biometrics.Manage registra y revoca; Patients.Identify verifica. */
+    listPatientFaces(patientId: Guid, signal?: AbortSignal): Promise<PatientFace[]>;
+    /** capture: la imagen tomada con la cámara (nunca se guarda en el navegador). clientRequestId: uno por captura. */
+    enrollPatientFace(patientId: Guid, capture: Blob, clientRequestId: Guid): Promise<FaceEnrollmentResponse>;
+    verifyPatientFace(patientId: Guid, capture: Blob, clientRequestId: Guid): Promise<FaceVerificationResponse>;
+    revokePatientFace(patientId: Guid, referenceId: Guid, reason?: FaceRevocationReason): Promise<PatientFace>;
 
     /** Atenciones abiertas de la clínica activa (ni Closed ni Cancelled, ni en traslado). */
     listActiveEncounters(signal?: AbortSignal): Promise<ClinicalEncounterSummary[]>;
@@ -132,7 +143,11 @@ const KNOWN_DETAILS: [RegExp, string][] = [
     [/No active enrollment reader/i, 'El lector ya no está disponible. Elige otro.'],
     [/cannot manage this patient's fingerprints/i, 'No puedes gestionar las huellas de este paciente.'],
     [/completed fingerprint enrollment cannot be cancelled/i, 'El registro ya se completó; no se puede cancelar.'],
-    [/^PatientBiometricReference .* was not found/i, 'La huella no existe para este paciente.'],
+    [/^PatientBiometricReference .* was not found/i, 'La referencia biométrica no existe para este paciente.'],
+    [/already has an active face reference/i, 'El paciente ya tiene un rostro registrado. Revócalo antes de registrar otro.'],
+    [/no active face reference/i, 'El paciente no tiene un rostro registrado activo.'],
+    [/face verification service is not available/i, 'La verificación facial no está disponible en este momento. Inténtalo más tarde.'],
+    [/^capture /i, 'La imagen no es válida. Toma la foto de nuevo con la cámara.'],
 ];
 
 /**

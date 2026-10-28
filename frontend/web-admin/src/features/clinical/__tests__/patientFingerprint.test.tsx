@@ -286,7 +286,7 @@ describe('revocación de la huella', () => {
     renderAs(RECEPTIONIST, withActive(() => problem(404, 'Not found.', { detail: 'PatientBiometricReference ref-1 was not found.' })));
     const { fingerprint } = await confirmRevoke();
 
-    expect(await within(fingerprint).findByText('La huella no existe para este paciente.', {}, WAIT)).toBeInTheDocument();
+    expect(await within(fingerprint).findByText('La referencia biométrica no existe para este paciente.', {}, WAIT)).toBeInTheDocument();
     expect(within(fingerprint).getByText('Activa')).toBeInTheDocument();
   });
 
