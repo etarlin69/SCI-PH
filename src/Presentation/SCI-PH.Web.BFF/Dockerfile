@@ -46,7 +46,24 @@ ARG FACE_MODELS=include
 
 COPY ["scripts/biometrics/fetch-face-models.sh", "/tmp/fetch-face-models.sh"]
 
-RUN mkdir -p /models/face     && if [ "$FACE_MODELS" = "include" ]; then sh /tmp/fetch-face-models.sh /models/face;        elif [ "$FACE_MODELS" != "none" ]; then echo "FACE_MODELS must be include or none" >&2; exit 1; fi
+RUN mkdir -p /models/face \
+    && if [ "$FACE_MODELS" = "include" ]; then sh /tmp/fetch-face-models.sh /models/face; \
+       elif [ "$FACE_MODELS" != "none" ]; then echo "FACE_MODELS must be include or none" >&2; exit 1; fi
+
+
+# Minimal native OpenCV runtime of the face provider (ADR-012), built from pinned sources: OpenCV 5.0.0 + OpenCvSharpExtern
+# as a matching pair of shared libraries, without FFmpeg, GStreamer, V4L, GTK/X11, Tesseract, videoio, highgui, text or
+# stitching. The script verifies the pinned commits and fails the build if any forbidden component is configured, linked or
+# embedded. Debian 12 = the glibc of the aspnet:9.0 image. Never the official NuGet Linux runtime.
+FROM debian:bookworm@sha256:d74df7598108a173a621eda4d58a2adbf850b2d9a9d81bc2cca1a6c21174a880 AS opencv-native
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential cmake ninja-build git ca-certificates binutils \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY ["scripts/biometrics/build-opencv-linux.sh", "/tmp/build-opencv-linux.sh"]
+
+RUN bash /tmp/build-opencv-linux.sh /out /tmp/opencv-build && rm -rf /tmp/opencv-build
 
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
@@ -59,8 +76,12 @@ ENV ASPNETCORE_URLS=http://+:8080
 
 COPY --from=build /app/publish .
 
-# Linux x64 runtime: OpenCV headless (no GTK/X11). Third-party notices travel with the binaries; keys, connection strings
-# and templates never enter the image (runtime secrets only).
+# Linux x64 native runtime: only the source-built OpenCV libraries and OpenCvSharpExtern (RPATH $ORIGIN). Third-party
+# notices and the runtime build manifest travel with the binaries; keys, connection strings and templates never enter the
+# image (runtime secrets only).
+COPY --from=opencv-native /out/*.so* /app/
+COPY --from=opencv-native /out/licenses/ /app/licenses/opencv-runtime/
+COPY --from=opencv-native /out/opencv-runtime-manifest.txt /app/licenses/
 COPY ["docs/legal/face-opencv-third-party.md", "docs/legal/licenses/", "/app/licenses/"]
 COPY --from=face-models /models/face /app/models/face
 
