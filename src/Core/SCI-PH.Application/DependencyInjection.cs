@@ -76,6 +76,7 @@ namespace SCI_PH.Application
         public static IServiceCollection AddFaceVerificationWorkflow(this IServiceCollection services)
         {
             services.AddScoped<PatientFaceService>();
+            services.AddScoped<FaceTemplateCleanupService>();
 
             return services;
         }

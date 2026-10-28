@@ -1,7 +1,13 @@
 using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using SCI_PH.Application.Abstractions.Biometrics;
+using SCI_PH.Application.Features.Clinical;
+using SCI_PH.Domain.Enums.Patients;
 using SCI_PH.Infrastructure.Biometrics.Face.OpenCv;
+using SCI_PH.IntegrationTests.Security.Support;
 using Testcontainers.Azurite;
 
 namespace SCI_PH.IntegrationTests.Biometrics.Face
@@ -43,7 +49,7 @@ namespace SCI_PH.IntegrationTests.Biometrics.Face
     }
 
     // The encrypted template store on Azure Blob (Azurite): private container, opaque names, owner/format metadata only,
-    // never overwritten.
+    // never overwritten; and the report-only reconciliation of the store with the clinical references.
     public class FaceTemplateStoreTests : IClassFixture<AzuriteFixture>
     {
         private static readonly CancellationToken None = CancellationToken.None;
@@ -106,6 +112,51 @@ namespace SCI_PH.IntegrationTests.Biometrics.Face
             await Assert.ThrowsAnyAsync<Exception>(() => store.DeleteAsync(Guid.NewGuid(), None));
         }
 
+        // Reconciliation A (an active reference without its template), B (a template no retained reference points to) and the
+        // cleanup jobs needing attention are reported with opaque ids only, and nothing is deleted.
+        [Fact]
+        public async Task ReconciliationReportsMissingAndOrphanTemplatesWithoutDeleting()
+        {
+            var store = new OpenCvFaceProviderTests.InMemoryTemplateStore();
+            var (active, missing, pendingCleanup, orphan) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+            foreach (var id in new[] { active, pendingCleanup, orphan })
+            {
+                store.Blobs[id] = [1];
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var struggling = FaceTemplateDeletion.Request(Guid.NewGuid(), now) with { Attempts = FaceTemplateCleanupService.AttentionAttempts };
+            var retained = new RetainedStore(
+            [
+                new RetainedFaceTemplate(FaceSubjectReference.Format(active), Active: true),
+                new RetainedFaceTemplate(FaceSubjectReference.Format(missing), Active: true),
+                new RetainedFaceTemplate(FaceSubjectReference.Format(pendingCleanup), Active: false)
+            ],
+            [
+                new FaceTemplateDeletionTarget(FaceTemplateDeletion.Request(Guid.NewGuid(), now) with { Attempts = 4 },
+                    Guid.NewGuid(), BiometricModality.Face, "SCIPH-FaceOpenCV", FaceSubjectReference.Format(pendingCleanup)),
+                new FaceTemplateDeletionTarget(struggling, Guid.NewGuid(), BiometricModality.Face, "SCIPH-FaceOpenCV", "face:x")
+            ]);
+            var services = new ServiceCollection().AddScoped<IFaceTemplateDeletionStore>(_ => retained).BuildServiceProvider();
+            var logs = new CapturingLoggerProvider();
+            var reconciler = new FaceTemplateReconciler(
+                services.GetRequiredService<IServiceScopeFactory>(), store,
+                LoggerFactory.Create(b => b.AddProvider(logs)).CreateLogger<FaceTemplateReconciler>());
+
+            var report = await reconciler.ReportAsync(None);
+
+            Assert.Equal(3, report.Stored);
+            Assert.Equal([missing], report.Missing);
+            Assert.Equal([orphan], report.Orphans);
+            Assert.Equal([struggling.Id], report.Attention);
+            Assert.Equal(3, store.Blobs.Count);
+            Assert.Equal(LocalOpenCvFaceVerificationService.ProviderName, retained.Provider);
+            Assert.Contains($"FaceTemplateMissing: 1 active face reference(s) without a template: {missing}", logs.Text);
+            Assert.Contains($"FaceTemplateOrphan: 1 template(s) without a retained reference (not deleted): {orphan}", logs.Text);
+            Assert.Contains($"FaceTemplateCleanupAttention: 1 cleanup job(s) failed 5 or more times and keep being retried: {struggling.Id}", logs.Text);
+            Assert.DoesNotContain("face:", logs.Text);
+        }
+
         private static async Task<List<Guid>> ListAsync(IFaceTemplateStore store)
         {
             var ids = new List<Guid>();
@@ -115,6 +166,28 @@ namespace SCI_PH.IntegrationTests.Biometrics.Face
             }
 
             return ids;
+        }
+
+        private sealed class RetainedStore(IReadOnlyList<RetainedFaceTemplate> retained, IReadOnlyList<FaceTemplateDeletionTarget> pending)
+            : IFaceTemplateDeletionStore
+        {
+            public string? Provider { get; private set; }
+
+            public Task<IReadOnlyList<RetainedFaceTemplate>> ListRetainedAsync(string provider, CancellationToken cancellationToken)
+            {
+                Provider = provider;
+                return Task.FromResult(retained);
+            }
+
+            public Task<FaceTemplateDeletionTarget?> FindAsync(Guid deletionId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+            public Task<IReadOnlyList<FaceTemplateDeletionTarget>> ListPendingAsync(int limit, CancellationToken cancellationToken) =>
+                Task.FromResult(pending);
+
+            public void Add(FaceTemplateDeletion deletion) => throw new NotSupportedException();
+
+            public void Update(FaceTemplateDeletion deletion, FaceTemplateDeletionStatus expectedStatus, int expectedAttempts) =>
+                throw new NotSupportedException();
         }
     }
 }

@@ -43,8 +43,9 @@ namespace SCI_PH.Infrastructure
         // Verificación facial 1:1 asistida (ADR-012): normalización de capturas (independiente del proveedor) y el proveedor
         // elegido por configuración del servidor (FaceVerification:Provider): Fake fuera de Production, Disabled (503) en
         // Production si no se configura otro; Fake configurado en Production impide arrancar. Con "OpenCv" (proveedor local
-        // real, ADR-012 PR 2) también registra su validación de arranque (modelos con hash fijado, claves, almacén) y su
-        // almacén de plantillas cifradas; sin "OpenCv" nada de eso se registra ni necesita modelos o claves.
+        // real, ADR-012 PR 2) también registra su validación de arranque (modelos con hash fijado, claves, almacén), su almacén
+        // de plantillas cifradas y el worker de limpieza durable; sin "OpenCv" nada de eso se registra ni necesita modelos o
+        // claves.
         public static IServiceCollection AddFaceVerification(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddOptions<FaceVerificationOptions>()
@@ -103,8 +104,11 @@ namespace SCI_PH.Infrastructure
                 provider.GetRequiredService<FaceTemplateCipher>(),
                 provider.GetRequiredService<OpenCvFaceOptions>(),
                 provider.GetRequiredService<ILogger<LocalOpenCvFaceVerificationService>>()));
-            // The provider (native runtime + models) is built at startup, before any request; a failure stops the host.
+            services.AddSingleton<FaceTemplateReconciler>();
+            // Started in registration order: the provider (native runtime + models) is built at startup, before any
+            // request, and a failure stops the host; then the cleanup worker.
             services.AddHostedService<OpenCvFaceProviderStartup>();
+            services.AddHostedService<FaceTemplateCleanupWorker>();
         }
 
         public static IServiceCollection AddJwtSecurity(this IServiceCollection services, IConfiguration configuration)

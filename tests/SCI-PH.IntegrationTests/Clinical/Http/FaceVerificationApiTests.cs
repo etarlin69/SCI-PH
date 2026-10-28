@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using SCI_PH.Application.Abstractions.Biometrics;
 using SCI_PH.Application.Common.Security;
 using SCI_PH.Application.Features.Clinical;
 using SCI_PH.Domain.Entities.Organizations;
@@ -149,8 +150,12 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             Assert.False(Provider(host).Holds(stored.SubjectReference));
             var replay = await RevokeAsync(reception, patient.Id, referenceId, """{"reason":"Other"}""");
             Assert.Equal((HttpStatusCode.OK, revokedRaw), (replay.StatusCode, await replay.Content.ReadAsStringAsync()));
+            // The revocation and the completion of its template cleanup (one job, completed by the immediate attempt).
             Assert.Equal(2, await host.DbAsync(db => db.ClinicalAuditEntries.CountAsync(a =>
                 a.EntityName == nameof(PatientBiometricReference) && a.Action == AuditActionType.Update)));
+            var job = await host.DbAsync(db => db.FaceTemplateDeletionJobs.AsNoTracking().SingleAsync());
+            Assert.Equal((referenceId, FaceTemplateDeletionStatus.Completed, FaceTemplateDeletionOutcome.Deleted),
+                (job.BiometricReferenceId, job.Status, job.Outcome));
             await AssertProblemAsync(await VerifyAsync(reception, patient.Id, FaceFixtures.Png(FaceFixtures.FaceA)), HttpStatusCode.Conflict);
 
             Assert.Equal(HttpStatusCode.Created, (await EnrollAsync(reception, patient.Id, FaceFixtures.Png(FaceFixtures.FaceB))).StatusCode);
@@ -378,7 +383,8 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             };
             var audits = (await host.DbAsync(db => db.ClinicalAuditEntries.AsNoTracking().Where(a => a.PatientId == patient.Id).Select(a => a.ChangesJson).ToListAsync()))
                 .Select(changes => changes ?? string.Empty).ToList();
-            var logs = host.Logs.Text;
+            // The SQL log names the cleanup table; that name is not template data.
+            var logs = host.Logs.Text.Replace("FaceTemplateDeletionJobs", "", StringComparison.Ordinal);
 
             foreach (var text in bodies.Concat(audits).Append(logs))
             {

@@ -349,7 +349,7 @@ namespace SCI_PH.IntegrationTests.Biometrics.Face
             }
         }
 
-        // OpenCv is a real provider: allowed in Production (unlike the Fake), with its startup check.
+        // OpenCv is a real provider: allowed in Production (unlike the Fake), with its startup check and cleanup worker.
         [Fact]
         public void TheOpenCvProviderIsAllowedInProductionWithItsWorker()
         {
@@ -360,7 +360,7 @@ namespace SCI_PH.IntegrationTests.Biometrics.Face
             // Registrations only: building them would load the (absent) models.
             var services = new ServiceCollection();
             services.AddFaceVerification(new ConfigurationBuilder().AddInMemoryCollection(settings).Build());
-            Assert.Equal(["OpenCvFaceProviderStartup"],
+            Assert.Equal(["OpenCvFaceProviderStartup", "FaceTemplateCleanupWorker"],
                 services.Where(s => s.ServiceType == typeof(IHostedService)).Select(s => s.ImplementationType!.Name));
         }
     }

@@ -26,8 +26,8 @@ namespace SCI_PH.IntegrationTests.PostgreSql
                 new[] { "AccountInvitations", "AspNetRoleClaims", "AspNetRoles", "AspNetUserClaims", "AspNetUserLogins", "AspNetUserRoles", "AspNetUserTokens", "AspNetUsers", "DataProtectionKeys", "DeviceCredentials", "MfaLoginChallenges", "RefreshTokens", "SecurityAuditEvents", "__EFMigrationsHistory" }.Order(StringComparer.Ordinal),
                 identityTables.Order(StringComparer.Ordinal));
             // 28 Domain tables + IdempotencyReceipts + FingerprintIdentificationSessions + FingerprintEnrollmentSessions
-            // + FingerprintSlotDeletionJobs.
-            Assert.Equal(32, await ScalarAsync<long>(connection,
+            // + FingerprintSlotDeletionJobs + FaceTemplateDeletionJobs.
+            Assert.Equal(33, await ScalarAsync<long>(connection,
                 "select count(*) from information_schema.tables where table_schema = 'clinical' and table_name <> '__EFMigrationsHistory'"));
             Assert.Equal(0, await ScalarAsync<long>(connection,
                 "select count(*) from information_schema.tables where table_schema not in ('identity', 'clinical', 'pg_catalog', 'information_schema')"));
@@ -40,8 +40,8 @@ namespace SCI_PH.IntegrationTests.PostgreSql
             Assert.Equal(4, await ScalarAsync<long>(connection, "select count(*) from identity.\"__EFMigrationsHistory\""));
             // InitialClinical + EnforceSingleActiveTransferPerEncounter + AddClinicalIdempotencyReceipts
             // + AddFingerprintIdentificationSessions + AddFingerprintEnrollmentSessions + AddFingerprintSlotDeletionJobs
-            // + AddActiveFaceReferencePerPatientIndex.
-            Assert.Equal(7, await ScalarAsync<long>(connection, "select count(*) from clinical.\"__EFMigrationsHistory\""));
+            // + AddActiveFaceReferencePerPatientIndex + AddFaceTemplateDeletionJobs.
+            Assert.Equal(8, await ScalarAsync<long>(connection, "select count(*) from clinical.\"__EFMigrationsHistory\""));
             Assert.Equal(0, await ScalarAsync<long>(connection,
                 "select count(*) from pg_index i join pg_class c on c.oid = i.indexrelid join pg_namespace n on n.oid = c.relnamespace where n.nspname in ('identity', 'clinical') and not i.indisvalid"));
 

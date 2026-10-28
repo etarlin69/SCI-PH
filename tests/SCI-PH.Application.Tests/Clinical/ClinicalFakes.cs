@@ -59,7 +59,7 @@ namespace SCI_PH.Application.Tests.Clinical
     // It also holds the fingerprint sessions (as FingerprintSessionStore): an update commits only while the stored status
     // is still the expected one, and the unique active-session rules are checked on save, as the indexes would.
     internal sealed class FakeClinicalStore : IClinicalReadStore, IClinicalWriteStore, IIdempotencyStore, IFingerprintSessionStore, IFingerprintEnrollmentStore,
-        IFingerprintSlotDeletionStore
+        IFingerprintSlotDeletionStore, IFaceTemplateDeletionStore
     {
         private readonly List<object> _pending = [];
 
@@ -208,6 +208,37 @@ namespace SCI_PH.Application.Tests.Clinical
             _pending.Add(new DeletionUpdate(deletion, expectedStatus, expectedLastAttemptId));
 
         private sealed record DeletionUpdate(FingerprintSlotDeletion Deletion, FingerprintSlotDeletionStatus ExpectedStatus, Guid? ExpectedLastAttemptId);
+
+        // ---- Face template deletion jobs (as FaceTemplateDeletionStore) ----
+        public List<FaceTemplateDeletion> FaceDeletions { get; } = [];
+
+        private FaceTemplateDeletionTarget FaceTarget(FaceTemplateDeletion deletion)
+        {
+            var reference = BiometricReferences.Single(r => r.Id == deletion.BiometricReferenceId);
+            return new FaceTemplateDeletionTarget(deletion, reference.PatientId, reference.Modality, reference.Provider, reference.SubjectReference);
+        }
+
+        Task<FaceTemplateDeletionTarget?> IFaceTemplateDeletionStore.FindAsync(Guid deletionId, CancellationToken cancellationToken) =>
+            Task.FromResult(FaceDeletions.SingleOrDefault(x => x.Id == deletionId) is { } deletion ? FaceTarget(deletion) : null);
+
+        public Task<IReadOnlyList<FaceTemplateDeletionTarget>> ListPendingAsync(int limit, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<FaceTemplateDeletionTarget>>(FaceDeletions.Where(x => x.IsPending)
+                .OrderBy(x => x.CreatedAtUtc).Take(limit).Select(FaceTarget).ToList());
+
+        public Task<IReadOnlyList<RetainedFaceTemplate>> ListRetainedAsync(string provider, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<RetainedFaceTemplate>>(BiometricReferences
+                .Where(r => r.Modality == BiometricModality.Face && r.Provider == provider)
+                .Where(r => r.Status == BiometricReferenceStatus.Active
+                    || FaceDeletions.SingleOrDefault(x => x.BiometricReferenceId == r.Id) is not { IsPending: false })
+                .Select(r => new RetainedFaceTemplate(r.SubjectReference, r.Status == BiometricReferenceStatus.Active))
+                .ToList());
+
+        public void Add(FaceTemplateDeletion deletion) => _pending.Add(deletion);
+
+        public void Update(FaceTemplateDeletion deletion, FaceTemplateDeletionStatus expectedStatus, int expectedAttempts) =>
+            _pending.Add(new FaceDeletionUpdate(deletion, expectedStatus, expectedAttempts));
+
+        private sealed record FaceDeletionUpdate(FaceTemplateDeletion Deletion, FaceTemplateDeletionStatus ExpectedStatus, int ExpectedAttempts);
 
         public Task<FingerprintSession?> FindAsync(Guid sessionId, CancellationToken cancellationToken) =>
             Task.FromResult(Sessions.SingleOrDefault(x => x.Id == sessionId));
@@ -401,6 +432,7 @@ namespace SCI_PH.Application.Tests.Clinical
 
             CommitSessions();
             CommitDeletions();
+            CommitFaceDeletions();
             CommitEnrollmentsAndReferences();
             Receipts.AddRange(_pending.OfType<IdempotencyReceipt>());
             Assignments.AddRange(_pending.OfType<EncounterStaffAssignment>());
@@ -468,6 +500,31 @@ namespace SCI_PH.Application.Tests.Clinical
             }
 
             Deletions.AddRange(added);
+        }
+
+        // Status and attempts tokens and one job per reference: any violation discards the whole save.
+        private void CommitFaceDeletions()
+        {
+            var updates = _pending.OfType<FaceDeletionUpdate>().ToList();
+            var added = _pending.OfType<FaceTemplateDeletion>().ToList();
+            if (updates.Any(u => FaceDeletions.Single(x => x.Id == u.Deletion.Id) is var stored
+                    && (stored.Status != u.ExpectedStatus || stored.Attempts != u.ExpectedAttempts))
+                || added.Any(a => FaceDeletions.Any(x => x.BiometricReferenceId == a.BiometricReferenceId))
+                || added.GroupBy(a => a.BiometricReferenceId).Any(g => g.Count() > 1))
+            {
+                _pending.Clear();
+                throw new ResourceConflictException("The record was changed by another operation. Reload it and try again.");
+            }
+
+            for (var i = 0; i < FaceDeletions.Count; i++)
+            {
+                if (updates.SingleOrDefault(u => u.Deletion.Id == FaceDeletions[i].Id) is { } update)
+                {
+                    FaceDeletions[i] = update.Deletion;
+                }
+            }
+
+            FaceDeletions.AddRange(added);
         }
 
         // Reference status token, the unique ACTIVE subject reference and the Pending-enrollment indexes: any violation
@@ -599,7 +656,8 @@ namespace SCI_PH.Application.Tests.Clinical
             EnrollmentReaderSide = new FingerprintEnrollmentReaderService(Store, Store, Store, Store, Time);
             FingerprintRevocations = new FingerprintRevocationService(Actor, access, Store, Store, Store, Readers, Time);
             DeletionReaderSide = new FingerprintSlotDeletionReaderService(Store, Store, Time);
-            Faces = new PatientFaceService(Actor, access, Store, Store, Store, FaceProvider, new PassThroughCaptureNormalizer(), Time);
+            FaceCleanup = new FaceTemplateCleanupService(Store, Store, FaceProvider, Time);
+            Faces = new PatientFaceService(Actor, access, Store, Store, Store, FaceProvider, new PassThroughCaptureNormalizer(), Store, FaceCleanup, Time);
         }
 
         public FakeCurrentUser User { get; }
@@ -613,6 +671,7 @@ namespace SCI_PH.Application.Tests.Clinical
         public EncounterRecordService Records { get; }
         public MedicationService Medications { get; }
         public TransferService Transfers { get; }
+        public FaceTemplateCleanupService FaceCleanup { get; }
         public PrehospitalEmergencyService Emergencies { get; }
         public FakeReaders Readers { get; } = new();
         public EmergencyFingerprintService Fingerprints { get; }
