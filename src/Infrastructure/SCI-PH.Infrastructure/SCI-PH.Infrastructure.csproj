@@ -24,10 +24,11 @@
          without fontconfig/freetype dependencies is what the containers and CI need. -->
     <PackageReference Include="SkiaSharp" Version="3.119.2" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.2" />
-    <!-- Real face provider (ADR-012, PR 2): managed OpenCvSharp5 only (Apache-2.0; its analyzer is removed by
-         Directory.Build.targets). The native runtimes are referenced by the host that uses the provider (Web BFF), not here.
-         Templates: Azure Blob (Azurite in development). Azure.Core 1.55 (Blobs 12.29.x) needs the 10.0.3 abstractions above. -->
-    <PackageReference Include="OpenCvSharp5" Version="5.0.0.20261003" />
+    <!-- Real face provider (ADR-012, PR 2): managed OpenCvSharp5 only (Apache-2.0). Private: it does not flow to the
+         projects that reference Infrastructure; only the Web BFF, the one host of the provider, references it (with the native
+         runtime). Templates: Azure Blob (Azurite in development). Azure.Core 1.55 (Blobs 12.29.x) needs the 10.0.3
+         abstractions above. -->
+    <PackageReference Include="OpenCvSharp5" Version="5.0.0.20261003" PrivateAssets="all" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.29.2" />
   </ItemGroup>
 
@@ -37,5 +38,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <!-- OpenCvSharp5 ships a Roslyn analyzer built for a newer compiler than the .NET 9 SDK's (warning CS9057: it cannot
+       load). ExcludeAssets="analyzers" is not honored by SDK 9.0.305 for it, so only that package's analyzer is removed,
+       in this project only. -->
+  <Target Name="RemoveOpenCvSharpAnalyzer" AfterTargets="ResolveLockFileAnalyzers" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)" Condition="'%(Analyzer.NuGetPackageId)' == 'OpenCvSharp5'" />
+    </ItemGroup>
+  </Target>
 
 </Project>

@@ -34,4 +34,13 @@
     <ProjectReference Include="..\..\src\Presentation\SCI-PH.Device.API\SCI-PH.Device.API.csproj" />
   </ItemGroup>
 
+  <!-- OpenCvSharp5 ships a Roslyn analyzer built for a newer compiler than the .NET 9 SDK's (warning CS9057: it cannot
+       load). ExcludeAssets="analyzers" is not honored by SDK 9.0.305 for it, so only that package's analyzer is removed,
+       in this project only. -->
+  <Target Name="RemoveOpenCvSharpAnalyzer" AfterTargets="ResolveLockFileAnalyzers" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)" Condition="'%(Analyzer.NuGetPackageId)' == 'OpenCvSharp5'" />
+    </ItemGroup>
+  </Target>
+
 </Project>

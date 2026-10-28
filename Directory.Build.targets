@@ -1,9 +1,0 @@
-<Project>
-  <!-- OpenCvSharp5 (face provider, ADR-012) ships a Roslyn analyzer built for a newer compiler than the .NET 9 SDK's, which
-       only produces warning CS9057 in every project that gets the package (directly or transitively). It is not used. -->
-  <Target Name="RemoveOpenCvSharpAnalyzer" AfterTargets="ResolveLockFileAnalyzers" BeforeTargets="CoreCompile">
-    <ItemGroup>
-      <Analyzer Remove="@(Analyzer)" Condition="'%(Filename)' == 'OpenCvSharp.Analyzers'" />
-    </ItemGroup>
-  </Target>
-</Project>

@@ -10,8 +10,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.9" />
-    <!-- Native OpenCV for the real face provider (ADR-012): Windows x64 and Linux x64 HEADLESS (dnn included, no GTK/X11;
-         the slim profile has no dnn). Third-party components and notices: docs/legal/face-opencv-third-party.md. -->
+    <!-- Real face provider (ADR-012): the managed OpenCvSharp5 API (same exact version as Infrastructure, where it is
+         private) and the native OpenCV for Windows x64 and Linux x64 HEADLESS. Third-party components and notices:
+         docs/legal/face-opencv-third-party.md. -->
+    <PackageReference Include="OpenCvSharp5" Version="5.0.0.20261003" />
     <PackageReference Include="OpenCvSharp5.runtime.win" Version="5.0.0.20261003" />
     <PackageReference Include="OpenCvSharp5.official.runtime.linux-x64.headless" Version="5.0.0.20261003" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.9">
@@ -25,5 +27,14 @@
     <ProjectReference Include="..\..\Infrastructure\SCI-PH.Persistence\SCI-PH.Persistence.csproj" />
     <ProjectReference Include="..\..\Infrastructure\SCI-PH.Infrastructure\SCI-PH.Infrastructure.csproj" />
   </ItemGroup>
+
+  <!-- OpenCvSharp5 ships a Roslyn analyzer built for a newer compiler than the .NET 9 SDK's (warning CS9057: it cannot
+       load). ExcludeAssets="analyzers" is not honored by SDK 9.0.305 for it, so only that package's analyzer is removed,
+       in this project only. -->
+  <Target Name="RemoveOpenCvSharpAnalyzer" AfterTargets="ResolveLockFileAnalyzers" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)" Condition="'%(Analyzer.NuGetPackageId)' == 'OpenCvSharp5'" />
+    </ItemGroup>
+  </Target>
 
 </Project>
