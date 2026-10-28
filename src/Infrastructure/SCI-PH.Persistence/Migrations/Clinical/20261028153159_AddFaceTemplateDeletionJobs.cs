@@ -31,7 +31,7 @@ namespace SCI_PH.Persistence.Migrations.Clinical
                     table.PrimaryKey("PK_FaceTemplateDeletionJobs", x => x.Id);
                     table.CheckConstraint("CK_FaceTemplateDeletionJobs_Attempts", "\"Attempts\" >= 0");
                     table.CheckConstraint("CK_FaceTemplateDeletionJobs_Dates", "(\"LastAttemptAtUtc\" >= \"CreatedAtUtc\") AND (\"CompletedAtUtc\" >= \"CreatedAtUtc\")");
-                    table.CheckConstraint("CK_FaceTemplateDeletionJobs_LastFailure_Enum", "\"LastFailure\" IN (1, 2)");
+                    table.CheckConstraint("CK_FaceTemplateDeletionJobs_LastFailure_Enum", "\"LastFailure\" IN (1, 2, 3)");
                     table.CheckConstraint("CK_FaceTemplateDeletionJobs_Lifecycle", "((\"Status\" = 1) AND (\"Outcome\" IS NULL) AND (\"CompletedAtUtc\" IS NULL)) OR ((\"Status\" = 2) AND (\"Outcome\" IS NOT NULL) AND (\"CompletedAtUtc\" IS NOT NULL))");
                     table.CheckConstraint("CK_FaceTemplateDeletionJobs_Outcome_Enum", "\"Outcome\" IN (1, 2)");
                     table.CheckConstraint("CK_FaceTemplateDeletionJobs_Status_Enum", "\"Status\" IN (1, 2)");

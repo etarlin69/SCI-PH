@@ -13,7 +13,8 @@ namespace SCI_PH.Application.Features.Clinical
     // Durable cleanup of revoked face templates (ADR-012, PR 2). A revocation commits a Pending job with it; this service
     // asks the CONFIGURED provider to delete the template, right after the revocation and then on every worker pass until it
     // succeeds. Deleted and NotFound both complete the job (the template is gone); a provider failure counts one more attempt
-    // and is retried after a growing delay; a reference of another provider is never sent to this one. At-least-once: two
+    // and is retried after a growing delay; a reference of another provider is never sent to this one. With no provider
+    // configured (Disabled) nothing is attempted, written or counted: the jobs simply stay Pending. At-least-once: two
     // workers may try the same job, the status and attempts concurrency tokens let only one result apply, and only the final
     // completion is audited. Security never depends on this: the revoked reference is already unusable.
     public sealed class FaceTemplateCleanupService
@@ -48,6 +49,11 @@ namespace SCI_PH.Application.Features.Clinical
         // One worker pass: the due Pending jobs (at most `limit`). Returns how many it completed.
         public async Task<int> RunOnceAsync(int limit, CancellationToken cancellationToken)
         {
+            if (!_faces.IsEnabled)
+            {
+                return 0;
+            }
+
             var now = _time.GetUtcNow();
             var completed = 0;
             foreach (var target in await _jobs.ListPendingAsync(limit, cancellationToken))
@@ -63,7 +69,8 @@ namespace SCI_PH.Application.Features.Clinical
 
         // The immediate attempt after a revocation. False when the job stays Pending (or another worker completed it).
         public async Task<bool> TryCompleteAsync(Guid deletionId, CancellationToken cancellationToken) =>
-            await _jobs.FindAsync(deletionId, cancellationToken) is { Deletion.IsPending: true } target
+            _faces.IsEnabled
+            && await _jobs.FindAsync(deletionId, cancellationToken) is { Deletion.IsPending: true } target
             && await ProcessAsync(target, cancellationToken);
 
         private async Task<bool> ProcessAsync(FaceTemplateDeletionTarget target, CancellationToken cancellationToken)

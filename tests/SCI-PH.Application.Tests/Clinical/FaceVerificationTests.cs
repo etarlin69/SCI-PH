@@ -276,6 +276,38 @@ namespace SCI_PH.Application.Tests.Clinical
             Assert.Equal(0, await s.Reception.FaceCleanup.RunOnceAsync(10, None));
         }
 
+        // No provider configured (Disabled): the revocation stands and its job stays Pending as ProviderDisabled, but nothing is
+        // sent to the provider and no attempt is counted, neither now nor on later worker passes.
+        [Fact]
+        public async Task WithTheProviderDisabledTheCleanupWaitsWithoutCountingAttempts()
+        {
+            var s = Start();
+            await EnrollAsync(s);
+            var reference = ActiveFace(s);
+            s.Reception.FaceProvider.IsEnabled = false;
+            var saves = s.Reception.Store.SaveCount;
+
+            var revoked = await s.Reception.Faces.RevokeAsync(s.Patient.Id, reference.Id, null, None);
+
+            Assert.Equal(BiometricReferenceStatus.Revoked, revoked.Status);
+            Assert.Equal(saves + 1, s.Reception.Store.SaveCount);
+            var job = Assert.Single(s.Reception.Store.FaceDeletions);
+            Assert.Equal((FaceTemplateDeletionStatus.Pending, 0, FaceTemplateDeletionFailure.ProviderDisabled, (DateTimeOffset?)null),
+                (job.Status, job.Attempts, job.LastFailure, job.LastAttemptAtUtc));
+
+            s.Reception.Time.Now = s.Reception.Time.Now.AddHours(1);
+            Assert.Equal(0, await s.Reception.FaceCleanup.RunOnceAsync(10, None));
+            Assert.False(await s.Reception.FaceCleanup.TryCompleteAsync(job.Id, None));
+            Assert.Equal(job, Assert.Single(s.Reception.Store.FaceDeletions));
+            Assert.Equal(saves + 1, s.Reception.Store.SaveCount);
+            Assert.DoesNotContain(s.Reception.FaceProvider.Calls, c => c.StartsWith("delete", StringComparison.Ordinal));
+
+            // Once a provider is configured again, the job is processed like any other.
+            s.Reception.FaceProvider.IsEnabled = true;
+            Assert.Equal(1, await s.Reception.FaceCleanup.RunOnceAsync(10, None));
+            Assert.Equal(FaceTemplateDeletionStatus.Completed, s.Reception.Store.FaceDeletions.Single().Status);
+        }
+
         // A template that is already gone completes the job as NotFound.
         [Fact]
         public async Task AMissingTemplateCompletesTheCleanupAsNotFound()

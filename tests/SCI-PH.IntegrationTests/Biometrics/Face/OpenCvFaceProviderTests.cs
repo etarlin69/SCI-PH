@@ -310,6 +310,7 @@ namespace SCI_PH.IntegrationTests.Biometrics.Face
             _ = provider.GetRequiredService<IOptions<FaceVerificationOptions>>().Value;
             var faces = provider.GetRequiredService<IFaceVerificationService>();
             Assert.IsType<DisabledFaceVerificationService>(faces);
+            Assert.False(faces.IsEnabled);
             Assert.Empty(provider.GetServices<IHostedService>());
             Assert.Null(provider.GetService<LocalOpenCvFaceVerificationService>());
             await Assert.ThrowsAsync<ExternalServiceUnavailableException>(() => faces.DeleteAsync("face:x", None));

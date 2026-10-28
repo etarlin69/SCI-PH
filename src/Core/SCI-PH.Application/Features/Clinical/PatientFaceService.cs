@@ -242,6 +242,12 @@ namespace SCI_PH.Application.Features.Clinical
                         reason = reason?.ToString()
                     }))));
                 var deletion = FaceTemplateDeletion.Request(reference.Id, now);
+                if (!_faces.IsEnabled)
+                {
+                    // No provider configured: Pending, nothing attempted, no attempt counted.
+                    deletion = deletion with { LastFailure = FaceTemplateDeletionFailure.ProviderDisabled };
+                }
+
                 _deletions.Add(deletion);
                 try
                 {

@@ -66,11 +66,13 @@ namespace SCI_PH.Application.Abstractions.Biometrics
         NotFound = 2
     }
 
-    // ProviderUnavailable: the provider or its store failed (retried). ProviderMismatch: the reference belongs to another
-    // provider than the configured one; nothing is ever sent to it (needs attention).
+    // ProviderUnavailable: a delete was attempted and the provider or its store failed (retried). ProviderMismatch: the
+    // reference belongs to another provider than the configured one; nothing is ever sent to it (needs attention).
+    // ProviderDisabled: no provider is configured; nothing was attempted and no attempt is counted.
     public enum FaceTemplateDeletionFailure
     {
         ProviderUnavailable = 1,
-        ProviderMismatch = 2
+        ProviderMismatch = 2,
+        ProviderDisabled = 3
     }
 }

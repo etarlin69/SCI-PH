@@ -1638,7 +1638,7 @@ namespace SCI_PH.Persistence.Migrations.Clinical
 
                             t.HasCheckConstraint("CK_FaceTemplateDeletionJobs_Dates", "(\"LastAttemptAtUtc\" >= \"CreatedAtUtc\") AND (\"CompletedAtUtc\" >= \"CreatedAtUtc\")");
 
-                            t.HasCheckConstraint("CK_FaceTemplateDeletionJobs_LastFailure_Enum", "\"LastFailure\" IN (1, 2)");
+                            t.HasCheckConstraint("CK_FaceTemplateDeletionJobs_LastFailure_Enum", "\"LastFailure\" IN (1, 2, 3)");
 
                             t.HasCheckConstraint("CK_FaceTemplateDeletionJobs_Lifecycle", "((\"Status\" = 1) AND (\"Outcome\" IS NULL) AND (\"CompletedAtUtc\" IS NULL)) OR ((\"Status\" = 2) AND (\"Outcome\" IS NOT NULL) AND (\"CompletedAtUtc\" IS NOT NULL))");
 
