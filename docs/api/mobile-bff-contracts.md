@@ -395,9 +395,10 @@ Crea en **una transacción** una sesión `Pending` (hora del servidor; vence a l
 
 - `status`: `Pending`, `Matched`, `NoMatch`, `Failed`, `Expired`, `Cancelled` o `Confirmed`.
 - `failure`: `LowQuality` o `SensorError` cuando `Failed`; si no, `null`.
-- `candidate`: solo con `Matched` y mientras la referencia siga activa; solo nombre y fecha de nacimiento (nunca el id
-  del paciente, sus documentos ni la referencia biométrica). Un `Matched` sin candidato (referencia revocada) no se
-  puede confirmar.
+- `candidate`: solo con `Matched`, mientras la referencia siga activa **y el lector de la sesión siga siendo un lector de
+  huella válido** (activo, con `Device.Fingerprint.Identify`; se reevalúa en cada consulta); solo nombre y fecha de
+  nacimiento (nunca el id del paciente, sus documentos ni la referencia biométrica). Un `Matched` sin candidato
+  (referencia revocada o lector que ya no es válido; no se dice cuál) no se puede confirmar: la app lo cancela.
 
 #### `GET /api/mobile/emergencies/{id}/identify/fingerprint/sessions/{sessionId}`
 
@@ -412,7 +413,9 @@ mientras está `Pending` y deja de hacerlo al cambiar de estado o al salir de la
 ```
 
 Sin paciente: el servidor lo toma de la referencia de la sesión. Comprueba de nuevo que la sesión sea de esa emergencia
-y de ese paramédico, esté `Matched` y no vencida, que la referencia siga activa, que la emergencia siga NN y sin clínica.
+y de ese paramédico, esté `Matched` y no vencida, que la referencia siga activa, que la emergencia siga NN y sin clínica,
+y, como último paso antes de identificar, que el lector de la sesión siga activo con `Device.Fingerprint.Identify`
+([ADR-009](../adr/ADR-009-fingerprint-identification.md), decisión 11).
 En **una transacción**: la identificación de la emergencia (auditoría `Identify`), la sesión `Confirmed` y el recibo.
 
 | Estado | Cuándo |
@@ -420,10 +423,12 @@ En **una transacción**: la identificación de la emergencia (auditoría `Identi
 | `200` | La emergencia identificada (misma forma que `GET /api/mobile/emergencies/{id}`); también al repetir el mismo `clientRequestId` (sin otra auditoría) |
 | `400` | `clientRequestId` vacío o ausente, campos que sobran (`patientId`…) |
 | `403` / `404` | Como en la apertura; `404` también para una sesión de otra emergencia o de otro paramédico |
-| `409` | La sesión no está `Matched` o venció; la referencia se revocó; la emergencia ya fue identificada (por documento u otra sesión) o recibida por el hospital; o la clave se usó con otra sesión |
+| `409` | La sesión no está `Matched` o venció; la referencia se revocó; el lector de la sesión ya no es válido (revocado, inexistente o sin scope; mensaje genérico, la sesión sigue `Matched`); la emergencia ya fue identificada (por documento u otra sesión) o recibida por el hospital; o la clave se usó con otra sesión |
 
 - **Idempotencia:** operación `prehospital-emergency.fingerprint-confirm.v1`; el hash usa la emergencia y la sesión; el
-  recibo apunta a la **emergencia** (como la identificación por documento), así que un reintento la devuelve.
+  recibo apunta a la **emergencia** (como la identificación por documento), así que un reintento la devuelve, también
+  si el lector se revocó después de esa confirmación. Una confirmación rechazada no deja recibo: su reintento se evalúa
+  de nuevo.
 - **Concurrencia:** contra otra identificación gana una sola (`PatientId` es token de concurrencia; la otra recibe
   `409` y nunca sobrescribe al paciente); contra la recepción del hospital o la cancelación, `409`. Dos confirmaciones
   simultáneas: una identificación y una auditoría.

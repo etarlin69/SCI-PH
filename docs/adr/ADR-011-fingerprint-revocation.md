@@ -159,9 +159,9 @@ físico falle. El borrado en el sensor es limpieza, no seguridad.
 - Ciclo de vida completo en el prototipo: registro → identificación → revocación inmediata → borrado físico con
   reintentos → slot reutilizable. Probado de punta a punta con el simulador (modo `enroll`), sin hardware real.
 - Migración `AddFingerprintSlotDeletionJobs` (esquema `clinical`); sin cambios en el Domain ni en el esquema identity.
-- **Seguimiento (seguridad biométrica, P1/P2):** una sesión de identificación ya `Matched` puede confirmarse aunque su
-  lector se revoque entre el `Match` y la confirmación (la confirmación valida la referencia, no el lector). No se
-  resuelve aquí.
+- **Seguimiento (seguridad biométrica):** una sesión de identificación ya `Matched` podía confirmarse aunque su lector se
+  revocara entre el `Match` y la confirmación. Resuelto en
+  [ADR-009, decisión 11](ADR-009-fingerprint-identification.md#11-el-lector-de-la-sesión-se-revalida-en-la-confirmación-y-al-mostrar-el-candidato).
 - Fuera de alcance: reconciliación general de slots, estado `Abandoned`, borrado manual o reintento desde el Web,
   revocación masiva al revocar un lector, firmware real.
 - **Preguntas de hardware pendientes (R307):** comando de borrado por slot; si el borrado es síncrono; qué devuelve con
