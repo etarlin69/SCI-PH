@@ -357,6 +357,13 @@ export interface FingerprintEnroller {
 
 export type BiometricReferenceStatus = 'Active' | 'Revoked';
 
+/**
+ * Limpieza física de una huella revocada en su lector (ADR-011). Derivada por el servidor; nunca incluye el slot.
+ * Pending: el lector aún debe borrar su copia. Completed: borrada. AttentionRequired: el lector no puede hacerlo (revocado,
+ * desconocido) o sigue fallando. NotRequired: revocada antes de existir la limpieza automática.
+ */
+export type FingerprintCleanupStatus = 'Pending' | 'Completed' | 'AttentionRequired' | 'NotRequired';
+
 /** Referencia de huella del paciente. Nunca incluye el slot ni la referencia interna del sensor. */
 export interface PatientFingerprint {
     id: Guid;
@@ -365,7 +372,12 @@ export interface PatientFingerprint {
     reader: { code: string; name: string; available: boolean } | null;
     registeredAtUtc: string;
     revokedAtUtc: string | null;
+    /** null mientras está activa. */
+    cleanup: FingerprintCleanupStatus | null;
 }
+
+/** Motivo opcional de la revocación; solo queda en la auditoría. */
+export type FingerprintRevocationReason = 'PatientRequest' | 'EnrollmentError' | 'ReaderReplaced' | 'Other';
 
 export type FingerprintEnrollmentStatus = 'Pending' | 'Enrolled' | 'Failed' | 'Expired' | 'Cancelled';
 

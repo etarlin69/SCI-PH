@@ -47,12 +47,13 @@ namespace SCI_PH.IntegrationTests.Clinical
             using var context = CreateContext();
             var entities = context.Model.GetEntityTypes().ToList();
 
-            Assert.Equal(31, entities.Count);
+            Assert.Equal(32, entities.Count);
             Assert.All(entities, entity => Assert.Equal(ClinicalDbContext.Schema, entity.GetSchema()));
             // Technical state committed with the clinical rows, not Domain entities.
             var technical = entities.Where(entity => !entity.ClrType.Namespace!.StartsWith("SCI_PH.Domain.Entities", StringComparison.Ordinal))
                 .Select(entity => entity.ClrType).OrderBy(type => type.Name).ToList();
-            Assert.Equal([typeof(FingerprintEnrollmentSessionEntry), typeof(FingerprintIdentificationSessionEntry), typeof(IdempotencyReceiptEntry)], technical);
+            Assert.Equal([typeof(FingerprintEnrollmentSessionEntry), typeof(FingerprintIdentificationSessionEntry), typeof(FingerprintSlotDeletionJobEntry),
+                typeof(IdempotencyReceiptEntry)], technical);
         }
 
         [Fact]

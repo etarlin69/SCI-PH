@@ -150,7 +150,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             Assert.Equal(("Enrolled", reference.Id), (status.GetProperty("status").GetString(), status.GetProperty("biometricReferenceId").GetGuid()));
             var listedRaw = await (await reception.Client.GetAsync(Fingerprints(patient.Id))).Content.ReadAsStringAsync();
             var listed = Assert.Single(JsonDocument.Parse(listedRaw).RootElement.EnumerateArray());
-            Assert.Equal(["id", "status", "reader", "registeredAtUtc", "revokedAtUtc"], listed.EnumerateObject().Select(p => p.Name));
+            Assert.Equal(["id", "status", "reader", "registeredAtUtc", "revokedAtUtc", "cleanup"], listed.EnumerateObject().Select(p => p.Name));
             Assert.Equal((reader.Code, true), (listed.GetProperty("reader").GetProperty("code").GetString(), listed.GetProperty("reader").GetProperty("available").GetBoolean()));
             Assert.DoesNotContain("r307", listedRaw, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain(reader.Id.ToString(), listedRaw);

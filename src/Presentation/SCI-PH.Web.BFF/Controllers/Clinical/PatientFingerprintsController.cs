@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using SCI_PH.Application.Common.Security;
 using SCI_PH.Application.DTOs.Biometrics;
 using SCI_PH.Application.Features.Clinical;
 
 namespace SCI_PH.Web.BFF.Controllers.Clinical
 {
-    // Fingerprint references of a patient and their enrollment on a reader (ADR-010). Biometrics.Manage plus
+    // Fingerprint references of a patient, their enrollment on a reader (ADR-010) and their revocation (ADR-011). Biometrics.Manage plus
     // Patients.Read (the patient must be visible, as for GET /api/web/patients/{id}); the service also requires active
     // clinical staff. Never a slot, a subject reference or a reader's internal id of a reference.
     [ApiController]
@@ -17,8 +18,13 @@ namespace SCI_PH.Web.BFF.Controllers.Clinical
     public sealed class PatientFingerprintsController : ControllerBase
     {
         private readonly FingerprintEnrollmentService _enrollments;
+        private readonly FingerprintRevocationService _revocations;
 
-        public PatientFingerprintsController(FingerprintEnrollmentService enrollments) => _enrollments = enrollments;
+        public PatientFingerprintsController(FingerprintEnrollmentService enrollments, FingerprintRevocationService revocations)
+        {
+            _enrollments = enrollments;
+            _revocations = revocations;
+        }
 
         [HttpGet]
         [ProducesResponseType<IReadOnlyList<PatientFingerprintSummary>>(StatusCodes.Status200OK)]
@@ -61,6 +67,20 @@ namespace SCI_PH.Web.BFF.Controllers.Clinical
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> Cancel(Guid patientId, Guid enrollmentId, CancellationToken cancellationToken) =>
             Ok(await _enrollments.CancelAsync(patientId, enrollmentId, cancellationToken));
+
+        // Active -> Revoked, unusable for identification from this response on; the reader's copy is deleted later (cleanup).
+        // 200 also when it was already revoked (nothing written); 400 for an unknown reason or any other member; 404 for
+        // another patient's reference, one that is not a fingerprint, or none. The body is optional.
+        [HttpPost("{referenceId:guid}/revoke")]
+        [ProducesResponseType<PatientFingerprintSummary>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> Revoke(
+            Guid patientId, Guid referenceId, [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RevokeFingerprintRequest? request,
+            CancellationToken cancellationToken) =>
+            Ok(await _revocations.RevokeAsync(patientId, referenceId, request, cancellationToken));
     }
 
     // Readers the hospital can enroll fingerprints on: active, with both Device.Fingerprint.Enroll and

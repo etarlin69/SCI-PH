@@ -72,6 +72,13 @@ export const httpClinicalApi: ClinicalApi = {
             method: 'POST',
         }),
 
+    // Solo el motivo (opcional): paciente y referencia van en la ruta; el personal y la fecha los pone el servidor.
+    revokePatientFingerprint: (patientId, referenceId, reason) =>
+        apiRequest<PatientFingerprint>(`${BASE}/patients/${id(patientId)}/fingerprints/${id(referenceId)}/revoke`, {
+            method: 'POST',
+            body: reason ? { reason } : {},
+        }),
+
     listActiveEncounters: (signal) =>
         apiRequest<ClinicalEncounterSummary[]>(`${BASE}/encounters`, { query: { clinicId: clinicIdForRequest() }, signal }),
 

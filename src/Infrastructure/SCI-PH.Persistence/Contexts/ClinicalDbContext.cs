@@ -61,6 +61,7 @@ namespace SCI_PH.Persistence.Contexts
         public DbSet<IdempotencyReceiptEntry> IdempotencyReceipts => Set<IdempotencyReceiptEntry>();
         public DbSet<FingerprintIdentificationSessionEntry> FingerprintIdentificationSessions => Set<FingerprintIdentificationSessionEntry>();
         public DbSet<FingerprintEnrollmentSessionEntry> FingerprintEnrollmentSessions => Set<FingerprintEnrollmentSessionEntry>();
+        public DbSet<FingerprintSlotDeletionJobEntry> FingerprintSlotDeletionJobs => Set<FingerprintSlotDeletionJobEntry>();
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
         {
@@ -83,6 +84,7 @@ namespace SCI_PH.Persistence.Contexts
             modelBuilder.ApplyConfiguration(new IdempotencyReceiptConfiguration());
             modelBuilder.ApplyConfiguration(new FingerprintIdentificationSessionConfiguration());
             modelBuilder.ApplyConfiguration(new FingerprintEnrollmentSessionConfiguration());
+            modelBuilder.ApplyConfiguration(new FingerprintSlotDeletionJobConfiguration());
             modelBuilder.RestrictAllDeletes().AddEnumCheckConstraints();
         }
 

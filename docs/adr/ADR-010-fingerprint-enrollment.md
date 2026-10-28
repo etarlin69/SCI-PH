@@ -95,8 +95,9 @@ confirmación de una identificación leía la referencia sin protegerla de una r
 
 - Una huella registrada en el Web sirve de inmediato para identificar una emergencia con ese mismo lector (probado de
   punta a punta con el simulador).
-- Fuera de alcance y para el siguiente PR: la revocación pública (invalidación inmediata en SCI-PH + trabajo de borrado
-  del slot en el dispositivo + compensación), la reconciliación de slots huérfanos y el firmware real.
+- La revocación pública (invalidación inmediata en SCI-PH + trabajo de borrado del slot en el dispositivo) se decidió en
+  [ADR-011](ADR-011-fingerprint-revocation.md). Siguen fuera de alcance la reconciliación de slots huérfanos y el
+  firmware real.
 - Preguntas de hardware pendientes (documentación del R307): capacidad y numeración de slots; capturas y tiempo por
   registro; si informa slots ocupados; si detecta duplicados antes de guardar; si borra slots individuales; puntaje y
   umbral de la búsqueda; detección de dedos falsos; persistencia de los slots ante cortes de energía.

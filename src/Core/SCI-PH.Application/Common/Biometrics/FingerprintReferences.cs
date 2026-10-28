@@ -30,17 +30,35 @@ namespace SCI_PH.Application.Common.Biometrics
             string.Create(CultureInfo.InvariantCulture, $"r307:device:{deviceCredentialId:D}:slot:");
 
         // The reader of a subject reference, or null when it does not follow this format.
-        public static Guid? ReaderOf(string subjectReference)
+        public static Guid? ReaderOf(string subjectReference) =>
+            TryParse(subjectReference, out var deviceCredentialId, out _) ? deviceCredentialId : null;
+
+        // The only parser of the format: exactly "r307:device:<GUID in D format>:slot:<non-negative integer>", and only when
+        // building it again gives the same text (no sign, no leading zeros, no spaces). Anything else is not a reference of
+        // this prototype (a legacy or foreign one): its reader and slot are unknown and nothing physical is asked of a reader.
+        public static bool TryParse(string? subjectReference, out Guid deviceCredentialId, out int slot)
         {
             const string head = "r307:device:";
-            if (!subjectReference.StartsWith(head, StringComparison.Ordinal))
+            const string slotSeparator = ":slot:";
+            deviceCredentialId = Guid.Empty;
+            slot = -1;
+            if (subjectReference is null || !subjectReference.StartsWith(head, StringComparison.Ordinal))
             {
-                return null;
+                return false;
             }
 
             var rest = subjectReference.AsSpan(head.Length);
-            var separator = rest.IndexOf(':');
-            return separator > 0 && Guid.TryParseExact(rest[..separator], "D", out var id) ? id : null;
+            var separator = rest.IndexOf(slotSeparator, StringComparison.Ordinal);
+            if (separator <= 0
+                || !Guid.TryParseExact(rest[..separator], "D", out var id)
+                || !int.TryParse(rest[(separator + slotSeparator.Length)..], NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)
+                || !string.Equals(SubjectReference(id, parsed), subjectReference, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            (deviceCredentialId, slot) = (id, parsed);
+            return true;
         }
     }
 }

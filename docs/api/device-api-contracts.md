@@ -16,6 +16,8 @@
 | `POST` | `/api/device/fingerprint/sessions/{sessionId}/result` | Lo que el sensor comparó para esa sesión | `Device.Fingerprint.Identify` | Implementado |
 | `GET` | `/api/device/fingerprint/enrollments/pending` | El registro de huella que debe hacer este lector, si lo hay | `Device.Fingerprint.Enroll` | Implementado |
 | `POST` | `/api/device/fingerprint/enrollments/{enrollmentId}/result` | Qué hizo el sensor al registrar la huella | `Device.Fingerprint.Enroll` | Implementado |
+| `GET` | `/api/device/fingerprint/deletions/pending` | El slot de una huella revocada que este lector debe borrar, si lo hay | `Device.Fingerprint.Enroll` | Implementado |
+| `POST` | `/api/device/fingerprint/deletions/{deletionId}/result` | Qué hizo el sensor en un intento de borrado | `Device.Fingerprint.Enroll` | Implementado |
 
 ---
 
@@ -121,6 +123,48 @@ historia, referencia ni slot esperado). **`204`:** nada pendiente. `401` / `403`
 
 Dos resultados simultáneos: uno se acepta y el otro recibe `409`; nunca dos referencias. El registro vence a los 120 s
 (duración del prototipo; el tiempo real del R307 está pendiente de verificar).
+
+Un slot cuya plantilla revocada este lector **todavía debe borrar** (ver abajo) no está libre: `409` como un slot ocupado.
+
+---
+
+## Borrado del slot de una huella revocada
+
+Diseño en [ADR-011](../adr/ADR-011-fingerprint-revocation.md). Cuando el hospital revoca una huella, SCI-PH la invalida
+**de inmediato** (deja de identificar aunque el lector esté apagado) y deja un trabajo para que **su** lector borre la
+plantilla del slot. El borrado es limpieza: la seguridad no depende de él. Mismo scope que el registro.
+
+| Método | Ruta | Descripción | Scope | Estado |
+|---|---|---|---|---|
+| `GET` | `/api/device/fingerprint/deletions/pending` | El borrado más antiguo pendiente de este lector, si lo hay | `Device.Fingerprint.Enroll` | Implementado |
+| `POST` | `/api/device/fingerprint/deletions/{deletionId}/result` | Qué hizo el sensor en un intento de borrado | `Device.Fingerprint.Enroll` | Implementado |
+
+### `GET /api/device/fingerprint/deletions/pending`
+
+**`200 OK`:** `{ "deletionId": "…", "slot": 5 }`. El slot sale de la referencia revocada (nunca lo elige el lector) y es
+la única instrucción técnica; nunca paciente, nombre, fecha de nacimiento, historia, referencia ni `SubjectReference`.
+**`204`:** nada pendiente. Los trabajos no vencen. `401` / `403` / `429` como en los demás endpoints.
+
+### `POST /api/device/fingerprint/deletions/{deletionId}/result`
+
+```json
+{ "attemptId": "6f1c…", "outcome": "Deleted" }
+```
+
+- `attemptId`: un UUID que el lector genera **por cada intento físico** de borrado y conserva al reenviar ese mismo
+  resultado. `outcome`: `Deleted`, `NotFound` (el slot ya estaba vacío: también cumple el objetivo) o `SensorError`.
+  Sin `slot` ni `deviceId` ni ningún otro campo: `400`.
+
+| Estado | Cuándo | Qué hace el lector |
+|---|---|---|
+| `204` | Intento aceptado: `Deleted`/`NotFound` completan el borrado; `SensorError` lo deja pendiente y cuenta un intento. También al reenviar **el mismo** intento con el mismo resultado (no cuenta dos veces) | Terminado; tras un `SensorError`, espera y vuelve a intentar con **otro** `attemptId` |
+| `400` | Cuerpo inválido | No reintenta ese envío |
+| `404` | El borrado no existe o es de otro lector (no se distingue) | No reintenta |
+| `409` | El mismo intento con **otro** resultado, o un intento nuevo para un borrado ya completado (su resultado no cambia) | No reintenta |
+| sin respuesta, timeout, 5xx, 429 | Incierto | Reenvía el **mismo** `attemptId` y resultado |
+
+Dos informes simultáneos: uno se aplica y el otro se decide sobre lo que dejó. Un lector revocado no puede autenticarse:
+su borrado queda pendiente y el Web lo muestra como "requiere atención".
 
 ---
 

@@ -19,7 +19,8 @@ var deviceKey = GetRequiredEnvironmentVariable("DEVICE_KEY");
 
 // heartbeat (default): periodic heartbeats. fingerprint: an R307 reader that polls for its capture job and reports
 // what the sensor matched. enroll: an R307 reader that polls for its enrollment job, stores the template in a free slot
-// of its (simulated) sensor and reports it. The sensor itself is simulated: no template ever leaves the device.
+// of its (simulated) sensor and reports it, and deletes the slots of revoked fingerprints (ADR-011). The sensor itself is
+// simulated: no template ever leaves the device.
 var mode = GetEnvironmentVariable("DEVICE_MODE", "heartbeat").ToLowerInvariant();
 
 var firmwareVersion = GetEnvironmentVariable(
@@ -383,7 +384,7 @@ static async Task<bool> SubmitResultAsync(
 // slot of its simulated sensor (a JSON file of occupied slots) and reports it. The slot is kept only after a 204. An
 // uncertain answer (no response, timeout, 5xx, 429) is retried with EXACTLY the same result until the enrollment
 // expires; a terminal rejection (400, 401, 403, 404, 409) or the expiry deletes the slot it just stored (compensation).
-// The slot number is never printed.
+// Between enrollments it also polls for slot deletions (ProcessSlotDeletionAsync). The slot number is never printed.
 static async Task<int> RunEnrollmentReaderAsync(HttpClient httpClient, string deviceId, CancellationToken cancellationToken)
 {
     string[] outcomes = ["Enrolled", "Failed", "LowQuality", "SensorError"];
@@ -406,6 +407,12 @@ static async Task<int> RunEnrollmentReaderAsync(HttpClient httpClient, string de
     var loseFirstResponse = GetBooleanEnvironmentVariable("ENROLL_LOSE_FIRST_RESPONSE");
     var changedReplay = GetBooleanEnvironmentVariable("ENROLL_CHANGED_REPLAY");
     var once = GetBooleanEnvironmentVariable("FINGERPRINT_ONCE");
+    var deletion = new SlotDeletionOptions(
+        SensorErrors: GetNonNegativeIntegerEnvironmentVariable("DELETE_SENSOR_ERRORS", 0),
+        RetrySeconds: GetPositiveIntegerEnvironmentVariable("DELETE_RETRY_SECONDS", 3),
+        LoseFirstResponse: GetBooleanEnvironmentVariable("DELETE_LOSE_FIRST_RESPONSE"),
+        ChangedReplay: GetBooleanEnvironmentVariable("DELETE_CHANGED_REPLAY"));
+    var sensorErrorsLeft = deletion.SensorErrors;
 
     Console.WriteLine($"Enrollment outcome: {outcome}");
     Console.WriteLine($"Occupied slots: {ReadSlots(slotsFile).Count} (simulated sensor memory)");
@@ -471,6 +478,28 @@ static async Task<int> RunEnrollmentReaderAsync(HttpClient httpClient, string de
                 {
                     return accepted ? 0 : 3;
                 }
+            }
+
+            var (deletionStatus, deletionJob) = await GetPendingSlotDeletionAsync(httpClient, cancellationToken);
+            if (deletionStatus is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                Console.Error.WriteLine($"[{Now()}] Device authentication failed ({(int)deletionStatus} {deletionStatus}).");
+
+                return 2;
+            }
+
+            if (deletionJob is { } deletionTarget)
+            {
+                var sensorError = sensorErrorsLeft > 0;
+                sensorErrorsLeft -= sensorError ? 1 : 0;
+                var reported = await ProcessSlotDeletionAsync(httpClient, slotsFile, deletionTarget.Id, deletionTarget.Slot, sensorError, deletion, cancellationToken);
+                if (sensorError || !reported)
+                {
+                    // Backoff before the next PHYSICAL attempt (a new attemptId); no busy loop on a failing sensor.
+                    await Task.Delay(TimeSpan.FromSeconds(deletion.RetrySeconds), cancellationToken);
+                }
+
+                continue;
             }
 
             await Task.Delay(TimeSpan.FromSeconds(pollSeconds), cancellationToken);
@@ -593,6 +622,131 @@ static async Task<(HttpStatusCode? Status, (Guid Id, DateTimeOffset ExpiresAtUtc
 }
 
 
+// One PHYSICAL attempt to delete the slot of a revoked fingerprint (ADR-011), with its own attemptId. The simulated sensor
+// deletes the slot if it holds it (Deleted) or reports it absent (NotFound); a simulated sensor error changes nothing.
+// The result is resent with the SAME attemptId and outcome while the answer is uncertain (a lost 204 must not count as a
+// second attempt). True only after a 204. The slot number is never printed.
+static async Task<bool> ProcessSlotDeletionAsync(
+    HttpClient httpClient,
+    string slotsFile,
+    Guid deletionId,
+    int slot,
+    bool sensorError,
+    SlotDeletionOptions options,
+    CancellationToken cancellationToken)
+{
+    var attemptId = Guid.NewGuid();
+    string outcome;
+    if (sensorError)
+    {
+        outcome = "SensorError";
+    }
+    else
+    {
+        var occupied = ReadSlots(slotsFile);
+        outcome = occupied.Remove(slot) ? "Deleted" : "NotFound";
+        WriteSlots(slotsFile, occupied);
+    }
+
+    Console.WriteLine($"[{Now()}] Slot deletion requested (deletion {deletionId.ToString()[..8]}): sensor answered {outcome}.");
+    var lose = options.LoseFirstResponse;
+    for (var tries = 0; tries < 30; tries++)
+    {
+        var status = await SendSlotDeletionResultAsync(httpClient, deletionId, attemptId, outcome, cancellationToken);
+        if (lose)
+        {
+            // Simulated lost response: whatever the server answered, the device does not know it.
+            lose = false;
+            Console.WriteLine($"[{Now()}] Response lost (simulated); resending the same attempt.");
+            continue;
+        }
+
+        if (status == HttpStatusCode.NoContent)
+        {
+            Console.WriteLine($"[{Now()}] Deletion result {outcome} accepted.");
+            if (options.ChangedReplay && outcome != "SensorError")
+            {
+                // The same attempt with another outcome must be rejected (and change nothing).
+                var changed = await SendSlotDeletionResultAsync(
+                    httpClient, deletionId, attemptId, outcome == "Deleted" ? "NotFound" : "Deleted", cancellationToken);
+                Console.WriteLine($"[{Now()}] Changed result answered {(int?)changed ?? 0} (expected 409).");
+            }
+
+            return true;
+        }
+
+        if (status is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
+            or HttpStatusCode.NotFound or HttpStatusCode.Conflict)
+        {
+            Console.Error.WriteLine($"[{Now()}] Deletion result {outcome} rejected ({(int)status} {status}).");
+
+            return false;
+        }
+
+        Console.Error.WriteLine($"[{Now()}] Uncertain answer ({(int?)status ?? 0}); resending the same attempt.");
+        await Task.Delay(TimeSpan.FromSeconds(options.RetrySeconds), cancellationToken);
+    }
+
+    return false;
+}
+
+
+// The status code, or null when there was no answer.
+static async Task<HttpStatusCode?> SendSlotDeletionResultAsync(
+    HttpClient httpClient,
+    Guid deletionId,
+    Guid attemptId,
+    string outcome,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            $"api/device/fingerprint/deletions/{deletionId}/result", new { attemptId, outcome }, cancellationToken);
+        return response.StatusCode;
+    }
+    catch (HttpRequestException)
+    {
+        return null;
+    }
+    catch (TaskCanceledException)
+        when (!cancellationToken.IsCancellationRequested)
+    {
+        return null;
+    }
+}
+
+
+static async Task<(HttpStatusCode? Status, (Guid Id, int Slot)? Job)> GetPendingSlotDeletionAsync(
+    HttpClient httpClient,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        using var response = await httpClient.GetAsync("api/device/fingerprint/deletions/pending", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.OK)
+        {
+            using var pending = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+            return (response.StatusCode, (pending.RootElement.GetProperty("deletionId").GetGuid(),
+                pending.RootElement.GetProperty("slot").GetInt32()));
+        }
+
+        return (response.StatusCode, null);
+    }
+    catch (HttpRequestException exception)
+    {
+        Console.Error.WriteLine($"[{Now()}] Unable to reach Device API: {exception.Message}");
+
+        return (null, null);
+    }
+    catch (TaskCanceledException)
+        when (!cancellationToken.IsCancellationRequested)
+    {
+        return (null, null);
+    }
+}
+
+
 static HashSet<int> ReadSlots(string file) =>
     File.Exists(file) ? JsonSerializer.Deserialize<HashSet<int>>(File.ReadAllText(file)) ?? [] : [];
 
@@ -689,3 +843,7 @@ static int GetNonNegativeIntegerEnvironmentVariable(
 
 static bool GetBooleanEnvironmentVariable(string name) =>
     bool.TryParse(Environment.GetEnvironmentVariable(name), out var value) && value;
+
+
+// DELETE_SENSOR_ERRORS: how many physical deletion attempts fail with a sensor error before the sensor works.
+internal sealed record SlotDeletionOptions(int SensorErrors, int RetrySeconds, bool LoseFirstResponse, bool ChangedReplay);

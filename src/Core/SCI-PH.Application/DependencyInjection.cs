@@ -66,6 +66,7 @@ namespace SCI_PH.Application
             services.AddScoped<PrehospitalEmergencyService>();
             services.AddScoped<EmergencyFingerprintService>();
             services.AddScoped<FingerprintEnrollmentService>();
+            services.AddScoped<FingerprintRevocationService>();
 
             return services;
         }
@@ -77,6 +78,7 @@ namespace SCI_PH.Application
             services.AddScoped<DeviceAuthenticationService>();
             services.AddScoped<FingerprintReaderService>();
             services.AddScoped<FingerprintEnrollmentReaderService>();
+            services.AddScoped<FingerprintSlotDeletionReaderService>();
 
             return services;
         }
