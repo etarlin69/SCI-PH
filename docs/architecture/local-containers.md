@@ -133,6 +133,13 @@ DEVICE_MODE=fingerprint FINGERPRINT_OUTCOME=Match FINGERPRINT_SLOT=1 DEVICE_ID=<
   `SensorError` antes de que el sensor funcione, por defecto 0; no tocan el archivo), `DELETE_RETRY_SECONDS` (espera
   entre intentos, por defecto 3), `DELETE_LOSE_FIRST_RESPONSE=true` (simula un 204 perdido: reenvía el mismo intento) y
   `DELETE_CHANGED_REPLAY=true` (reenvía el mismo intento con otro resultado, que debe dar 409).
+
+## Verificación facial
+
+El Web BFF usa el proveedor facial de `FaceVerification:Provider` ([ADR-012](../adr/ADR-012-face-verification.md)). Sin
+configurar, en Development (el stack local) es `Fake`: un proveedor determinista que **no reconoce caras** (decide por el
+color medio de capturas sintéticas) y no necesita modelos ni claves. En Production, sin configurar, es `Disabled` (503) y
+`Fake` impide arrancar. El proveedor local real (OpenCV: YuNet + SFace) llega en el PR 2.
 - Para que un `Match` tenga candidato, el paciente debe estar registrado en ese lector (registro desde el Web con el modo
   `enroll`); en Development también se puede sembrar la referencia del paciente con
   `ClinicalDevelopmentSeed:FingerprintReferences` (`PatientId`, `DeviceCredentialId` y `Slot`; User Secrets, nunca el

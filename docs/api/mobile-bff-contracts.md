@@ -16,7 +16,7 @@
 | Método | Ruta | Descripción | Autenticación | Estado |
 |---|---|---|---|---|
 | `POST` | `/api/mobile/auth/qr/challenge` | Inicia el acceso mediante QR | No | Previsto |
-| `POST` | `/api/mobile/auth/face/verify` | Verificación facial 1:1 para completar el acceso | Challenge válido | Previsto |
+| `POST` | `/api/mobile/auth/face/verify` | Verificación facial 1:1 para completar el acceso (la app solo lo simula; requerirá liveness, [ADR-012](../adr/ADR-012-face-verification.md)) | Challenge válido | Previsto |
 | `POST` | `/api/mobile/auth/login` · `/mfa/verify` | Inicio de sesión (con segundo factor si la cuenta tiene MFA) | No | Implementado |
 | `POST` | `/api/mobile/auth/refresh` · `/logout` | Renueva o cierra la sesión (refresh token en el cuerpo) | No | Implementado |
 | `POST` | `/api/mobile/auth/change-password` · `/revoke-sessions` | Contraseña y sesiones | Sí | Implementado |

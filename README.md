@@ -129,6 +129,7 @@ Para levantar todo (PostgreSQL, migraciones, BFFs, Device API y web-admin) en co
   - [ADR-009 Identificación por huella en la emergencia prehospitalaria](docs/adr/ADR-009-fingerprint-identification.md)
   - [ADR-010 Registro (enrolamiento) de huellas](docs/adr/ADR-010-fingerprint-enrollment.md)
   - [ADR-011 Revocación de huellas y borrado del slot en el lector](docs/adr/ADR-011-fingerprint-revocation.md)
+  - [ADR-012 Verificación facial 1:1 asistida](docs/adr/ADR-012-face-verification.md)
 - Contratos de API (previstos)
   - [Web BFF](docs/api/web-bff-contracts.md)
   - [Mobile BFF](docs/api/mobile-bff-contracts.md)
