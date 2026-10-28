@@ -55,6 +55,8 @@ namespace SCI_PH.Infrastructure.Web
                 AccessDeniedException => (StatusCodes.Status403Forbidden, "Access denied.", exception.Message),
                 ResourceNotFoundException => (StatusCodes.Status404NotFound, "The resource was not found.", exception.Message),
                 ResourceConflictException => (StatusCodes.Status409Conflict, "The request conflicts with the current state.", exception.Message),
+                // Generic by construction: no provider, credential, model path or stack in the response.
+                ExternalServiceUnavailableException => (StatusCodes.Status503ServiceUnavailable, "The service is temporarily unavailable.", exception.Message),
                 // Domain state rules are conflicts; any other Domain rule is invalid input (e.g. a vital sign out of range).
                 PatientAlreadyIdentifiedException or InvalidClinicalEncounterStateException =>
                     (StatusCodes.Status409Conflict, "The request conflicts with the current state.", exception.Message),

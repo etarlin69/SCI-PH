@@ -45,4 +45,11 @@ namespace SCI_PH.Application.Common.Errors
     {
         public ResourceConflictException(string message, Exception? innerException = null) : base(message, innerException) { }
     }
+
+    // An external dependency the request needs is not available now (a biometric provider that is down, timed out or
+    // failed internally): 503. The message is generic; the cause stays in the inner exception, never in the response.
+    public sealed class ExternalServiceUnavailableException : Exception
+    {
+        public ExternalServiceUnavailableException(string message, Exception? innerException = null) : base(message, innerException) { }
+    }
 }

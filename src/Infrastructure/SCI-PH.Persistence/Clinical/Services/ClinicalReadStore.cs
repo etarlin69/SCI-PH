@@ -126,6 +126,31 @@ namespace SCI_PH.Persistence.Clinical.Services
                 .Select(r => new FingerprintReferenceRow(r.Id, r.Provider, r.SubjectReference, r.Status, r.CreatedAtUtc, r.RevokedAtUtc))
                 .ToListAsync(cancellationToken);
 
+        public async Task<IReadOnlyList<FaceReferenceRow>> ListFaceReferencesAsync(Guid patientId, CancellationToken cancellationToken) =>
+            await FaceReferences(patientId)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .Select(FaceRow)
+                .ToListAsync(cancellationToken);
+
+        public Task<FaceReferenceRow?> FindActiveFaceReferenceAsync(Guid patientId, CancellationToken cancellationToken) =>
+            FaceReferences(patientId)
+                .Where(r => r.Status == BiometricReferenceStatus.Active)
+                .Select(FaceRow)
+                .SingleOrDefaultAsync(cancellationToken);
+
+        public Task<string?> GetAuditChangesAsync(Guid auditEntryId, string entityName, Guid patientId, CancellationToken cancellationToken) =>
+            _clinical.ClinicalAuditEntries.AsNoTracking()
+                .Where(a => a.Id == auditEntryId && a.EntityName == entityName && a.PatientId == patientId)
+                .Select(a => a.ChangesJson)
+                .SingleOrDefaultAsync(cancellationToken);
+
+        private IQueryable<PatientBiometricReference> FaceReferences(Guid patientId) =>
+            _clinical.PatientBiometricReferences.AsNoTracking()
+                .Where(r => r.PatientId == patientId && r.Modality == BiometricModality.Face);
+
+        private static readonly Expression<Func<PatientBiometricReference, FaceReferenceRow>> FaceRow = r =>
+            new FaceReferenceRow(r.Id, r.Provider, r.SubjectReference, r.AlgorithmVersion, r.Status, r.CreatedAtUtc, r.RevokedAtUtc);
+
         public async Task<EncounterRow?> GetEncounterAsync(Guid encounterId, CancellationToken cancellationToken) =>
             (await ToRowsAsync(_clinical.ClinicalEncounters.Where(e => e.Id == encounterId), 1, cancellationToken)).SingleOrDefault();
 

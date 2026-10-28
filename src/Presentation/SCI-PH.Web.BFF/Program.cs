@@ -15,13 +15,14 @@ builder.Services.AddHealthChecks();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi(options => options.AddBearerSecurity());
 
-builder.Services.AddApplication().AddAccountSecurity().AddAccountManagement(builder.Configuration).AddClinicalWorkflows();
+builder.Services.AddApplication().AddAccountSecurity().AddAccountManagement(builder.Configuration).AddClinicalWorkflows().AddFaceVerificationWorkflow();
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration)
     .AddJwtSecurity(builder.Configuration)
     .AddEmailDelivery(builder.Configuration)
     .AddFrontendCors(builder.Configuration)
-    .AddSecurityRateLimiting(builder.Configuration);
+    .AddSecurityRateLimiting(builder.Configuration)
+    .AddFaceVerification(builder.Configuration);
 
 var app = builder.Build();
 

@@ -1285,14 +1285,18 @@ namespace SCI_PH.Persistence.Migrations.Clinical
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PatientId");
-
                     b.HasIndex("RegisteredByStaffId");
 
                     b.HasIndex("Provider", "Modality", "SubjectReference")
                         .IsUnique()
                         .HasDatabaseName("UX_PatientBiometricReferences_ActiveSubject")
                         .HasFilter("\"Status\" = 1");
+
+                    b.HasIndex(new[] { "PatientId" }, "IX_PatientBiometricReferences_PatientId");
+
+                    b.HasIndex(new[] { "PatientId" }, "UX_PatientBiometricReferences_ActiveFacePerPatient")
+                        .IsUnique()
+                        .HasFilter("(\"Modality\" = 2) AND (\"Status\" = 1)");
 
                     b.ToTable("PatientBiometricReferences", "clinical", t =>
                         {

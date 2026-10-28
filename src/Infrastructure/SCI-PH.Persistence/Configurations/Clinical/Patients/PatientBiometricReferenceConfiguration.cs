@@ -11,11 +11,13 @@ namespace SCI_PH.Persistence.Configurations.Clinical.Patients
     internal sealed class PatientBiometricReferenceConfiguration : IEntityTypeConfiguration<PatientBiometricReference>
     {
         public const string ActiveSubjectIndexName = "UX_PatientBiometricReferences_ActiveSubject";
+        public const string ActiveFacePerPatientIndexName = "UX_PatientBiometricReferences_ActiveFacePerPatient";
 
         public void Configure(EntityTypeBuilder<PatientBiometricReference> builder)
         {
             const string status = nameof(PatientBiometricReference.Status);
             const string revokedAt = nameof(PatientBiometricReference.RevokedAtUtc);
+            const string modality = nameof(PatientBiometricReference.Modality);
 
             builder.HasKey(x => x.Id);
             // Concurrency token: a use of the reference (a fingerprint confirmation) loses against its revocation.
@@ -34,6 +36,13 @@ namespace SCI_PH.Persistence.Configurations.Clinical.Patients
                 .IsUnique()
                 .HasDatabaseName(ActiveSubjectIndexName)
                 .HasFilter(Is(status, BiometricReferenceStatus.Active));
+            // The foreign key's own (unfiltered) index, declared so the partial index below never replaces it.
+            builder.HasIndex([nameof(PatientBiometricReference.PatientId)], "IX_PatientBiometricReferences_PatientId");
+            // At most one ACTIVE face reference per patient (ADR-012), also under concurrent enrollments; revoked ones stay as
+            // history.
+            builder.HasIndex([nameof(PatientBiometricReference.PatientId)], ActiveFacePerPatientIndexName)
+                .IsUnique()
+                .HasFilter(All(Is(modality, BiometricModality.Face), Is(status, BiometricReferenceStatus.Active)));
 
             builder.ToTable(table =>
             {
