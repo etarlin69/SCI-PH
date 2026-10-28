@@ -117,7 +117,8 @@ recepción desde el cliente.
 
 ## Web Hospital — huella digital (implementado)
 
-Registro (enrolamiento) de huellas de un paciente en un lector ([ADR-010](../adr/ADR-010-fingerprint-enrollment.md)).
+Registro (enrolamiento) de huellas de un paciente en un lector ([ADR-010](../adr/ADR-010-fingerprint-enrollment.md)) y su
+revocación ([ADR-011](../adr/ADR-011-fingerprint-revocation.md)).
 Permiso `Biometrics.Manage` **y** personal clínico activo que pueda ver al paciente (`Patients.Read`); sin atajo por
 rol. El lector guarda la plantilla en su sensor; SCI-PH solo guarda a qué paciente pertenece. Nunca se devuelven el slot,
 la referencia interna (`SubjectReference`), plantillas, claves ni scopes.
@@ -125,10 +126,17 @@ la referencia interna (`SubjectReference`), plantillas, claves ni scopes.
 | Método | Ruta | Request | Response |
 |---|---|---|---|
 | `GET` | `/api/web/fingerprint-enrollers` | — | `[{ id, code, name, lastSeenAtUtc }]`: lectores **activos** con `Device.Fingerprint.Enroll` **y** `Device.Fingerprint.Identify` |
-| `GET` | `/api/web/patients/{patientId}/fingerprints` | — | `[{ id, status: Active\|Revoked, reader: { code, name, available }?, registeredAtUtc, revokedAtUtc }]`, más recientes primero |
+| `GET` | `/api/web/patients/{patientId}/fingerprints` | — | `[PatientFingerprint]`, más recientes primero |
 | `POST` | `/api/web/patients/{patientId}/fingerprints/enrollments` | `{ clientRequestId, deviceId }` | 201 `FingerprintEnrollment` · 200 reintento · 400 · 403 · 404 paciente o lector no elegible · 409 |
 | `GET` | `/api/web/patients/{patientId}/fingerprints/enrollments/{enrollmentId}` | — | `FingerprintEnrollment` (404 si es de otro paciente) |
 | `POST` | `/api/web/patients/{patientId}/fingerprints/enrollments/{enrollmentId}/cancel` | — | 200 `FingerprintEnrollment` · 409 si ya está `Enrolled` |
+| `POST` | `/api/web/patients/{patientId}/fingerprints/{referenceId}/revoke` | `{ reason? }` (opcional; sin cuerpo también) | 200 `PatientFingerprint` (también si ya estaba revocada) · 400 · 403 · 404 |
+
+- `PatientFingerprint`: `{ id, status: Active|Revoked, reader: { code, name, available }?, registeredAtUtc, revokedAtUtc,
+  cleanup: null|Pending|Completed|AttentionRequired|NotRequired }`. `cleanup` es `null` mientras está activa y, revocada,
+  el estado (derivado) del borrado en su lector: `AttentionRequired` si el lector está revocado, no existe, no puede
+  borrar o lleva 5 intentos fallidos, o si la referencia no permite saber lector y slot; `NotRequired` si se revocó antes
+  de existir el borrado automático.
 
 - `FingerprintEnrollment`: `{ id, status: Pending|Enrolled|Failed|Expired|Cancelled, readerId, expiresAtUtc, failure:
   Failed|LowQuality|SensorError (solo Failed), biometricReferenceId (solo Enrolled) }`.
@@ -141,10 +149,18 @@ la referencia interna (`SubjectReference`), plantillas, claves ni scopes.
   abrió el registro) en la misma transacción; `Failed`/`LowQuality`/`SensorError` terminan en `Failed`. Otro intento es
   otro registro.
 - **Cancelar:** `Pending → Cancelled` (auditada una sola vez); ya `Cancelled`, `Expired` o `Failed`: 200 sin cambios;
-  `Enrolled`: 409 (la referencia no se toca; la revocación será otra operación).
+  `Enrolled`: 409 (la referencia no se toca; la revocación es otra operación).
+- **Revocar:** `Active → Revoked` con su auditoría y **un** trabajo de borrado para el lector, en una transacción; desde
+  esa respuesta la huella no identifica a nadie. `reason`: `PatientRequest`, `EnrollmentError`, `ReaderReplaced` u
+  `Other`, solo en la auditoría (sin texto libre). Otro campo (`slot`, `subjectReference`, `deviceId`, `status`,
+  `revokedAt`, `staffId`, `patientId`) o un motivo desconocido: 400. Ya revocada: 200 con su estado y nada escrito (nunca
+  un trabajo de reparación). Referencia de otro paciente, no de huella o inexistente: 404. Sin reintento manual de la
+  limpieza: el lector reintenta solo.
 - **Vencimiento:** un registro `Pending` vencido se cierra como `Expired` al consultarlo o cancelarlo.
 - La UI (detalle del paciente, `/hospital/pacientes/{id}`) pide una confirmación operacional antes de abrir, consulta
   cada segundo mientras está `Pending` y deja de hacerlo al terminar o al salir. No es un registro de consentimiento.
+  "Revocar huella" pide confirmación (con motivo opcional), muestra la huella `Revocada` al instante y la limpieza del
+  lector aparte; nunca la presenta como válida mientras se limpia.
 
 ---
 

@@ -127,6 +127,12 @@ DEVICE_MODE=fingerprint FINGERPRINT_OUTCOME=Match FINGERPRINT_SLOT=1 DEVICE_ID=<
   `ENROLL_FIRST_SLOT` (por defecto 1), `ENROLL_LOSE_FIRST_RESPONSE=true` (simula una respuesta perdida),
   `ENROLL_CHANGED_REPLAY=true` (envía después otro resultado, que debe dar 409), y los mismos `FINGERPRINT_*` de retardo,
   repetición, intervalo y `FINGERPRINT_ONCE`.
+- El mismo modo `enroll` **borra** los slots de huellas revocadas (ADR-011): consulta su borrado pendiente, quita el slot
+  de su archivo (`Deleted`) o informa que no estaba (`NotFound`), con un `attemptId` nuevo por intento físico; ante una
+  respuesta incierta reenvía el mismo intento. Opcionales: `DELETE_SENSOR_ERRORS` (cuántos intentos fallan con
+  `SensorError` antes de que el sensor funcione, por defecto 0; no tocan el archivo), `DELETE_RETRY_SECONDS` (espera
+  entre intentos, por defecto 3), `DELETE_LOSE_FIRST_RESPONSE=true` (simula un 204 perdido: reenvía el mismo intento) y
+  `DELETE_CHANGED_REPLAY=true` (reenvía el mismo intento con otro resultado, que debe dar 409).
 - Para que un `Match` tenga candidato, el paciente debe estar registrado en ese lector (registro desde el Web con el modo
   `enroll`); en Development también se puede sembrar la referencia del paciente con
   `ClinicalDevelopmentSeed:FingerprintReferences` (`PatientId`, `DeviceCredentialId` y `Slot`; User Secrets, nunca el
