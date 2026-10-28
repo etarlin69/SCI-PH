@@ -1,7 +1,8 @@
 # ADR-012: Verificación facial 1:1 asistida
 
-- **Estado:** Aceptado. PR 1/2 implementado en `feature/biometric-face-verification` (proveedor Fake); PR 2/2 (proveedor
-  local OpenCV) planificado.
+- **Estado:** Aceptado. PR 1/2 implementado (proveedor Fake, #36). PR 2/2 (proveedor local OpenCV, plantillas cifradas y
+  limpieza durable) implementado en `feature/biometric-face-opencv-provider`; **gate de licencias bloqueado** (ver
+  [componentes de terceros](../legal/face-opencv-third-party.md)).
 - **Fecha:** 2026-10-28
 - **Relacionado:** [ADR-001](ADR-001-onion-architecture.md), [ADR-004](ADR-004-document-storage.md),
   [ADR-005](ADR-005-clinical-model.md) (decisión 9), [ADR-010](ADR-010-fingerprint-enrollment.md),
@@ -104,17 +105,18 @@ proveedor, así el PR 2 cambia el proveedor sin tocar la validación:
 - `POST /api/web/patients/{patientId}/faces/{referenceId}/revoke`, motivo opcional cerrado (`PatientRequest`,
   `EnrollmentError`, `ReferenceOutdated`, `Other`; solo en la auditoría). La referencia debe ser del paciente y de rostro
   (si no, 404).
-- `Active → Revoked` con su auditoría en una transacción (`PatientBiometricReference.Revoke`, sin cambios en el Domain);
-  desde ese commit nunca se verifica contra ella. Ya revocada: 200 sin escribir nada.
-- Después, `DeleteAsync` de la plantilla (mejor esfuerzo) y una entrada `{ cleanup: Deleted | NotFound | Failed |
-  NotAttempted }`. **La seguridad no depende del borrado:** la revocación lógica manda. Luego se puede registrar otro rostro.
+- `Active → Revoked`, su auditoría y **un** job `FaceTemplateDeletionJobs` `Pending` en **una** transacción
+  (`PatientBiometricReference.Revoke`, sin cambios en el Domain); desde ese commit nunca se verifica contra ella. Ya
+  revocada: 200 sin escribir nada.
+- Después, un intento inmediato de borrar la plantilla; si falla, el job sigue `Pending` y lo reintenta el worker (§13).
+  **La seguridad no depende del borrado:** la revocación lógica manda. Luego se puede registrar otro rostro.
 
 ### 9. Almacenamiento de plantillas (frontera para el PR 2)
 
 - Se mantiene ADR-005 §9: el esquema `clinical` **nunca** guarda imagen facial, embedding, plantilla ni vector; solo la
   referencia opaca. La plantilla vive en un **almacén privado del proveedor**: Application no lo conoce (ni
   `IFaceTemplateStore` ni `IStorageService`; solo `IFaceVerificationService`).
-- El Fake guarda su "plantilla" (un color) en memoria del proceso. El proveedor real guardará la suya cifrada (ver el plan).
+- El Fake guarda su "plantilla" (un color) en memoria del proceso. El proveedor real guarda la suya cifrada (§12).
 
 ### 10. Proveedor Fake (PR 1)
 
@@ -130,27 +132,104 @@ Sirve para CI, tests de integración, el E2E del PR 1 y desarrollo.
 | Registro | `Create` `PatientBiometricReference` | `modality`, `provider`, `algorithmVersion` |
 | Verificación | `Read` `FaceVerification` | `outcome`, `biometricReferenceId`, `provider`, `algorithmVersion` |
 | Revocación | `Update` `PatientBiometricReference` | `status: [Active, Revoked]`, `reason` |
-| Limpieza | `Update` `PatientBiometricReference` | `cleanup` |
+| Limpieza completada (actor `System` `face-template-cleanup`, una sola vez) | `Update` `PatientBiometricReference` | `cleanup: Deleted \| NotFound` |
 
 Nunca en auditoría, logs ni respuestas: bytes de imagen, base64, embedding, plantilla, puntaje, umbral ni
 `SubjectReference` (probado contra respuestas, auditoría y logs del Web BFF).
 
-## Plan del PR 2/2 (no implementado)
+### 12. Proveedor local OpenCV (PR 2)
 
-- `LocalOpenCvFaceVerificationService`: detector **YuNet** (licencia **MIT**) + reconocedor **SFace** (licencia
-  **Apache-2.0**), vía OpenCV en Infrastructure. Sin cambios en Application ni en la normalización.
-- Plantillas en un **contenedor Blob privado propiedad del proveedor** (`IFaceTemplateStore` interno a Infrastructure),
-  **cifradas antes de guardarse**, con nombre de objeto **aleatorio y opaco** (nunca el `PatientId`). Nunca una tabla
-  clínica.
-- Imagen de registro y de verificación: nunca guardadas. Umbral: configuración versionada del servidor.
-- Archivos de modelo: **no** se suben al repositorio; script de descarga con verificación de checksum. Verificar las
-  dependencias nativas en Windows y Linux (contenedores, CI).
-- **Bloqueante para el PR 2:** una estrategia **durable** de limpieza/reconciliación de plantillas (borrado tras la
-  revocación que sobreviva a fallos y reconciliación de huérfanas) antes de considerarlo completo para producción.
+`FaceVerification:Provider=OpenCv` → `LocalOpenCvFaceVerificationService` (`Provider` `SCIPH-FaceOpenCV`,
+`AlgorithmVersion` `opencv-sface-2021dec-yunet-2023mar`), en proceso, sin nube. Solo el Web BFF lo registra.
+
+- **Runtime:** `OpenCvSharp5` 5.0.0.20261003 (managed, en Infrastructure) + `OpenCvSharp5.runtime.win` y
+  `OpenCvSharp5.official.runtime.linux-x64.headless` 5.0.0.20261003 (en el Web BFF). OpenCV 5.0.0. Versiones exactas, sin
+  `slim` (no trae `dnn`). Spike validado en Windows 10 y Ubuntu 24.04 (`aspnet:9.0`, sin GTK/X11).
+- **Modelos** (nunca en el repositorio): YuNet `face_detection_yunet_2023mar.onnx` (MIT) y SFace
+  `face_recognition_sface_2021dec.onnx` FP32 (Apache-2.0), SHA-256 fijados en `FaceModels`. Se obtienen con
+  `scripts/biometrics/fetch-face-models.{ps1,sh}` (URL fijada → temporal → SHA-256 → movimiento atómico) en `.models/face/`
+  (ignorado). El Web BFF nunca descarga nada. YuNet 2026may dio resultados idénticos en el spike: se mantiene 2023mar.
+- **Pipeline:** `ImDecode` → `SetInputSize` → YuNet → calidad → `AlignCrop` → `Feature` → normalización L2.
+  Calidad (`FaceQuality`): ninguna cara ≥ `DetectorScore` 0.6 → `NoFace`; dos o más ≥ `GoodScore` 0.9 →
+  `MultipleFaces`; la mejor < 0.9, lado menor < `MinFaceSide` 80 px o más del 10 % de su caja fuera de la imagen →
+  `LowQuality`. Sin medida de desenfoque.
+- **Decisión:** similitud coseno ≥ `CosineThreshold` 0.363 → `Match`. Valor derivado de upstream
+  (`samples/dnn/face_detect.py`), **no calibrado para las webcams de SCI-PH**. Solo configuración del servidor: nunca en
+  API, query, formulario ni header, y el puntaje nunca sale del proveedor.
+- **Concurrencia:** pool acotado de pares detector+reconocedor (`EngineCapacity`, por defecto max(1, CPU/2) hasta 4) con
+  `SemaphoreSlim`; el primero se crea al arrancar y todos se liberan al apagar. Buffers propios se limpian
+  (`CryptographicOperations.ZeroMemory` / `Array.Clear`) y todo objeto de OpenCV se libera.
+- **Plantilla:** `"SFT"` | formato 1 | longitud + `AlgorithmVersion` UTF-8 | dimensiones u16 | float32 LE (128). Lectura
+  estricta: otro formato, algoritmo o dimensión → 503.
+- **Sobre cifrado:** AES-256-GCM, `"SFE"` | versión 1 | longitud + keyId | nonce aleatorio (12) | tag (16) | texto
+  cifrado. Datos asociados: la cabecera **y** el GUID de la plantilla (un cifrado copiado bajo otro id no descifra).
+- **Claves:** `FaceVerification:OpenCv:Encryption:ActiveKeyId` y `Keys:<keyId>` (base64 de 32 bytes exactos). La activa
+  cifra; todas las configuradas descifran (rotación sin re-cifrado masivo, que queda fuera de alcance). **Nunca** en
+  appsettings versionados, base de datos, Blob, imagen Docker ni logs: User Secrets, variables de entorno o un almacén de
+  secretos.
+- **Almacén** (`IFaceTemplateStore`, interno a Infrastructure): Azure Blob (`Azure.Storage.Blobs` 12.29.2; Azurite en
+  desarrollo), contenedor **privado** `face-templates`, un blob por plantilla con nombre `<guid>` y solo los metadatos
+  `owner=sciph-face-opencv` y `format=1`; nunca sobrescribe (`If-None-Match: *`). `SubjectReference` = `face:<guid>`,
+  parseado estrictamente.
+- **Propiedad:** antes de verificar, la referencia debe ser de **este** proveedor y de **esta** `AlgorithmVersion`; si no
+  (Fake, otro proveedor, otra versión) → 503 genérico y nunca se interpreta (hace falta volver a registrar). La limpieza
+  tampoco envía a este proveedor referencias de otro.
+- **Fallos:** almacén caído, plantilla ausente/corrupta/de otra clave o versión, motor con error → 503, **nunca**
+  `NoMatch`. Registro: si falla el almacén no se escribe nada clínico; si falla el commit clínico se compensa con
+  `DeleteAsync`; si también falla la compensación queda una huérfana que informa la reconciliación. Logs: solo categorías
+  (`FaceTemplateMissing`, `FaceTemplateStoreUnavailable`, `FaceTemplateAuthenticationFailed`, `FaceReferenceInvalid`, …) y
+  el tipo de excepción.
+- **Arranque (fail fast)** con `Provider=OpenCv`: modelo ausente, hash distinto, `ActiveKeyId` ausente, clave que no es de
+  32 bytes, cadena de conexión o contenedor inválidos → el host no arranca (mensajes sin claves ni rutas). El runtime
+  nativo y el primer par se cargan al arrancar. Un almacén caído **no** impide arrancar: es 503 por petición. Sin health
+  check en este PR (no tocar el PR #23): queda como seguimiento.
+- **Disabled** sigue igual: arranca sin modelos ni claves, todo 503, sin worker. **Fake** sigue siendo el valor por defecto
+  fuera de Production y está prohibido en Production; OpenCv sí se permite en Production.
+
+### 13. Limpieza durable y reconciliación (PR 2)
+
+- Tabla técnica `clinical.FaceTemplateDeletionJobs` (no es entidad del Domain): `Id`, `BiometricReferenceId` (FK única,
+  `Restrict`), `Status` (`Pending`/`Completed`), `Outcome` (`Deleted`/`NotFound`), `Attempts`, `LastAttemptAtUtc`,
+  `LastFailure` (`ProviderUnavailable`/`ProviderMismatch`), `CreatedAtUtc`, `CompletedAtUtc`. `Status` y `Attempts` son
+  tokens de concurrencia. Sin `SubjectReference`, paciente ni proveedor duplicados.
+- `FaceTemplateCleanupService` (Application): intento inmediato tras la revocación y luego en cada pasada del
+  `FaceTemplateCleanupWorker` (`BackgroundService` del Web BFF, `PeriodicTimer` de `Cleanup:IntervalSeconds` = 30, lotes de
+  `BatchSize` = 50; solo con `Provider=OpenCv`). Reintentos tras 1, 2, 3, 5 y luego 10 minutos, sin límite; desde 5
+  intentos fallidos el job **requiere atención** (derivado, no almacenado) y la reconciliación lo informa
+  (`FaceTemplateCleanupAttention`, con los ids de los jobs).
+- Varias instancias: cada una puede intentar el mismo job; solo un resultado se aplica (tokens) y converge en **un**
+  `Completed` con **una** auditoría de finalización; un fallo de una pasada se registra y la siguiente reintenta.
+- **Reconciliación** (`FaceTemplateReconciler`, cada `ReconcileIntervalMinutes` = 360, **solo informe**, nunca borra):
+  A = referencia activa sin plantilla (`FaceTemplateMissing`); B = plantilla sin referencia retenida (`FaceTemplateOrphan`,
+  con ids opacos); además, los jobs que requieren atención. Las huérfanas no se borran automáticamente.
+
+### 14. Pruebas
+
+- CI normal (Windows/Ubuntu): formato, sobre y claves (P0), calidad, servicio con analizador simulado, configuración fail
+  fast, Disabled, almacén sobre Azurite (Testcontainers), reconciliación, limpieza durable (Application y PostgreSQL), y
+  **carga del runtime nativo** sin modelos (`Cv2.GetVersionString`, API facial presente).
+- Opt-in `SCIPH_FACE_MODELS=1` (tras `fetch-face-models` y `fetch-face-fixtures`): pipeline real sobre caras
+  **sintéticas** de Face Synthetics (misma identidad transformada → `Match`, otra → `NoMatch`, `NoFace`, `MultipleFaces`,
+  `LowQuality`, pool concurrente). Face Synthetics: Microsoft Research Use of Data Agreement (no comercial); nunca se
+  versiona, ni va en Docker ni en artefactos de CI, y debe reemplazarse si SCI-PH se comercializa.
+
+### 15. Despliegue
+
+- Imagen del Web BFF: runtime headless; etapa `face-models` que ejecuta el mismo script con verificación SHA-256
+  (`--build-arg FACE_MODELS=include|none`, por defecto `include`) y copia a `/app/models/face`; avisos de terceros en
+  `/app/licenses/`. Secretos (claves, cadena de conexión) solo en runtime.
+- Configuración mínima (secretos fuera del repositorio):
+  `FaceVerification__Provider=OpenCv`, `FaceVerification__OpenCv__Templates__ConnectionString=…`,
+  `FaceVerification__OpenCv__Encryption__ActiveKeyId=k1`, `FaceVerification__OpenCv__Encryption__Keys__k1=<base64 32 bytes>`.
 
 ## Consecuencias
 
-- Registro, verificación 1:1 y revocación de punta a punta con el proveedor Fake, sin datos biométricos reales.
+- Registro, verificación 1:1 y revocación de punta a punta con el proveedor Fake (PR 1) y con el proveedor local OpenCV
+  (PR 2), con plantillas cifradas fuera del esquema clínico y limpieza durable.
+- El binario nativo Linux de OpenCvSharp incluye FFmpeg (LGPL-2.1) enlazado estáticamente aunque SCI-PH no lo usa: sus
+  obligaciones de redistribución están abiertas (gate de licencias bloqueado).
+- `Azure.Storage.Blobs` 12.29.x arrastra `Azure.Core` 1.55, que exige las abstracciones `Microsoft.Extensions.*` 10.0.3:
+  Infrastructure las referencia en esa versión (el resto del host sigue en ASP.NET Core 9).
 - SkiaSharp (MIT) entra en Infrastructure (con su librería nativa para Linux sin dependencias).
-- Limitaciones aceptadas: sin liveness (una foto de una foto puede coincidir); el Fake no reconoce caras; el login facial
-  del paciente sigue simulado.
+- Limitaciones aceptadas: sin liveness (una foto de una foto puede coincidir); umbral no calibrado para las webcams de
+  SCI-PH; el Fake no reconoce caras; el login facial del paciente sigue simulado.
