@@ -420,3 +420,59 @@ export interface FingerprintEnrollment {
     failure: 'Failed' | 'LowQuality' | 'SensorError' | null;
     biometricReferenceId: Guid | null;
 }
+
+/** Tipos de punto a revisar: solo sobre la DOCUMENTACIÓN, nunca un juicio clínico (ADR-013). */
+export type EncounterAiReviewPointKind = 'MissingDocumentation' | 'Inconsistency' | 'PendingItem';
+
+export type ClinicalAiSourceType =
+    | 'Triage'
+    | 'VitalSign'
+    | 'ClinicalNote'
+    | 'Diagnosis'
+    | 'Prescription'
+    | 'MedicationAdministration'
+    | 'ClinicalProcedure'
+    | 'ClinicalTransfer';
+
+/** Registro relacionado: el servidor comprobó que existe en esta atención, NO que respalde la frase. */
+export interface EncounterAiSourceReference {
+    type: ClinicalAiSourceType;
+    id: Guid;
+}
+
+export interface EncounterAiSection {
+    text: string;
+    sources: EncounterAiSourceReference[];
+}
+
+export interface EncounterAiReviewPoint {
+    kind: EncounterAiReviewPointKind;
+    text: string;
+    sources: EncounterAiSourceReference[];
+}
+
+/**
+ * Resumen asistido de una atención (ADR-013): generado por IA, requiere revisión profesional, efímero (no se guarda) e
+ * instantánea de los registros en generatedAtUtc. Sin diagnóstico, recomendación, tratamiento, gravedad ni confianza.
+ */
+export interface EncounterAiSummary {
+    aiGenerated: true;
+    requiresClinicianReview: true;
+    summary: string;
+    sections: {
+        course: EncounterAiSection | null;
+        vitalSigns: EncounterAiSection | null;
+        medications: EncounterAiSection | null;
+        procedures: EncounterAiSection | null;
+        notes: EncounterAiSection | null;
+        transfer: EncounterAiSection | null;
+    };
+    reviewPoints: EncounterAiReviewPoint[];
+    notDocumented: string[];
+    generatedAtUtc: string;
+    provider: string;
+    model: string;
+    promptVersion: string;
+    sourceFingerprint: string;
+    truncated: boolean;
+}

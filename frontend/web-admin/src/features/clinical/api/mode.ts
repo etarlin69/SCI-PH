@@ -14,7 +14,8 @@ export type ClinicalFeature =
     | 'prescriptions'
     | 'administrations'
     | 'discharge'
-    | 'transfers';
+    | 'transfers'
+    | 'aiSummary';
 
 /** Funciones con endpoints reales en el Web BFF (verticales clínicas 1 a 4): todo el módulo hospitalario. */
 export const HTTP_CLINICAL_FEATURES: readonly ClinicalFeature[] = [
@@ -30,6 +31,7 @@ export const HTTP_CLINICAL_FEATURES: readonly ClinicalFeature[] = [
     'prescriptions',
     'administrations',
     'transfers',
+    'aiSummary',
 ];
 
 /** true = todo el módulo hospitalario es simulado. */

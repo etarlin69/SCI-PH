@@ -246,6 +246,17 @@ namespace SCI_PH.Persistence.Clinical.Services
                     a.DoseUnit, a.Route, a.AdministeredAtUtc, a.AdministeredByStaffId, a.Status, a.Notes))
                 .ToListAsync(cancellationToken);
 
+        public async Task<IReadOnlyList<ClinicalProcedureSummary>> ListProceduresAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            await _clinical.ClinicalProcedures.AsNoTracking()
+                .Where(p => p.ClinicalEncounterId == encounterId)
+                .OrderByDescending(p => p.PerformedAtUtc.HasValue).ThenByDescending(p => p.PerformedAtUtc).ThenBy(p => p.Id)
+                .Select(p => new ClinicalProcedureSummary(
+                    p.Id, p.ClinicalEncounterId, p.Name, p.CodeSystem, p.Code, p.Status, p.PerformedAtUtc, p.CompletedAtUtc, p.Outcome))
+                .ToListAsync(cancellationToken);
+
+        public Task<IReadOnlyList<TransferRow>> ListEncounterTransfersAsync(Guid encounterId, int limit, CancellationToken cancellationToken) =>
+            ToTransferRowsAsync(_clinical.ClinicalTransfers.Where(t => t.ClinicalEncounterId == encounterId), limit, cancellationToken);
+
         public async Task<ClinicStatus?> GetClinicStatusAsync(Guid clinicId, CancellationToken cancellationToken) =>
             await _clinical.Clinics.AsNoTracking()
                 .Where(c => c.Id == clinicId)

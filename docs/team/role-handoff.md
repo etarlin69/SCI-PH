@@ -153,11 +153,13 @@ Este documento explica qué puede empezar a hacer cada rol **ahora**, sobre la a
 
 **No hace**
 - Guardar imágenes faciales en el dispositivo más de lo necesario.
-- Presentar la IA como diagnóstico: es un asistente **educativo**.
+- Presentar la IA como diagnóstico: es un asistente **educativo** (hoy un chat simulado sin backend; no usa el resumen
+  asistido del hospital, ver [ADR-013](../adr/ADR-013-clinical-ai-assistant.md)).
 
 ## Rol 8 — AI / Biometrics / OCR / QR
 
-**Responsabilidades:** IA educativa, Face Verification 1:1, OCR, QR y pruebas de proveedores.
+**Responsabilidades:** IA clínica asistida (resumen de la atención, [ADR-013](../adr/ADR-013-clinical-ai-assistant.md)), IA
+educativa, Face Verification 1:1, OCR, QR y pruebas de proveedores.
 
 **Toca principalmente**
 - `src/Core/SCI-PH.Application/Abstractions/` (`AI`, `Biometrics`, `OCR`, `QR`, `Storage`, `Documents`)
@@ -165,12 +167,15 @@ Este documento explica qué puede empezar a hacer cada rol **ahora**, sobre la a
 
 **Puede empezar ahora**
 - Evaluar proveedores de IA, verificación facial 1:1 y OCR, y documentar la comparación.
-- Proponer los métodos de `IAiAssistantService`, `IFaceVerificationService`, `IOcrService` e `IQrService` (hoy son interfaces vacías) mediante PR revisado por el Rol 1.
+- Proponer los métodos de `IOcrService` e `IQrService` (hoy son interfaces vacías) mediante PR revisado por el Rol 1.
+  `IClinicalAiService` e `IFaceVerificationService` ya tienen contrato (ADR-013, ADR-012): una operación de IA nueva es
+  otro método cerrado con su prompt versionado, nunca un prompt libre.
 - Implementaciones de prueba (fakes) en Infrastructure para que los BFF puedan integrarse sin proveedor real.
 
 **No hace**
 - Agregar el SDK de Azure u otros proveedores sin ADR y sin revisión.
-- Que la IA diagnostique o prescriba.
+- Que la IA diagnostique o prescriba, o que su salida se guarde como dato del expediente.
+- Enviar datos reales de pacientes a un proveedor externo sin el acuerdo de datos y la revisión de ADR-013 (decisión 12).
 - Referenciar SDKs externos desde Domain o Application.
 
 ## Rol 9 — Hardware / QA / DevOps

@@ -21,6 +21,7 @@ import type {
     CreatePrescriptionRequest,
     CreateTriageRequest,
     Diagnosis,
+    EncounterAiSummary,
     Guid,
     Medication,
     MedicationAdministration,
@@ -93,6 +94,12 @@ export interface ClinicalApi {
     listMedicationAdministrations(encounterId: Guid, signal?: AbortSignal): Promise<MedicationAdministration[]>;
     createMedicationAdministration(encounterId: Guid, request: CreateMedicationAdministrationRequest): Promise<MedicationAdministration>;
 
+    /**
+     * Resumen asistido por IA de la atención (ADR-013): solo lectura, efímero, requiere revisión profesional. Sin
+     * opciones: proveedor, modelo y límites son del servidor. 429 por límite de uso; 503 si no está disponible.
+     */
+    generateEncounterAiSummary(encounterId: Guid, signal?: AbortSignal): Promise<EncounterAiSummary>;
+
     listIncomingTransfers(signal?: AbortSignal): Promise<ClinicalTransfer[]>;
     receiveTransfer(transferId: Guid): Promise<void>;
 }
@@ -148,6 +155,7 @@ const KNOWN_DETAILS: [RegExp, string][] = [
     [/no active face reference/i, 'El paciente no tiene un rostro registrado activo.'],
     [/face verification service is not available/i, 'La verificación facial no está disponible en este momento. Inténtalo más tarde.'],
     [/^capture /i, 'La imagen no es válida. Toma la foto de nuevo con la cámara.'],
+    [/assisted summary is not available/i, 'El resumen asistido no está disponible en este momento. Inténtalo más tarde.'],
 ];
 
 /**

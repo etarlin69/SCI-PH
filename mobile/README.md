@@ -224,7 +224,7 @@ Se entra con la sesión real del personal clínico. `HttpParamedicApiService` es
 | Historial clínico | Alergias, condiciones, medicación habitual y episodios | por definir |
 | Resultados | Resultados publicados | por definir |
 | Documentos | Documentos autorizados; "Ver" responde "Disponible próximamente" | por definir |
-| Asistente IA | Respuestas educativas fijas | por definir |
+| Asistente IA | Respuestas educativas fijas (simulado; no usa el resumen asistido del hospital, ADR-013) | por definir |
 
 Datos simulados (no son datos clínicos reales): `MockPatientSessionService` (sesión en memoria de una hora, token de
 prueba que nunca se persiste), `MockPatientDataService` (todos los datos de las pantallas) y

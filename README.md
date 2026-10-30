@@ -15,7 +15,7 @@ Backend de SCI-PH construido con **ASP.NET Core (.NET 9)** siguiendo **Onion Arc
 | Mobile | .NET MAUI |
 | Hardware | ESP32 + sensor de huella R307 |
 | Almacenamiento de archivos | Azure Blob Storage |
-| IA | Asistente educativo (no diagnostica, no prescribe) |
+| IA | Resumen asistido de la atención con revisión profesional (ADR-013) · asistente educativo del paciente (simulado). No diagnostica, no prescribe |
 | Biometría | Verificación facial 1:1 · Identificación por huella para emergencias |
 
 ## Estructura

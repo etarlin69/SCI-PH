@@ -6,6 +6,7 @@ import type {
     ClinicalNote,
     ClinicalTransfer,
     Diagnosis,
+    EncounterAiSummary,
     FingerprintEnroller,
     FingerprintEnrollment,
     FaceEnrollmentResponse,
@@ -177,6 +178,10 @@ export const httpClinicalApi: ClinicalApi = {
             method: 'POST',
             body: { medicationId, dose, doseUnit, route, administeredAtUtc, prescriptionId, prescriptionDetailId, notes },
         }),
+
+    // Resumen asistido (ADR-013): POST sin cuerpo; el servidor decide proveedor, modelo, prompt y límites.
+    generateEncounterAiSummary: (encounterId, signal) =>
+        apiRequest<EncounterAiSummary>(`${BASE}/encounters/${id(encounterId)}/ai-summary`, { method: 'POST', signal }),
 
     // Traslados con destino a las clínicas del usuario (Requested / InTransit).
     listIncomingTransfers: (signal) =>

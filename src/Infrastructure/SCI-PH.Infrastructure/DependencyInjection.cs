@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using SCI_PH.Application.Abstractions.AI;
 using SCI_PH.Application.Abstractions.Biometrics;
 using SCI_PH.Application.Abstractions.Security;
 using SCI_PH.Application.Common.Security;
@@ -13,6 +14,7 @@ using Azure.Storage.Blobs;
 using Microsoft.Extensions.Logging;
 using SCI_PH.Infrastructure.Biometrics.Face;
 using SCI_PH.Infrastructure.Biometrics.Face.OpenCv;
+using SCI_PH.Infrastructure.ClinicalAi;
 using SCI_PH.Infrastructure.Email;
 using SCI_PH.Infrastructure.Security;
 using SCI_PH.Infrastructure.Web;
@@ -29,7 +31,7 @@ namespace SCI_PH.Infrastructure
             // - Verificación facial (IFaceVerificationService): AddFaceVerification, solo en el Web BFF
             // - OCR (IOcrService)
             // - QR (IQrService)
-            // - IA (IAiAssistantService)
+            // - IA clínica asistida (IClinicalAiService): AddClinicalAi, solo en el Web BFF
             // - Otros servicios externos
 
             services.TryAddSingleton(TimeProvider.System);
@@ -68,6 +70,27 @@ namespace SCI_PH.Infrastructure
             {
                 services.AddOpenCvFaceProvider(configuration);
             }
+
+            return services;
+        }
+
+        // Assisted clinical AI (ADR-013): the provider chosen by server configuration (ClinicalAi:Provider). Fake (deterministic,
+        // in process) outside Production, Disabled (503) in Production if nothing else is configured; Fake configured in
+        // Production prevents the host from starting. No real provider yet (PR 2): no data leaves SCI-PH.
+        public static IServiceCollection AddClinicalAi(this IServiceCollection services, IConfiguration configuration)
+        {
+            services.AddOptions<ClinicalAiOptions>()
+                .Bind(configuration.GetSection(ClinicalAiOptions.SectionName))
+                .ValidateOnStart();
+            services.AddSingleton<IValidateOptions<ClinicalAiOptions>, ClinicalAiOptionsValidator>();
+            services.AddSingleton<FakeClinicalAiService>();
+            services.AddSingleton<IClinicalAiService>(provider =>
+                provider.GetRequiredService<IOptions<ClinicalAiOptions>>().Value.Resolve(provider.GetRequiredService<IHostEnvironment>()) switch
+                {
+                    ClinicalAiOptions.FakeProvider => provider.GetRequiredService<FakeClinicalAiService>(),
+                    ClinicalAiOptions.DisabledProvider => new DisabledClinicalAiService(),
+                    var other => throw new InvalidOperationException($"ClinicalAi:Provider '{other}' is not supported.")
+                });
 
             return services;
         }

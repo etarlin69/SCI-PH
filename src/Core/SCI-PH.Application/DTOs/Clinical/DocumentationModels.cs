@@ -46,4 +46,16 @@ namespace SCI_PH.Application.DTOs.Clinical
         DateTimeOffset RecordedAtUtc,
         DateTimeOffset? ConfirmedAtUtc,
         Guid RecordedByStaffId);
+
+    // Read model of a procedure of an encounter (today recorded by the paramedic, PrehospitalEmergencyService).
+    public sealed record ClinicalProcedureSummary(
+        Guid Id,
+        Guid EncounterId,
+        string Name,
+        string? CodeSystem,
+        string? Code,
+        [property: JsonConverter(typeof(TextEnumConverter))] ClinicalProcedureStatus Status,
+        DateTimeOffset? PerformedAtUtc,
+        DateTimeOffset? CompletedAtUtc,
+        string? Outcome);
 }
