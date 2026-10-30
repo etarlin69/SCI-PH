@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Button, Card, Checkbox, EmptyState, Input, Select, Textarea } from '../../../components/shared';
 import { clinicalApi } from '../api';
 import { ClinicSelector } from '../components/ClinicSelector';
+import { EncounterAiSummaryCard } from '../components/EncounterAiSummaryCard';
 import { EncounterStatusBadge, TriagePriorityBadge } from '../components/ClinicalBadges';
 import { EncounterShell } from '../components/EncounterShell';
 import { EncounterSubject } from '../components/EncounterSubject';
@@ -25,15 +26,20 @@ import {
 /** /hospital/atenciones: atenciones abiertas. /hospital/atenciones/:id: expediente de la atención. */
 export function EncounterDashboardPage() {
     const { encounterId } = useParams();
+    const canRead = useAuth().can(Permissions.Encounters.Read);
     if (!encounterId) return <EncounterList />;
 
     return (
         <EncounterShell encounterId={encounterId}>
             {(encounter) => (
-                <div className="grid gap-5 xl:grid-cols-2">
-                    <DiagnosesCard encounter={encounter} />
-                    <NotesCard encounter={encounter} />
-                </div>
+                <>
+                    <div className="grid gap-5 xl:grid-cols-2">
+                        <DiagnosesCard encounter={encounter} />
+                        <NotesCard encounter={encounter} />
+                    </div>
+                    {/* Resumen asistido (ADR-013): mismo acceso que leer la atención; uno nuevo por atención. */}
+                    {canRead && <EncounterAiSummaryCard key={encounter.id} encounterId={encounter.id} />}
+                </>
             )}
         </EncounterShell>
     );

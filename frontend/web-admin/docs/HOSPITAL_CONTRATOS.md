@@ -31,7 +31,7 @@ traslados entrantes). El adaptador MOCK solo se usa con `VITE_CLINICAL_API_MODE=
 |---|---|---|
 | Recepción | `Encounters.Create`, `Patients.Read` | Buscar: `Patients.Read` · registrar: `Patients.Create` · abrir atención: `Encounters.Create` · admisión e identificar NN: `Patients.Identify` · traslados entrantes: `Transfers.Read` · registrar llegada: `Transfers.Manage` |
 | Pacientes | `Patients.Read` | Registrar: `Patients.Create` |
-| Atenciones / Expediente | `Encounters.Read` | Diagnóstico: `Diagnoses.Write` · nota: `ClinicalNotes.Write` |
+| Atenciones / Expediente | `Encounters.Read` | Diagnóstico: `Diagnoses.Write` · nota: `ClinicalNotes.Write` · resumen asistido por IA: `Encounters.Read` (sin permiso propio) |
 | Triage | `Triage.Write` | Signos vitales en el triage o sueltos: `VitalSigns.Write` |
 | Medicación y egreso | `Medications.Read`, `Prescriptions.Write`, `MedicationAdministrations.Write` | Emitir prescripción: `Prescriptions.Write` · registrar administración: `MedicationAdministrations.Write` · cerrar la atención: `Encounters.Close`, solo desde `InProgress`/`Received`/`InEvolution`. Ninguna escritura en una atención cerrada |
 | Transferencias | `Transfers.Read` | Registrar llegada (solo traslados `InTransit`): `Transfers.Manage`. Abrir la atención recibida: `Encounters.Read` |
@@ -55,6 +55,7 @@ Recepción **no** tiene `Encounters.Read`: tras crear una atención se queda en 
 | VitalSigns | GET · POST | `/api/web/encounters/{id}/vital-signs` | Triage |
 | ClinicalNotes | GET · POST | `/api/web/encounters/{id}/notes` | Expediente |
 | Diagnoses | GET · POST | `/api/web/encounters/{id}/diagnoses` | Expediente |
+| AI summary | POST (sin cuerpo) | `/api/web/encounters/{id}/ai-summary` | Expediente (resumen asistido, ADR-013) |
 | Encounters | POST | `/api/web/encounters/{id}/close` | Medicación y egreso |
 | Medications | GET | `/api/web/medications` | Medicación y egreso |
 | Prescriptions | GET · POST | `/api/web/encounters/{id}/prescriptions` | Medicación y egreso |

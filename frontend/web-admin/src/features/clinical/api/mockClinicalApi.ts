@@ -272,6 +272,11 @@ export const mockClinicalApi: ClinicalApi = {
         return delay([], signal);
     },
 
+    // Resumen asistido: solo con backend real (ADR-013). La simulación nunca inventa contenido generado.
+    async generateEncounterAiSummary() {
+        throw new ClinicalApiError(503, 'El resumen asistido necesita el backend real.');
+    },
+
     async enrollPatientFace() {
         throw new ClinicalApiError(409, 'La verificación facial necesita el backend real.');
     },
