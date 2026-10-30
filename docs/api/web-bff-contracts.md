@@ -200,6 +200,39 @@ referencia del proveedor (`SubjectReference`), la plantilla, el puntaje ni el um
 
 ---
 
+## Web Hospital — resumen asistido por IA (implementado)
+
+Resumen **asistido** de una atención con puntos de documentación a revisar ([ADR-013](../adr/ADR-013-clinical-ai-assistant.md)).
+Generado por IA, **requiere revisión profesional**, de solo lectura y **efímero**: no se guarda, no crea notas,
+diagnósticos ni órdenes y no cambia la atención. Mismo acceso que leer la atención; sin permiso propio.
+
+| Método | Ruta | Permiso | Request | Response |
+|---|---|---|---|---|
+| `POST` | `/api/web/encounters/{encounterId}/ai-summary` | `Encounters.Read` + acceso a la atención | sin cuerpo o `{}` | 200 `EncounterAiSummary` · 400 · 401 · 403 · 404 · 429 · 503 |
+
+- `EncounterAiSummary`: `{ aiGenerated: true, requiresClinicianReview: true, summary, sections: { course, vitalSigns,
+  medications, procedures, notes, transfer }, reviewPoints: [{ kind, text, sources }], notDocumented: [string],
+  generatedAtUtc, provider, model, promptVersion, sourceFingerprint, truncated }`. Cada sección es `{ text, sources }` o
+  `null`; `kind`: `MissingDocumentation`, `Inconsistency` o `PendingItem`; `sources`: `[{ type, id }]` con `type` entre
+  `Triage`, `VitalSign`, `ClinicalNote`, `Diagnosis`, `Prescription`, `MedicationAdministration`, `ClinicalProcedure` y
+  `ClinicalTransfer`. Sin diagnóstico sugerido, recomendación, tratamiento, gravedad ni confianza.
+- **Registros relacionados:** existen en esta atención (el servidor lo comprueba), pero no demuestran que la frase esté
+  respaldada por ellos; sirven para navegar.
+- **Instantánea** de los registros en `generatedAtUtc` (`sourceFingerprint` identifica esa entrada); no se actualiza sola.
+  `truncated`: la atención tenía más registros de los que admite el resumen y solo se incluyeron los más recientes.
+- **Cuerpo sin opciones:** cualquier miembro (`model`, `prompt`, `temperature`, `provider`, `maxTokens`, `systemPrompt`,
+  `patientId`, datos clínicos) es 400. Proveedor, modelo, prompt y límites son del servidor.
+- **429:** 10 generaciones por minuto y una a la vez por usuario, con `Retry-After` (también cuentan las peticiones
+  rechazadas).
+- **503:** proveedor deshabilitado o no disponible, tiempo agotado o respuesta del proveedor inválida; mensaje genérico,
+  sin detalles internos.
+- Cada intento queda en la auditoría (`ClinicalAiEncounterSummary`, Read, éxito o fallo) solo con metadatos: nunca el
+  contenido generado ni datos clínicos.
+- La UI muestra todo como texto plano, con el aviso fijo "Generado por IA · Requiere revisión profesional" y la hora de
+  generación.
+
+---
+
 ## Web Administration — contratos iniciales previstos
 
 > Los endpoints marcados **Implementado** existen; el resto son contratos previstos que pueden evolucionar

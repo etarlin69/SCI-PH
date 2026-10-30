@@ -60,7 +60,7 @@ Guarda los archivos físicos (documentos, imágenes). PostgreSQL guarda solo la 
 
 | Servicio | Uso | Límites |
 |---|---|---|
-| IA | Asistente **educativo** | **No diagnostica. No prescribe.** Sus respuestas no reemplazan criterio clínico. |
+| IA | Resumen **asistido** de una atención para el personal del hospital ([ADR-013](../adr/ADR-013-clinical-ai-assistant.md)); asistente **educativo** del paciente (simulado) | **No diagnostica. No prescribe.** Solo lectura, sin guardar lo generado y siempre con revisión profesional. Hoy proveedor Fake en proceso: ningún dato sale de SCI-PH. |
 | Verificación facial | Verificación **1:1**: confirma que la persona es quien dice ser, comparándola con una referencia conocida | No se usa para identificar entre muchos (1:N) |
 | Huella (R307) | **Identificación** del paciente en **emergencias**, cuando no puede identificarse por sí mismo | Solo para el flujo de emergencia |
 | OCR | Extracción de texto de documentos | — |
