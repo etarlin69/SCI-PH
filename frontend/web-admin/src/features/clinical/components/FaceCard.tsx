@@ -7,7 +7,10 @@ import { CameraCapture } from './CameraCapture';
 
 const formatDate = (value: string) => new Date(value).toLocaleString('es-DO', { dateStyle: 'medium', timeStyle: 'short' });
 
-const PROVIDERS: Record<string, string> = { 'SCIPH-FaceFake': 'Proveedor simulado (desarrollo)' };
+const PROVIDERS: Record<string, string> = {
+  'SCIPH-FaceFake': 'Proveedor simulado (desarrollo)',
+  'SCIPH-FaceOpenCV': 'Reconocimiento local (OpenCV)',
+};
 const providerLabel = (provider: string) => PROVIDERS[provider] ?? provider;
 
 const REVOCATION_REASONS: { value: FaceRevocationReason; label: string }[] = [

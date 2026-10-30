@@ -10,6 +10,8 @@ namespace SCI_PH.Infrastructure.Biometrics.Face
 
         public string AlgorithmVersion => "none";
 
+        public bool IsEnabled => false;
+
         public Task<FaceEnrollmentResult> EnrollAsync(FaceCapture capture, CancellationToken cancellationToken) => throw Unavailable();
 
         public Task<FaceVerificationOutcome> VerifyAsync(string subjectReference, FaceCapture capture, CancellationToken cancellationToken) =>

@@ -18,9 +18,24 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
 {
     // The real Web BFF over a migrated PostgreSQL database (Testcontainers): concurrency tokens, unique indexes,
     // composite foreign keys and transactions behave as in production. Every log line is captured (Trace), so a test can
-    // check that nothing sensitive was written.
-    internal sealed class PostgresWebBffFactory(string connectionString, CapturingLoggerProvider logs) : BffFactory<AuthController>
+    // check that nothing sensitive was written. Extra settings override the test defaults (e.g. a real face provider).
+    internal sealed class PostgresWebBffFactory(
+        string connectionString, CapturingLoggerProvider logs, IReadOnlyDictionary<string, string?>? extraSettings = null) : BffFactory<AuthController>
     {
+        protected override IDictionary<string, string?> Settings
+        {
+            get
+            {
+                var settings = base.Settings;
+                foreach (var (key, value) in extraSettings ?? new Dictionary<string, string?>())
+                {
+                    settings[key] = value;
+                }
+
+                return settings;
+            }
+        }
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             base.ConfigureWebHost(builder);
@@ -35,10 +50,10 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
     {
         private readonly PostgresWebBffFactory _factory;
 
-        private ClinicalApiHost(string connectionString)
+        private ClinicalApiHost(string connectionString, IReadOnlyDictionary<string, string?>? settings = null)
         {
             ConnectionString = connectionString;
-            _factory = new PostgresWebBffFactory(connectionString, Logs);
+            _factory = new PostgresWebBffFactory(connectionString, Logs, settings);
         }
 
         public string ConnectionString { get; }
@@ -50,8 +65,8 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
 
         public PostgresWebBffFactory Factory => _factory;
 
-        public static async Task<ClinicalApiHost> StartAsync(PostgresFixture postgres) =>
-            new(await postgres.CreateMigratedDatabaseAsync());
+        public static async Task<ClinicalApiHost> StartAsync(PostgresFixture postgres, IReadOnlyDictionary<string, string?>? settings = null) =>
+            new(await postgres.CreateMigratedDatabaseAsync(), settings);
 
         public HttpClient Anonymous() => _factory.CreateHttpsClient();
 

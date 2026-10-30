@@ -11,7 +11,7 @@ namespace SCI_PH.Application.Tests.Clinical
 {
     // Assisted 1:1 face verification (PatientFaceService, ADR-012) over the in-memory store and a recording provider:
     // enrollment and its compensation, verification against the patient's own active reference only, idempotency that
-    // never calls the provider twice, revocation and its best-effort cleanup, and no identification of anything.
+    // never calls the provider twice, revocation and its durable template cleanup, and no identification of anything.
     public class FaceVerificationTests
     {
         private static readonly CancellationToken None = CancellationToken.None;
@@ -163,11 +163,26 @@ namespace SCI_PH.Application.Tests.Clinical
             var s = Start();
 
             await Assert.ThrowsAsync<ResourceConflictException>(() => VerifyAsync(s, "face:A"));
-
-            // A face of another provider (a previous configuration) is not usable by this one.
-            s.Reception.Store.BiometricReferences.Add(PatientBiometricReference.Register(s.Patient.Id, BiometricModality.Face, "OTHER", "face:x"));
-            await Assert.ThrowsAsync<ResourceConflictException>(() => VerifyAsync(s, "face:A"));
             Assert.Empty(s.Reception.FaceProvider.Calls);
+        }
+
+        // Ownership: an active face of another provider, or of another algorithm version of this one, is never handed to the
+        // provider; it is a 503 (re-enrollment needed), not a "no face" and never a NoMatch.
+        [Fact]
+        public async Task AFaceOfAnotherProviderOrVersionIsNeverInterpreted()
+        {
+            var s = Start();
+            var other = PatientBiometricReference.Register(s.Patient.Id, BiometricModality.Face, "OTHER", "face:x", algorithmVersion: "test-v1");
+            s.Reception.Store.BiometricReferences.Add(other);
+            await Assert.ThrowsAsync<ExternalServiceUnavailableException>(() => VerifyAsync(s, "face:A"));
+
+            s.Reception.Store.BiometricReferences.Remove(other);
+            s.Reception.Store.BiometricReferences.Add(
+                PatientBiometricReference.Register(s.Patient.Id, BiometricModality.Face, "TEST-Face", "face:y", algorithmVersion: "test-v0"));
+            await Assert.ThrowsAsync<ExternalServiceUnavailableException>(() => VerifyAsync(s, "face:A"));
+
+            Assert.Empty(s.Reception.FaceProvider.Calls);
+            Assert.DoesNotContain(s.Reception.Store.Audit, a => a.EntityName == PatientFaceService.VerificationEntityName);
         }
 
         [Fact]
@@ -182,31 +197,176 @@ namespace SCI_PH.Application.Tests.Clinical
             Assert.DoesNotContain(s.Reception.Store.Audit, a => a.EntityName == PatientFaceService.VerificationEntityName);
         }
 
-        // Revocation is logical first; the cleanup is best effort and audited; a replay writes nothing; a new face can be
-        // enrolled afterwards.
+        // Revocation is logical first and commits ONE Pending cleanup job with it; the immediate attempt completes it and audits
+        // only that completion (by the system); a replay writes nothing; a new face can be enrolled afterwards.
         [Fact]
-        public async Task RevocationIsLogicalFirstAndTheCleanupIsBestEffort()
+        public async Task RevocationCommitsADurableCleanupThatCompletesOnce()
         {
             var s = Start();
             await EnrollAsync(s);
             var reference = ActiveFace(s);
-            s.Reception.FaceProvider.FailDeletes = true;
 
             var revoked = await s.Reception.Faces.RevokeAsync(s.Patient.Id, reference.Id, new RevokeFaceRequest(FaceRevocationReason.PatientRequest), None);
 
             Assert.Equal(BiometricReferenceStatus.Revoked, revoked.Status);
+            var job = Assert.Single(s.Reception.Store.FaceDeletions);
+            Assert.Equal(reference.Id, job.BiometricReferenceId);
+            Assert.Equal(FaceTemplateDeletionStatus.Completed, job.Status);
+            Assert.Equal(FaceTemplateDeletionOutcome.Deleted, job.Outcome);
+            Assert.Empty(s.Reception.FaceProvider.Subjects);
             var updates = s.Reception.Store.Audit.Where(a => a.Action == AuditActionType.Update).ToList();
             Assert.Equal(2, updates.Count);
             Assert.Contains("PatientRequest", updates[0].ChangesJson);
-            Assert.Contains("\"cleanup\":\"Failed\"", updates[1].ChangesJson);
+            Assert.Contains("\"cleanup\":\"Deleted\"", updates[1].ChangesJson);
+            Assert.Equal(AuditActorType.System, updates[1].ActorType);
             await Assert.ThrowsAsync<ResourceConflictException>(() => VerifyAsync(s, "face:A"));
 
             var audits = s.Reception.Store.Audit.Count;
             Assert.Equal(revoked, await s.Reception.Faces.RevokeAsync(s.Patient.Id, reference.Id, null, None));
             Assert.Equal(audits, s.Reception.Store.Audit.Count);
+            Assert.Single(s.Reception.Store.FaceDeletions);
 
             Assert.True((await EnrollAsync(s, "face:B")).Created);
             Assert.Equal(FaceVerificationOutcome.Match, (await VerifyAsync(s, "face:B")).Outcome);
+        }
+
+        // A provider outage never undoes or fails the revocation: the job stays Pending with its failed attempt, and the
+        // worker passes retry it after 1, 2, 3, 5 then 10 minutes until it completes; nothing but the completion is audited.
+        [Fact]
+        public async Task AFailedCleanupStaysPendingAndIsRetriedWithBackoff()
+        {
+            var s = Start();
+            await EnrollAsync(s);
+            var reference = ActiveFace(s);
+            var provider = s.Reception.FaceProvider;
+            provider.FailDeletes = true;
+
+            var revoked = await s.Reception.Faces.RevokeAsync(s.Patient.Id, reference.Id, null, None);
+
+            Assert.Equal(BiometricReferenceStatus.Revoked, revoked.Status);
+            var job = Assert.Single(s.Reception.Store.FaceDeletions);
+            Assert.Equal((FaceTemplateDeletionStatus.Pending, 1, FaceTemplateDeletionFailure.ProviderUnavailable),
+                (job.Status, job.Attempts, job.LastFailure));
+            var audits = s.Reception.Store.Audit.Count;
+
+            // Not due yet: no call.
+            var calls = provider.Calls.Count;
+            Assert.Equal(0, await s.Reception.FaceCleanup.RunOnceAsync(10, None));
+            Assert.Equal(calls, provider.Calls.Count);
+
+            foreach (var (wait, attempts) in new[] { (1, 2), (2, 3), (3, 4), (5, 5), (10, 6), (10, 7) })
+            {
+                s.Reception.Time.Now = s.Reception.Time.Now.AddMinutes(wait).AddSeconds(-1);
+                Assert.Equal(0, await s.Reception.FaceCleanup.RunOnceAsync(10, None));
+                Assert.Equal(attempts - 1, s.Reception.Store.FaceDeletions.Single().Attempts);
+                s.Reception.Time.Now = s.Reception.Time.Now.AddSeconds(1);
+                Assert.Equal(0, await s.Reception.FaceCleanup.RunOnceAsync(10, None));
+                Assert.Equal(attempts, s.Reception.Store.FaceDeletions.Single().Attempts);
+            }
+
+            Assert.True(s.Reception.Store.FaceDeletions.Single().Attempts >= FaceTemplateCleanupService.AttentionAttempts);
+            Assert.Equal(audits, s.Reception.Store.Audit.Count);
+
+            provider.FailDeletes = false;
+            s.Reception.Time.Now = s.Reception.Time.Now.AddMinutes(10);
+            Assert.Equal(1, await s.Reception.FaceCleanup.RunOnceAsync(10, None));
+            job = s.Reception.Store.FaceDeletions.Single();
+            Assert.Equal((FaceTemplateDeletionStatus.Completed, FaceTemplateDeletionOutcome.Deleted), (job.Status, job.Outcome));
+            Assert.Equal(audits + 1, s.Reception.Store.Audit.Count);
+            Assert.Equal(0, await s.Reception.FaceCleanup.RunOnceAsync(10, None));
+        }
+
+        // No provider configured (Disabled): the revocation stands and its job stays Pending as ProviderDisabled, but nothing is
+        // sent to the provider and no attempt is counted, neither now nor on later worker passes.
+        [Fact]
+        public async Task WithTheProviderDisabledTheCleanupWaitsWithoutCountingAttempts()
+        {
+            var s = Start();
+            await EnrollAsync(s);
+            var reference = ActiveFace(s);
+            s.Reception.FaceProvider.IsEnabled = false;
+            var saves = s.Reception.Store.SaveCount;
+
+            var revoked = await s.Reception.Faces.RevokeAsync(s.Patient.Id, reference.Id, null, None);
+
+            Assert.Equal(BiometricReferenceStatus.Revoked, revoked.Status);
+            Assert.Equal(saves + 1, s.Reception.Store.SaveCount);
+            var job = Assert.Single(s.Reception.Store.FaceDeletions);
+            Assert.Equal((FaceTemplateDeletionStatus.Pending, 0, FaceTemplateDeletionFailure.ProviderDisabled, (DateTimeOffset?)null),
+                (job.Status, job.Attempts, job.LastFailure, job.LastAttemptAtUtc));
+
+            s.Reception.Time.Now = s.Reception.Time.Now.AddHours(1);
+            Assert.Equal(0, await s.Reception.FaceCleanup.RunOnceAsync(10, None));
+            Assert.False(await s.Reception.FaceCleanup.TryCompleteAsync(job.Id, None));
+            Assert.Equal(job, Assert.Single(s.Reception.Store.FaceDeletions));
+            Assert.Equal(saves + 1, s.Reception.Store.SaveCount);
+            Assert.DoesNotContain(s.Reception.FaceProvider.Calls, c => c.StartsWith("delete", StringComparison.Ordinal));
+
+            // Once a provider is configured again, the job is processed like any other.
+            s.Reception.FaceProvider.IsEnabled = true;
+            Assert.Equal(1, await s.Reception.FaceCleanup.RunOnceAsync(10, None));
+            Assert.Equal(FaceTemplateDeletionStatus.Completed, s.Reception.Store.FaceDeletions.Single().Status);
+        }
+
+        // A template that is already gone completes the job as NotFound.
+        [Fact]
+        public async Task AMissingTemplateCompletesTheCleanupAsNotFound()
+        {
+            var s = Start();
+            await EnrollAsync(s);
+            var reference = ActiveFace(s);
+            s.Reception.FaceProvider.Subjects.Clear();
+
+            await s.Reception.Faces.RevokeAsync(s.Patient.Id, reference.Id, null, None);
+
+            var job = Assert.Single(s.Reception.Store.FaceDeletions);
+            Assert.Equal((FaceTemplateDeletionStatus.Completed, FaceTemplateDeletionOutcome.NotFound), (job.Status, job.Outcome));
+        }
+
+        // The cleanup never sends another provider's subject reference to the configured one: the job stays Pending.
+        [Fact]
+        public async Task TheCleanupNeverInterpretsAnotherProvidersReference()
+        {
+            var s = Start();
+            var other = PatientBiometricReference.Register(s.Patient.Id, BiometricModality.Face, "OTHER", "face:x", algorithmVersion: "v");
+            s.Reception.Store.BiometricReferences.Add(other);
+
+            await s.Reception.Faces.RevokeAsync(s.Patient.Id, other.Id, null, None);
+
+            var job = Assert.Single(s.Reception.Store.FaceDeletions);
+            Assert.Equal((FaceTemplateDeletionStatus.Pending, FaceTemplateDeletionFailure.ProviderMismatch), (job.Status, job.LastFailure));
+            Assert.DoesNotContain(s.Reception.FaceProvider.Calls, c => c.StartsWith("delete", StringComparison.Ordinal));
+        }
+
+        // Two workers on the same job: both may ask the provider, only the first result applies and the loser audits nothing.
+        [Fact]
+        public async Task TwoWorkersConvergeOnOneCompletedJob()
+        {
+            var s = Start();
+            await EnrollAsync(s);
+            var reference = ActiveFace(s);
+            s.Reception.FaceProvider.FailDeletes = true;
+            await s.Reception.Faces.RevokeAsync(s.Patient.Id, reference.Id, null, None);
+            s.Reception.FaceProvider.FailDeletes = false;
+            s.Reception.Time.Now = s.Reception.Time.Now.AddMinutes(1);
+            var audits = s.Reception.Store.Audit.Count;
+
+            // Another worker commits its completion while this one is between its read and its save.
+            s.Reception.Store.BeforeSave = () =>
+            {
+                s.Reception.Store.BeforeSave = null;
+                var stored = s.Reception.Store.FaceDeletions[0];
+                s.Reception.Store.FaceDeletions[0] = stored with
+                {
+                    Status = FaceTemplateDeletionStatus.Completed, Outcome = FaceTemplateDeletionOutcome.NotFound, CompletedAtUtc = s.Reception.Time.Now
+                };
+            };
+
+            Assert.Equal(0, await s.Reception.FaceCleanup.RunOnceAsync(10, None));
+
+            var job = Assert.Single(s.Reception.Store.FaceDeletions);
+            Assert.Equal((FaceTemplateDeletionStatus.Completed, FaceTemplateDeletionOutcome.NotFound), (job.Status, job.Outcome));
+            Assert.Equal(audits, s.Reception.Store.Audit.Count);
         }
 
         [Fact]

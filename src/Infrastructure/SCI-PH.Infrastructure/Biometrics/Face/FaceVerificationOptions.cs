@@ -10,9 +10,10 @@ namespace SCI_PH.Infrastructure.Biometrics.Face
         public const string SectionName = "FaceVerification";
         public const string FakeProvider = "Fake";
         public const string DisabledProvider = "Disabled";
+        public const string OpenCvProvider = "OpenCv";
 
-        // "Fake" (deterministic: CI and development) or "Disabled" (every face operation answers 503). Not configured:
-        // Fake outside Production, Disabled in Production. The local OpenCV provider arrives in PR 2.
+        // "Fake" (deterministic: CI and development), "Disabled" (every face operation answers 503) or "OpenCv" (the real
+        // local provider, FaceVerification:OpenCv). Not configured: Fake outside Production, Disabled in Production.
         public string? Provider { get; set; }
 
         public string Resolve(IHostEnvironment environment) =>
@@ -30,7 +31,8 @@ namespace SCI_PH.Infrastructure.Biometrics.Face
             {
                 FaceVerificationOptions.FakeProvider when _environment.IsProduction() =>
                     ValidateOptionsResult.Fail("FaceVerification:Provider 'Fake' cannot be used in Production: it does not recognize faces."),
-                FaceVerificationOptions.FakeProvider or FaceVerificationOptions.DisabledProvider => ValidateOptionsResult.Success,
+                FaceVerificationOptions.FakeProvider or FaceVerificationOptions.DisabledProvider or FaceVerificationOptions.OpenCvProvider =>
+                    ValidateOptionsResult.Success,
                 var other => ValidateOptionsResult.Fail($"FaceVerification:Provider '{other}' is not supported.")
             };
     }

@@ -238,6 +238,13 @@ describe('rostro del paciente', () => {
     expect(within(face).queryByRole('button', { name: 'Registrar rostro' })).not.toBeInTheDocument();
   });
 
+  it('el proveedor local real se muestra con su etiqueta', async () => {
+    renderAs(DOCTOR, backend([{ ...ACTIVE, provider: 'SCIPH-FaceOpenCV' }]));
+    const face = await card();
+    expect(await within(face).findByText('Reconocimiento local (OpenCV)', {}, WAIT)).toBeInTheDocument();
+    expect(face.textContent).not.toMatch(/SCIPH-FaceOpenCV/);
+  });
+
   it('sin Patients.Identify ni Biometrics.Manage no se muestra el rostro', async () => {
     const { bff } = renderAs(NURSE, backend([ACTIVE]));
 

@@ -31,7 +31,8 @@ namespace SCI_PH.Persistence.Clinical.Services
             [FingerprintEnrollmentSessionConfiguration.PendingPerReaderIndexName] = "The fingerprint reader is busy with another enrollment.",
             [PatientBiometricReferenceConfiguration.ActiveSubjectIndexName] = "The biometric reference is already active.",
             [PatientBiometricReferenceConfiguration.ActiveFacePerPatientIndexName] = "The patient already has an active face reference.",
-            [FingerprintSlotDeletionJobConfiguration.PerReferenceIndexName] = "The biometric reference already has a deletion job."
+            [FingerprintSlotDeletionJobConfiguration.PerReferenceIndexName] = "The biometric reference already has a deletion job.",
+            [FaceTemplateDeletionJobConfiguration.PerReferenceIndexName] = "The face reference already has a template deletion job."
         };
 
         private readonly ClinicalDbContext _clinical;

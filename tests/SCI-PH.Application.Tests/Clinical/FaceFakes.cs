@@ -35,6 +35,9 @@ namespace SCI_PH.Application.Tests.Clinical
         public List<string> Calls { get; } = [];
         public bool FailDeletes { get; set; }
 
+        // False: behaves as the Disabled provider for the template cleanup.
+        public bool IsEnabled { get; set; } = true;
+
         public string Provider => "TEST-Face";
 
         public string AlgorithmVersion => "test-v1";

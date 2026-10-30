@@ -176,7 +176,7 @@ referencia del proveedor (`SubjectReference`), la plantilla, el puntaje ni el um
 |---|---|---|---|---|
 | `GET` | `/api/web/patients/{patientId}/faces` | `Biometrics.Manage` o `Patients.Identify` | — | `[PatientFace]`, más recientes primero |
 | `POST` | `/api/web/patients/{patientId}/faces/enroll` | `Biometrics.Manage` | multipart: `capture`, `clientRequestId` | 201 `{ outcome: Enrolled, face }` · 200 reintento o `{ outcome: NoFace\|MultipleFaces\|LowQuality, face: null }` · 400 · 403 · 404 · 409 · 503 |
-| `POST` | `/api/web/patients/{patientId}/faces/verify` | `Patients.Identify` | multipart: `capture`, `clientRequestId` | 200 `{ verificationId, outcome: Match\|NoMatch\|NoFace\|MultipleFaces\|LowQuality }` · 400 · 403 · 404 · 409 sin rostro activo · 503 |
+| `POST` | `/api/web/patients/{patientId}/faces/verify` | `Patients.Identify` | multipart: `capture`, `clientRequestId` | 200 `{ verificationId, outcome: Match\|NoMatch\|NoFace\|MultipleFaces\|LowQuality }` · 400 · 403 · 404 · 409 sin rostro activo · 503 (también rostro de otro proveedor) |
 | `POST` | `/api/web/patients/{patientId}/faces/{referenceId}/revoke` | `Biometrics.Manage` | `{ reason? }` (opcional; sin cuerpo también) | 200 `PatientFace` (también si ya estaba revocado) · 400 · 403 · 404 |
 
 - `PatientFace`: `{ id, status: Active|Revoked, provider, registeredAtUtc, revokedAtUtc }`. `provider` es el nombre
@@ -190,8 +190,11 @@ referencia del proveedor (`SubjectReference`), la plantilla, el puntaje ni el um
 - **Verificación:** todos los resultados biométricos son 200. El mismo `clientRequestId` con la misma imagen devuelve el
   resultado registrado sin llamar al proveedor; con otra imagen, 409. Se registra en la auditoría (`FaceVerification`).
 - **Revocación:** `reason`: `PatientRequest`, `EnrollmentError`, `ReferenceOutdated` u `Other` (solo en la auditoría).
-  Desde esa respuesta el rostro no se usa para verificar; la plantilla del proveedor se borra después (mejor esfuerzo).
-- **503:** el proveedor facial no está disponible; mensaje genérico, sin detalles internos.
+  Desde esa respuesta el rostro no se usa para verificar; la plantilla del proveedor se borra después con un job durable
+  que se reintenta hasta completarse (no cambia la respuesta).
+- **503:** el proveedor facial no está disponible, su plantilla falta o no se puede leer, o el rostro activo pertenece a
+  otro proveedor o versión de algoritmo (hay que registrarlo de nuevo); mensaje genérico, sin detalles internos y nunca
+  un `NoMatch`.
 - La UI usa la cámara del equipo (`getUserMedia`, sin selector de archivos), la apaga en cuanto toma la foto y no guarda
   la captura en el navegador. Muestra solo "Coincide", "No coincide" o la calidad; nunca un porcentaje.
 

@@ -14,6 +14,10 @@
         // Version of the provider's algorithm, stored as PatientBiometricReference.AlgorithmVersion.
         string AlgorithmVersion { get; }
 
+        // False only when no provider is configured (Disabled): nothing is ever sent to it, so a pending template cleanup is
+        // neither attempted nor counted as a failed attempt.
+        bool IsEnabled => true;
+
         // Creates a template from the capture. Enrolled carries the provider's opaque subject reference ("face:<guid>"),
         // which never contains patient data; the other outcomes create nothing.
         Task<FaceEnrollmentResult> EnrollAsync(FaceCapture capture, CancellationToken cancellationToken);

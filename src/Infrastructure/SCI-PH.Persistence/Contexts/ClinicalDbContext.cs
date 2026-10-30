@@ -62,6 +62,7 @@ namespace SCI_PH.Persistence.Contexts
         public DbSet<FingerprintIdentificationSessionEntry> FingerprintIdentificationSessions => Set<FingerprintIdentificationSessionEntry>();
         public DbSet<FingerprintEnrollmentSessionEntry> FingerprintEnrollmentSessions => Set<FingerprintEnrollmentSessionEntry>();
         public DbSet<FingerprintSlotDeletionJobEntry> FingerprintSlotDeletionJobs => Set<FingerprintSlotDeletionJobEntry>();
+        public DbSet<FaceTemplateDeletionJobEntry> FaceTemplateDeletionJobs => Set<FaceTemplateDeletionJobEntry>();
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
         {
@@ -85,6 +86,7 @@ namespace SCI_PH.Persistence.Contexts
             modelBuilder.ApplyConfiguration(new FingerprintIdentificationSessionConfiguration());
             modelBuilder.ApplyConfiguration(new FingerprintEnrollmentSessionConfiguration());
             modelBuilder.ApplyConfiguration(new FingerprintSlotDeletionJobConfiguration());
+            modelBuilder.ApplyConfiguration(new FaceTemplateDeletionJobConfiguration());
             modelBuilder.RestrictAllDeletes().AddEnumCheckConstraints();
         }
 

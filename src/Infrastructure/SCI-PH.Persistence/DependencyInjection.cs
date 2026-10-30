@@ -73,6 +73,7 @@ namespace SCI_PH.Persistence
             services.AddScoped<IFingerprintSessionStore, FingerprintSessionStore>();
             services.AddScoped<IFingerprintEnrollmentStore, FingerprintEnrollmentStore>();
             services.AddScoped<IFingerprintSlotDeletionStore, FingerprintSlotDeletionStore>();
+            services.AddScoped<IFaceTemplateDeletionStore, FaceTemplateDeletionStore>();
             services.AddScoped<IdentitySeeder>();
             services.AddOptions<IdentityBootstrapOptions>().Bind(configuration.GetSection(IdentityBootstrapOptions.SectionName));
             services.AddScoped<IdentityDevelopmentAccountSeeder>();

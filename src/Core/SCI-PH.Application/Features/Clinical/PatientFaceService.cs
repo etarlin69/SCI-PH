@@ -27,6 +27,7 @@ namespace SCI_PH.Application.Features.Clinical
         public const string VerificationEntityName = "FaceVerification";
 
         private const string NoActiveFace = "The patient has no active face reference to verify against.";
+        private const string ProviderUnavailable = "The face verification service is not available. Try again later.";
 
         private readonly ICurrentClinicalActor _actor;
         private readonly IPatientAccessAuthorizer _patientAccess;
@@ -35,6 +36,8 @@ namespace SCI_PH.Application.Features.Clinical
         private readonly IIdempotencyStore _receipts;
         private readonly IFaceVerificationService _faces;
         private readonly IFaceCaptureNormalizer _captures;
+        private readonly IFaceTemplateDeletionStore _deletions;
+        private readonly FaceTemplateCleanupService _cleanup;
         private readonly TimeProvider _time;
 
         public PatientFaceService(
@@ -45,6 +48,8 @@ namespace SCI_PH.Application.Features.Clinical
             IIdempotencyStore receipts,
             IFaceVerificationService faces,
             IFaceCaptureNormalizer captures,
+            IFaceTemplateDeletionStore deletions,
+            FaceTemplateCleanupService cleanup,
             TimeProvider time)
         {
             _actor = actor;
@@ -54,6 +59,8 @@ namespace SCI_PH.Application.Features.Clinical
             _receipts = receipts;
             _faces = faces;
             _captures = captures;
+            _deletions = deletions;
+            _cleanup = cleanup;
             _time = time;
         }
 
@@ -151,11 +158,17 @@ namespace SCI_PH.Application.Features.Clinical
 
             var row = await _reads.FindActiveFaceReferenceAsync(patientId, cancellationToken);
             var reference = row is null ? null : await _writes.FindBiometricReferenceAsync(row.Id, cancellationToken);
-            if (reference is not { Status: BiometricReferenceStatus.Active, Modality: BiometricModality.Face }
-                || reference.PatientId != patientId
-                || !string.Equals(reference.Provider, _faces.Provider, StringComparison.Ordinal))
+            if (reference is not { Status: BiometricReferenceStatus.Active, Modality: BiometricModality.Face } || reference.PatientId != patientId)
             {
                 throw new ResourceConflictException(NoActiveFace);
+            }
+
+            // Ownership: only a reference of THIS provider and algorithm version is ever handed to it. Another one (the Fake,
+            // a former provider, an unsupported version) needs a re-enrollment; it is never interpreted (503).
+            if (!string.Equals(reference.Provider, _faces.Provider, StringComparison.Ordinal)
+                || !string.Equals(reference.AlgorithmVersion, _faces.AlgorithmVersion, StringComparison.Ordinal))
+            {
+                throw new ExternalServiceUnavailableException(ProviderUnavailable);
             }
 
             var outcome = await _faces.VerifyAsync(reference.SubjectReference, capture, cancellationToken);
@@ -191,10 +204,10 @@ namespace SCI_PH.Application.Features.Clinical
             return new FaceVerificationResponse(audit.Id, outcome);
         }
 
-        // Biometrics.Manage. Active -> Revoked with its audit entry (reason only there), in one transaction: from that commit
-        // it is never verified again. Then the provider's template is deleted (best effort, recorded as a cleanup outcome;
-        // security never depends on it). Already Revoked: 200 with its state, nothing written. Another patient's reference
-        // or one that is not a face: 404.
+        // Biometrics.Manage. Active -> Revoked with its audit entry (reason only there) and ONE Pending template deletion job,
+        // in one transaction: from that commit it is never verified again. Then one immediate cleanup attempt; if it fails the
+        // job stays Pending and FaceTemplateCleanupService retries it (security never depends on it). Already Revoked: 200
+        // with its state, nothing written. Another patient's reference or one that is not a face: 404.
         public async Task<PatientFaceSummary> RevokeAsync(
             Guid patientId, Guid referenceId, RevokeFaceRequest? request, CancellationToken cancellationToken)
         {
@@ -228,6 +241,14 @@ namespace SCI_PH.Application.Features.Clinical
                         status = new[] { BiometricReferenceStatus.Active.ToString(), reference.Status.ToString() },
                         reason = reason?.ToString()
                     }))));
+                var deletion = FaceTemplateDeletion.Request(reference.Id, now);
+                if (!_faces.IsEnabled)
+                {
+                    // No provider configured: Pending, nothing attempted, no attempt counted.
+                    deletion = deletion with { LastFailure = FaceTemplateDeletionFailure.ProviderDisabled };
+                }
+
+                _deletions.Add(deletion);
                 try
                 {
                     await _writes.SaveChangesAsync(cancellationToken);
@@ -238,37 +259,21 @@ namespace SCI_PH.Application.Features.Clinical
                     continue;
                 }
 
-                await CleanUpAsync(actor, patientId, reference, cancellationToken);
+                await TryCleanUpNowAsync(deletion.Id, cancellationToken);
                 return await SummaryAsync(patientId, referenceId, cancellationToken);
             }
         }
 
-        // The template of a revoked reference is deleted from its provider; the outcome (Deleted, NotFound, Failed) is
-        // audited. Never fails the revocation: it is already committed.
-        private async Task CleanUpAsync(ClinicalActor actor, Guid patientId, PatientBiometricReference reference, CancellationToken cancellationToken)
+        // The immediate attempt never fails the revocation (already committed): the job stays Pending for the worker.
+        private async Task TryCleanUpNowAsync(Guid deletionId, CancellationToken cancellationToken)
         {
-            string cleanup;
             try
             {
-                cleanup = string.Equals(reference.Provider, _faces.Provider, StringComparison.Ordinal)
-                    ? (await _faces.DeleteAsync(reference.SubjectReference, cancellationToken)).ToString()
-                    : "NotAttempted";
+                await _cleanup.TryCompleteAsync(deletionId, cancellationToken);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                cleanup = "Failed";
-            }
-
-            try
-            {
-                _writes.Add(ClinicalAuditEntry.Success(
-                    actor.AuditActor, AuditActionType.Update, nameof(PatientBiometricReference), reference.Id.ToString(), _time.GetUtcNow(),
-                    new AuditContext(PatientId: patientId, ChangesJson: JsonSerializer.Serialize(new { cleanup }))));
-                await _writes.SaveChangesAsync(cancellationToken);
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                // The revocation stands; only the record of its cleanup was lost.
+                // Durability comes from the job.
             }
         }
 
