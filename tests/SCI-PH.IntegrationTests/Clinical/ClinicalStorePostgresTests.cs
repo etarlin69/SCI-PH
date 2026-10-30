@@ -16,6 +16,7 @@ using SCI_PH.Persistence.Identity.Models;
 using SCI_PH.Domain.Entities.Encounters;
 using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Organizations;
+using SCI_PH.Domain.Entities.Transport;
 using SCI_PH.Domain.Enums.Encounters;
 using SCI_PH.Domain.Enums.Medications;
 using SCI_PH.Domain.Enums.Patients;
@@ -366,6 +367,46 @@ namespace SCI_PH.IntegrationTests.Clinical
             public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
             public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } =
                 new Microsoft.Extensions.FileProviders.NullFileProvider();
+        }
+
+        // The reads of the assisted summary (ADR-013): an encounter's procedures (performed newest first, planned last) and
+        // its transfers in any status (most recently requested first, bounded); never another encounter's.
+        [SkippableFact]
+        public async Task ProceduresAndTransfersAreReadPerEncounter()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            await using var host = await ClinicalApiHost.StartAsync(_postgres);
+            var (clinic, staff) = await ClinicWithStaffAsync(host);
+            var destination = await host.CreateClinicAsync("Destino");
+            var encounter = await AddEncounterAsync(host, clinic.Id);
+            var other = await AddEncounterAsync(host, clinic.Id);
+            var now = DateTimeOffset.UtcNow;
+            var planned = ClinicalProcedure.Plan(encounter.Id, "Radiografía");
+            var older = ClinicalProcedure.RecordCompleted(encounter.Id, "Electrocardiograma", staff.Id, now.AddMinutes(-8), now.AddMinutes(-7), "Registrado", codeSystem: "SCIPH-PREHOSPITAL", code: "ECG");
+            var newer = ClinicalProcedure.RecordCompleted(encounter.Id, "Glucometría", staff.Id, now.AddMinutes(-2), now.AddMinutes(-2));
+            var cancelled = ClinicalTransfer.Request(encounter.Id, destination.Id, now.AddMinutes(-6), clinic.Id, reason: "Primera solicitud");
+            cancelled.Cancel(now.AddMinutes(-5));
+            var active = ClinicalTransfer.Request(encounter.Id, destination.Id, now.AddMinutes(-3), clinic.Id, reason: "Segunda solicitud");
+            await host.DbAsync(async db =>
+            {
+                db.ClinicalProcedures.AddRange(planned, older, newer, ClinicalProcedure.Plan(other.Id, "Ajena"));
+                db.ClinicalTransfers.AddRange(cancelled, active, ClinicalTransfer.Request(other.Id, destination.Id, now, clinic.Id));
+                await db.SaveChangesAsync();
+            });
+
+            await using var scope = host.Services.CreateAsyncScope();
+            var reads = scope.ServiceProvider.GetRequiredService<IClinicalReadStore>();
+            var procedures = await reads.ListProceduresAsync(encounter.Id, None);
+            Assert.Equal([newer.Id, older.Id, planned.Id], procedures.Select(p => p.Id));
+            var ecg = procedures[1];
+            Assert.Equal(("Electrocardiograma", "SCIPH-PREHOSPITAL", "ECG", ClinicalProcedureStatus.Completed, "Registrado"),
+                (ecg.Name, ecg.CodeSystem, ecg.Code, ecg.Status, ecg.Outcome));
+            Assert.Equal((ClinicalProcedureStatus.Planned, (DateTimeOffset?)null), (procedures[2].Status, procedures[2].PerformedAtUtc));
+
+            var transfers = await reads.ListEncounterTransfersAsync(encounter.Id, 10, None);
+            Assert.Equal([active.Id, cancelled.Id], transfers.Select(t => t.Id));
+            Assert.Equal([Domain.Enums.Transport.ClinicalTransferStatus.Requested, Domain.Enums.Transport.ClinicalTransferStatus.Cancelled], transfers.Select(t => t.Status));
+            Assert.Equal([active.Id], (await reads.ListEncounterTransfersAsync(encounter.Id, 1, None)).Select(t => t.Id));
         }
 
         private static async Task<(Clinic Clinic, ClinicalStaff Staff)> ClinicWithStaffAsync(ClinicalApiHost host)

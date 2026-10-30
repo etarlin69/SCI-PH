@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SCI_PH.Application.DTOs.Security;
 using SCI_PH.Domain.Entities.Medications;
@@ -18,9 +19,13 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
 {
     // The real Web BFF over a migrated PostgreSQL database (Testcontainers): concurrency tokens, unique indexes,
     // composite foreign keys and transactions behave as in production. Every log line is captured (Trace), so a test can
-    // check that nothing sensitive was written. Extra settings override the test defaults (e.g. a real face provider).
+    // check that nothing sensitive was written. Extra settings override the test defaults (e.g. a real face provider); extra
+    // services replace registrations (e.g. a recording decorator around a provider).
     internal sealed class PostgresWebBffFactory(
-        string connectionString, CapturingLoggerProvider logs, IReadOnlyDictionary<string, string?>? extraSettings = null) : BffFactory<AuthController>
+        string connectionString,
+        CapturingLoggerProvider logs,
+        IReadOnlyDictionary<string, string?>? extraSettings = null,
+        Action<IServiceCollection>? extraServices = null) : BffFactory<AuthController>
     {
         protected override IDictionary<string, string?> Settings
         {
@@ -40,7 +45,11 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
         {
             base.ConfigureWebHost(builder);
             builder.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace).AddProvider(logs));
-            builder.ConfigureTestServices(services => services.UsePostgresStores(connectionString));
+            builder.ConfigureTestServices(services =>
+            {
+                services.UsePostgresStores(connectionString);
+                extraServices?.Invoke(services);
+            });
         }
     }
 
@@ -50,10 +59,11 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
     {
         private readonly PostgresWebBffFactory _factory;
 
-        private ClinicalApiHost(string connectionString, IReadOnlyDictionary<string, string?>? settings = null)
+        private ClinicalApiHost(
+            string connectionString, IReadOnlyDictionary<string, string?>? settings = null, Action<IServiceCollection>? services = null)
         {
             ConnectionString = connectionString;
-            _factory = new PostgresWebBffFactory(connectionString, Logs, settings);
+            _factory = new PostgresWebBffFactory(connectionString, Logs, settings, services);
         }
 
         public string ConnectionString { get; }
@@ -65,8 +75,9 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
 
         public PostgresWebBffFactory Factory => _factory;
 
-        public static async Task<ClinicalApiHost> StartAsync(PostgresFixture postgres, IReadOnlyDictionary<string, string?>? settings = null) =>
-            new(await postgres.CreateMigratedDatabaseAsync(), settings);
+        public static async Task<ClinicalApiHost> StartAsync(
+            PostgresFixture postgres, IReadOnlyDictionary<string, string?>? settings = null, Action<IServiceCollection>? services = null) =>
+            new(await postgres.CreateMigratedDatabaseAsync(), settings, services);
 
         public HttpClient Anonymous() => _factory.CreateHttpsClient();
 

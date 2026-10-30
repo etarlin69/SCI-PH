@@ -15,14 +15,15 @@ builder.Services.AddHealthChecks();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi(options => options.AddBearerSecurity());
 
-builder.Services.AddApplication().AddAccountSecurity().AddAccountManagement(builder.Configuration).AddClinicalWorkflows().AddFaceVerificationWorkflow();
+builder.Services.AddApplication().AddAccountSecurity().AddAccountManagement(builder.Configuration).AddClinicalWorkflows().AddFaceVerificationWorkflow().AddClinicalAiWorkflow();
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration)
     .AddJwtSecurity(builder.Configuration)
     .AddEmailDelivery(builder.Configuration)
     .AddFrontendCors(builder.Configuration)
     .AddSecurityRateLimiting(builder.Configuration)
-    .AddFaceVerification(builder.Configuration);
+    .AddFaceVerification(builder.Configuration)
+    .AddClinicalAi(builder.Configuration);
 
 var app = builder.Build();
 
@@ -45,8 +46,9 @@ else
 
 app.UseApiSecurityHeaders();
 app.UseCors(FrontendCors.PolicyName);
-app.UseRateLimiter();
+// La autenticación va antes del rate limiting: la política de IA clínica se particiona por usuario autenticado.
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();

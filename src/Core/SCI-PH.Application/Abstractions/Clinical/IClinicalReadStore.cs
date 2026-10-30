@@ -94,6 +94,12 @@ namespace SCI_PH.Application.Abstractions.Clinical
         // Newest first (by administration time).
         Task<IReadOnlyList<MedicationAdministrationSummary>> ListMedicationAdministrationsAsync(Guid encounterId, CancellationToken cancellationToken);
 
+        // Newest first (by performed time; planned ones, without it, last).
+        Task<IReadOnlyList<ClinicalProcedureSummary>> ListProceduresAsync(Guid encounterId, CancellationToken cancellationToken);
+
+        // The encounter's transfers in any status, most recently requested first, at most limit.
+        Task<IReadOnlyList<TransferRow>> ListEncounterTransfersAsync(Guid encounterId, int limit, CancellationToken cancellationToken);
+
         // Null when the clinic does not exist.
         Task<ClinicStatus?> GetClinicStatusAsync(Guid clinicId, CancellationToken cancellationToken);
 

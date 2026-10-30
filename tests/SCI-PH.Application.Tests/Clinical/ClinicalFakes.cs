@@ -357,6 +357,17 @@ namespace SCI_PH.Application.Tests.Clinical
                     a.Dose, a.DoseUnit, a.Route, a.AdministeredAtUtc, a.AdministeredByStaffId, a.Status, a.Notes))
                 .ToList());
 
+        public Task<IReadOnlyList<ClinicalProcedureSummary>> ListProceduresAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ClinicalProcedureSummary>>(Procedures.Where(p => p.ClinicalEncounterId == encounterId)
+                .OrderByDescending(p => p.PerformedAtUtc.HasValue).ThenByDescending(p => p.PerformedAtUtc).ThenBy(p => p.Id)
+                .Select(p => new ClinicalProcedureSummary(
+                    p.Id, p.ClinicalEncounterId, p.Name, p.CodeSystem, p.Code, p.Status, p.PerformedAtUtc, p.CompletedAtUtc, p.Outcome))
+                .ToList());
+
+        public Task<IReadOnlyList<TransferRow>> ListEncounterTransfersAsync(Guid encounterId, int limit, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<TransferRow>>(Transfers.Where(t => t.ClinicalEncounterId == encounterId)
+                .OrderByDescending(t => t.RequestedAtUtc).Take(limit).Select(ToRow).ToList());
+
         public Task<ClinicStatus?> GetClinicStatusAsync(Guid clinicId, CancellationToken cancellationToken) =>
             Task.FromResult(Clinics.TryGetValue(clinicId, out var status) ? status : (ClinicStatus?)null);
 
@@ -658,6 +669,7 @@ namespace SCI_PH.Application.Tests.Clinical
             DeletionReaderSide = new FingerprintSlotDeletionReaderService(Store, Store, Time);
             FaceCleanup = new FaceTemplateCleanupService(Store, Store, FaceProvider, Time);
             Faces = new PatientFaceService(Actor, access, Store, Store, Store, FaceProvider, new PassThroughCaptureNormalizer(), Store, FaceCleanup, Time);
+            AiSummaries = new EncounterAiSummaryService(Actor, Store, Store, access, AiProvider, Time, AiLogs);
         }
 
         public FakeCurrentUser User { get; }
@@ -682,6 +694,9 @@ namespace SCI_PH.Application.Tests.Clinical
         public FingerprintSlotDeletionReaderService DeletionReaderSide { get; }
         public TestFaceProvider FaceProvider { get; } = new();
         public PatientFaceService Faces { get; }
+        public TestClinicalAiProvider AiProvider { get; } = new();
+        public CapturingLogger<EncounterAiSummaryService> AiLogs { get; } = new();
+        public EncounterAiSummaryService AiSummaries { get; }
 
         public static ClinicalHarness ForRole(string role, int clinics = 1)
         {

@@ -81,6 +81,15 @@ namespace SCI_PH.Application
             return services;
         }
 
+        // Assisted clinical AI (ADR-013, Web BFF only): closed, read-only operations. Requires a clinical AI provider
+        // (Infrastructure: AddClinicalAi) and AddClinicalWorkflows.
+        public static IServiceCollection AddClinicalAiWorkflow(this IServiceCollection services)
+        {
+            services.AddScoped<EncounterAiSummaryService>();
+
+            return services;
+        }
+
         // Autenticación de dispositivos y lado del lector de huella (solo Device API). Independiente de las cuentas humanas.
         // Requiere AddPersistence (credenciales de dispositivo, sesiones de huella y stores clínicos).
         public static IServiceCollection AddDeviceSecurity(this IServiceCollection services)
