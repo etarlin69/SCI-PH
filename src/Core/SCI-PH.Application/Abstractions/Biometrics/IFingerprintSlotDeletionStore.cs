@@ -20,6 +20,10 @@ namespace SCI_PH.Application.Abstractions.Biometrics
         // slot cannot hold a new enrollment yet.
         Task<bool> HasPendingForSubjectAsync(Guid deviceCredentialId, string subjectReference, CancellationToken cancellationToken);
 
+        // The subject references of this reader's Pending jobs: slots it still has to delete (part of its slot inventory). For
+        // Application only; they never leave it.
+        Task<IReadOnlyList<string>> ListPendingSubjectReferencesForReaderAsync(Guid deviceCredentialId, CancellationToken cancellationToken);
+
         void Add(FingerprintSlotDeletion deletion);
 
         // Tracks the new state of a job read with FindAsync; it only commits while the stored status AND last attempt are

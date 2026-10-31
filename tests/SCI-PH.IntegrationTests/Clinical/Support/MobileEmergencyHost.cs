@@ -112,6 +112,15 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
 
         public HttpClient DeviceAnonymous() => _device.CreateHttpsClient();
 
+        // The same reader headers over plain HTTP (the tests keep RequireHttps on).
+        public HttpClient ReaderOverHttp(TestReader reader)
+        {
+            var client = _device.CreateClient();
+            client.DefaultRequestHeaders.Add(DeviceAuthenticationDefaults.DeviceIdHeader, reader.Code);
+            client.DefaultRequestHeaders.Add(DeviceAuthenticationDefaults.DeviceKeyHeader, reader.Key);
+            return client;
+        }
+
         public async ValueTask DisposeAsync()
         {
             await _device.DisposeAsync();

@@ -100,6 +100,7 @@ namespace SCI_PH.Application
             services.AddScoped<FingerprintReaderService>();
             services.AddScoped<FingerprintEnrollmentReaderService>();
             services.AddScoped<FingerprintSlotDeletionReaderService>();
+            services.AddScoped<FingerprintSlotInventoryReaderService>();
 
             return services;
         }

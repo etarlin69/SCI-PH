@@ -127,6 +127,14 @@ namespace SCI_PH.Application.Tests.Clinical
                 && r.Provider == provider && r.Status == BiometricReferenceStatus.Active
                 && r.SubjectReference.StartsWith(subjectReferencePrefix, StringComparison.Ordinal)));
 
+        public Task<IReadOnlyList<string>> ListActiveFingerprintSubjectReferencesAsync(
+            string provider, string subjectReferencePrefix, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<string>>(BiometricReferences
+                .Where(r => r.Modality == BiometricModality.Fingerprint && r.Provider == provider && r.Status == BiometricReferenceStatus.Active
+                    && r.SubjectReference.StartsWith(subjectReferencePrefix, StringComparison.Ordinal))
+                .Select(r => r.SubjectReference)
+                .ToList());
+
         public Task<IReadOnlyList<FingerprintReferenceRow>> ListFingerprintReferencesAsync(Guid patientId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<FingerprintReferenceRow>>(BiometricReferences
                 .Where(r => r.PatientId == patientId && r.Modality == BiometricModality.Fingerprint)
@@ -208,6 +216,10 @@ namespace SCI_PH.Application.Tests.Clinical
         public Task<bool> HasPendingForSubjectAsync(Guid deviceCredentialId, string subjectReference, CancellationToken cancellationToken) =>
             Task.FromResult(Deletions.Any(x => x.DeviceCredentialId == deviceCredentialId && x.IsPending
                 && Target(x).SubjectReference == subjectReference));
+
+        public Task<IReadOnlyList<string>> ListPendingSubjectReferencesForReaderAsync(Guid deviceCredentialId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<string>>(Deletions.Where(x => x.DeviceCredentialId == deviceCredentialId && x.IsPending)
+                .Select(x => Target(x).SubjectReference).ToList());
 
         public void Add(FingerprintSlotDeletion deletion) => _pending.Add(deletion);
 
