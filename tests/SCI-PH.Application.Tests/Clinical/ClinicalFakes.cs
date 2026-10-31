@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using SCI_PH.Application.Abstractions.Biometrics;
 using SCI_PH.Application.Abstractions.Clinical;
 using SCI_PH.Application.Abstractions.Idempotency;
@@ -52,6 +53,12 @@ namespace SCI_PH.Application.Tests.Clinical
         public DateTimeOffset Now { get; set; } = now;
 
         public override DateTimeOffset GetUtcNow() => Now;
+    }
+
+    // MemoryCache reads expirations on this clock, so a test can move time past an entry's lifetime.
+    internal sealed class FixedTimeClock(FixedTime time) : Microsoft.Extensions.Internal.ISystemClock
+    {
+        public DateTimeOffset UtcNow => time.Now;
     }
 
     // In-memory clinical store: writes become visible only after SaveChangesAsync, like a transaction. It also holds the
@@ -646,8 +653,9 @@ namespace SCI_PH.Application.Tests.Clinical
     {
         public static readonly DateTimeOffset Start = new(2026, 10, 1, 8, 0, 0, TimeSpan.Zero);
 
-        // A shared store lets two users act on the same data (e.g. a doctor prescribes, a nurse administers).
-        public ClinicalHarness(FakeCurrentUser user, FakeClinicalStore? store = null)
+        // A shared store lets two users act on the same data (e.g. a doctor prescribes, a nurse administers); sharedAi lets
+        // them use the same clinical AI provider and summary cache, as the singletons of one host.
+        public ClinicalHarness(FakeCurrentUser user, FakeClinicalStore? store = null, ClinicalHarness? sharedAi = null)
         {
             User = user;
             Store = store ?? new FakeClinicalStore();
@@ -669,7 +677,9 @@ namespace SCI_PH.Application.Tests.Clinical
             DeletionReaderSide = new FingerprintSlotDeletionReaderService(Store, Store, Time);
             FaceCleanup = new FaceTemplateCleanupService(Store, Store, FaceProvider, Time);
             Faces = new PatientFaceService(Actor, access, Store, Store, Store, FaceProvider, new PassThroughCaptureNormalizer(), Store, FaceCleanup, Time);
-            AiSummaries = new EncounterAiSummaryService(Actor, Store, Store, access, AiProvider, Time, AiLogs);
+            AiProvider = sharedAi?.AiProvider ?? new TestClinicalAiProvider();
+            AiCache = sharedAi?.AiCache ?? new MemoryCache(new MemoryCacheOptions { SizeLimit = 500, Clock = new FixedTimeClock(Time) });
+            AiSummaries = new EncounterAiSummaryService(Actor, Store, Store, access, AiProvider, AiCache, AiMetrics, Time, AiLogs);
         }
 
         public FakeCurrentUser User { get; }
@@ -694,8 +704,11 @@ namespace SCI_PH.Application.Tests.Clinical
         public FingerprintSlotDeletionReaderService DeletionReaderSide { get; }
         public TestFaceProvider FaceProvider { get; } = new();
         public PatientFaceService Faces { get; }
-        public TestClinicalAiProvider AiProvider { get; } = new();
+        public TestClinicalAiProvider AiProvider { get; }
         public CapturingLogger<EncounterAiSummaryService> AiLogs { get; } = new();
+        // The summary cache as the composition root registers it (dedicated, bounded), on this harness's clock.
+        public MemoryCache AiCache { get; }
+        public ClinicalAiMetrics AiMetrics { get; } = new();
         public EncounterAiSummaryService AiSummaries { get; }
 
         public static ClinicalHarness ForRole(string role, int clinics = 1)

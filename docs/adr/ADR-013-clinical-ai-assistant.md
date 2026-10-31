@@ -1,10 +1,11 @@
 # ADR-013: Asistente clínico de IA (resumen asistido de la atención)
 
 - **Estado:** Aceptado. PR 1/2 implementado en `feature/clinical-ai-assistant`: contrato, proveedor Fake determinista,
-  UI del hospital, auditoría y límites. PR 2/2 (proveedor real en la nube): pendiente, con las condiciones de la decisión 12.
+  UI del hospital, auditoría y límites. PR 2/2 (proveedor real Azure OpenAI): implementado, ver
+  [ADR-014](ADR-014-clinical-ai-real-provider.md), que precisa las decisiones 5, 8, 11 y 12.
 - **Fecha:** 2026-10-30
 - **Relacionado:** [ADR-001](ADR-001-onion-architecture.md), [ADR-005](ADR-005-clinical-model.md),
-  [ADR-006](ADR-006-identity-security.md), [ADR-012](ADR-012-face-verification.md),
+  [ADR-006](ADR-006-identity-security.md), [ADR-012](ADR-012-face-verification.md), [ADR-014](ADR-014-clinical-ai-real-provider.md),
   [contratos del Web BFF](../api/web-bff-contracts.md#web-hospital--resumen-asistido-por-ia-implementado)
 
 ## Contexto
@@ -101,8 +102,9 @@ lectura y con revisión humana**.
   categoría de latencia y categoría de fallo. Nunca prompt, respuesta, texto de notas, contenido generado, valores
   clínicos, alias ni claves.
 - Logs: los mismos metadatos (la correlación sale del scope de la petición); nunca contenido clínico ni generado.
-- **PR 2:** cuando los datos salgan hacia un proveedor externo, `Action = Export` (también un intento fallido después de
-  enviar datos). Sin cambios de Domain.
+- **PR 2 (implementado, ADR-014):** cuando los datos salen hacia un proveedor externo, `Action = Export` (también un
+  intento fallido después de enviar datos); `ChangesJson` añade categoría, llamadas al proveedor, acierto de caché y tokens.
+  Sin cambios de Domain.
 
 ### 9. Acceso, límites y cuerpo sin opciones
 
@@ -128,8 +130,9 @@ lectura y con revisión humana**.
 
 ### 11. Proveedores y configuración
 
-- `ClinicalAi:Provider` (solo servidor): `Fake` o `Disabled`. Sin configurar: Fake fuera de Production, Disabled en
-  Production. Fake en Production impide arrancar. `AzureOpenAI` está reservado para el PR 2 (hoy no arranca).
+- `ClinicalAi:Provider` (solo servidor): `Fake`, `Disabled` o `AzureOpenAI` (PR 2, ADR-014: solo con
+  `ClinicalAi:AllowExternalClinicalData = true`). Sin configurar: Fake fuera de Production, Disabled en Production. Fake en
+  Production impide arrancar.
 - **Fake** (`SCIPH-AiFake`, `fake-summary-v1`): determinista y en proceso (sin red, claves ni modelos). Escribe una
   plantilla fija a partir de los registros estructurados; nunca copia texto narrativo (notas, motivos, observaciones), así
   que una nota no puede cambiar su respuesta. Sus puntos a revisar son hechos documentales derivables (p. ej. una
@@ -139,6 +142,9 @@ lectura y con revisión humana**.
 - **PR 1: ningún dato sale de SCI-PH.**
 
 ### 12. Proveedor real (PR 2) y gobierno de PHI
+
+> Implementado y precisado en [ADR-014](ADR-014-clinical-ai-real-provider.md) (proveedor, schema estricto, guard de datos
+> externos, caché, reintentos, métricas). Lo siguiente es la propuesta original.
 
 - Propuesta: Azure OpenAI con salida estructurada estricta, el prompt V1 y el mismo validador; OpenAI API como alternativa.
   Un modelo local (Ollama/llama.cpp) solo como opción posterior detrás de la misma interfaz.
@@ -163,7 +169,7 @@ lectura y con revisión humana**.
   tiene IA en esta vertical.
 - El PR #23 (observabilidad) también modifica `Web.BFF/Program.cs`: puede producir un conflicto trivial con el orden
   `UseAuthentication` → `UseRateLimiter` y el registro de `AddClinicalAi`; al resolverlo se conserva ese orden.
-- Seguimientos: proveedor real (PR 2); health check del proveedor (tras el PR #23, que además debe verificar que su
+- Seguimientos: proveedor real (PR 2, hecho: ADR-014); health check del proveedor (tras el PR #23, que además debe verificar que su
   middleware de observabilidad no registre cuerpos); métricas agregadas (peticiones, fallos, latencia, tokens) sin
   contenido; resumen de traspaso prehospitalario (P2); explicación educativa de un concepto documentado como operación
   separada (P2).

@@ -20,6 +20,8 @@ namespace SCI_PH.Application.Tests.Clinical
 
         public bool IsEnabled { get; set; } = true;
 
+        public bool SendsDataExternally { get; set; }
+
         public List<EncounterSummaryInput> Inputs { get; } = [];
 
         // Answers the draft for the input; may throw (provider failures) or wait (timeout, cancellation).

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -10,6 +11,7 @@ using SCI_PH.Application.Abstractions.AI;
 using SCI_PH.Application.Abstractions.Biometrics;
 using SCI_PH.Application.Abstractions.Security;
 using SCI_PH.Application.Common.Security;
+using SCI_PH.Application.Features.Clinical;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Logging;
 using SCI_PH.Infrastructure.Biometrics.Face;
@@ -74,23 +76,43 @@ namespace SCI_PH.Infrastructure
             return services;
         }
 
-        // Assisted clinical AI (ADR-013): the provider chosen by server configuration (ClinicalAi:Provider). Fake (deterministic,
-        // in process) outside Production, Disabled (503) in Production if nothing else is configured; Fake configured in
-        // Production prevents the host from starting. No real provider yet (PR 2): no data leaves SCI-PH.
+        // Assisted clinical AI (ADR-013, ADR-014): the provider chosen by server configuration (ClinicalAi:Provider). Fake
+        // (deterministic, in process) outside Production, Disabled (503) in Production if nothing else is configured; Fake
+        // configured in Production prevents the host from starting. "AzureOpenAI" sends the minimized input outside SCI-PH:
+        // the host starts with it only when ClinicalAi:AllowExternalClinicalData is also true (validated on start, and
+        // checked again when the provider is built) and, in Production, only with a managed identity (never an API key).
+        // Nothing contacts the provider at startup. It also registers the summary cache Application consumes as a keyed
+        // IMemoryCache (EncounterAiSummaryService.CacheServiceKey): a dedicated, bounded MemoryCache (SizeLimit 500 entries),
+        // not the host's shared one, on the host's TimeProvider.
         public static IServiceCollection AddClinicalAi(this IServiceCollection services, IConfiguration configuration)
         {
+            services.TryAddSingleton(TimeProvider.System);
+            services.AddKeyedSingleton<IMemoryCache>(EncounterAiSummaryService.CacheServiceKey, (provider, _) => new MemoryCache(new MemoryCacheOptions
+            {
+                SizeLimit = ClinicalAiOptions.SummaryCacheSizeLimit,
+                Clock = new TimeProviderClock(provider.GetRequiredService<TimeProvider>())
+            }));
             services.AddOptions<ClinicalAiOptions>()
                 .Bind(configuration.GetSection(ClinicalAiOptions.SectionName))
                 .ValidateOnStart();
             services.AddSingleton<IValidateOptions<ClinicalAiOptions>, ClinicalAiOptionsValidator>();
             services.AddSingleton<FakeClinicalAiService>();
+            services.AddSingleton<AzureOpenAiClinicalAiService>();
             services.AddSingleton<IClinicalAiService>(provider =>
-                provider.GetRequiredService<IOptions<ClinicalAiOptions>>().Value.Resolve(provider.GetRequiredService<IHostEnvironment>()) switch
+            {
+                var options = provider.GetRequiredService<IOptions<ClinicalAiOptions>>().Value;
+                IClinicalAiService ai = options.Resolve(provider.GetRequiredService<IHostEnvironment>()) switch
                 {
                     ClinicalAiOptions.FakeProvider => provider.GetRequiredService<FakeClinicalAiService>(),
                     ClinicalAiOptions.DisabledProvider => new DisabledClinicalAiService(),
+                    ClinicalAiOptions.AzureOpenAiProvider => provider.GetRequiredService<AzureOpenAiClinicalAiService>(),
                     var other => throw new InvalidOperationException($"ClinicalAi:Provider '{other}' is not supported.")
-                });
+                };
+
+                return ai.SendsDataExternally && !options.AllowExternalClinicalData
+                    ? throw new InvalidOperationException("The clinical AI provider sends data outside SCI-PH and ClinicalAi:AllowExternalClinicalData is not true.")
+                    : ai;
+            });
 
             return services;
         }
