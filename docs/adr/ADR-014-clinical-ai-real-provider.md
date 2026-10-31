@@ -70,8 +70,9 @@ tiene sus propios fallos (filtros de contenido, negativas, cuotas, límites de t
   rol *Cognitive Services OpenAI User*). `ApiKey` o `DefaultAzureCredential` en Production, o una clave configurada junto a
   Entra ID, impiden arrancar.
 - **Development:** `ApiKey` (User Secrets o variable de entorno) o `DefaultAzureCredential` (`az login`).
-- `TokenScope` configurable (por defecto `https://cognitiveservices.azure.com/.default`; la documentación de Microsoft usa
-  también `https://ai.azure.com/.default` en algunas guías: verificarlo con el E2E real).
+- `TokenScope`: `https://cognitiveservices.azure.com/.default` por defecto para Azure pública (verificado por el Tech Lead
+  en la documentación v1 actual de Azure OpenAI / Foundry; decisión cerrada). Sigue siendo configurable para nubes
+  soberanas o cambios futuros de Azure; no se cambia a `https://ai.azure.com/.default` sin nueva evidencia oficial.
 - Nunca hay secretos en `appsettings*.json`, el repositorio, la imagen, los logs ni la auditoría; los mensajes de validación
   no repiten valores configurados.
 - **Sin llamada al arrancar:** construir el cliente no contacta a nadie (ni token ni petición); la disponibilidad se conoce
@@ -136,7 +137,9 @@ tiene sus propios fallos (filtros de contenido, negativas, cuotas, límites de t
 
 ### 10. Caché en memoria (deduplicación de costo, no idempotencia)
 
-- `EncounterAiSummaryCache` en Application (`MemoryCache` propio): clave usuario + atención + huella de la entrada +
+- Application solo consume `IMemoryCache` (paquete `Microsoft.Extensions.Caching.Abstractions`), inyectado con la clave
+  `EncounterAiSummaryService.CacheServiceKey`; la instancia concreta la crea la raíz de composición (Infrastructure,
+  `AddClinicalAi`): un `MemoryCache` dedicado, no la caché compartida del host. Clave usuario + atención + huella de la entrada +
   versión de prompt + proveedor + modelo; 10 minutos absolutos; `SizeLimit` 500. Solo para proveedores externos (el Fake
   responde siempre, como en el PR 1).
 - Solo entra un resumen **validado**; nunca un error, timeout, negativa, filtro ni salida inválida.

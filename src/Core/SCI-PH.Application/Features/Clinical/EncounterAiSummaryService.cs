@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SCI_PH.Application.Abstractions.AI;
 using SCI_PH.Application.Abstractions.Clinical;
@@ -20,14 +22,21 @@ namespace SCI_PH.Application.Features.Clinical
     // and its category, provider calls, cache hit and token usage; never the input, prompt, answer or any clinical value.
     // Its action is Export when the input was (or may have been) transmitted to an external provider, Read otherwise
     // (in-process provider, Disabled, cache hit, rejected before transmission). With an external provider an identical
-    // request of the same user within 10 minutes is answered from EncounterAiSummaryCache (same GeneratedAtUtc, no new
-    // call). Every failure of the provider (Disabled, unavailable, timeout, filtered, invalid or unknown-source answer) is
+    // request of the same user within 10 minutes is answered from the summary cache (same GeneratedAtUtc, no new call).
+    // Every failure of the provider (Disabled, unavailable, timeout, filtered, invalid or unknown-source answer) is
     // the same generic 503. A cancelled request (client gone) records nothing and stops the provider call.
     public sealed class EncounterAiSummaryService
     {
         public const string EntityName = "ClinicalAiEncounterSummary";
         public const string Operation = "encounter-summary";
         public const int MaxProviderCalls = 2;
+
+        // The summary cache (ADR-014): deduplication of external calls (cost, data transfer), NOT idempotency. A dedicated
+        // IMemoryCache registered by the composition root under this key (bounded, memory only, never the host's shared
+        // cache); entries are keyed per user, encounter, input fingerprint, prompt, provider and model, hold only validated
+        // summaries, are never serialized or logged and expire 10 minutes after they were stored.
+        public const string CacheServiceKey = "clinical-ai-summaries";
+        public static readonly TimeSpan CacheTimeToLive = TimeSpan.FromMinutes(10);
 
         private const string Unavailable = "The assisted summary is not available right now. Try again later.";
 
@@ -38,7 +47,7 @@ namespace SCI_PH.Application.Features.Clinical
         private readonly IClinicalWriteStore _writes;
         private readonly IPatientAccessAuthorizer _patientAccess;
         private readonly IClinicalAiService _ai;
-        private readonly EncounterAiSummaryCache _cache;
+        private readonly IMemoryCache _cache;
         private readonly ClinicalAiMetrics _metrics;
         private readonly TimeProvider _time;
         private readonly ILogger<EncounterAiSummaryService> _logger;
@@ -49,7 +58,7 @@ namespace SCI_PH.Application.Features.Clinical
             IClinicalWriteStore writes,
             IPatientAccessAuthorizer patientAccess,
             IClinicalAiService ai,
-            EncounterAiSummaryCache cache,
+            [FromKeyedServices(CacheServiceKey)] IMemoryCache cache,
             ClinicalAiMetrics metrics,
             TimeProvider time,
             ILogger<EncounterAiSummaryService> logger)
@@ -87,9 +96,9 @@ namespace SCI_PH.Application.Features.Clinical
                 await _reads.ListEncounterTransfersAsync(encounter.Id, EncounterAiInputBuilder.MaxTransfers + 1, cancellationToken));
 
             // Only an external provider is deduplicated (cost, data transfer); the in-process Fake answers every request.
-            var key = new EncounterAiSummaryCacheKey(
+            var key = new CacheKey(
                 actor.IdentityUserId, encounter.Id, prepared.Fingerprint, _ai.PromptVersion, _ai.Provider, _ai.ModelVersion);
-            if (_ai.SendsDataExternally && _cache.TryGet(key, out var cached))
+            if (_ai.SendsDataExternally && _cache.TryGetValue(key, out EncounterAiSummary? cached) && cached is not null)
             {
                 return await CacheHitAsync(context, prepared, cached, cancellationToken);
             }
@@ -187,13 +196,17 @@ namespace SCI_PH.Application.Features.Clinical
                 prepared.Input.Truncated);
             if (_ai.SendsDataExternally)
             {
-                _cache.Set(key, summary);
+                _cache.Set(key, summary, new MemoryCacheEntryOptions { Size = 1, AbsoluteExpirationRelativeToNow = CacheTimeToLive });
             }
 
             return summary;
         }
 
         private sealed record Attempt(ClinicalActor Actor, Guid EncounterId, Guid? PatientId);
+
+        // Everything a cached summary depends on: a different user, encounter, input, prompt, provider or model is a miss.
+        private sealed record CacheKey(
+            Guid UserId, Guid EncounterId, string SourceFingerprint, string PromptVersion, string Provider, string ModelVersion);
 
         // Failure (foundation names: ProviderDisabled, Timeout, InvalidOutput, UnknownSource, ProviderUnavailable), its
         // provider category, latency category and provider calls.

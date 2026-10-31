@@ -81,13 +81,12 @@ namespace SCI_PH.Application
             return services;
         }
 
-        // Assisted clinical AI (ADR-013, ADR-014, Web BFF only): closed, read-only operations, with the in-memory summary
-        // cache of external providers and the "SCI-PH.ClinicalAi" meter (one per host). Requires a clinical AI provider
-        // (Infrastructure: AddClinicalAi) and AddClinicalWorkflows.
+        // Assisted clinical AI (ADR-013, ADR-014, Web BFF only): closed, read-only operations and the "SCI-PH.ClinicalAi"
+        // meter (one per host). Requires a clinical AI provider and the summary cache (Infrastructure: AddClinicalAi) and
+        // AddClinicalWorkflows.
         public static IServiceCollection AddClinicalAiWorkflow(this IServiceCollection services)
         {
             services.AddScoped<EncounterAiSummaryService>();
-            services.AddSingleton<EncounterAiSummaryCache>();
             services.AddSingleton<ClinicalAiMetrics>();
 
             return services;

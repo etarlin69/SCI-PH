@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Azure.Core;
 using Azure.Identity;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,6 +14,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SCI_PH.Application.Abstractions.AI;
+using SCI_PH.Application.Features.Clinical;
 using SCI_PH.Infrastructure;
 using SCI_PH.Infrastructure.ClinicalAi;
 
@@ -516,6 +518,27 @@ namespace SCI_PH.IntegrationTests.ClinicalAi
 
             using var badScope = Build("Development", With(ManagedIdentity(), ("ClinicalAi:AzureOpenAI:TokenScope", "https://cognitiveservices.azure.com/")));
             Assert.Contains("TokenScope", Assert.Throws<OptionsValidationException>(() => badScope.GetRequiredService<IOptions<ClinicalAiOptions>>().Value).Message);
+        }
+
+        [Fact]
+        public void TheSummaryCacheIsADedicatedBoundedMemoryCacheOfTheCompositionRoot()
+        {
+            using var provider = Build("Development", ScriptedAzureOpenAi.Settings());
+            var cache = provider.GetRequiredKeyedService<IMemoryCache>(EncounterAiSummaryService.CacheServiceKey);
+
+            Assert.IsType<MemoryCache>(cache);
+            Assert.Same(cache, provider.GetRequiredKeyedService<IMemoryCache>(EncounterAiSummaryService.CacheServiceKey));
+            // Not the host's shared cache (there is none here; the key alone resolves it).
+            Assert.Null(provider.GetService<IMemoryCache>());
+            // Bounded: an entry without a size is refused, and no more than SummaryCacheSizeLimit entries are kept.
+            Assert.Throws<InvalidOperationException>(() => cache.Set("unsized", "x"));
+            for (var i = 0; i < ClinicalAiOptions.SummaryCacheSizeLimit + 10; i++)
+            {
+                cache.Set(i, i, new MemoryCacheEntryOptions { Size = 1 });
+            }
+
+            Assert.Equal(ClinicalAiOptions.SummaryCacheSizeLimit, ((MemoryCache)cache).Count);
+            Assert.Equal(TimeSpan.FromMinutes(10), EncounterAiSummaryService.CacheTimeToLive);
         }
 
         [Fact]

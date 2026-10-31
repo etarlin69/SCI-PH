@@ -97,7 +97,7 @@ namespace SCI_PH.Application.Tests.Clinical
         {
             var s = Seed();
             await GenerateAsync(s);
-            s.Harness.Time.Now = s.Harness.Time.Now.Add(EncounterAiSummaryCache.TimeToLive).AddSeconds(1);
+            s.Harness.Time.Now = s.Harness.Time.Now.Add(EncounterAiSummaryService.CacheTimeToLive).AddSeconds(1);
             await GenerateAsync(s);
 
             Assert.Equal(2, s.Harness.AiProvider.Inputs.Count);

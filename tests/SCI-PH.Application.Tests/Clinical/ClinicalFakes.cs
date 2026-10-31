@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using SCI_PH.Application.Abstractions.Biometrics;
 using SCI_PH.Application.Abstractions.Clinical;
 using SCI_PH.Application.Abstractions.Idempotency;
@@ -52,6 +53,12 @@ namespace SCI_PH.Application.Tests.Clinical
         public DateTimeOffset Now { get; set; } = now;
 
         public override DateTimeOffset GetUtcNow() => Now;
+    }
+
+    // MemoryCache reads expirations on this clock, so a test can move time past an entry's lifetime.
+    internal sealed class FixedTimeClock(FixedTime time) : Microsoft.Extensions.Internal.ISystemClock
+    {
+        public DateTimeOffset UtcNow => time.Now;
     }
 
     // In-memory clinical store: writes become visible only after SaveChangesAsync, like a transaction. It also holds the
@@ -671,7 +678,7 @@ namespace SCI_PH.Application.Tests.Clinical
             FaceCleanup = new FaceTemplateCleanupService(Store, Store, FaceProvider, Time);
             Faces = new PatientFaceService(Actor, access, Store, Store, Store, FaceProvider, new PassThroughCaptureNormalizer(), Store, FaceCleanup, Time);
             AiProvider = sharedAi?.AiProvider ?? new TestClinicalAiProvider();
-            AiCache = sharedAi?.AiCache ?? new EncounterAiSummaryCache(Time);
+            AiCache = sharedAi?.AiCache ?? new MemoryCache(new MemoryCacheOptions { SizeLimit = 500, Clock = new FixedTimeClock(Time) });
             AiSummaries = new EncounterAiSummaryService(Actor, Store, Store, access, AiProvider, AiCache, AiMetrics, Time, AiLogs);
         }
 
@@ -699,7 +706,8 @@ namespace SCI_PH.Application.Tests.Clinical
         public PatientFaceService Faces { get; }
         public TestClinicalAiProvider AiProvider { get; }
         public CapturingLogger<EncounterAiSummaryService> AiLogs { get; } = new();
-        public EncounterAiSummaryCache AiCache { get; }
+        // The summary cache as the composition root registers it (dedicated, bounded), on this harness's clock.
+        public MemoryCache AiCache { get; }
         public ClinicalAiMetrics AiMetrics { get; } = new();
         public EncounterAiSummaryService AiSummaries { get; }
 

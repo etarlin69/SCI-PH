@@ -13,6 +13,9 @@ namespace SCI_PH.Infrastructure.ClinicalAi
         // External: the minimized clinical input leaves SCI-PH (ADR-014).
         public const string AzureOpenAiProvider = "AzureOpenAI";
 
+        // Entries of the summary cache of external providers (one entry = one validated summary).
+        public const int SummaryCacheSizeLimit = 500;
+
         // "Fake" (deterministic, in process: CI and development), "Disabled" (every operation answers 503) or "AzureOpenAI"
         // (external, requires AllowExternalClinicalData). Not configured: Fake outside Production, Disabled in Production.
         public string? Provider { get; set; }
