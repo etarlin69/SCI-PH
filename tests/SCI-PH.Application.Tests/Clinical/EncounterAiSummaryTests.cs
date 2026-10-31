@@ -108,7 +108,8 @@ namespace SCI_PH.Application.Tests.Clinical
             Assert.Equal(s.Harness.StaffId, audit.ActorStaffId);
             using var changes = JsonDocument.Parse(audit.ChangesJson!);
             Assert.Equal(
-                ["operation", "provider", "model", "promptVersion", "sourceFingerprint", "records", "truncated", "latency", "failure"],
+                ["operation", "provider", "model", "promptVersion", "sourceFingerprint", "records", "truncated", "latency", "failure", "category",
+                    "providerCalls", "cacheHit", "usage"],
                 changes.RootElement.EnumerateObject().Select(p => p.Name));
             Assert.Equal(summary.SourceFingerprint, changes.RootElement.GetProperty("sourceFingerprint").GetString());
             Assert.Equal(2, changes.RootElement.GetProperty("records").GetProperty("vitalSigns").GetInt32());

@@ -646,8 +646,9 @@ namespace SCI_PH.Application.Tests.Clinical
     {
         public static readonly DateTimeOffset Start = new(2026, 10, 1, 8, 0, 0, TimeSpan.Zero);
 
-        // A shared store lets two users act on the same data (e.g. a doctor prescribes, a nurse administers).
-        public ClinicalHarness(FakeCurrentUser user, FakeClinicalStore? store = null)
+        // A shared store lets two users act on the same data (e.g. a doctor prescribes, a nurse administers); sharedAi lets
+        // them use the same clinical AI provider and summary cache, as the singletons of one host.
+        public ClinicalHarness(FakeCurrentUser user, FakeClinicalStore? store = null, ClinicalHarness? sharedAi = null)
         {
             User = user;
             Store = store ?? new FakeClinicalStore();
@@ -669,7 +670,9 @@ namespace SCI_PH.Application.Tests.Clinical
             DeletionReaderSide = new FingerprintSlotDeletionReaderService(Store, Store, Time);
             FaceCleanup = new FaceTemplateCleanupService(Store, Store, FaceProvider, Time);
             Faces = new PatientFaceService(Actor, access, Store, Store, Store, FaceProvider, new PassThroughCaptureNormalizer(), Store, FaceCleanup, Time);
-            AiSummaries = new EncounterAiSummaryService(Actor, Store, Store, access, AiProvider, Time, AiLogs);
+            AiProvider = sharedAi?.AiProvider ?? new TestClinicalAiProvider();
+            AiCache = sharedAi?.AiCache ?? new EncounterAiSummaryCache(Time);
+            AiSummaries = new EncounterAiSummaryService(Actor, Store, Store, access, AiProvider, AiCache, AiMetrics, Time, AiLogs);
         }
 
         public FakeCurrentUser User { get; }
@@ -694,8 +697,10 @@ namespace SCI_PH.Application.Tests.Clinical
         public FingerprintSlotDeletionReaderService DeletionReaderSide { get; }
         public TestFaceProvider FaceProvider { get; } = new();
         public PatientFaceService Faces { get; }
-        public TestClinicalAiProvider AiProvider { get; } = new();
+        public TestClinicalAiProvider AiProvider { get; }
         public CapturingLogger<EncounterAiSummaryService> AiLogs { get; } = new();
+        public EncounterAiSummaryCache AiCache { get; }
+        public ClinicalAiMetrics AiMetrics { get; } = new();
         public EncounterAiSummaryService AiSummaries { get; }
 
         public static ClinicalHarness ForRole(string role, int clinics = 1)

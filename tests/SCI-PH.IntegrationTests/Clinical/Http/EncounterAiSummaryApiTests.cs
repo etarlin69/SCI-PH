@@ -263,7 +263,8 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             {
                 // jsonb: the member order is not kept.
                 Assert.Equal(
-                    ["failure", "latency", "model", "operation", "promptVersion", "provider", "records", "sourceFingerprint", "truncated"],
+                    ["cacheHit", "category", "failure", "latency", "model", "operation", "promptVersion", "provider", "providerCalls", "records",
+                        "sourceFingerprint", "truncated", "usage"],
                     changes.RootElement.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
                 Assert.Equal(body.GetProperty("sourceFingerprint").GetString(), changes.RootElement.GetProperty("sourceFingerprint").GetString());
             }
