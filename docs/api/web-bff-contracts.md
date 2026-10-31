@@ -224,10 +224,15 @@ diagnósticos ni órdenes y no cambia la atención. Mismo acceso que leer la ate
   `patientId`, datos clínicos) es 400. Proveedor, modelo, prompt y límites son del servidor.
 - **429:** 10 generaciones por minuto y una a la vez por usuario, con `Retry-After` (también cuentan las peticiones
   rechazadas).
-- **503:** proveedor deshabilitado o no disponible, tiempo agotado o respuesta del proveedor inválida; mensaje genérico,
-  sin detalles internos.
-- Cada intento queda en la auditoría (`ClinicalAiEncounterSummary`, Read, éxito o fallo) solo con metadatos: nunca el
-  contenido generado ni datos clínicos.
+- **503:** proveedor deshabilitado o no disponible, tiempo agotado, filtro de contenido, negativa, cuota o límite del
+  proveedor, o respuesta del proveedor inválida; mensaje genérico, sin detalles internos. Nunca se propaga el estado HTTP
+  del proveedor (un 429 del proveedor también es 503; solo nuestro limitador responde 429).
+- `provider`/`model`: el proveedor configurado en el servidor (`SCIPH-AiFake`/`fake-summary-v1`, o `AzureOpenAI` y la
+  versión del modelo desplegado, [ADR-014](../adr/ADR-014-clinical-ai-real-provider.md)); nunca el nombre del despliegue.
+  Con un proveedor externo, repetir la misma petición dentro de 10 minutos, con la misma entrada, devuelve el mismo resumen
+  (mismo `generatedAtUtc`) sin generarlo de nuevo.
+- Cada intento queda en la auditoría (`ClinicalAiEncounterSummary`: `Read`, o `Export` cuando la entrada se envió a un
+  proveedor externo; éxito o fallo) solo con metadatos: nunca el contenido generado ni datos clínicos.
 - La UI muestra todo como texto plano, con el aviso fijo "Generado por IA · Requiere revisión profesional" y la hora de
   generación.
 

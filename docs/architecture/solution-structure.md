@@ -42,7 +42,7 @@ Casos de uso y contratos que la aplicación necesita del exterior.
 
   | Carpeta | Abstracción prevista |
   |---|---|
-  | `AI` | `IClinicalAiService` (implementada con Fake y Disabled, ADR-013): solo operaciones clínicas cerradas, sin prompt libre |
+  | `AI` | `IClinicalAiService` (Fake, Disabled y Azure OpenAI; ADR-013, ADR-014): solo operaciones clínicas cerradas, sin prompt libre; el SDK solo en Infrastructure |
   | `Biometrics` | `IFaceVerificationService` y `IFaceCaptureNormalizer` (implementadas, ADR-012), stores de huella (implementados), `IFingerprintService` (vacía) |
   | `Documents` | `IDocumentService` |
   | `OCR` | `IOcrService` |

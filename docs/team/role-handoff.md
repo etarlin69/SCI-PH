@@ -175,7 +175,9 @@ educativa, Face Verification 1:1, OCR, QR y pruebas de proveedores.
 **No hace**
 - Agregar el SDK de Azure u otros proveedores sin ADR y sin revisión.
 - Que la IA diagnostique o prescriba, o que su salida se guarde como dato del expediente.
-- Enviar datos reales de pacientes a un proveedor externo sin el acuerdo de datos y la revisión de ADR-013 (decisión 12).
+- Enviar datos reales de pacientes a un proveedor externo sin el acuerdo de datos y la revisión de ADR-013 (decisión 12) y
+  [ADR-014](../adr/ADR-014-clinical-ai-real-provider.md) (decisión 4); habilitar `ClinicalAi:AllowExternalClinicalData` es
+  esa decisión, no un ajuste técnico.
 - Referenciar SDKs externos desde Domain o Application.
 
 ## Rol 9 — Hardware / QA / DevOps
