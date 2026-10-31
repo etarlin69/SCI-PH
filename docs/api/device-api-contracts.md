@@ -18,6 +18,7 @@
 | `POST` | `/api/device/fingerprint/enrollments/{enrollmentId}/result` | Qué hizo el sensor al registrar la huella | `Device.Fingerprint.Enroll` | Implementado |
 | `GET` | `/api/device/fingerprint/deletions/pending` | El slot de una huella revocada que este lector debe borrar, si lo hay | `Device.Fingerprint.Enroll` | Implementado |
 | `POST` | `/api/device/fingerprint/deletions/{deletionId}/result` | Qué hizo el sensor en un intento de borrado | `Device.Fingerprint.Enroll` | Implementado |
+| `GET` | `/api/device/fingerprint/slots` | Los slots que SCI-PH considera ocupados en el sensor de este lector (reconciliación de huérfanos) | `Device.Fingerprint.Enroll` | Implementado |
 
 ---
 
@@ -165,6 +166,46 @@ la única instrucción técnica; nunca paciente, nombre, fecha de nacimiento, hi
 
 Dos informes simultáneos: uno se aplica y el otro se decide sobre lo que dejó. Un lector revocado no puede autenticarse:
 su borrado queda pendiente y el Web lo muestra como "requiere atención".
+
+---
+
+## Inventario de slots (reconciliación de huérfanos)
+
+Diseño en [ADR-010, decisión 10](../adr/ADR-010-fingerprint-enrollment.md#10-inventario-de-slots-para-reconciliar-huérfanos).
+Un slot **huérfano** es una plantilla en el sensor que SCI-PH no conoce: el lector la guardó pero nunca recibió el `204`
+del registro (reinicio, pérdida del almacenamiento local, controlador reemplazado). Ocupa capacidad y, si es el mismo
+dedo que otro slot válido, la búsqueda puede devolverlo y la identificación termina en `NoMatch`. Con este inventario el
+lector detecta y borra sus huérfanos. Mismo scope que el registro y el borrado.
+
+### `GET /api/device/fingerprint/slots`
+
+Sin parámetros: el lector es **solo** su credencial (no hay `deviceId`, referencia ni paciente en la URL).
+
+**`200 OK`** (siempre; nunca `204`):
+
+```json
+{ "slots": [0, 1, 7, 22] }
+```
+
+- Enteros únicos y en orden ascendente; `{ "slots": [] }` si no hay ninguno.
+- Ocupado para SCI-PH = slot de una referencia **activa** de este lector **o** de una referencia cuyo borrado de este
+  lector sigue **pendiente** (la plantilla sigue físicamente ahí y su limpieza la controla el servidor). Un borrado
+  completado no cuenta; las referencias de otro lector, de rostro o que no siguen el formato `r307:device:<id>:slot:<n>`
+  tampoco (se ignoran, nunca se reinterpretan).
+- Solo números de slot: nunca paciente, referencia, `SubjectReference`, id del lector ni id del borrado.
+- `401`: credencial ausente, inválida, revocada o sin HTTPS. `403`: sin el scope. `429`: límite de peticiones.
+  `Cache-Control: no-store`.
+
+**Reglas del lector:**
+
+- Un slot ocupado en el sensor que **no** está en el inventario **ni** en su propio registro local de un registro en
+  curso es huérfano y puede borrarse. Nunca se borra un slot del inventario: los pendientes de borrar llegan por
+  `deletions/pending`.
+- El inventario es una **foto**: no reserva slots. Entre la consulta y un registro posterior el estado puede cambiar;
+  el lector sigue comprobando que el slot esté vacío antes de guardar y respetando el `409` del registro.
+- No se consulta en cada ciclo: al arrancar o tras recuperar un registro interrumpido, con la misma prioridad baja que
+  los borrados.
+- Los logs normales del lector y del servidor nunca imprimen números de slot (el servidor registra solo la cantidad).
 
 ---
 

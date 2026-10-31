@@ -162,7 +162,10 @@ físico falle. El borrado en el sensor es limpieza, no seguridad.
 - **Seguimiento (seguridad biométrica):** una sesión de identificación ya `Matched` podía confirmarse aunque su lector se
   revocara entre el `Match` y la confirmación. Resuelto en
   [ADR-009, decisión 11](ADR-009-fingerprint-identification.md#11-el-lector-de-la-sesión-se-revalida-en-la-confirmación-y-al-mostrar-el-candidato).
-- Fuera de alcance: reconciliación general de slots, estado `Abandoned`, borrado manual o reintento desde el Web,
+- El inventario de slots para reconciliar huérfanos
+  ([ADR-010, decisión 10](ADR-010-fingerprint-enrollment.md#10-inventario-de-slots-para-reconciliar-huérfanos)) incluye
+  los slots con borrado `Pending`: el lector nunca los trata como huérfanos mientras la limpieza siga pendiente.
+- Fuera de alcance: borrado de huérfanos en el servidor (lo hace el firmware), estado `Abandoned`, borrado manual o reintento desde el Web,
   revocación masiva al revocar un lector, firmware real.
 - **Preguntas de hardware pendientes (R307):** comando de borrado por slot; si el borrado es síncrono; qué devuelve con
   un slot vacío (¿`NotFound` o éxito?); códigos de error; persistencia del borrado ante cortes de energía; si permite
