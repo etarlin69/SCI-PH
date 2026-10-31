@@ -74,9 +74,12 @@ namespace SCI_PH.Infrastructure
             return services;
         }
 
-        // Assisted clinical AI (ADR-013): the provider chosen by server configuration (ClinicalAi:Provider). Fake (deterministic,
-        // in process) outside Production, Disabled (503) in Production if nothing else is configured; Fake configured in
-        // Production prevents the host from starting. No real provider yet (PR 2): no data leaves SCI-PH.
+        // Assisted clinical AI (ADR-013, ADR-014): the provider chosen by server configuration (ClinicalAi:Provider). Fake
+        // (deterministic, in process) outside Production, Disabled (503) in Production if nothing else is configured; Fake
+        // configured in Production prevents the host from starting. "AzureOpenAI" sends the minimized input outside SCI-PH:
+        // the host starts with it only when ClinicalAi:AllowExternalClinicalData is also true (validated on start, and
+        // checked again when the provider is built) and, in Production, only with a managed identity (never an API key).
+        // Nothing contacts the provider at startup.
         public static IServiceCollection AddClinicalAi(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddOptions<ClinicalAiOptions>()
@@ -84,13 +87,22 @@ namespace SCI_PH.Infrastructure
                 .ValidateOnStart();
             services.AddSingleton<IValidateOptions<ClinicalAiOptions>, ClinicalAiOptionsValidator>();
             services.AddSingleton<FakeClinicalAiService>();
+            services.AddSingleton<AzureOpenAiClinicalAiService>();
             services.AddSingleton<IClinicalAiService>(provider =>
-                provider.GetRequiredService<IOptions<ClinicalAiOptions>>().Value.Resolve(provider.GetRequiredService<IHostEnvironment>()) switch
+            {
+                var options = provider.GetRequiredService<IOptions<ClinicalAiOptions>>().Value;
+                IClinicalAiService ai = options.Resolve(provider.GetRequiredService<IHostEnvironment>()) switch
                 {
                     ClinicalAiOptions.FakeProvider => provider.GetRequiredService<FakeClinicalAiService>(),
                     ClinicalAiOptions.DisabledProvider => new DisabledClinicalAiService(),
+                    ClinicalAiOptions.AzureOpenAiProvider => provider.GetRequiredService<AzureOpenAiClinicalAiService>(),
                     var other => throw new InvalidOperationException($"ClinicalAi:Provider '{other}' is not supported.")
-                });
+                };
+
+                return ai.SendsDataExternally && !options.AllowExternalClinicalData
+                    ? throw new InvalidOperationException("The clinical AI provider sends data outside SCI-PH and ClinicalAi:AllowExternalClinicalData is not true.")
+                    : ai;
+            });
 
             return services;
         }

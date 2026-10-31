@@ -8,13 +8,19 @@ namespace SCI_PH.Infrastructure.ClinicalAi
     // The two messages of one encounter summary request: fixed instructions and the data, never mixed.
     public sealed record ClinicalAiPrompt(string System, string User);
 
-    // THE prompt of the encounter summary (ADR-013), in one place and versioned: any change of wording, rules or schema
-    // is a new version (EncounterSummaryPromptV2), recorded in every answer and audit entry.
+    // THE prompt of the encounter summary (ADR-013), in one place and versioned: any change of wording, rules or answer
+    // contract is a new version (EncounterSummaryPromptV2), recorded in every answer and audit entry. (Making the schema's
+    // REPRESENTATION strict-compatible for the first real provider changed neither the meaning nor the contract, so it
+    // stayed v1: ADR-014.)
     // - The system message is a constant: no clinical text, alias or value is ever interpolated into it.
     // - The user message is ONLY the minimized input serialized as JSON ({"encounterData": ...}); free text (notes,
     //   reasons) is a JSON string value, escaped by the serializer, so it can never become an instruction or end the data.
     // - The answer must match ResponseSchema (strict JSON, no extra members); ParseDraft reads it into an untrusted draft
     //   that Application validates. No tools, no browsing, no conversation history.
+    // - ResponseSchema is the STRUCTURE only, in the subset strict structured outputs accept (Azure OpenAI / OpenAI): every
+    //   member required, additionalProperties false on every object, a nullable section as anyOf with null, closed enums;
+    //   no size or format keyword (maxLength, maxItems, pattern...). Sizes and counts are the system message's rule 7 and,
+    //   authoritatively, EncounterAiOutputValidator's limits.
     public static class EncounterSummaryPromptV1
     {
         public const string Version = "encounter-summary.v1";
@@ -55,8 +61,11 @@ namespace SCI_PH.Infrastructure.ClinicalAi
             8. Answer ONLY with one JSON object that matches the response schema.
             """;
 
-        // JSON Schema of the answer (strict structured output in PR 2). No diagnosis, recommendation, treatment, severity or
-        // confidence member exists.
+        // Name of the schema in the structured-output request.
+        public const string SchemaName = "encounter_summary";
+
+        // JSON Schema of the answer (strict structured output, ADR-014). No diagnosis, recommendation, treatment, severity
+        // or confidence member exists.
         public const string ResponseSchema =
             """
             {
@@ -64,49 +73,47 @@ namespace SCI_PH.Infrastructure.ClinicalAi
               "additionalProperties": false,
               "required": ["summary", "sections", "reviewPoints", "notDocumented"],
               "properties": {
-                "summary": { "type": "string", "maxLength": 1500 },
+                "summary": { "type": "string" },
                 "sections": {
                   "type": "object",
                   "additionalProperties": false,
                   "required": ["course", "vitalSigns", "medications", "procedures", "notes", "transfer"],
                   "properties": {
-                    "course": { "$ref": "#/$defs/section" },
-                    "vitalSigns": { "$ref": "#/$defs/section" },
-                    "medications": { "$ref": "#/$defs/section" },
-                    "procedures": { "$ref": "#/$defs/section" },
-                    "notes": { "$ref": "#/$defs/section" },
-                    "transfer": { "$ref": "#/$defs/section" }
+                    "course": { "anyOf": [{ "$ref": "#/$defs/section" }, { "type": "null" }] },
+                    "vitalSigns": { "anyOf": [{ "$ref": "#/$defs/section" }, { "type": "null" }] },
+                    "medications": { "anyOf": [{ "$ref": "#/$defs/section" }, { "type": "null" }] },
+                    "procedures": { "anyOf": [{ "$ref": "#/$defs/section" }, { "type": "null" }] },
+                    "notes": { "anyOf": [{ "$ref": "#/$defs/section" }, { "type": "null" }] },
+                    "transfer": { "anyOf": [{ "$ref": "#/$defs/section" }, { "type": "null" }] }
                   }
                 },
                 "reviewPoints": {
                   "type": "array",
-                  "maxItems": 10,
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
                     "required": ["kind", "text", "sources"],
                     "properties": {
                       "kind": { "type": "string", "enum": ["MissingDocumentation", "Inconsistency", "PendingItem"] },
-                      "text": { "type": "string", "maxLength": 300 },
+                      "text": { "type": "string" },
                       "sources": { "$ref": "#/$defs/sources" }
                     }
                   }
                 },
-                "notDocumented": { "type": "array", "maxItems": 10, "items": { "type": "string", "maxLength": 200 } }
+                "notDocumented": { "type": "array", "items": { "type": "string" } }
               },
               "$defs": {
                 "section": {
-                  "type": ["object", "null"],
+                  "type": "object",
                   "additionalProperties": false,
                   "required": ["text", "sources"],
                   "properties": {
-                    "text": { "type": "string", "maxLength": 800 },
+                    "text": { "type": "string" },
                     "sources": { "$ref": "#/$defs/sources" }
                   }
                 },
                 "sources": {
                   "type": "array",
-                  "maxItems": 20,
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
