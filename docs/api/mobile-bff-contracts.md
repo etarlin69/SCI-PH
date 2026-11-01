@@ -9,80 +9,32 @@
 - **Proyecto:** `SCI-PH.Mobile.BFF`
 - **Prefijo:** `/api/mobile`
 - **Formato:** JSON. Los errores se devuelven como `application/problem+json` (ProblemDetails).
-- **Autenticación:** JWT Bearer + refresh token según [ADR-006](../adr/ADR-006-identity-security.md). Login con usuario/contraseña y sesión en `/api/mobile/auth` ([detalle](../architecture/security.md#endpoints)); el acceso por QR y verificación facial sigue previsto y emitirá la misma sesión. La cuenta autenticada se consulta en `GET /api/mobile/auth/me`.
+- **Autenticación:** JWT Bearer + refresh token según [ADR-006](../adr/ADR-006-identity-security.md). Login con usuario/contraseña (y MFA si la cuenta lo tiene) y sesión en `/api/mobile/auth` ([detalle](../architecture/security.md#endpoints)), igual para el personal clínico y para el paciente; el QR y el rostro nunca emiten una sesión ([ADR-015](../adr/ADR-015-patient-authentication-qr-identification.md)). La cuenta autenticada se consulta en `GET /api/mobile/auth/me`.
 
-## Patient — contratos iniciales previstos
+## Patient — cuenta y autoservicio
+
+> **Decisión ([ADR-015](../adr/ADR-015-patient-authentication-qr-identification.md)):** el paciente inicia sesión con
+> **su cuenta** (invitación → activación → contraseña → MFA opcional) en los mismos endpoints `/api/mobile/auth` que el
+> personal clínico. **El QR no autentica, el rostro no autentica y QR + rostro nunca emiten una sesión.**
+>
+> **Sustituido (no se implementará):** el flujo previsto `POST /api/mobile/auth/qr/challenge` →
+> `POST /api/mobile/auth/face/verify` → sesión. El QR del paciente será un **identificador** que la app muestra y el
+> paramédico escanea (siguiente PR, ADR-015 decisiones 3–5); el rostro sigue siendo una verificación 1:1 **asistida** por
+> el personal en el Web ([ADR-012](../adr/ADR-012-face-verification.md)).
 
 | Método | Ruta | Descripción | Autenticación | Estado |
 |---|---|---|---|---|
-| `POST` | `/api/mobile/auth/qr/challenge` | Inicia el acceso mediante QR | No | Previsto |
-| `POST` | `/api/mobile/auth/face/verify` | Verificación facial 1:1 para completar el acceso (la app solo lo simula; requerirá liveness, [ADR-012](../adr/ADR-012-face-verification.md)) | Challenge válido | Previsto |
 | `POST` | `/api/mobile/auth/login` · `/mfa/verify` | Inicio de sesión (con segundo factor si la cuenta tiene MFA) | No | Implementado |
 | `POST` | `/api/mobile/auth/refresh` · `/logout` | Renueva o cierra la sesión (refresh token en el cuerpo) | No | Implementado |
 | `POST` | `/api/mobile/auth/change-password` · `/revoke-sessions` | Contraseña y sesiones | Sí | Implementado |
 | `GET` | `/api/mobile/auth/me` | Información de la cuenta autenticada | Sí | Implementado |
 
-### Flujo previsto de acceso
-
-```
-App MAUI                          Mobile BFF
-   │  POST /auth/qr/challenge          │
-   │ ────────────────────────────────► │  valida el QR y crea un challenge temporal
-   │ ◄──────────────────────────────── │  challengeId + expiración
-   │                                   │
-   │  POST /auth/face/verify           │
-   │  (challengeId + captura facial)   │
-   │ ────────────────────────────────► │  verificación 1:1 contra la referencia de la cuenta
-   │ ◄──────────────────────────────── │  sesión / token (formato pendiente de ADR)
-   │                                   │
-   │  GET /me                          │
-   │ ────────────────────────────────► │
-```
-
----
-
-### `POST /api/mobile/auth/qr/challenge`
-
-Recibe el contenido del QR escaneado y crea un challenge de corta duración.
-
-**Body (forma propuesta):**
-
-```json
-{
-  "qrPayload": "<contenido del QR>"
-}
-```
-
-**Respuesta `200 OK` (forma propuesta):**
-
-```json
-{
-  "challengeId": "00000000-0000-0000-0000-000000000000",
-  "expiresAt": "2026-01-01T00:05:00Z"
-}
-```
-
-**Errores previstos:** `400` (QR inválido o vencido), `429` (demasiados intentos).
-
----
-
-### `POST /api/mobile/auth/face/verify`
-
-Verificación facial **1:1**: compara la captura con la referencia de la cuenta asociada al challenge. No identifica entre muchas personas.
-
-**Body (forma propuesta):** `challengeId` y la captura facial. El formato de la imagen (JSON base64 o `multipart/form-data`) se definirá al implementar.
-
-**Respuestas previstas:**
-
-| Código | Cuándo |
-|---|---|
-| `200 OK` | Verificación correcta; devuelve la sesión/token |
-| `400` | Challenge inválido o captura ilegible |
-| `401` | La verificación facial no coincide |
-| `410 Gone` | Challenge vencido |
-| `429` | Demasiados intentos |
-
-Las imágenes faciales no se registran en logs.
+- **Cuentas:** sin registro público. El personal con `Accounts.InvitePatient` invita a un `Patient` existente
+  (`POST /api/web/admin/invitations/patients`); el enlace va al Email principal activo del paciente y la activación
+  (`POST /api/web/auth/activate-account`) vincula `Patient.IdentityUserId`. Recuperación de contraseña y confirmación
+  de email: en el Web (`/api/web/auth`).
+- **Área de la app:** la decide la cuenta tras `/me`. Rol `Patient` → área del paciente; permiso `Emergencies.Operate`
+  → área paramédica. El paciente no recibe `Emergencies.Operate` ni ningún otro permiso.
 
 ---
 
@@ -102,7 +54,8 @@ Devuelve la información de la cuenta autenticada.
 }
 ```
 
-Devuelve datos de la **cuenta** (`ApplicationUser`). Si la cuenta está vinculada a un paciente, la inclusión de datos clínicos se definirá aparte: cuenta y paciente son conceptos distintos.
+Devuelve datos de la **cuenta** (`ApplicationUser`), nunca datos clínicos: cuenta y paciente son conceptos distintos. Los
+datos del expediente propio están en `/api/mobile/patient/me`.
 
 **Errores previstos:** `401`.
 

@@ -10,7 +10,7 @@ SCI-PH tiene tres tipos de cliente con necesidades distintas:
 | Cliente | Necesidades |
 |---|---|
 | Web (React + TypeScript) | Área hospitalaria (recepción, traslados, evolución, resultados) y área de administración (usuarios, roles, auditoría, dispositivos) |
-| Mobile (.NET MAUI) | Paciente (QR, verificación facial, perfil) y paramédicos (emergencias en campo), con conectividad variable |
+| Mobile (.NET MAUI) | Paciente (su cuenta y su propio expediente; QR de identificación, ADR-015) y paramédicos (emergencias en campo), con conectividad variable |
 | ESP32 + R307 | Hardware limitado, payloads pequeños, autenticación de dispositivo en lugar de usuario |
 
 Una única API genérica obligaría a cada cliente a adaptar respuestas que no fueron pensadas para él, y mezclaría modelos de autenticación diferentes (usuario vs. dispositivo).

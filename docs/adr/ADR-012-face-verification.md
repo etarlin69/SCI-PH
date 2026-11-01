@@ -28,8 +28,10 @@ Access, solo clientes gestionados por Microsoft), así que no es viable para el 
   abrir una cuenta. La UI lo dice ("Verificación asistida…").
 - Una verificación **no identifica nada**: el paciente ya es el dato de entrada. No llama a `ClinicalEncounter.IdentifyPatient`,
   no cambia `PatientId` de ninguna atención y no crea `IdentificationAttempt` (ver 7).
-- Fuera de esta fase: login facial de la app del paciente (sigue **simulado**, `POST /api/mobile/auth/face/verify`
-  **previsto**; requerirá liveness del proveedor), verificación del paramédico tras el documento, liveness.
+- Fuera de esta fase: verificación del paramédico tras el documento o el QR, liveness. El login facial de la app del
+  paciente (`POST /api/mobile/auth/face/verify`) quedó **sustituido** por
+  [ADR-015](ADR-015-patient-authentication-qr-identification.md): el paciente inicia sesión con su cuenta y el rostro
+  nunca emite una sesión; si alguna vez se usara como autenticación autónoma, el liveness sería obligatorio.
 
 ### 2. Proveedor detrás de `IFaceVerificationService`
 
@@ -248,7 +250,7 @@ Nunca en auditoría, logs ni respuestas: bytes de imagen, base64, embedding, pla
   Infrastructure las referencia en esa versión (el resto del host sigue en ASP.NET Core 9).
 - SkiaSharp (MIT) entra en Infrastructure (con su librería nativa para Linux sin dependencias).
 - Limitaciones aceptadas: sin liveness (una foto de una foto puede coincidir); umbral no calibrado para las webcams de
-  SCI-PH; el Fake no reconoce caras; el login facial del paciente sigue simulado.
+  SCI-PH; el Fake no reconoce caras.
 - Seguimientos: estado de la limpieza durable en la tarjeta de rostro (P1; la seguridad ya depende de `Revoked`); health
   check del proveedor (tras el PR #23); salida 139 de un arranque fallido (preexistente en develop, aparte); validación
   manual con webcam (P2, demo).

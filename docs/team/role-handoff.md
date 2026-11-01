@@ -141,18 +141,21 @@ Este documento explica qué puede empezar a hacer cada rol **ahora**, sobre la a
 
 ## Rol 7 — Mobile / Patient
 
-**Responsabilidades:** QR, facial, perfil, historial, resultados, documentos e IA.
+**Responsabilidades:** inicio de sesión del paciente con su cuenta, perfil, historial, resultados, QR (mostrarlo),
+documentos e IA ([ADR-015](../adr/ADR-015-patient-authentication-qr-identification.md)).
 
 **Toca principalmente**
 - El proyecto .NET MAUI (app del paciente)
 - [docs/api/mobile-bff-contracts.md](../api/mobile-bff-contracts.md), sección del paciente (solo mediante PR revisado)
 
 **Puede empezar ahora**
-- Pantallas de escaneo QR, captura facial y perfil con los contratos `POST /api/mobile/auth/qr/challenge`, `POST /api/mobile/auth/face/verify` y `GET /api/mobile/me` y mocks.
+- Pantallas del área del paciente sobre `/api/mobile/auth` y `/api/mobile/patient/me` (el paciente inicia sesión con su
+  cuenta; el QR y el rostro nunca crean una sesión, ADR-015).
 - Proponer los contratos de historial, resultados, documentos y asistente de IA.
 
 **No hace**
 - Guardar imágenes faciales en el dispositivo más de lo necesario.
+- Usar el QR o el rostro como inicio de sesión, o enviar un `patientId` desde la app.
 - Presentar la IA como diagnóstico: es un asistente **educativo** (hoy un chat simulado sin backend; no usa el resumen
   asistido del hospital, ver [ADR-013](../adr/ADR-013-clinical-ai-assistant.md)).
 

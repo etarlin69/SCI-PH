@@ -38,7 +38,7 @@ Los tres puntos de entrada son procesos independientes que comparten Domain, App
 Backend de la aplicación web. Atiende dos áreas: **Hospital** (recepción, médicos, enfermería, traslados, evolución y resultados) y **Administración** (`/api/web/admin`: usuarios, roles, auditoría, dispositivos y configuración).
 
 ### Mobile BFF
-Backend de la app móvil. Atiende dos flujos: **Patient** (acceso mediante QR y verificación facial 1:1, perfil, historial, documentos e IA) y **Paramedic** (`/api/mobile/emergencies`: emergencias, identificación, signos vitales, procedimientos, medicamentos y traslados).
+Backend de la app móvil. Atiende dos flujos: **Patient** (inicio de sesión con la cuenta del paciente y lectura de su propio expediente en `/api/mobile/patient/me`, [ADR-015](../adr/ADR-015-patient-authentication-qr-identification.md)) y **Paramedic** (`/api/mobile/emergencies`: emergencias, identificación, signos vitales, procedimientos, medicamentos y traslados).
 
 ### Device API
 Recibe peticiones de los dispositivos ESP32 con sensor de huella R307: identificación por huella para emergencias (el sensor compara; el dispositivo recoge su sesión y envía el resultado, sin recibir datos clínicos, [ADR-009](../adr/ADR-009-fingerprint-identification.md)) y heartbeat del dispositivo. La autenticación del dispositivo es distinta de la de usuarios ([ADR-007](../adr/ADR-007-device-authentication.md)).
@@ -64,7 +64,7 @@ Guarda los archivos físicos (documentos, imágenes). PostgreSQL guarda solo la 
 | Verificación facial | Verificación **1:1**: confirma que la persona es quien dice ser, comparándola con una referencia conocida | No se usa para identificar entre muchos (1:N) |
 | Huella (R307) | **Identificación** del paciente en **emergencias**, cuando no puede identificarse por sí mismo | Solo para el flujo de emergencia |
 | OCR | Extracción de texto de documentos | — |
-| QR | Generación y validación de códigos para el flujo de acceso móvil | — |
+| QR | **Identificación** del paciente por un código opaco que muestra su app (nunca autenticación ni acceso al expediente) | Previsto ([ADR-015](../adr/ADR-015-patient-authentication-qr-identification.md)) |
 
 ## Endpoints técnicos comunes
 
