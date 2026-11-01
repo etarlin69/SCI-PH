@@ -16,7 +16,8 @@ builder.Services.AddOpenApi(options => options.AddBearerSecurity());
 
 // La app MAUI no es un navegador: no usa CORS ni cookies; guarda el refresh token en SecureStorage.
 // AddClinicalWorkflows: emergencia prehospitalaria del paramédico (api/mobile/emergencies).
-builder.Services.AddApplication().AddAccountSecurity().AddClinicalWorkflows();
+// AddPatientSelfService: expediente propio del paciente, solo lectura (api/mobile/patient/me, ADR-015).
+builder.Services.AddApplication().AddAccountSecurity().AddClinicalWorkflows().AddPatientSelfService();
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration)
     .AddJwtSecurity(builder.Configuration)

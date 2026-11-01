@@ -118,6 +118,7 @@ ESP32 ─► HTTPS + X-Device-Id + X-Device-Key ─► DeviceApiKey ─► princ
 | `GET/POST /api/web/admin/staff…` | `ClinicalStaff.Manage` | listar, ver, alta, activar, desactivar, afiliaciones (abrir, finalizar); la cuenta del personal se crea con la invitación (`Users.Manage`) |
 | `POST /api/mobile/auth/login`, `/mfa/verify`, `/refresh`, `/logout` | Anónimo | Tokens en el cuerpo |
 | `GET /api/mobile/auth/me`, `POST /change-password`, `/revoke-sessions` | Autenticado | |
+| `GET /api/mobile/patient/me…` (perfil, resumen, atenciones, alergias, diagnósticos, recetas, resultados) | Rol `Patient` + vínculo `Patient.IdentityUserId` | expediente propio, solo lectura; sin `patientId` en la ruta; atención ajena `404` (ADR-015) |
 | `POST /api/device/heartbeat` | Dispositivo con `Device.Heartbeat` | |
 | `GET /api/device/fingerprint/sessions/pending`, `POST …/{sessionId}/result` | Dispositivo con `Device.Fingerprint.Identify` | identificación por huella (ADR-009) |
 | `GET /api/device/fingerprint/enrollments/pending`, `POST …/{enrollmentId}/result` | Dispositivo con `Device.Fingerprint.Enroll` | registro de huellas (ADR-010) |
@@ -150,6 +151,8 @@ Errores (ProblemDetails): 400 validación o enlace inválido, 401 sin credencial
 ## Reglas para el código nuevo
 
 - Proteger endpoints con `[Authorize(Policy = Permissions.X.Y)]`; nunca comparar strings de roles.
+  Única excepción: el autoservicio del paciente (`[Authorize(Roles = SecurityRoles.Patient)]`), porque el rol `Patient`
+  no tiene permisos y su acceso es el expediente propio, que luego decide `PatientSelfService` (ADR-015).
 - Datos de un paciente: `IAuthorizationService.AuthorizeAsync(User, patientId, PatientRecordRequirement.Read(...))`
   o `IPatientAccessAuthorizer`; nunca confiar en un `patientId` del cliente para un usuario Patient.
 - Endpoints públicos sensibles: `[EnableRateLimiting(...)]` y respuestas que no revelen si una cuenta existe.

@@ -1,7 +1,7 @@
 # Contratos del Mobile BFF
 
-> **Estado: contratos iniciales previstos, salvo los marcados como _Implementado_** (autenticación; apertura, lectura,
-> identificación por documento y signos vitales de la emergencia prehospitalaria).
+> **Estado: contratos iniciales previstos, salvo los marcados como _Implementado_** (autenticación; autoservicio del
+> paciente; apertura, lectura, identificación por documento y signos vitales de la emergencia prehospitalaria).
 >
 > Estos endpoints describen la intención acordada para empezar a trabajar en paralelo (app móvil y backend). Pueden evolucionar mediante **revisión arquitectónica**; cualquier cambio debe reflejarse en este documento dentro del mismo PR.
 
@@ -58,6 +58,43 @@ Devuelve datos de la **cuenta** (`ApplicationUser`), nunca datos clínicos: cuen
 datos del expediente propio están en `/api/mobile/patient/me`.
 
 **Errores previstos:** `401`.
+
+---
+
+### Autoservicio del paciente — Implementado
+
+Expediente **propio** del paciente autenticado, **solo lectura** ([ADR-015](../adr/ADR-015-patient-authentication-qr-identification.md),
+decisión 2).
+
+- **Autorización:** cuenta con el rol `Patient` (el rol no tiene permisos; el controlador solo admite ese rol) **y**
+  vínculo clínico `Patient.IdentityUserId`. El servidor resuelve el paciente desde la cuenta; **ninguna ruta recibe un
+  `patientId`** y un `patientId` en la query se ignora. Sin vínculo: `403` (nunca se vincula por email, nombre,
+  documento ni teléfono). El personal clínico (también Administrator): `403`. El paciente no entra en
+  `/api/mobile/emergencies`, `/devices` ni `/catalogs` (`403`).
+- **Recursos hijos:** solo `encounterId` aparece en una ruta, y el servidor comprueba que la atención es del paciente:
+  si no existe o es de otro, `404` (no se revela que exista).
+- **Sin datos internos:** las respuestas no llevan `patientId`, `IdentityUserId`, ids de personal, de clínica ni de
+  medicamento, rutas de Blob ni auditoría. Los enums viajan como texto. Cada lista devuelve como máximo 200 elementos,
+  los más recientes primero.
+- **Visibilidad:** alergias de la **última versión** del historial; resultados **publicados** (`Final`, `Corrected`;
+  nunca `Pending` ni `Cancelled`); recetas **emitidas** (`Issued`, o `Cancelled` después de emitirse; nunca un
+  borrador, ni uno cancelado).
+- **Fuera de alcance:** documentos (el almacenamiento aún no existe), citas, notificaciones, QR, rostro, edición del
+  perfil y cualquier escritura (`POST`/`PUT`/`DELETE` → `405`).
+
+| Método | Ruta | Respuesta |
+|---|---|---|
+| `GET` | `/api/mobile/patient/me` | Perfil: `givenNames`, `familyNames`, `dateOfBirth`, `sex`, `identityStatus`, `document` (`type` + valor enmascarado `***1234`), `email`, `phone` |
+| `GET` | `/api/mobile/patient/me/summary` | `displayName`, `encounterCount`, `resultCount`, `latestEncounter`, `latestResult`, `activeAllergies` |
+| `GET` | `/api/mobile/patient/me/encounters` | Atenciones: `id`, `type`, `status`, `reason`, `startedAtUtc`, `endedAtUtc`, `clinicName` |
+| `GET` | `/api/mobile/patient/me/encounters/{encounterId}` | `encounter` + sus `diagnoses`, `results` y `prescriptions`; `404` si no es propia |
+| `GET` | `/api/mobile/patient/me/allergies` | `id`, `substance`, `severity`, `status`, `reaction`, `onsetDate` |
+| `GET` | `/api/mobile/patient/me/diagnoses` | `id`, `encounterId`, `description`, `codeSystem`, `code`, `type`, `isPrimary`, `recordedAtUtc`, `confirmedAtUtc` |
+| `GET` | `/api/mobile/patient/me/prescriptions` | `id`, `encounterId`, `status`, `notes`, `issuedAtUtc`, `validUntilUtc`, `cancelledAtUtc`, `items[]` (`medicationName`, `presentation`, `concentration`, `dose`, `doseUnit`, `route`, `frequency`, `durationDays`, `instructions`) |
+| `GET` | `/api/mobile/patient/me/results` | `id`, `encounterId`, `type`, `status`, `name`, `codeSystem`, `code`, `resultText`, `numericValue`, `unit`, `referenceRange`, `resultedAtUtc` |
+
+**Errores:** `401` (sin token o token inválido), `403` (cuenta que no es de paciente o sin vínculo clínico), `404`
+(atención que no es propia), `405` (cualquier escritura).
 
 ---
 
