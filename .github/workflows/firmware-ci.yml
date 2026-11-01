@@ -1,0 +1,115 @@
+name: SCI-PH Firmware CI
+
+# ESP32 + R307 fingerprint reader (firmware/sciph-fingerprint-reader). Separate from build.yml and mobile.yml:
+# it only runs when the firmware or this workflow changes. No physical device is involved.
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - "firmware/**"
+      - ".github/workflows/firmware-ci.yml"
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "firmware/**"
+      - ".github/workflows/firmware-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firmware-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PLATFORMIO_VERSION: "6.2.0"
+
+jobs:
+  firmware:
+    name: firmware
+    # The runner's GCC/G++ is the host compiler of the PlatformIO native environment.
+    runs-on: ubuntu-24.04
+
+    defaults:
+      run:
+        working-directory: firmware/sciph-fingerprint-reader
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PlatformIO
+        run: python -m pip install --disable-pip-version-check "platformio==${PLATFORMIO_VERSION}"
+
+      # Only the downloaded platforms, toolchains, frameworks and tools (several GB). Build outputs (.pio/) are
+      # never cached, so every run compiles the sources from scratch.
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/platforms
+            ~/.platformio/packages
+          key: platformio-${{ runner.os }}-${{ env.PLATFORMIO_VERSION }}-${{ hashFiles('firmware/sciph-fingerprint-reader/platformio.ini') }}
+
+      # The resolved production environment keeps its safeguards: HTTPS only, no slot diagnostics, min_spiffs.
+      - name: Check production configuration
+        run: |
+          pio project config --json-output > "$RUNNER_TEMP/pio-config.json"
+          python - "$RUNNER_TEMP/pio-config.json" <<'EOF'
+          import json, sys
+
+          sections = {name: dict(options) for name, options in json.load(open(sys.argv[1]))}
+
+          def flags(env):
+              return [" ".join(flag.split()) for flag in sections[env]["build_flags"]]
+
+          errors = []
+          prod, dev = flags("env:esp32dev"), flags("env:esp32dev-devhttp")
+          for required in ("-D SCIPH_PRODUCTION=1", "-D SCIPH_ALLOW_DEV_HTTP=0", "-D SCIPH_DEBUG_SLOTS=0"):
+              if required not in prod:
+                  errors.append(f"esp32dev is missing {required}")
+          if any("SCIPH_PRODUCTION" in flag for flag in dev):
+              errors.append("esp32dev-devhttp must not be a production build")
+          for env in ("env:esp32dev", "env:esp32dev-devhttp"):
+              if sections[env].get("board_build.partitions") != "min_spiffs.csv":
+                  errors.append(f"{env} must use min_spiffs.csv")
+
+          for error in errors:
+              print(f"::error::{error}")
+          sys.exit(1 if errors else 0)
+          EOF
+
+      # The #error guards must reject dev HTTP and slot diagnostics in a production build. The first compile is the
+      # control: the header alone compiles, so the failures below come from the guards and nothing else.
+      - name: Check production compile guards
+        run: |
+          guard() { echo '#include "firmware_config.h"' | g++ -fsyntax-only -x c++ -I include "$@" - ; }
+          guard -D SCIPH_PRODUCTION=1
+          if guard -D SCIPH_PRODUCTION=1 -D SCIPH_ALLOW_DEV_HTTP=1 2>/dev/null; then
+            echo "::error::production build accepted SCIPH_ALLOW_DEV_HTTP=1"; exit 1
+          fi
+          if guard -D SCIPH_PRODUCTION=1 -D SCIPH_DEBUG_SLOTS=1 2>/dev/null; then
+            echo "::error::production build accepted SCIPH_DEBUG_SLOTS=1"; exit 1
+          fi
+
+      - name: Check TLS validation is never disabled
+        run: |
+          if grep -rnE '(\.|->)setInsecure[[:space:]]*\(' src include; then
+            echo "::error::setInsecure() disables certificate validation"; exit 1
+          fi
+
+      - name: Native tests
+        run: pio test -e native
+
+      # PlatformIO fails the build when the image exceeds the app partition; the RAM/Flash usage lines are the size
+      # report.
+      - name: Build production firmware
+        run: pio run -e esp32dev
+
+      - name: Build development HTTP firmware
+        run: pio run -e esp32dev-devhttp

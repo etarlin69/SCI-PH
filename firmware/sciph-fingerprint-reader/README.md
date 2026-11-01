@@ -64,7 +64,7 @@ Instalación (no incluida en este repositorio; ocupa varios GB entre PlatformIO,
 python -m venv ~/.platformio/penv && ~/.platformio/penv/bin/python -m pip install "platformio==6.2.0"
 cd firmware/sciph-fingerprint-reader
 pio run -e esp32dev            # compila el firmware de producción (descarga platform y librerías la primera vez)
-pio test -e native             # pruebas en el PC (requiere un compilador C++ del sistema: gcc/clang)
+pio test -e native             # pruebas en el PC (requiere gcc/g++ del sistema; ver Pruebas)
 ```
 
 Entornos:
@@ -76,8 +76,10 @@ Entornos:
 | `native` | Pruebas Unity en el PC con sensor, HTTP, NVS, reloj y red simulados |
 
 Los entornos ESP32 usan la tabla de particiones `min_spiffs.csv` (dos slots OTA de 1.9 MB): con la tabla por defecto
-(1.25 MB) el binario con TLS no cabe. NVS conserva el offset `0x9000`, pero cambiar de tabla exige flashear por
-cable (no por OTA) la primera vez.
+(1.25 MB) el binario con TLS no cabe. NVS conserva el offset `0x9000`.
+
+**El primer flasheo con esta tabla debe hacerse por USB/serie** (`-t upload`), porque cambia la tabla de particiones
+y eso no se puede hacer por OTA. Solo un dispositivo que ya tiene esta tabla puede actualizarse después por OTA.
 
 ## Registrar el dispositivo en SCI-PH
 
@@ -272,6 +274,13 @@ en el PC.
 ```bash
 pio test -e native
 ```
+
+Es el único comando de pruebas soportado. El entorno `native` de PlatformIO usa el compilador GCC/G++ del sistema: en
+Linux y macOS basta el del sistema; en Windows hace falta un GCC compatible con MinGW en el `PATH`. Sin ese compilador,
+la validación canónica es el workflow [`firmware-ci.yml`](../../.github/workflows/firmware-ci.yml) (Ubuntu 24.04,
+PlatformIO 6.2.0), que en cada PR que toca `firmware/**` ejecuta `pio test -e native`, `pio run -e esp32dev` y
+`pio run -e esp32dev-devhttp`, y comprueba que producción mantiene HTTPS con CA, sin diagnóstico de slots y con
+`min_spiffs.csv`.
 
 Cubren: estados y arranque, prioridad y sondeo, presupuesto de peticiones, clasificación HTTP, 401/403/429 con
 `Retry-After`, backoff de Wi-Fi, journal y recuperación al arrancar, reenvío del mismo resultado, compensación,
