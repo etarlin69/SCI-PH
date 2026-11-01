@@ -227,4 +227,6 @@ Scope requerido: `Device.Heartbeat`. El dispositivo se identifica por su credenc
 **Respuestas:** `204 No Content` (recibido), `401` (credencial ausente, inválida, revocada o sin HTTPS),
 `403` (sin el scope), `429` (límite de peticiones).
 
-La frecuencia del heartbeat se acordará con el equipo de hardware.
+El firmware del lector físico ([`firmware/sciph-fingerprint-reader`](../../firmware/sciph-fingerprint-reader/README.md))
+envía el heartbeat cada 60 s y sondea sesiones y registros cada 3 s y borrados cada 30 s (unas 43 peticiones por
+minuto).
