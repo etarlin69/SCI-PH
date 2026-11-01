@@ -61,7 +61,7 @@ módulos del toolchain (compiladores, esptool) tienen sus propias licencias.
 Instalación (no incluida en este repositorio; ocupa varios GB entre PlatformIO, el toolchain Xtensa y el framework):
 
 ```bash
-python -m pip install --user platformio
+python -m venv ~/.platformio/penv && ~/.platformio/penv/bin/python -m pip install "platformio==6.2.0"
 cd firmware/sciph-fingerprint-reader
 pio run -e esp32dev            # compila el firmware de producción (descarga platform y librerías la primera vez)
 pio test -e native             # pruebas en el PC (requiere un compilador C++ del sistema: gcc/clang)
@@ -74,6 +74,10 @@ Entornos:
 | `esp32dev` | Producción: solo HTTPS con CA. `SCIPH_PRODUCTION=1`; HTTP de desarrollo y diagnóstico de slots dan error de compilación |
 | `esp32dev-devhttp` | Desarrollo: además acepta `http://` a un Device API con `RequireHttps=false` en una red aislada |
 | `native` | Pruebas Unity en el PC con sensor, HTTP, NVS, reloj y red simulados |
+
+Los entornos ESP32 usan la tabla de particiones `min_spiffs.csv` (dos slots OTA de 1.9 MB): con la tabla por defecto
+(1.25 MB) el binario con TLS no cabe. NVS conserva el offset `0x9000`, pero cambiar de tabla exige flashear por
+cable (no por OTA) la primera vez.
 
 ## Registrar el dispositivo en SCI-PH
 
