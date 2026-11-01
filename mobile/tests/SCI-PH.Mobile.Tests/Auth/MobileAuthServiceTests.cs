@@ -1,12 +1,11 @@
 using SCI_PH.Mobile.Common.Api;
 using SCI_PH.Mobile.Common.Authentication;
 using SCI_PH.Mobile.Features.Auth.ViewModels;
-using SCI_PH.Mobile.Features.Patient.Services.Mocks;
 using SCI_PH.Mobile.Common.Navigation;
 
 namespace SCI_PH.Mobile.Tests.Auth;
 
-// MobileAuthService real contra el BFF falso: login, MFA, permiso de /me, almacenamiento y logout.
+// MobileAuthService real contra el BFF falso: login, MFA, área de /me (paramédica o paciente), almacenamiento y logout.
 public class MobileAuthServiceTests
 {
     [Fact]
@@ -181,20 +180,66 @@ public class MobileAuthServiceTests
     }
 
     [Fact]
-    public async Task ClinicalLogoutNeverTouchesThePatientSession()
+    public async Task APatientAccountSignsInToThePatientAreaWithoutAnyPermission()
     {
         using var h = new AuthHarness();
-        await h.SignInAsync();
-        var patientSession = new MockPatientSessionService(TimeProvider.System);
-        await patientSession.CreateSessionAsync();
-        var navigator = new FakeNavigator();
-        var account = new ClinicalAccountViewModel(h.Auth, h.Session, navigator);
+        h.Bff.Roles = [AccountRoles.Patient];
+        h.Bff.Permissions = [];
 
-        await account.LogoutCommand.ExecuteAsync(null);
+        var result = await h.Auth.LoginAsync(FakeMobileBff.Identifier, FakeMobileBff.Password);
 
-        Assert.False(h.Session.IsAuthenticated);
-        Assert.True(patientSession.IsAuthenticated);
-        Assert.Equal(AppRoutes.Root(AppRoutes.Entry), Assert.Single(navigator.Navigations).Route);
+        Assert.Equal((ClinicalSignInStatus.Authenticated, AccountArea.Patient), (result.Status, result.Area));
+        Assert.Equal(AccountArea.Patient, h.Session.Area);
+        Assert.False(h.Session.CanOperateEmergencies);
+        Assert.Equal(h.Bff.RefreshToken, Assert.Single(h.Storage.Values).Value);
+    }
+
+    [Fact]
+    public async Task AParamedicSignsInToTheParamedicArea()
+    {
+        using var h = new AuthHarness();
+
+        var result = await h.Auth.LoginAsync(FakeMobileBff.Identifier, FakeMobileBff.Password);
+
+        Assert.Equal((ClinicalSignInStatus.Authenticated, AccountArea.Paramedic), (result.Status, result.Area));
+        Assert.Equal(AccountArea.Paramedic, h.Session.Area);
+    }
+
+    [Fact]
+    public async Task AnAccountThatWouldBeBothPatientAndParamedicGetsNoArea()
+    {
+        using var h = new AuthHarness();
+        h.Bff.Roles = [AccountRoles.Patient];
+        h.Bff.Permissions = [ClinicalPermissions.EmergenciesOperate];
+
+        var result = await h.Auth.LoginAsync(FakeMobileBff.Identifier, FakeMobileBff.Password);
+
+        Assert.Equal(ClinicalSignInStatus.NoAccess, result.Status);
+        Assert.Equal(AccountArea.None, h.Session.Area);
+        Assert.Empty(h.Storage.Values);
+        Assert.Equal(1, h.Bff.LogoutCalls);
+    }
+
+    [Fact]
+    public async Task APatientSessionIsRestoredRefreshedAndLoggedOutLikeAnyOther()
+    {
+        using var h = new AuthHarness();
+        h.Bff.Roles = [AccountRoles.Patient];
+        h.Bff.Permissions = [];
+        var (_, refreshToken) = h.Bff.IssueSession();
+        await h.Tokens.SaveRefreshTokenAsync(refreshToken);
+
+        Assert.Equal(ClinicalSessionRestore.Restored, await h.Auth.RestoreSessionAsync());
+        Assert.Equal(AccountArea.Patient, h.Session.Area);
+
+        h.Bff.ExpireAccessToken();
+        await h.GetProtectedAsync();
+        Assert.Equal(2, h.Bff.RefreshCalls);
+
+        await h.Auth.LogoutAsync();
+        Assert.Equal(AccountArea.None, h.Session.Area);
+        Assert.Empty(h.Storage.Values);
+        Assert.Equal(1, h.Bff.LogoutCalls);
     }
 
     [Fact]

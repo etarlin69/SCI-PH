@@ -9,8 +9,9 @@ using SCI_PH.Mobile.Features.Auth.Services;
 namespace SCI_PH.Mobile.Features.Auth.ViewModels;
 
 /// <summary>
-/// Inicio de sesión del personal clínico contra el Mobile BFF. La contraseña se borra del estado en cuanto se envía,
-/// salga bien o mal. Con MFA no se crea sesión: solo se guarda el challenge en memoria y se pasa a verificarlo.
+/// Inicio de sesión con la cuenta de SCI-PH (personal clínico o paciente, ADR-015) contra el Mobile BFF; tras autenticar
+/// se abre el área de la cuenta. La contraseña se borra del estado en cuanto se envía, salga bien o mal. Con MFA no se
+/// crea sesión: solo se guarda el challenge en memoria y se pasa a verificarlo.
 /// </summary>
 public sealed partial class LoginViewModel : BaseViewModel
 {
@@ -67,14 +68,14 @@ public sealed partial class LoginViewModel : BaseViewModel
             {
                 case ClinicalSignInStatus.Authenticated:
                     _pendingMfa.Clear();
-                    await _navigator.GoToAsync(AuthRoutes.ClinicalArea);
+                    await _navigator.GoToAsync(AuthRoutes.AreaRoute(result.Area));
                     break;
                 case ClinicalSignInStatus.MfaRequired:
                     _pendingMfa.Set(result.MfaChallenge!);
                     await _navigator.GoToAsync(AuthRoutes.Mfa);
                     break;
                 default:
-                    ErrorMessage = AuthMessages.NoEmergencyAccess;
+                    ErrorMessage = AuthMessages.NoMobileAccess;
                     break;
             }
         }

@@ -7,7 +7,7 @@ namespace SCI_PH.Mobile.Features.Auth.ViewModels;
 
 /// <summary>
 /// Cuenta del personal clínico dentro del área paramédica: quién está dentro y cerrar sesión. El logout local ocurre
-/// aunque el servidor no responda, y nunca toca la sesión del paciente.
+/// aunque el servidor no responda.
 /// </summary>
 public sealed partial class ClinicalAccountViewModel : BaseViewModel
 {

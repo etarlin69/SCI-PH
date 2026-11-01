@@ -65,6 +65,18 @@ public class LoginViewModelTests
     }
 
     [Fact]
+    public async Task APatientLoginOpensThePatientArea()
+    {
+        _auth.LoginResult = () => new ClinicalSignInResult(ClinicalSignInStatus.Authenticated, Area: AccountArea.Patient);
+        var vm = Create();
+
+        await vm.LoginCommand.ExecuteAsync(null);
+
+        Assert.Equal(AuthRoutes.PatientArea, Assert.Single(_navigator.Navigations).Route);
+        Assert.False(vm.HasError);
+    }
+
+    [Fact]
     public async Task ALoginThatRequiresMfaKeepsOnlyTheChallengeAndOpensMfa()
     {
         var challenge = new MfaChallengeDto { Token = "challenge", ExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(5) };
@@ -114,7 +126,7 @@ public class LoginViewModelTests
 
         await vm.LoginCommand.ExecuteAsync(null);
 
-        Assert.Equal(AuthMessages.NoEmergencyAccess, vm.ErrorMessage);
+        Assert.Equal(AuthMessages.NoMobileAccess, vm.ErrorMessage);
         Assert.Empty(_navigator.Navigations);
     }
 

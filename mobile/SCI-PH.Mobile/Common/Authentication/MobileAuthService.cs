@@ -5,17 +5,18 @@ namespace SCI_PH.Mobile.Common.Authentication;
 
 public enum ClinicalSignInStatus
 {
-    /// <summary>Sesión iniciada y verificada con <c>/me</c>; puede entrar al área paramédica.</summary>
+    /// <summary>Sesión iniciada y verificada con <c>/me</c>; entra al área de <see cref="ClinicalSignInResult.Area"/>.</summary>
     Authenticated,
 
     /// <summary>La cuenta exige segundo factor: todavía no hay sesión.</summary>
     MfaRequired,
 
-    /// <summary>Credenciales válidas pero sin <see cref="ClinicalPermissions.EmergenciesOperate"/>: la sesión se descarta.</summary>
+    /// <summary>Credenciales válidas pero la cuenta no tiene área en la app (<see cref="AccountArea.None"/>): la sesión se descarta.</summary>
     NoAccess
 }
 
-public sealed record ClinicalSignInResult(ClinicalSignInStatus Status, MfaChallengeDto? MfaChallenge = null);
+public sealed record ClinicalSignInResult(
+    ClinicalSignInStatus Status, MfaChallengeDto? MfaChallenge = null, AccountArea Area = AccountArea.None);
 
 public enum ClinicalSessionRestore
 {
@@ -49,7 +50,7 @@ public interface IClinicalSessionRefresher
     Task EndExpiredSessionAsync(CancellationToken cancellationToken);
 }
 
-/// <summary>Autenticación del personal clínico contra el Mobile BFF. Sin UI.</summary>
+/// <summary>Autenticación de la cuenta (personal clínico o paciente) contra el Mobile BFF. Sin UI.</summary>
 public interface IMobileAuthService
 {
     /// <summary>La sesión terminó sin que el usuario la cerrara (refresh rechazado): la app vuelve a la entrada.</summary>
@@ -64,7 +65,7 @@ public interface IMobileAuthService
     /// <summary>Relee <c>/me</c> con la sesión actual.</summary>
     Task<ClinicalUser> GetCurrentUserAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Al arrancar: renueva la sesión guardada y la valida con <c>/me</c> antes de mostrar el área clínica.</summary>
+    /// <summary>Al arrancar: renueva la sesión guardada y la valida con <c>/me</c> antes de mostrar un área.</summary>
     Task<ClinicalSessionRestore> RestoreSessionAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Revoca el refresh token en el servidor si se puede y SIEMPRE borra la sesión local.</summary>
@@ -73,9 +74,9 @@ public interface IMobileAuthService
 
 /// <summary>
 /// Access token en memoria (<see cref="IClinicalSessionService"/>), refresh token en <see cref="ISecureTokenStore"/>.
-/// Toda sesión nueva (login, MFA, restauración) pasa por <c>/me</c> y exige
-/// <see cref="ClinicalPermissions.EmergenciesOperate"/>; sin él se revoca en el servidor y se borra.
-/// Nunca registra contraseñas, códigos ni tokens.
+/// Toda sesión nueva (login, MFA, restauración) pasa por <c>/me</c> y exige un área (<see cref="ClinicalUser.Area"/>):
+/// el permiso <see cref="ClinicalPermissions.EmergenciesOperate"/> o una cuenta <see cref="AccountRoles.Patient"/>; sin
+/// ninguna se revoca en el servidor y se borra. Nunca registra contraseñas, códigos ni tokens.
 /// </summary>
 public sealed class MobileAuthService : IMobileAuthService, IClinicalSessionRefresher
 {
@@ -264,7 +265,7 @@ public sealed class MobileAuthService : IMobileAuthService, IClinicalSessionRefr
         return await CompleteSignInAsync(await _api.VerifyMfaAsync(request, cancellationToken), cancellationToken);
     }
 
-    // Tokens nuevos → refresh a SecureStorage, access a memoria → /me → permiso. Si algo falla, nada queda a medias.
+    // Tokens nuevos → refresh a SecureStorage, access a memoria → /me → área. Si algo falla, nada queda a medias.
     private async Task<ClinicalSignInResult> CompleteSignInAsync(AuthenticationResultDto result, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(result.AccessToken) || string.IsNullOrWhiteSpace(result.RefreshToken))
@@ -286,14 +287,14 @@ public sealed class MobileAuthService : IMobileAuthService, IClinicalSessionRefr
             throw;
         }
 
-        if (!user.CanOperateEmergencies)
+        if (user.Area == AccountArea.None)
         {
             await DiscardSessionAsync(result.RefreshToken);
             return new ClinicalSignInResult(ClinicalSignInStatus.NoAccess);
         }
 
         _session.SetCurrentUser(user);
-        return new ClinicalSignInResult(ClinicalSignInStatus.Authenticated);
+        return new ClinicalSignInResult(ClinicalSignInStatus.Authenticated, Area: user.Area);
     }
 
     // Revoca en el servidor si hay conexión; la limpieza local ocurre siempre.

@@ -13,31 +13,19 @@
 
             <VerticalStackLayout Spacing="4">
                 <Label Text="SCI-PH" Style="{StaticResource SciTitle}" HorizontalTextAlignment="Center" />
-                <Label Text="Elige cómo quieres acceder."
+                <Label Text="Inicia sesión con tu cuenta."
                        Style="{StaticResource SciSubtitle}"
                        HorizontalTextAlignment="Center" />
             </VerticalStackLayout>
 
-            <!-- Personal clínico: inicio de sesión real contra el Mobile BFF. -->
+            <!-- Un solo inicio de sesión (ADR-015): la cuenta decide el área (paramédica o del paciente). -->
             <Border Style="{StaticResource SciCard}">
                 <VerticalStackLayout Spacing="10">
-                    <Button Text="Personal clínico"
-                            AutomationId="EntryClinicalStaff"
-                            Command="{Binding OpenClinicalStaffCommand}"
+                    <Button Text="Iniciar sesión"
+                            AutomationId="EntrySignIn"
+                            Command="{Binding SignInCommand}"
                             Style="{StaticResource SciPrimaryButton}" />
-                    <Label Text="Atención prehospitalaria. Requiere una cuenta del personal clínico de SCI-PH."
-                           Style="{StaticResource SciSubtitle}" FontSize="13" />
-                </VerticalStackLayout>
-            </Border>
-
-            <!-- Paciente: QR y verificación facial simulados hasta integrar el Mobile BFF. -->
-            <Border Style="{StaticResource SciCard}">
-                <VerticalStackLayout Spacing="10">
-                    <Button Text="Paciente"
-                            AutomationId="EntryPatient"
-                            Command="{Binding OpenPatientCommand}"
-                            Style="{StaticResource SciSecondaryButton}" />
-                    <Label Text="Acceso con tu código QR y verificación facial. Prototipo: ambos pasos son simulados."
+                    <Label Text="Personal clínico: atención prehospitalaria. Pacientes: la cuenta que activaste con la invitación de tu centro de salud."
                            Style="{StaticResource SciSubtitle}" FontSize="13" />
                 </VerticalStackLayout>
             </Border>

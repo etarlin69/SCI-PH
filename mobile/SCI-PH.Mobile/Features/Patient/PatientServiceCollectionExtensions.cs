@@ -1,5 +1,4 @@
 using SCI_PH.Mobile.Features.Patient.Ai;
-using SCI_PH.Mobile.Features.Patient.Auth;
 using SCI_PH.Mobile.Features.Patient.Documents;
 using SCI_PH.Mobile.Features.Patient.History;
 using SCI_PH.Mobile.Features.Patient.Home;
@@ -14,14 +13,12 @@ namespace SCI_PH.Mobile.Features.Patient;
 public static class PatientServiceCollectionExtensions
 {
     /// <summary>
-    /// Registra el módulo del paciente. Los servicios son mocks del prototipo: al conectar el Mobile BFF solo cambian
-    /// estas líneas, no las páginas ni los ViewModels.
+    /// Registra el módulo del paciente. Su sesión es la de la cuenta (inicio de sesión común, ADR-015): no hay sesión
+    /// propia del paciente ni acceso por QR o rostro.
     /// </summary>
     public static IServiceCollection AddPatientFeature(this IServiceCollection services)
     {
-        // Sesión única en memoria mientras la app está abierta.
         services.AddSingleton(TimeProvider.System);
-        services.AddSingleton<IPatientSessionService, MockPatientSessionService>();
         services.AddSingleton<IPatientDataService, MockPatientDataService>();
         services.AddSingleton<IPatientAssistantService, MockPatientAssistantService>();
 
@@ -31,8 +28,6 @@ public static class PatientServiceCollectionExtensions
         services.AddSingleton(MediaPicker.Default);
         services.AddSingleton(FileSystem.Current);
 
-        services.AddTransient<QrAccessViewModel>();
-        services.AddTransient<FaceVerifyViewModel>();
         services.AddTransient<HomeViewModel>();
         services.AddTransient<ProfileViewModel>();
         services.AddTransient<HistoryViewModel>();
@@ -40,8 +35,6 @@ public static class PatientServiceCollectionExtensions
         services.AddTransient<DocumentsViewModel>();
         services.AddTransient<AiAssistantViewModel>();
 
-        services.AddTransient<QrScanPage>();
-        services.AddTransient<FaceVerifyPage>();
         services.AddTransient<HomePage>();
         services.AddTransient<ProfilePage>();
         services.AddTransient<HistoryPage>();
@@ -50,15 +43,5 @@ public static class PatientServiceCollectionExtensions
         services.AddTransient<AiAssistantPage>();
 
         return services;
-    }
-
-    /// <summary>
-    /// Acceso del paciente: se apila sobre la entrada compartida (QR → rostro), de modo que "Atrás" vuelve a elegir el
-    /// tipo de acceso. Tras la verificación facial se navega al área del paciente declarada en el AppShell.
-    /// </summary>
-    public static void RegisterPatientRoutes()
-    {
-        Routing.RegisterRoute(PatientRoutes.QrAccess, typeof(QrScanPage));
-        Routing.RegisterRoute(PatientRoutes.FaceVerify, typeof(FaceVerifyPage));
     }
 }

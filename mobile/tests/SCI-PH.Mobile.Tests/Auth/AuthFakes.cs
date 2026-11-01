@@ -108,9 +108,9 @@ internal sealed class FakeAuthService : IMobileAuthService
 {
     public event EventHandler? SessionExpired;
 
-    public Func<ClinicalSignInResult> LoginResult { get; set; } = () => new(ClinicalSignInStatus.Authenticated);
+    public Func<ClinicalSignInResult> LoginResult { get; set; } = () => new(ClinicalSignInStatus.Authenticated, Area: AccountArea.Paramedic);
 
-    public Func<ClinicalSignInResult> VerifyResult { get; set; } = () => new(ClinicalSignInStatus.Authenticated);
+    public Func<ClinicalSignInResult> VerifyResult { get; set; } = () => new(ClinicalSignInStatus.Authenticated, Area: AccountArea.Paramedic);
 
     public ClinicalSessionRestore RestoreResult { get; set; } = ClinicalSessionRestore.NoSession;
 

@@ -25,7 +25,7 @@ namespace SCI_PH.Mobile.Extensions
 
             AddMobileBff(services);
 
-            // Arranque (restaura la sesión clínica) y entrada compartida (personal clínico / paciente).
+            // Arranque (restaura la sesión guardada) y entrada compartida (un solo inicio de sesión).
             services.AddTransient<StartupViewModel>();
             services.AddTransient<StartupPage>();
             services.AddTransient<EntryViewModel>();

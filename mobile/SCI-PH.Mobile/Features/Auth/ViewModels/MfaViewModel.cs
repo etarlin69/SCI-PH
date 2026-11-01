@@ -93,12 +93,12 @@ public sealed partial class MfaViewModel : BaseViewModel
             if (result.Status == ClinicalSignInStatus.Authenticated)
             {
                 _pendingMfa.Clear();
-                await _navigator.GoToAsync(AuthRoutes.ClinicalArea);
+                await _navigator.GoToAsync(AuthRoutes.AreaRoute(result.Area));
             }
             else
             {
-                // El servidor emitió la sesión pero la cuenta no tiene el permiso: el challenge quedó consumido.
-                CloseChallenge(AuthMessages.NoEmergencyAccess);
+                // El servidor emitió la sesión pero la cuenta no tiene área en la app: el challenge quedó consumido.
+                CloseChallenge(AuthMessages.NoMobileAccess);
             }
         }
         catch (MobileApiException ex) when (ex.Error == MobileApiError.Unauthorized && IsExpired(challenge.ExpiresAtUtc))

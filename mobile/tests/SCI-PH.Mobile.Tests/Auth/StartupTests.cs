@@ -12,7 +12,7 @@ public class StartupTests
 
     private async Task<string> StartAsync(AuthHarness h)
     {
-        await new StartupViewModel(h.Auth, _navigator).StartAsync();
+        await new StartupViewModel(h.Auth, h.Session, _navigator).StartAsync();
         return Assert.Single(_navigator.Navigations).Route;
     }
 
@@ -40,6 +40,20 @@ public class StartupTests
         Assert.Equal(h.Bff.AccessToken, h.Session.AccessToken);
         Assert.Equal(h.Bff.RefreshToken, Assert.Single(h.Storage.Values).Value);
         Assert.NotEqual(refreshToken, h.Bff.RefreshToken);
+    }
+
+    [Fact]
+    public async Task AStoredPatientSessionOpensThePatientArea()
+    {
+        using var h = new AuthHarness();
+        h.Bff.Roles = [AccountRoles.Patient];
+        h.Bff.Permissions = [];
+        var (_, refreshToken) = h.Bff.IssueSession();
+        await h.Tokens.SaveRefreshTokenAsync(refreshToken);
+
+        Assert.Equal(AuthRoutes.PatientArea, await StartAsync(h));
+        Assert.Equal(AccountArea.Patient, h.Session.Area);
+        Assert.False(h.Session.CanOperateEmergencies);
     }
 
     [Fact]
