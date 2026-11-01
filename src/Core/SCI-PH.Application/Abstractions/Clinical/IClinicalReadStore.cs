@@ -41,6 +41,11 @@ namespace SCI_PH.Application.Abstractions.Clinical
         Task<bool> HasActiveFingerprintReferenceAsync(
             Guid patientId, string provider, string subjectReferencePrefix, CancellationToken cancellationToken);
 
+        // The subject references of every ACTIVE fingerprint reference of this provider that starts with the prefix (one
+        // reader's slot inventory, see FingerprintReferences.ReaderPrefix). For Application only; they never leave it.
+        Task<IReadOnlyList<string>> ListActiveFingerprintSubjectReferencesAsync(
+            string provider, string subjectReferencePrefix, CancellationToken cancellationToken);
+
         // The patient's fingerprint references (active and revoked), newest first. The subject reference is for
         // Application only (to name the reader); it never leaves it.
         Task<IReadOnlyList<FingerprintReferenceRow>> ListFingerprintReferencesAsync(Guid patientId, CancellationToken cancellationToken);

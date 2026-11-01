@@ -36,6 +36,12 @@ namespace SCI_PH.Persistence.Clinical.Services
                 && t.Job.Status == FingerprintSlotDeletionStatus.Pending
                 && t.SubjectReference == subjectReference, cancellationToken);
 
+        public async Task<IReadOnlyList<string>> ListPendingSubjectReferencesForReaderAsync(Guid deviceCredentialId, CancellationToken cancellationToken) =>
+            await Targets()
+                .Where(t => t.Job.DeviceCredentialId == deviceCredentialId && t.Job.Status == FingerprintSlotDeletionStatus.Pending)
+                .Select(t => t.SubjectReference)
+                .ToListAsync(cancellationToken);
+
         public void Add(FingerprintSlotDeletion deletion) =>
             _clinical.FingerprintSlotDeletionJobs.Add(FingerprintSlotDeletionJobEntry.From(deletion));
 

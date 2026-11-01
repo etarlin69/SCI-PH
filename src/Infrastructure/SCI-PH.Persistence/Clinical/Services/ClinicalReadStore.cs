@@ -119,6 +119,16 @@ namespace SCI_PH.Persistence.Clinical.Services
                 && r.Status == BiometricReferenceStatus.Active
                 && r.SubjectReference.StartsWith(subjectReferencePrefix), cancellationToken);
 
+        public async Task<IReadOnlyList<string>> ListActiveFingerprintSubjectReferencesAsync(
+            string provider, string subjectReferencePrefix, CancellationToken cancellationToken) =>
+            await _clinical.PatientBiometricReferences.AsNoTracking()
+                .Where(r => r.Modality == BiometricModality.Fingerprint
+                    && r.Provider == provider
+                    && r.Status == BiometricReferenceStatus.Active
+                    && r.SubjectReference.StartsWith(subjectReferencePrefix))
+                .Select(r => r.SubjectReference)
+                .ToListAsync(cancellationToken);
+
         public async Task<IReadOnlyList<FingerprintReferenceRow>> ListFingerprintReferencesAsync(Guid patientId, CancellationToken cancellationToken) =>
             await _clinical.PatientBiometricReferences.AsNoTracking()
                 .Where(r => r.PatientId == patientId && r.Modality == BiometricModality.Fingerprint)
