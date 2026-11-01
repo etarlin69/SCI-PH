@@ -66,16 +66,19 @@ datos del expediente propio están en `/api/mobile/patient/me`.
 Expediente **propio** del paciente autenticado, **solo lectura** ([ADR-015](../adr/ADR-015-patient-authentication-qr-identification.md),
 decisión 2).
 
-- **Autorización:** cuenta con el rol `Patient` (el rol no tiene permisos; el controlador solo admite ese rol) **y**
-  vínculo clínico `Patient.IdentityUserId`. El servidor resuelve el paciente desde la cuenta; **ninguna ruta recibe un
+- **Autorización:** la política `PatientSelfService` es solo la puerta de entrada (cuenta con el rol `Patient`, que no
+  tiene permisos); la frontera es el vínculo clínico `Patient.IdentityUserId`, que comprueba `PatientSelfService`. El servidor resuelve el paciente desde la cuenta; **ninguna ruta recibe un
   `patientId`** y un `patientId` en la query se ignora. Sin vínculo: `403` (nunca se vincula por email, nombre,
   documento ni teléfono). El personal clínico (también Administrator): `403`. El paciente no entra en
   `/api/mobile/emergencies`, `/devices` ni `/catalogs` (`403`).
 - **Recursos hijos:** solo `encounterId` aparece en una ruta, y el servidor comprueba que la atención es del paciente:
   si no existe o es de otro, `404` (no se revela que exista).
 - **Sin datos internos:** las respuestas no llevan `patientId`, `IdentityUserId`, ids de personal, de clínica ni de
-  medicamento, rutas de Blob ni auditoría. Los enums viajan como texto. Cada lista devuelve como máximo 200 elementos,
-  los más recientes primero.
+  medicamento, rutas de Blob ni auditoría. Los enums viajan como texto.
+- **Límite actual (sin paginación):** cada lista devuelve como máximo **200** elementos, los más recientes primero, con
+  orden determinista (atenciones por `startedAtUtc`, diagnósticos por `recordedAtUtc`, recetas por `issuedAtUtc`,
+  resultados por `resultedAtUtc`, todos descendentes y desempatados por `id`; alergias por sustancia). Un historial más
+  largo no muestra lo más antiguo: la paginación por cursor es un seguimiento P1.
 - **Visibilidad:** alergias de la **última versión** del historial; resultados **publicados** (`Final`, `Corrected`;
   nunca `Pending` ni `Cancelled`); recetas **emitidas** (`Issued`, o `Cancelled` después de emitirse; nunca un
   borrador, ni uno cancelado).

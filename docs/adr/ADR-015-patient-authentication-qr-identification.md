@@ -84,3 +84,13 @@ asistente de IA del paciente (no se conecta a la IA clínica) y la edición del 
   NN.
 - Como para el personal, un access token emitido antes de desactivar la cuenta o revocar sus sesiones sigue siendo
   válido hasta 15 min (ADR-006, sin lista negra); el refresh se rechaza de inmediato.
+
+## Seguimientos
+
+- **P1 — Paginación del historial del paciente:** hoy cada lista de `/api/mobile/patient/me` se corta en los 200
+  elementos más recientes (orden determinista); falta una paginación por cursor.
+- **P1 — Seguridad: ventana del access token tras desactivar o revocar** (heredada de ADR-006): hasta 15 min de uso de
+  un token ya emitido. Endurecerla (security stamp o lista de revocación) es un cambio de ADR-006, no de esta vertical.
+- **Integración HTTP real del área paramédica en MAUI:** `HttpParamedicApiService` todavía usa
+  `MockParamedicApiService` internamente; es una vertical aparte (el backend paramédico no cambia aquí).
+- **Siguiente PR:** QR del paciente (decisiones 3–5).

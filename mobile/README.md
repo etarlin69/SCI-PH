@@ -300,6 +300,8 @@ no firma con claves propias y no publica nada.
 - Enrolamiento de huellas, firmware real del ESP32/R307, modo sin conexión, cierre del traslado (`Complete`) y llegada
   física.
 - Documentos del paciente (con la vertical de almacenamiento de documentos) y su asistente de IA.
+- Historial del paciente paginado (hoy, las 200 entradas más recientes de cada lista; P1).
+- Integración HTTP completa del área paramédica: `HttpParamedicApiService` aún usa `MockParamedicApiService`.
 - Converger PatientTheme con SciPhTheme.
 - CI de iOS y Mac Catalyst (requiere runners macOS).
 - Identidad de la app (`ApplicationId`) definitiva.

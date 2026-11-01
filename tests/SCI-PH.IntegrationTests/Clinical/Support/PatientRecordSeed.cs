@@ -20,14 +20,16 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
         Guid AllergyId,
         Guid SupersededAllergyId,
         Guid FinalResultId,
+        Guid CorrectedResultId,
         Guid PendingResultId,
         Guid IssuedPrescriptionId,
+        Guid IssuedThenCancelledPrescriptionId,
         Guid DraftPrescriptionId,
         Guid CancelledDraftPrescriptionId);
 
     // A complete own record for a patient: two encounters in a clinic, a diagnosis, two medical history versions (only
-    // the latest allergy is current), a published and a pending result, and an issued, a draft and a cancelled-draft
-    // prescription. Works on the in-memory stores and on PostgreSQL (real clinic, staff and medication rows).
+    // the latest allergy is current), a final, a corrected and a pending result, and four prescriptions: issued, issued and then
+    // cancelled (still history), a draft and a draft cancelled before issue (never orders). Works on the in-memory stores and on PostgreSQL (real clinic, staff and medication rows).
     internal static class PatientRecordSeed
     {
         public static async Task<SeededPatientRecord> SeedAsync(
@@ -65,23 +67,30 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
 
             var final = ClinicalResult.Request(encounter.Id, ClinicalResultType.Laboratory, $"Hemoglobina {givenNames}", referenceRange: "12-16 g/dL");
             final.RecordFinal(now.AddHours(-1), numericValue: 13.5m, unit: "g/dL", recordedByStaffId: staff.Id);
+            var corrected = ClinicalResult.Request(encounter.Id, ClinicalResultType.Laboratory, $"Glucosa {givenNames}");
+            corrected.RecordFinal(now.AddHours(-2), numericValue: 180m, unit: "mg/dL", recordedByStaffId: staff.Id);
+            corrected.Correct(now.AddHours(-1.5), numericValue: 92m, unit: "mg/dL", recordedByStaffId: staff.Id);
             var pending = ClinicalResult.Request(encounter.Id, ClinicalResultType.Imaging, $"Radiografía {givenNames}");
-            db.ClinicalResults.AddRange(final, pending);
+            db.ClinicalResults.AddRange(final, corrected, pending);
 
             var issued = Prescription.Draft(encounter.Id, staff.Id, "Tomar con alimentos");
             issued.AddDetail(medication.Id, 500, "mg", MedicationRoute.Oral, "Cada 8 horas", 7);
             issued.Issue(now.AddHours(-2));
+            var issuedThenCancelled = Prescription.Draft(encounter.Id, staff.Id);
+            issuedThenCancelled.AddDetail(medication.Id, 400, "mg", MedicationRoute.Oral, "Cada 6 horas", 3);
+            issuedThenCancelled.Issue(now.AddHours(-2.5));
+            issuedThenCancelled.Cancel(now.AddHours(-1.5));
             var draft = Prescription.Draft(encounter.Id, staff.Id);
             draft.AddDetail(medication.Id, 250, "mg", MedicationRoute.Oral, "Cada 12 horas");
             var cancelledDraft = Prescription.Draft(encounter.Id, staff.Id);
             cancelledDraft.AddDetail(medication.Id, 1, "g", MedicationRoute.Oral, "Una vez");
             cancelledDraft.Cancel(now.AddHours(-1));
-            db.Prescriptions.AddRange(issued, draft, cancelledDraft);
+            db.Prescriptions.AddRange(issued, issuedThenCancelled, draft, cancelledDraft);
 
             await db.SaveChangesAsync();
             return new SeededPatientRecord(
-                patient.Id, givenNames, encounter.Id, older.Id, diagnosis.Id, allergy.Id, superseded.Id, final.Id, pending.Id,
-                issued.Id, draft.Id, cancelledDraft.Id);
+                patient.Id, givenNames, encounter.Id, older.Id, diagnosis.Id, allergy.Id, superseded.Id, final.Id, corrected.Id, pending.Id,
+                issued.Id, issuedThenCancelled.Id, draft.Id, cancelledDraft.Id);
         }
     }
 }

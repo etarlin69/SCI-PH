@@ -60,8 +60,8 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             var detail = await own.ReadAsAsync<PatientSelfEncounterDetail>();
             Assert.Equal(a.EncounterId, detail.Encounter.Id);
             Assert.Equal(a.DiagnosisId, Assert.Single(detail.Diagnoses).Id);
-            Assert.Equal(a.FinalResultId, Assert.Single(detail.Results).Id);
-            Assert.Equal(a.IssuedPrescriptionId, Assert.Single(detail.Prescriptions).Id);
+            Assert.Equal([a.FinalResultId, a.CorrectedResultId], detail.Results.Select(r => r.Id));
+            Assert.Equal([a.IssuedPrescriptionId, a.IssuedThenCancelledPrescriptionId], detail.Prescriptions.Select(p => p.Id));
             var older = await clientA.GetFromJsonAsync<PatientSelfEncounterDetail>($"{Me}/encounters/{a.OlderEncounterId}");
             Assert.Empty(older!.Diagnoses);
             Assert.Empty(older.Results);
@@ -193,7 +193,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
 
             var summary = await client.GetFromJsonAsync<PatientSelfSummary>($"{Me}/summary");
             Assert.Equal($"{own.GivenNames} Prueba", summary!.DisplayName);
-            Assert.Equal((2, 1), (summary.EncounterCount, summary.ResultCount));
+            Assert.Equal((2, 2), (summary.EncounterCount, summary.ResultCount));
             Assert.Equal(own.EncounterId, summary.LatestEncounter!.Id);
             Assert.Equal(own.FinalResultId, summary.LatestResult!.Id);
             Assert.Equal(own.AllergyId, Assert.Single(summary.ActiveAllergies).Id);
@@ -210,15 +210,24 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             var diagnosis = Assert.Single((await client.GetFromJsonAsync<List<PatientSelfDiagnosis>>($"{Me}/diagnoses"))!);
             Assert.Equal((own.DiagnosisId, own.EncounterId), (diagnosis.Id, diagnosis.EncounterId));
 
-            // Issued only: never the draft nor the cancelled draft.
-            var prescription = Assert.Single((await client.GetFromJsonAsync<List<PatientSelfPrescription>>($"{Me}/prescriptions"))!);
-            Assert.Equal((own.IssuedPrescriptionId, PrescriptionStatus.Issued), (prescription.Id, prescription.Status));
+            // Ever issued, newest issue first: the issued one and the one cancelled after issue (still history, with its
+            // current status); never the draft nor the draft cancelled before issue.
+            var prescriptions = (await client.GetFromJsonAsync<List<PatientSelfPrescription>>($"{Me}/prescriptions"))!;
+            Assert.Equal([own.IssuedPrescriptionId, own.IssuedThenCancelledPrescriptionId], prescriptions.Select(p => p.Id));
+            var prescription = prescriptions[0];
+            Assert.Equal(PrescriptionStatus.Issued, prescription.Status);
+            var cancelledAfterIssue = prescriptions[1];
+            Assert.Equal(PrescriptionStatus.Cancelled, cancelledAfterIssue.Status);
+            Assert.NotNull(cancelledAfterIssue.IssuedAtUtc);
+            Assert.NotNull(cancelledAfterIssue.CancelledAtUtc);
             var item = Assert.Single(prescription.Items);
             Assert.Equal(($"Amoxicilina {own.GivenNames}", 500m, "Cada 8 horas"), (item.MedicationName, item.Dose, item.Frequency));
 
-            // Published only: never the pending order.
-            var result = Assert.Single((await client.GetFromJsonAsync<List<PatientSelfResult>>($"{Me}/results"))!);
-            Assert.Equal((own.FinalResultId, ClinicalResultStatus.Final, 13.5m), (result.Id, result.Status, result.NumericValue));
+            // Published only (Final and Corrected, newest first): never the pending order.
+            var results = (await client.GetFromJsonAsync<List<PatientSelfResult>>($"{Me}/results"))!;
+            Assert.Equal([own.FinalResultId, own.CorrectedResultId], results.Select(r => r.Id));
+            Assert.Equal((ClinicalResultStatus.Final, 13.5m), (results[0].Status, results[0].NumericValue));
+            Assert.Equal((ClinicalResultStatus.Corrected, 92m), (results[1].Status, results[1].NumericValue));
 
             foreach (var route in SelfRoutes)
             {
@@ -226,7 +235,8 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 foreach (var foreignId in new[]
                 {
                     other.PatientId, other.EncounterId, other.OlderEncounterId, other.DiagnosisId, other.AllergyId,
-                    other.FinalResultId, other.IssuedPrescriptionId, own.SupersededAllergyId, own.PendingResultId,
+                    other.FinalResultId, other.CorrectedResultId, other.IssuedPrescriptionId, other.IssuedThenCancelledPrescriptionId,
+                    own.SupersededAllergyId, own.PendingResultId,
                     own.DraftPrescriptionId, own.CancelledDraftPrescriptionId
                 })
                 {

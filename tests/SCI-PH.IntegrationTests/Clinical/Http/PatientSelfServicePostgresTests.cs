@@ -33,21 +33,22 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 var encounters = (await client.GetFromJsonAsync<List<PatientSelfEncounter>>($"{Me}/encounters"))!;
                 var allergies = await client.GetFromJsonAsync<List<PatientSelfAllergy>>($"{Me}/allergies");
                 var diagnoses = await client.GetFromJsonAsync<List<PatientSelfDiagnosis>>($"{Me}/diagnoses");
-                var prescriptions = await client.GetFromJsonAsync<List<PatientSelfPrescription>>($"{Me}/prescriptions");
+                var prescriptions = (await client.GetFromJsonAsync<List<PatientSelfPrescription>>($"{Me}/prescriptions"))!;
                 var results = await client.GetFromJsonAsync<List<PatientSelfResult>>($"{Me}/results");
                 var detail = await client.GetFromJsonAsync<PatientSelfEncounterDetail>($"{Me}/encounters/{own.EncounterId}");
 
                 Assert.Equal(own.GivenNames, profile!.GivenNames);
-                Assert.Equal((2, 1, own.EncounterId, own.FinalResultId), (summary!.EncounterCount, summary.ResultCount, summary.LatestEncounter!.Id, summary.LatestResult!.Id));
+                Assert.Equal((2, 2, own.EncounterId, own.FinalResultId), (summary!.EncounterCount, summary.ResultCount, summary.LatestEncounter!.Id, summary.LatestResult!.Id));
                 Assert.Equal([own.EncounterId, own.OlderEncounterId], encounters.Select(e => e.Id));
                 Assert.Equal($"Hospital {own.GivenNames}", encounters[0].ClinicName);
                 Assert.Equal(own.AllergyId, Assert.Single(allergies!).Id);
                 Assert.Equal(own.DiagnosisId, Assert.Single(diagnoses!).Id);
-                Assert.Equal(own.IssuedPrescriptionId, Assert.Single(prescriptions!).Id);
-                Assert.Single(prescriptions![0].Items);
-                Assert.Equal(own.FinalResultId, Assert.Single(results!).Id);
-                Assert.Equal((own.DiagnosisId, own.FinalResultId, own.IssuedPrescriptionId),
-                    (Assert.Single(detail!.Diagnoses).Id, Assert.Single(detail.Results).Id, Assert.Single(detail.Prescriptions).Id));
+                Assert.Equal([own.IssuedPrescriptionId, own.IssuedThenCancelledPrescriptionId], prescriptions.Select(p => p.Id));
+                Assert.Single(prescriptions[0].Items);
+                Assert.Equal([own.FinalResultId, own.CorrectedResultId], results!.Select(r => r.Id));
+                Assert.Equal(own.DiagnosisId, Assert.Single(detail!.Diagnoses).Id);
+                Assert.Equal([own.FinalResultId, own.CorrectedResultId], detail.Results.Select(r => r.Id));
+                Assert.Equal(2, detail.Prescriptions.Count);
                 Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"{Me}/encounters/{other.EncounterId}")).StatusCode);
             }
 
