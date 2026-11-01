@@ -38,6 +38,8 @@ tests/
   SCI-PH.Application.Tests
   SCI-PH.IntegrationTests
 mobile/                      App .NET MAUI (solución propia: mobile/SCI-PH.Mobile.sln). Ver mobile/README.md.
+firmware/
+  sciph-fingerprint-reader   Lector físico ESP32 + R307 (PlatformIO). Ver su README.md.
 docs/
 ```
 
