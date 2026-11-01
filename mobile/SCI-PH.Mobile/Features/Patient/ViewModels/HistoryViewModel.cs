@@ -6,7 +6,7 @@ using SCI_PH.Mobile.Features.Patient.Services.Interfaces;
 
 namespace SCI_PH.Mobile.Features.Patient.ViewModels;
 
-/// <summary>Historial clínico: alergias, condiciones, medicación habitual y episodios.</summary>
+/// <summary>Historial clínico propio: alergias, diagnósticos, recetas y atenciones. Si falla, no muestra datos.</summary>
 public sealed partial class HistoryViewModel : BaseViewModel
 {
     private readonly IPatientDataService _data;
@@ -21,5 +21,8 @@ public sealed partial class HistoryViewModel : BaseViewModel
 
     [RelayCommand]
     private Task LoadAsync() => RunAsync(async () =>
-        History = await _data.GetHistoryAsync(), GenericErrorMessage);
+    {
+        History = null;
+        History = await _data.GetHistoryAsync();
+    }, PatientMessages.For);
 }

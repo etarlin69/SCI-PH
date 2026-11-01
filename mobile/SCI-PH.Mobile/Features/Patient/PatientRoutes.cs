@@ -11,5 +11,4 @@ public static class PatientRoutes
     public const string History = "History";
     public const string Results = "Results";
     public const string Documents = "Documents";
-    public const string Assistant = "Assistant";
 }

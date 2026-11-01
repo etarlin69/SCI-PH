@@ -48,8 +48,8 @@
                     ColumnDefinitions="*,*,*">
 
                     <VerticalStackLayout Grid.Column="0" HorizontalOptions="Center" Spacing="2">
-                        <Label Text="{Binding Profile.Consultations}" Style="{StaticResource MetricValueStyle}" />
-                        <Label Text="Consultas" Style="{StaticResource MetricLabelStyle}" />
+                        <Label Text="{Binding Profile.Encounters}" Style="{StaticResource MetricValueStyle}" />
+                        <Label Text="Atenciones" Style="{StaticResource MetricLabelStyle}" />
                     </VerticalStackLayout>
 
                     <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center" Spacing="2">
@@ -58,8 +58,8 @@
                     </VerticalStackLayout>
 
                     <VerticalStackLayout Grid.Column="2" HorizontalOptions="Center" Spacing="2">
-                        <Label Text="{Binding Profile.Documents}" Style="{StaticResource MetricValueStyle}" />
-                        <Label Text="Documentos" Style="{StaticResource MetricLabelStyle}" />
+                        <Label Text="{Binding Profile.ActiveAllergies}" Style="{StaticResource MetricValueStyle}" />
+                        <Label Text="Alergias activas" Style="{StaticResource MetricLabelStyle}" />
                     </VerticalStackLayout>
 
                 </Grid>
@@ -227,6 +227,11 @@
                             FontAttributes="Bold"
                             TextColor="{StaticResource TitleText}" />
 
+                        <Label Text="Documento" Style="{StaticResource FieldLabelStyle}" />
+                        <Label Text="{Binding Profile.Document, TargetNullValue='—'}" Style="{StaticResource FieldValueStyle}" />
+
+                        <BoxView HeightRequest="1" Color="{StaticResource CardStroke}" />
+
                         <Label Text="Correo electrónico" Style="{StaticResource FieldLabelStyle}" />
                         <Label Text="{Binding Profile.Email, TargetNullValue='—'}" Style="{StaticResource FieldValueStyle}" />
 
@@ -243,7 +248,7 @@
                         <BoxView HeightRequest="1" Color="{StaticResource CardStroke}" />
 
                         <Label Text="Teléfono" Style="{StaticResource FieldLabelStyle}" />
-                        <Label Text="{Binding Profile.PhoneNumber}" Style="{StaticResource FieldValueStyle}" />
+                        <Label Text="{Binding Profile.PhoneNumber, TargetNullValue='—'}" Style="{StaticResource FieldValueStyle}" />
 
                     </VerticalStackLayout>
 

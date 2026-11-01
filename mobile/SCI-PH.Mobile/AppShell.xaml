@@ -13,7 +13,6 @@
     xmlns:patientHistory="clr-namespace:SCI_PH.Mobile.Features.Patient.History"
     xmlns:patientResults="clr-namespace:SCI_PH.Mobile.Features.Patient.Results"
     xmlns:patientDocuments="clr-namespace:SCI_PH.Mobile.Features.Patient.Documents"
-    xmlns:patientAi="clr-namespace:SCI_PH.Mobile.Features.Patient.Ai"
     x:DataType="local:AppShell"
     Shell.BackgroundColor="{StaticResource SciNavy}"
     Shell.ForegroundColor="White"
@@ -91,10 +90,6 @@
 
     <FlyoutItem Title="Documentos" Route="{x:Static patient:PatientRoutes.Documents}">
         <ShellContent Title="Documentos" ContentTemplate="{DataTemplate patientDocuments:DocumentsPage}" />
-    </FlyoutItem>
-
-    <FlyoutItem Title="Asistente IA" Route="{x:Static patient:PatientRoutes.Assistant}">
-        <ShellContent Title="SCI-PH AI" ContentTemplate="{DataTemplate patientAi:AiAssistantPage}" />
     </FlyoutItem>
 
     <MenuItem Text="Cerrar sesión" Command="{Binding PatientLogoutCommand}" />

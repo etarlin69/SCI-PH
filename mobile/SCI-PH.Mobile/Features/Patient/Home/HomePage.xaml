@@ -106,7 +106,7 @@
                             TextColor="White" />
 
                         <Label
-                            Text="Cuenta verificada en SCI-PH"
+                            Text="Paciente de SCI-PH"
                             FontSize="13"
                             TextColor="{StaticResource OnDarkMutedText}" />
 
@@ -145,13 +145,13 @@
                     <VerticalStackLayout Spacing="6">
 
                         <Label
-                            Text="{Binding Summary.ClinicalDocuments}"
+                            Text="{Binding Summary.Encounters}"
                             FontSize="28"
                             FontAttributes="Bold"
                             TextColor="{StaticResource ColorSecondary}" />
 
                         <Label
-                            Text="Documentos clínicos"
+                            Text="Atenciones"
                             Style="{StaticResource CardMetaStyle}" />
 
                     </VerticalStackLayout>
@@ -163,7 +163,7 @@
             <!-- ÚLTIMO EPISODIO -->
 
             <Label
-                Text="Último episodio"
+                Text="Última atención"
                 Style="{StaticResource PatientSectionTitleStyle}"
                 IsVisible="{Binding Summary.LatestEpisode, Converter={StaticResource IsNotNullConverter}}" />
 
@@ -235,94 +235,6 @@
                             Text="{Binding Summary.LatestResult.Status}"
                             Style="{StaticResource StatusBadgeTextStyle}" />
                     </Border>
-
-                </Grid>
-
-            </Border>
-
-            <!-- DOCUMENTO RECIENTE -->
-
-            <Label
-                Text="Documento reciente"
-                Style="{StaticResource PatientSectionTitleStyle}"
-                IsVisible="{Binding Summary.LatestDocument, Converter={StaticResource IsNotNullConverter}}" />
-
-            <Border
-                Style="{StaticResource PatientCardStyle}"
-                IsVisible="{Binding Summary.LatestDocument, Converter={StaticResource IsNotNullConverter}}">
-
-                <Grid
-                    ColumnDefinitions="Auto,*"
-                    ColumnSpacing="14">
-
-                    <Label
-                        Text="{Binding Summary.LatestDocument.Icon}"
-                        FontSize="35"
-                        VerticalOptions="Center" />
-
-                    <VerticalStackLayout
-                        Grid.Column="1"
-                        Spacing="4">
-
-                        <Label
-                            Text="{Binding Summary.LatestDocument.Title}"
-                            Style="{StaticResource CardTitleStyle}" />
-
-                        <Label
-                            Text="{Binding Summary.LatestDocument.Subtitle}"
-                            Style="{StaticResource CardMetaStyle}" />
-
-                        <Label
-                            Text="{Binding Summary.LatestDocument.DateLabel}"
-                            FontSize="12"
-                            TextColor="{StaticResource MutedText}" />
-
-                    </VerticalStackLayout>
-
-                </Grid>
-
-            </Border>
-
-            <!-- ACCESO AL ASISTENTE -->
-
-            <Border
-                BackgroundColor="{StaticResource InfoBackground}"
-                Stroke="{StaticResource InfoStroke}"
-                StrokeThickness="1"
-                Padding="17"
-                SemanticProperties.Description="Abrir el asistente SCI-PH AI">
-
-                <Border.StrokeShape>
-                    <RoundRectangle CornerRadius="16" />
-                </Border.StrokeShape>
-
-                <Border.GestureRecognizers>
-                    <TapGestureRecognizer Command="{Binding OpenAssistantCommand}" />
-                </Border.GestureRecognizers>
-
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-
-                    <VerticalStackLayout Spacing="5">
-
-                        <Label
-                            Text="SCI-PH AI"
-                            FontSize="17"
-                            FontAttributes="Bold"
-                            TextColor="{StaticResource InfoText}" />
-
-                        <Label
-                            Text="Puedes usar el asistente educativo para comprender términos y resultados clínicos en lenguaje sencillo."
-                            FontSize="13"
-                            TextColor="{StaticResource BodyText}" />
-
-                    </VerticalStackLayout>
-
-                    <Label
-                        Grid.Column="1"
-                        Text="›"
-                        FontSize="28"
-                        TextColor="{StaticResource InfoText}"
-                        VerticalOptions="Center" />
 
                 </Grid>
 

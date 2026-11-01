@@ -33,7 +33,13 @@ public abstract partial class BaseViewModel : ObservableObject
     /// Ejecuta una operación marcando <see cref="IsBusy"/>. Si falla, muestra <paramref name="errorText"/>:
     /// nunca el detalle de la excepción.
     /// </summary>
-    protected async Task RunAsync(Func<Task> action, string errorText)
+    protected Task RunAsync(Func<Task> action, string errorText) => RunAsync(action, _ => errorText);
+
+    /// <summary>
+    /// Igual, pero el texto depende del fallo (por ejemplo, sin conexión frente a sin acceso). <paramref name="errorText"/>
+    /// debe devolver un texto apto para el usuario, nunca el detalle de la excepción.
+    /// </summary>
+    protected async Task RunAsync(Func<Task> action, Func<Exception, string> errorText)
     {
         ErrorMessage = null;
         IsBusy = true;
@@ -42,9 +48,9 @@ public abstract partial class BaseViewModel : ObservableObject
         {
             await action();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            ErrorMessage = errorText;
+            ErrorMessage = errorText(ex);
         }
         finally
         {

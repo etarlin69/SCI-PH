@@ -8,8 +8,9 @@ using SCI_PH.Mobile.Features.Patient.Services.Interfaces;
 namespace SCI_PH.Mobile.Features.Patient.ViewModels;
 
 /// <summary>
-/// Perfil: los datos de la cuenta vienen de <see cref="IPatientDataService"/>. La foto y la descripción son una
-/// demostración local del prototipo (solo este dispositivo); en Preferences nunca se guardan tokens ni datos clínicos.
+/// Perfil: los datos del paciente vienen de su expediente (<see cref="IPatientDataService"/>, solo lectura). La foto y
+/// la descripción son una demostración local del prototipo (solo este dispositivo); en Preferences nunca se guardan
+/// tokens ni datos clínicos.
 /// </summary>
 public sealed partial class ProfileViewModel : BaseViewModel
 {
@@ -56,14 +57,15 @@ public sealed partial class ProfileViewModel : BaseViewModel
     [RelayCommand]
     private Task LoadAsync() => RunAsync(async () =>
     {
-        Profile = await _data.GetProfileAsync();
-
         Description = _preferences.Get(DescriptionKey, DefaultDescription);
         DescriptionDraft = Description;
 
         string savedPhoto = _preferences.Get(PhotoKey, string.Empty);
         PhotoSource = !string.IsNullOrWhiteSpace(savedPhoto) && File.Exists(savedPhoto) ? savedPhoto : DefaultPhoto;
-    }, GenericErrorMessage);
+
+        Profile = null;
+        Profile = await _data.GetProfileAsync();
+    }, PatientMessages.For);
 
     [RelayCommand]
     private async Task ChangePhotoAsync()

@@ -6,7 +6,7 @@ using SCI_PH.Mobile.Features.Patient.Services.Interfaces;
 
 namespace SCI_PH.Mobile.Features.Patient.ViewModels;
 
-/// <summary>Resultados publicados del paciente.</summary>
+/// <summary>Resultados publicados del paciente. Si falla, la lista queda vacía con el mensaje.</summary>
 public sealed partial class ResultsViewModel : BaseViewModel
 {
     private readonly IPatientDataService _data;
@@ -21,11 +21,10 @@ public sealed partial class ResultsViewModel : BaseViewModel
     [RelayCommand]
     private Task LoadAsync() => RunAsync(async () =>
     {
-        var results = await _data.GetResultsAsync();
         Results.Clear();
-        foreach (var result in results)
+        foreach (var result in await _data.GetResultsAsync())
         {
             Results.Add(result);
         }
-    }, GenericErrorMessage);
+    }, PatientMessages.For);
 }

@@ -1,20 +1,10 @@
-using SCI_PH.Mobile.Features.Patient.ViewModels;
-
 namespace SCI_PH.Mobile.Features.Patient.Documents;
 
+/// <summary>Pantalla estática: los documentos clínicos todavía no están disponibles (sin datos ni ViewModel).</summary>
 public partial class DocumentsPage : ContentPage
 {
-    private readonly DocumentsViewModel _viewModel;
-
-    public DocumentsPage(DocumentsViewModel viewModel)
+    public DocumentsPage()
     {
         InitializeComponent();
-        BindingContext = _viewModel = viewModel;
-    }
-
-    protected override async void OnAppearing()
-    {
-        base.OnAppearing();
-        await _viewModel.LoadCommand.ExecuteAsync(null);
     }
 }
