@@ -119,6 +119,8 @@ ESP32 ─► HTTPS + X-Device-Id + X-Device-Key ─► DeviceApiKey ─► princ
 | `POST /api/mobile/auth/login`, `/mfa/verify`, `/refresh`, `/logout` | Anónimo | Tokens en el cuerpo |
 | `GET /api/mobile/auth/me`, `POST /change-password`, `/revoke-sessions` | Autenticado | |
 | `GET /api/mobile/patient/me…` (perfil, resumen, atenciones, alergias, diagnósticos, recetas, resultados) | Política `PatientSelfService` (cuenta `Patient`) + vínculo `Patient.IdentityUserId` | expediente propio, solo lectura; sin `patientId` en la ruta; atención ajena `404`; cada lectura auditada (sin auditoría, `503` sin datos); límite `patient-self-service` por usuario (ADR-015) |
+| `POST`, `DELETE /api/mobile/patient/me/qr` | Política `PatientSelfService` + vínculo; emitir exige además cuenta activa ahora | QR propio: identifica, nunca autentica; 15 min; solo su hash en el servidor; auditado en la misma transacción; límite `patient-qr` por usuario (ADR-015) |
+| `POST /api/mobile/emergencies/{id}/identify/qr/resolve`, `/confirm` | `Emergencies.Operate` + `Patients.Read` + `Patients.Identify` + personal clínico activo con acceso a la emergencia | candidato mínimo y confirmación humana; QR inválido siempre `404`; `resolve` falla cerrado sin auditoría; límite `patient-qr-resolve` por usuario (ADR-015) |
 | `POST /api/device/heartbeat` | Dispositivo con `Device.Heartbeat` | |
 | `GET /api/device/fingerprint/sessions/pending`, `POST …/{sessionId}/result` | Dispositivo con `Device.Fingerprint.Identify` | identificación por huella (ADR-009) |
 | `GET /api/device/fingerprint/enrollments/pending`, `POST …/{enrollmentId}/result` | Dispositivo con `Device.Fingerprint.Enroll` | registro de huellas (ADR-010) |
@@ -129,7 +131,7 @@ ESP32 ─► HTTPS + X-Device-Id + X-Device-Key ─► DeviceApiKey ─► princ
 
 Errores (ProblemDetails): 400 validación o enlace inválido, 401 sin credenciales o credenciales inválidas
 (siempre genérico), 403 sin permiso o CSRF rechazado, 409 conflicto (último administrador, duplicados),
-429 límite de peticiones, 503 (autoservicio del paciente) lectura que no se pudo auditar.
+429 límite de peticiones, 503 (autoservicio del paciente y QR) operación que no se pudo auditar.
 
 ## Configuración
 

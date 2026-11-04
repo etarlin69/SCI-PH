@@ -18,9 +18,9 @@
 > personal clínico. **El QR no autentica, el rostro no autentica y QR + rostro nunca emiten una sesión.**
 >
 > **Sustituido (no se implementará):** el flujo previsto `POST /api/mobile/auth/qr/challenge` →
-> `POST /api/mobile/auth/face/verify` → sesión. El QR del paciente será un **identificador** que la app muestra y el
-> paramédico escanea (siguiente PR, ADR-015 decisiones 3–5); el rostro sigue siendo una verificación 1:1 **asistida** por
-> el personal en el Web ([ADR-012](../adr/ADR-012-face-verification.md)).
+> `POST /api/mobile/auth/face/verify` → sesión. El QR del paciente es un **identificador** que la app muestra y el personal
+> resuelve (ADR-015, decisiones 3–5); el rostro sigue siendo una verificación 1:1 **asistida** por el personal en el Web
+> ([ADR-012](../adr/ADR-012-face-verification.md)).
 
 | Método | Ruta | Descripción | Autenticación | Estado |
 |---|---|---|---|---|
@@ -99,8 +99,8 @@ decisión 2).
 - **Límite de peticiones:** política `patient-self-service`, **60 por minuto por usuario autenticado** (`sub`), sin cola:
   cada paciente tiene su propio contador. Sin usuario autenticado cuenta por IP. Al superarlo: `429` con `Retry-After`. Login,
   MFA y refresh siguen con su política `authentication` por IP.
-- **Fuera de alcance:** documentos (el almacenamiento aún no existe), citas, notificaciones, QR, rostro, edición del
-  perfil y cualquier escritura (`POST`/`PUT`/`DELETE` → `405`).
+- **Fuera de alcance:** documentos (el almacenamiento aún no existe), citas, notificaciones, rostro, edición del perfil y
+  cualquier escritura del expediente (`POST`/`PUT`/`DELETE` → `405`). El QR propio tiene su sección, más abajo.
 
 | Método | Ruta | Respuesta |
 |---|---|---|
@@ -116,6 +116,40 @@ decisión 2).
 **Errores:** `401` (sin token o token inválido), `403` (cuenta que no es de paciente o sin vínculo clínico), `404`
 (atención que no es propia), `405` (cualquier escritura), `429` (límite por usuario), `503` (la lectura no se pudo
 auditar; genérico y sin datos).
+
+### QR propio del paciente — Implementado
+
+Identifica al paciente clínico ante el personal autorizado; **nunca autentica ni da acceso por sí solo**
+([ADR-015](../adr/ADR-015-patient-authentication-qr-identification.md), decisiones 3–4). Misma política de entrada que el
+autoservicio y sin ningún id de paciente. Límite `patient-qr`: **10 por minuto por usuario**, sin cola, compartido por las dos
+rutas. Respuestas sin caché (`no-store`).
+
+#### `POST /api/mobile/patient/me/qr`
+
+Sin cuerpo. Emite un QR nuevo y revoca el vigente, en una transacción con su auditoría. El contenido se entrega **una sola
+vez**: el servidor guarda solo su hash.
+
+```json
+{
+  "payload": "sciphqr:v1:<43 caracteres base64url>",
+  "issuedAtUtc": "2026-11-04T12:00:00+00:00",
+  "expiresAtUtc": "2026-11-04T12:15:00+00:00"
+}
+```
+
+| Estado | Cuándo |
+|---|---|
+| `200` | Emitido; válido 15 minutos en el reloj del servidor |
+| `401` | Sin token válido |
+| `403` | Cuenta que no es de paciente, desactivada (se comprueba ahora, no basta el token) o sin vínculo clínico |
+| `409` | Otra emisión simultánea confirmó primero; aquí no se emitió nada: reintentar una vez |
+| `429` | Límite por usuario |
+| `503` | No se pudo guardar con su auditoría; el QR vigente sigue igual |
+
+#### `DELETE /api/mobile/patient/me/qr`
+
+Sin cuerpo. Revoca el QR activo. `204`, también si no había ninguno (sin nueva auditoría). No exige cuenta activa. Cerrar
+sesión **no** llama a esta ruta. Errores: `401`, `403` (sin vínculo), `429`, `503`.
 
 ---
 
@@ -344,6 +378,61 @@ documento sale **enmascarado** (`primaryIdentifier`); el número enviado nunca s
 - **No encontrado no guarda nada** (ni recibo, ni paciente, ni auditoría): si el paciente se registra después, el mismo
   intento lo encuentra.
 - El documento no se registra en logs ni aparece en los errores.
+
+---
+
+### Identificación por QR del paciente — Implementado (backend)
+
+[ADR-015](../adr/ADR-015-patient-authentication-qr-identification.md), decisión 5. La app todavía no escanea (QR #2). Mismos
+permisos que el documento y la huella: `Emergencies.Operate` + `Patients.Read` + `Patients.Identify`, personal clínico activo
+y la regla de escritura prehospitalaria; todo se comprueba **antes** de mirar el QR. Sin atajo para el administrador.
+Límite `patient-qr-resolve`: **30 por minuto por usuario**, sin cola, compartido por las dos rutas. El QR viaja siempre en el
+cuerpo, nunca en la ruta ni en la query. No se aceptan otros campos (`patientId`, …): `400`.
+
+#### `POST /api/mobile/emergencies/{id}/identify/qr/resolve`
+
+```json
+{ "payload": "sciphqr:v1:…" }
+```
+
+Devuelve el candidato para la confirmación humana. **La emergencia sigue NN.** Sin `patient.id`, cuenta, datos clínicos ni
+referencias biométricas.
+
+```json
+{
+  "displayName": "Ana Pérez",
+  "dateOfBirth": "1985-03-14",
+  "document": { "type": "NationalId", "value": "***5678" }
+}
+```
+
+`document` es `null` si no tiene cédula ni pasaporte activos. Se registra un `IdentificationAttempt` (`QrCode`) y una auditoría
+`Read` (recurso `PatientQrCandidate`), sin token ni hash. **Falla cerrado:** sin esa auditoría, `503` genérico y sin candidato.
+
+#### `POST /api/mobile/emergencies/{id}/identify/qr/confirm`
+
+```json
+{ "clientRequestId": "00000000-0000-0000-0000-000000000000", "payload": "sciphqr:v1:…" }
+```
+
+El paramédico confirmó. El servidor **vuelve a resolver** el QR (no hay sesión ni se confía en el candidato) e identifica con
+`EncounterService.IdentifyPatientAsync`, como el documento y la huella: misma atención, código NN conservado, auditoría
+`Identify` y control de concurrencia. Respuesta `200`: la misma forma que `GET /api/mobile/emergencies/{id}`.
+
+- **Idempotencia:** operación `prehospital-emergency.qr-confirm.v1`, clave (usuario, operación, `clientRequestId`). El recibo
+  guarda un hash de la emergencia y de una huella del contenido, nunca el token ni el hash de la credencial. Repetir con la misma
+  clave y el mismo QR devuelve `200` sin nada nuevo, también si el QR ya venció o se sustituyó.
+
+| Estado | Cuándo |
+|---|---|
+| `200` | Candidato, o emergencia identificada (también en un reintento idempotente) |
+| `400` | Falta `payload` o `clientRequestId`, `clientRequestId` vacío, o campos que sobran |
+| `401` | Sin token válido |
+| `403` | Sin permisos, sin asignación, o la cuenta no es personal clínico activo |
+| `404` | **Cualquier QR inválido, siempre la misma respuesta:** malformado, otra versión, desconocido, revocado o vencido. También una emergencia que no existe |
+| `409` | Emergencia ya identificada, cerrada o recibida por el hospital; o `clientRequestId` usado con otros datos |
+| `429` | Límite por usuario |
+| `503` | `resolve`: la lectura no se pudo auditar |
 
 ---
 
