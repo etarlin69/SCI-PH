@@ -15,21 +15,21 @@ internal sealed class FakePatientSelfBff : HttpMessageHandler
     public Dictionary<string, string> Responses { get; } = new()
     {
         [Me] = """
-            {"givenNames":"Ana","familyNames":"Pérez","dateOfBirth":"1990-05-20","sex":"Female","identityStatus":"Verified",
+            {"givenNames":"Ana","familyNames":"Pérez","dateOfBirth":"1990-05-20","sex":"Female",
              "document":{"type":"NationalId","value":"***5678"},"email":"ana@sci-ph.test","phone":null}
             """,
         [$"{Me}/summary"] = """
             {"displayName":"Ana Pérez","encounterCount":3,"resultCount":2,
-             "latestEncounter":{"id":"0b1f0000-0000-0000-0000-000000000001","type":"Consultation","status":"Closed","reason":"Fiebre",
+             "latestEncounter":{"id":"0b1f0000-0000-0000-0000-000000000001","type":"Consultation","status":"Completed",
                                 "startedAtUtc":"2026-10-20T15:00:00Z","endedAtUtc":null,"clinicName":"Hospital Central"},
              "latestResult":{"id":"0b1f0000-0000-0000-0000-000000000002","encounterId":"0b1f0000-0000-0000-0000-000000000001",
-                             "type":"Laboratory","status":"Final","name":"Hemoglobina","codeSystem":null,"code":null,"resultText":null,
+                             "type":"Laboratory","status":"Final","name":"Hemoglobina","resultText":null,
                              "numericValue":13.5,"unit":"g/dL","referenceRange":"12-16","resultedAtUtc":"2026-10-20T16:00:00Z"},
              "activeAllergies":[{"id":"0b1f0000-0000-0000-0000-000000000003","substance":"Penicilina","severity":"Severe",
                                  "status":"Active","reaction":"Urticaria","onsetDate":null}]}
             """,
         [$"{Me}/encounters"] = """
-            [{"id":"0b1f0000-0000-0000-0000-000000000001","type":"Prehospital","status":"Received","reason":null,
+            [{"id":"0b1f0000-0000-0000-0000-000000000001","type":"Prehospital","status":"InProgress",
               "startedAtUtc":"2026-10-20T15:00:00Z","endedAtUtc":null,"clinicName":null}]
             """,
         [$"{Me}/allergies"] = """
@@ -38,20 +38,20 @@ internal sealed class FakePatientSelfBff : HttpMessageHandler
             """,
         [$"{Me}/diagnoses"] = """
             [{"id":"0b1f0000-0000-0000-0000-000000000005","encounterId":"0b1f0000-0000-0000-0000-000000000001","description":"Faringitis aguda",
-              "codeSystem":null,"code":null,"type":"Definitive","isPrimary":true,"recordedAtUtc":"2026-10-20T15:30:00Z","confirmedAtUtc":null}]
+              "type":"Definitive","recordedAtUtc":"2026-10-20T15:30:00Z"}]
             """,
         [$"{Me}/prescriptions"] = """
-            [{"id":"0b1f0000-0000-0000-0000-000000000006","encounterId":"0b1f0000-0000-0000-0000-000000000001","status":"Cancelled","notes":null,
+            [{"id":"0b1f0000-0000-0000-0000-000000000006","encounterId":"0b1f0000-0000-0000-0000-000000000001","status":"Cancelled",
               "issuedAtUtc":"2026-10-20T15:40:00Z","validUntilUtc":null,"cancelledAtUtc":"2026-10-20T18:00:00Z",
               "items":[{"medicationName":"Amoxicilina","presentation":"Cápsula","concentration":"500 mg","dose":500,"doseUnit":"mg",
                         "route":"Oral","frequency":"Cada 8 horas","durationDays":7,"instructions":null}]}]
             """,
         [$"{Me}/results"] = """
             [{"id":"0b1f0000-0000-0000-0000-000000000002","encounterId":"0b1f0000-0000-0000-0000-000000000001","type":"Laboratory","status":"Corrected",
-              "name":"Hemoglobina","codeSystem":null,"code":null,"resultText":null,"numericValue":13.5,"unit":"g/dL","referenceRange":"12-16",
+              "name":"Hemoglobina","resultText":null,"numericValue":13.5,"unit":"g/dL","referenceRange":"12-16",
               "resultedAtUtc":"2026-10-20T16:00:00Z"},
              {"id":"0b1f0000-0000-0000-0000-000000000007","encounterId":"0b1f0000-0000-0000-0000-000000000001","type":"NewTestKind","status":"Final",
-              "name":"Radiografía de tórax","codeSystem":null,"code":null,"resultText":"Sin hallazgos","numericValue":null,"unit":null,
+              "name":"Radiografía de tórax","resultText":"Sin hallazgos","numericValue":null,"unit":null,
               "referenceRange":null,"resultedAtUtc":null}]
             """
     };
@@ -64,13 +64,22 @@ internal sealed class FakePatientSelfBff : HttpMessageHandler
     /// <summary>Las peticiones fallan sin respuesta, como sin conexión.</summary>
     public bool Unreachable { get; set; }
 
+    /// <summary>Si no es null, las respuestas esperan a que el test lo libere (una respuesta que llega tarde).</summary>
+    public TaskCompletionSource? Gate { get; set; }
+
     public MobileApiClient Client() => new(new HttpClient(this) { BaseAddress = new Uri("http://sciph.test/") });
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         lock (Paths)
         {
             Paths.Add(request.RequestUri!.PathAndQuery);
+        }
+
+        var respondWith = Responses.TryGetValue(request.RequestUri!.AbsolutePath, out var json) ? json : null;
+        if (Gate is { } gate)
+        {
+            await gate.Task;
         }
 
         if (Unreachable)
@@ -80,14 +89,14 @@ internal sealed class FakePatientSelfBff : HttpMessageHandler
 
         if (Status is { } status)
         {
-            return Task.FromResult(new HttpResponseMessage(status)
+            return new HttpResponseMessage(status)
             {
                 Content = new StringContent("""{"title":"forced"}""", Encoding.UTF8, "application/problem+json")
-            });
+            };
         }
 
-        return Task.FromResult(Responses.TryGetValue(request.RequestUri!.AbsolutePath, out var json)
-            ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") }
-            : new HttpResponseMessage(HttpStatusCode.NotFound));
+        return respondWith is not null
+            ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(respondWith, Encoding.UTF8, "application/json") }
+            : new HttpResponseMessage(HttpStatusCode.NotFound);
     }
 }

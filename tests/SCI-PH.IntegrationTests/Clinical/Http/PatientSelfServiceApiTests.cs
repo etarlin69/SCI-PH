@@ -193,15 +193,15 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
 
             var summary = await client.GetFromJsonAsync<PatientSelfSummary>($"{Me}/summary");
             Assert.Equal($"{own.GivenNames} Prueba", summary!.DisplayName);
-            Assert.Equal((2, 2), (summary.EncounterCount, summary.ResultCount));
+            Assert.Equal((3, 2), (summary.EncounterCount, summary.ResultCount));
             Assert.Equal(own.EncounterId, summary.LatestEncounter!.Id);
             Assert.Equal(own.FinalResultId, summary.LatestResult!.Id);
             Assert.Equal(own.AllergyId, Assert.Single(summary.ActiveAllergies).Id);
 
             var encounters = (await client.GetFromJsonAsync<List<PatientSelfEncounter>>($"{Me}/encounters"))!;
-            Assert.Equal([own.EncounterId, own.OlderEncounterId], encounters.Select(e => e.Id));
+            Assert.Equal([own.EncounterId, own.CancelledEncounterId, own.OlderEncounterId], encounters.Select(e => e.Id));
             Assert.Equal($"Hospital {own.GivenNames}", encounters[0].ClinicName);
-            Assert.Equal((ClinicalEncounterType.Consultation, $"Fiebre {own.GivenNames}"), (encounters[0].Type, encounters[0].Reason));
+            Assert.Equal((ClinicalEncounterType.Consultation, PatientEncounterStatus.Completed), (encounters[0].Type, encounters[0].Status));
 
             // Only the latest medical history version.
             var allergy = Assert.Single((await client.GetFromJsonAsync<List<PatientSelfAllergy>>($"{Me}/allergies"))!);
@@ -236,8 +236,11 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 {
                     other.PatientId, other.EncounterId, other.OlderEncounterId, other.DiagnosisId, other.AllergyId,
                     other.FinalResultId, other.CorrectedResultId, other.IssuedPrescriptionId, other.IssuedThenCancelledPrescriptionId,
+                    other.CancelledEncounterId,
                     own.SupersededAllergyId, own.PendingResultId,
-                    own.DraftPrescriptionId, own.CancelledDraftPrescriptionId
+                    own.DraftPrescriptionId, own.CancelledDraftPrescriptionId,
+                    own.PresumptiveDiagnosisId, own.InProgressDiagnosisId,
+                    own.CancelledDiagnosisId, own.CancelledResultId, own.CancelledPrescriptionId
                 })
                 {
                     Assert.DoesNotContain(foreignId.ToString(), body);

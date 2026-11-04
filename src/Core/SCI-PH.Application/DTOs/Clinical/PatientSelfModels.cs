@@ -15,16 +15,23 @@ namespace SCI_PH.Application.DTOs.Clinical
         string FamilyNames,
         DateOnly? DateOfBirth,
         [property: JsonConverter(typeof(TextEnumConverter))] BiologicalSex Sex,
-        [property: JsonConverter(typeof(TextEnumConverter))] PatientIdentityStatus IdentityStatus,
         PatientIdentifierSummary? Document,
         string? Email,
         string? Phone);
 
+    // The patient-facing classification of an encounter: the internal workflow state never leaves the API.
+    public enum PatientEncounterStatus
+    {
+        InProgress = 1,
+        Completed = 2,
+        Cancelled = 3
+    }
+
+    // Minimal metadata; the staff's free-text reason is not published.
     public sealed record PatientSelfEncounter(
         Guid Id,
         [property: JsonConverter(typeof(TextEnumConverter))] ClinicalEncounterType Type,
-        [property: JsonConverter(typeof(TextEnumConverter))] ClinicalEncounterStatus Status,
-        string? Reason,
+        [property: JsonConverter(typeof(TextEnumConverter))] PatientEncounterStatus Status,
         DateTimeOffset StartedAtUtc,
         DateTimeOffset? EndedAtUtc,
         string? ClinicName);
@@ -45,16 +52,13 @@ namespace SCI_PH.Application.DTOs.Clinical
         string? Reaction,
         DateOnly? OnsetDate);
 
+    // Only published diagnoses (PatientSelfVisibility): definitive, from a closed encounter.
     public sealed record PatientSelfDiagnosis(
         Guid Id,
         Guid EncounterId,
         string Description,
-        string? CodeSystem,
-        string? Code,
         [property: JsonConverter(typeof(TextEnumConverter))] DiagnosisType Type,
-        bool IsPrimary,
-        DateTimeOffset RecordedAtUtc,
-        DateTimeOffset? ConfirmedAtUtc);
+        DateTimeOffset RecordedAtUtc);
 
     // Only published results (Final or Corrected): a pending order has no value to show and a cancelled one is noise.
     public sealed record PatientSelfResult(
@@ -63,20 +67,18 @@ namespace SCI_PH.Application.DTOs.Clinical
         [property: JsonConverter(typeof(TextEnumConverter))] ClinicalResultType Type,
         [property: JsonConverter(typeof(TextEnumConverter))] ClinicalResultStatus Status,
         string Name,
-        string? CodeSystem,
-        string? Code,
         string? ResultText,
         decimal? NumericValue,
         string? Unit,
         string? ReferenceRange,
         DateTimeOffset? ResultedAtUtc);
 
-    // Prescriptions that were issued (Issued, or Cancelled after issue); a draft is not an order and is never shown.
+    // Prescriptions that were issued (Issued, or Cancelled after issue); a draft is not an order and is never shown. The
+    // prescriber's notes are internal and are not published.
     public sealed record PatientSelfPrescription(
         Guid Id,
         Guid EncounterId,
         [property: JsonConverter(typeof(TextEnumConverter))] PrescriptionStatus Status,
-        string? Notes,
         DateTimeOffset? IssuedAtUtc,
         DateTimeOffset? ValidUntilUtc,
         DateTimeOffset? CancelledAtUtc,
@@ -108,7 +110,6 @@ namespace SCI_PH.Application.DTOs.Clinical
         string FamilyNames,
         DateOnly? DateOfBirth,
         BiologicalSex Sex,
-        PatientIdentityStatus IdentityStatus,
         PatientIdentifierRow? Document,
         string? Email,
         string? Phone);

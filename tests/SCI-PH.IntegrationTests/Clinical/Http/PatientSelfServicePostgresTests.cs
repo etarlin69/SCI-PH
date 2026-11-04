@@ -38,8 +38,11 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 var detail = await client.GetFromJsonAsync<PatientSelfEncounterDetail>($"{Me}/encounters/{own.EncounterId}");
 
                 Assert.Equal(own.GivenNames, profile!.GivenNames);
-                Assert.Equal((2, 2, own.EncounterId, own.FinalResultId), (summary!.EncounterCount, summary.ResultCount, summary.LatestEncounter!.Id, summary.LatestResult!.Id));
-                Assert.Equal([own.EncounterId, own.OlderEncounterId], encounters.Select(e => e.Id));
+                Assert.Equal((3, 2, own.EncounterId, own.FinalResultId), (summary!.EncounterCount, summary.ResultCount, summary.LatestEncounter!.Id, summary.LatestResult!.Id));
+                Assert.Equal([own.EncounterId, own.CancelledEncounterId, own.OlderEncounterId], encounters.Select(e => e.Id));
+                Assert.Equal(
+                    [PatientEncounterStatus.Completed, PatientEncounterStatus.Cancelled, PatientEncounterStatus.InProgress],
+                    encounters.Select(e => e.Status));
                 Assert.Equal($"Hospital {own.GivenNames}", encounters[0].ClinicName);
                 Assert.Equal(own.AllergyId, Assert.Single(allergies!).Id);
                 Assert.Equal(own.DiagnosisId, Assert.Single(diagnoses!).Id);

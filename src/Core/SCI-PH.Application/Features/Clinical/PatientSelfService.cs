@@ -44,7 +44,6 @@ namespace SCI_PH.Application.Features.Clinical
                 profile.FamilyNames,
                 profile.DateOfBirth,
                 profile.Sex,
-                profile.IdentityStatus,
                 profile.Document is { } document
                     ? new PatientIdentifierSummary(document.Type, ClinicalMapping.Mask(document.Type, document.NormalizedValue))
                     : null,

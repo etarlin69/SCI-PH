@@ -70,9 +70,7 @@ public sealed class HttpPatientDataService : IPatientDataService
     }
 
     private static EpisodeItemDto ToEpisode(EncounterResponse encounter) => new(
-        string.IsNullOrWhiteSpace(encounter.Reason)
-            ? PatientLabels.EncounterType(encounter.Type)
-            : $"{PatientLabels.EncounterType(encounter.Type)} · {encounter.Reason}",
+        PatientLabels.EncounterType(encounter.Type),
         encounter.ClinicName ?? PatientLabels.NoClinic(encounter.Type),
         LocalDate(encounter.StartedAtUtc),
         PatientLabels.EncounterStatus(encounter.Status));
@@ -151,12 +149,12 @@ public sealed class HttpPatientDataService : IPatientDataService
         List<AllergyResponse> ActiveAllergies);
 
     private sealed record EncounterResponse(
-        Guid Id, string Type, string Status, string? Reason, DateTimeOffset StartedAtUtc, DateTimeOffset? EndedAtUtc, string? ClinicName);
+        Guid Id, string Type, string Status, DateTimeOffset StartedAtUtc, DateTimeOffset? EndedAtUtc, string? ClinicName);
 
     private sealed record AllergyResponse(Guid Id, string Substance, string Severity, string Status, string? Reaction, DateOnly? OnsetDate);
 
     private sealed record DiagnosisResponse(
-        Guid Id, Guid EncounterId, string Description, string? Code, string Type, bool IsPrimary, DateTimeOffset RecordedAtUtc);
+        Guid Id, Guid EncounterId, string Description, string Type, DateTimeOffset RecordedAtUtc);
 
     private sealed record PrescriptionResponse(Guid Id, Guid EncounterId, string Status, List<PrescriptionItemResponse> Items);
 

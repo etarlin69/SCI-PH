@@ -44,7 +44,7 @@ public class PatientFeatureTests
         Assert.False(vm.HasError);
         var summary = vm.Summary!;
         Assert.Equal(("Ana Pérez", 2, 3), (summary.DisplayName, summary.AvailableResults, summary.Encounters));
-        Assert.Equal(("Consulta · Fiebre", "Hospital Central", "Cerrada"),
+        Assert.Equal(("Consulta", "Hospital Central", "Finalizada"),
             (summary.LatestEpisode!.Title, summary.LatestEpisode.Facility, summary.LatestEpisode.Status));
         Assert.Equal(("Hemoglobina", "13,5 g/dL", "Publicado"), (summary.LatestResult!.Name, summary.LatestResult.Value, summary.LatestResult.Status));
     }
@@ -65,7 +65,7 @@ public class PatientFeatureTests
         var prescription = Assert.Single(history.Prescriptions);
         Assert.Equal(("Amoxicilina 500 mg", "500 mg · Oral · Cada 8 horas · 7 días · Cancelada"), (prescription.Title, prescription.Detail));
         var episode = Assert.Single(history.Episodes);
-        Assert.Equal(("Atención prehospitalaria", "Ambulancia", "Recibida"), (episode.Title, episode.Facility, episode.Status));
+        Assert.Equal(("Atención prehospitalaria", "Ambulancia", "En curso"), (episode.Title, episode.Facility, episode.Status));
     }
 
     [Fact]
@@ -119,6 +119,7 @@ public class PatientFeatureTests
     [InlineData(HttpStatusCode.NotFound, PatientMessages.NotAvailable)]
     [InlineData(HttpStatusCode.Unauthorized, PatientMessages.SessionEnded)]
     [InlineData(HttpStatusCode.InternalServerError, MobileApiErrorMessages.Server)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, MobileApiErrorMessages.Server)]
     public async Task AFailureShowsItsMessageAndNoData(HttpStatusCode status, string message)
     {
         _bff.Status = status;

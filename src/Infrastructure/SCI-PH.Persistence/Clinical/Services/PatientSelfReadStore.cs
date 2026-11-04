@@ -14,13 +14,13 @@ namespace SCI_PH.Persistence.Clinical.Services
     internal sealed class PatientSelfReadStore : IPatientSelfReadStore
     {
         private static readonly Expression<Func<ClinicalEncounter, PatientSelfEncounter>> _encounter = e => new PatientSelfEncounter(
-            e.Id, e.Type, e.Status, e.Reason, e.StartedAtUtc, e.EndedAtUtc, e.Clinic != null ? e.Clinic.Name : null);
+            e.Id, e.Type, PatientSelfVisibility.EncounterStatus(e.Status), e.StartedAtUtc, e.EndedAtUtc, e.Clinic != null ? e.Clinic.Name : null);
 
         private static readonly Expression<Func<Diagnosis, PatientSelfDiagnosis>> _diagnosis = d => new PatientSelfDiagnosis(
-            d.Id, d.ClinicalEncounterId, d.Description, d.CodeSystem, d.Code, d.Type, d.IsPrimary, d.RecordedAtUtc, d.ConfirmedAtUtc);
+            d.Id, d.ClinicalEncounterId, d.Description, d.Type, d.RecordedAtUtc);
 
         private static readonly Expression<Func<ClinicalResult, PatientSelfResult>> _result = r => new PatientSelfResult(
-            r.Id, r.ClinicalEncounterId, r.Type, r.Status, r.Name, r.CodeSystem, r.Code, r.ResultText, r.NumericValue, r.Unit,
+            r.Id, r.ClinicalEncounterId, r.Type, r.Status, r.Name, r.ResultText, r.NumericValue, r.Unit,
             r.ReferenceRange, r.ResultedAtUtc);
 
         // Details have no entry order of their own: they are listed by medication name.
@@ -28,7 +28,6 @@ namespace SCI_PH.Persistence.Clinical.Services
             p.Id,
             p.ClinicalEncounterId,
             p.Status,
-            p.Notes,
             p.IssuedAtUtc,
             p.ValidUntilUtc,
             p.CancelledAtUtc,
@@ -52,7 +51,6 @@ namespace SCI_PH.Persistence.Clinical.Services
                     p.FamilyNames,
                     p.DateOfBirth,
                     p.Sex,
-                    p.IdentityStatus,
                     p.Identifiers
                         .Where(i => i.Status == PatientIdentifierStatus.Active
                             && (i.Type == PatientIdentifierType.NationalId || i.Type == PatientIdentifierType.Passport))
@@ -113,7 +111,10 @@ namespace SCI_PH.Persistence.Clinical.Services
         public async Task<IReadOnlyList<PatientSelfDiagnosis>> ListDiagnosesAsync(
             Guid patientId, Guid? encounterId, int limit, CancellationToken cancellationToken) =>
             await _clinical.Diagnoses.AsNoTracking()
-                .Where(d => d.Encounter.PatientId == patientId && (encounterId == null || d.ClinicalEncounterId == encounterId))
+                .Where(d => d.Encounter.PatientId == patientId
+                    && (encounterId == null || d.ClinicalEncounterId == encounterId)
+                    && PatientSelfVisibility.PublishedDiagnosisTypes.Contains(d.Type)
+                    && PatientSelfVisibility.PublishedDiagnosisEncounterStatuses.Contains(d.Encounter.Status))
                 .OrderByDescending(d => d.RecordedAtUtc)
                 .ThenBy(d => d.Id)
                 .Take(limit)
@@ -125,6 +126,7 @@ namespace SCI_PH.Persistence.Clinical.Services
             await _clinical.Prescriptions.AsNoTracking()
                 .Where(p => p.Encounter.PatientId == patientId
                     && (encounterId == null || p.ClinicalEncounterId == encounterId)
+                    && p.Encounter.Status != PatientSelfVisibility.WithheldRecordsEncounterStatus
                     && p.IssuedAtUtc != null)
                 .OrderByDescending(p => p.IssuedAtUtc)
                 .ThenBy(p => p.Id)
@@ -151,6 +153,7 @@ namespace SCI_PH.Persistence.Clinical.Services
             _clinical.ClinicalResults.AsNoTracking()
                 .Where(r => r.Encounter.PatientId == patientId
                     && (encounterId == null || r.ClinicalEncounterId == encounterId)
+                    && r.Encounter.Status != PatientSelfVisibility.WithheldRecordsEncounterStatus
                     && PatientSelfVisibility.PublishedResultStatuses.Contains(r.Status));
     }
 }

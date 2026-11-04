@@ -30,12 +30,8 @@ public static class PatientLabels
 
     public static string EncounterStatus(string value) => Label(value, new()
     {
-        ["Created"] = "Registrada",
         ["InProgress"] = "En curso",
-        ["Transferred"] = "En traslado",
-        ["Received"] = "Recibida",
-        ["InEvolution"] = "En evolución",
-        ["Closed"] = "Cerrada",
+        ["Completed"] = "Finalizada",
         ["Cancelled"] = "Cancelada"
     });
 
