@@ -23,6 +23,11 @@ namespace SCI_PH.Infrastructure.Web
         public const string ClinicalAi = "clinical-ai";
         // Patient self-service reads (Mobile BFF): abuse protection per authenticated user, not a clinical throughput limit.
         public const string PatientSelfService = "patient-self-service";
+        // Issuing and revoking the patient's own QR credential (Mobile BFF): per authenticated patient.
+        public const string PatientQr = "patient-qr";
+        // Resolving and confirming a patient QR (Mobile BFF): per authenticated staff member. Guessing a token is already
+        // infeasible (256 random bits); this protects the candidate lookup from abuse.
+        public const string PatientQrResolve = "patient-qr-resolve";
     }
 
     // Per client IP (and per device code for devices). Account lockout already limits guessing per account,
@@ -42,6 +47,10 @@ namespace SCI_PH.Infrastructure.Web
         public int ClinicalAiConcurrentRequests { get; init; } = 1;
         public int PatientSelfServicePermitLimit { get; init; } = 60;
         public int PatientSelfServiceWindowSeconds { get; init; } = 60;
+        public int PatientQrPermitLimit { get; init; } = 10;
+        public int PatientQrWindowSeconds { get; init; } = 60;
+        public int PatientQrResolvePermitLimit { get; init; } = 30;
+        public int PatientQrResolveWindowSeconds { get; init; } = 60;
     }
 
     public static class SecurityRateLimiting
@@ -62,6 +71,10 @@ namespace SCI_PH.Infrastructure.Web
                 limiter.AddPolicy(RateLimitPolicies.ClinicalAi, ClinicalAiPartition);
                 limiter.AddPolicy(RateLimitPolicies.PatientSelfService, context =>
                     Window(context, UserPartition(context), o => (o.PatientSelfServicePermitLimit, o.PatientSelfServiceWindowSeconds)));
+                limiter.AddPolicy(RateLimitPolicies.PatientQr, context =>
+                    Window(context, UserPartition(context), o => (o.PatientQrPermitLimit, o.PatientQrWindowSeconds)));
+                limiter.AddPolicy(RateLimitPolicies.PatientQrResolve, context =>
+                    Window(context, UserPartition(context), o => (o.PatientQrResolvePermitLimit, o.PatientQrResolveWindowSeconds)));
             });
 
             return services;

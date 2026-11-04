@@ -202,7 +202,6 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
         [InlineData("documents")]
         [InlineData("audit")]
         [InlineData("biometrics")]
-        [InlineData("qr")]
         [InlineData("face")]
         public async Task WithheldCategoriesHaveNoRoute(string category)
         {

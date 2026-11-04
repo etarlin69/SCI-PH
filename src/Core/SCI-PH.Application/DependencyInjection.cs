@@ -71,11 +71,13 @@ namespace SCI_PH.Application
             return services;
         }
 
-        // Autoservicio del paciente (ADR-015, solo Mobile BFF): lectura de su propio expediente, resuelto desde la cuenta.
-        // Requiere AddAccountSecurity (IPatientAccessAuthorizer), AddJwtSecurity (ICurrentUser) y AddPersistence.
+        // Autoservicio del paciente (ADR-015, solo Mobile BFF): lectura de su propio expediente, resuelto desde la cuenta, y su
+        // propia credencial QR. Requiere AddAccountSecurity (IPatientAccessAuthorizer), AddJwtSecurity (ICurrentUser) y
+        // AddPersistence.
         public static IServiceCollection AddPatientSelfService(this IServiceCollection services)
         {
             services.AddScoped<PatientSelfService>();
+            services.AddScoped<PatientQrService>();
 
             return services;
         }
