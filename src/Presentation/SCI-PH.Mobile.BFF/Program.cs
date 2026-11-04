@@ -43,8 +43,9 @@ else
 }
 
 app.UseApiSecurityHeaders();
-app.UseRateLimiter();
+// La autenticación va primero: el límite del autoservicio del paciente se parte por usuario autenticado (JWT "sub").
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();

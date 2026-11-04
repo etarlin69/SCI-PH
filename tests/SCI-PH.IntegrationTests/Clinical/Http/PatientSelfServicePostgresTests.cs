@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using SCI_PH.Application.Common.Security;
+using Microsoft.EntityFrameworkCore;
 using SCI_PH.Application.DTOs.Clinical;
+using SCI_PH.Domain.Enums.Auditing;
 using SCI_PH.IntegrationTests.Clinical.Support;
 using SCI_PH.IntegrationTests.PostgreSql;
 using SCI_PH.IntegrationTests.Security.Support;
@@ -54,6 +56,13 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 Assert.Equal(2, detail.Prescriptions.Count);
                 Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"{Me}/encounters/{other.EncounterId}")).StatusCode);
             }
+
+            // The audit entries satisfy the real table constraints: a user actor without staff id, success and failure.
+            var entries = await host.Web.DbAsync(db => db.ClinicalAuditEntries.AsNoTracking()
+                .Where(e => e.PatientId == a.PatientId || e.PatientId == b.PatientId).ToListAsync());
+            Assert.Equal(2 * 8, entries.Count(e => e.Outcome == AuditOutcome.Success));
+            Assert.Equal(2, entries.Count(e => e.Outcome == AuditOutcome.Failure));
+            Assert.All(entries, e => Assert.Null(e.ChangesJson));
 
             var paramedic = await host.SignInAsync(SecurityRoles.Paramedic, [await host.Web.CreateClinicAsync()]);
             Assert.Equal(HttpStatusCode.Forbidden, (await paramedic.Client.GetAsync(Me)).StatusCode);

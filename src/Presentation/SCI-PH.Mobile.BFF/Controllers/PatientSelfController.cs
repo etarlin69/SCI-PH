@@ -1,18 +1,23 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using SCI_PH.Application.Common.Security;
 using SCI_PH.Application.DTOs.Clinical;
 using SCI_PH.Application.Features.Clinical;
+using SCI_PH.Infrastructure.Web;
 
 namespace SCI_PH.Mobile.BFF.Controllers
 {
     // The signed-in patient's own record (ADR-015), read-only. No route takes a patient id: PatientSelfService resolves
     // it from the account (Patient.IdentityUserId). The PatientSelfService policy is only the entry gate (a Patient
     // account; staff accounts never get in); the resource boundary is the service: 403 without a clinical link, 404 for
-    // an encounter that is not the patient's own.
+    // an encounter that is not the patient's own. Every read is audited first: 503 and no data if it cannot be recorded.
     [ApiController]
     [Route("api/mobile/patient/me")]
     [Authorize(Policy = AccessPolicies.PatientSelfService)]
+    [EnableRateLimiting(RateLimitPolicies.PatientSelfService)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public sealed class PatientSelfController : ControllerBase
     {
