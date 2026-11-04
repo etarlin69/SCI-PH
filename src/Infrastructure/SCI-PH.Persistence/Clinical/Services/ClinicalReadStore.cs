@@ -14,7 +14,8 @@ namespace SCI_PH.Persistence.Clinical.Services
 {
     internal sealed class ClinicalReadStore : IClinicalReadStore
     {
-        // Primary active identifier first, then the oldest active one.
+        // Primary active identifier first, then the oldest active one. A QR credential is never a display identifier: its
+        // value is a hash of a system-issued token, and it must not reach a summary even masked (ADR-015).
         private static readonly Expression<Func<Patient, PatientRow>> _patientRow = p => new PatientRow(
             p.Id,
             p.GivenNames,
@@ -23,7 +24,7 @@ namespace SCI_PH.Persistence.Clinical.Services
             p.Sex,
             p.IdentityStatus,
             p.Identifiers
-                .Where(i => i.Status == PatientIdentifierStatus.Active)
+                .Where(i => i.Status == PatientIdentifierStatus.Active && i.Type != PatientIdentifierType.QrCode)
                 .OrderByDescending(i => i.IsPrimary)
                 .ThenBy(i => i.CreatedAtUtc)
                 .Select(i => new PatientIdentifierRow(i.Type, i.NormalizedValue))

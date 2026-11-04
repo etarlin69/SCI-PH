@@ -55,6 +55,7 @@ namespace SCI_PH.Application.Features.Clinical
 
             if (request.Identifier is { } input)
             {
+                RejectSystemIssued(input.Type, "identifier.type");
                 // The Domain normalizes the value; the client's formatting is never the source of truth.
                 var identifier = ClinicalInput.Apply(() => patient.AddIdentifier(
                     ClinicalInput.Defined(input.Type, "identifier.type"), input.Value, PatientIdentifierSource.Manual, input.Issuer, isPrimary: true));
@@ -90,6 +91,7 @@ namespace SCI_PH.Application.Features.Clinical
             if (request.IdentifierType is { } type)
             {
                 ClinicalInput.Defined(type, "identifierType");
+                RejectSystemIssued(type, "identifierType");
                 // Same normalization as stored identifiers; an empty or malformed value is a DomainException (400).
                 var normalized = PatientIdentifier.Normalize(type, value);
                 rows = await _reads.FindPatientsByIdentifierAsync(type, normalized, MaxSearchResults, cancellationToken);
@@ -106,6 +108,16 @@ namespace SCI_PH.Application.Features.Clinical
             }
 
             return rows.Select(row => row.ToSummary()).ToList();
+        }
+
+        // QR credentials are only issued by the system (PatientQrService, ADR-015). A value chosen by staff could make a
+        // known token resolve to the wrong patient, and searching by one would expose a lookup over credential hashes.
+        private static void RejectSystemIssued(PatientIdentifierType type, string field)
+        {
+            if (type == PatientIdentifierType.QrCode)
+            {
+                throw new RequestValidationException($"{field} does not accept a system-issued identifier type.", field);
+            }
         }
 
         private async Task<AuditActor> AuditActorAsync(CancellationToken cancellationToken)
