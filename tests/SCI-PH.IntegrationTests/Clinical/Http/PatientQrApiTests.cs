@@ -84,6 +84,10 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             host.Web.DbAsync(db => db.PatientIdentifiers.AsNoTracking()
                 .Where(i => i.PatientId == patientId && i.Type == PatientIdentifierType.QrCode).ToListAsync());
 
+        private static Task<List<IdentificationAttempt>> SuccessfulAttemptsAsync(MobileEmergencyHost host, Guid emergencyId) =>
+            host.Web.DbAsync(db => db.IdentificationAttempts.AsNoTracking()
+                .Where(a => a.ClinicalEncounterId == emergencyId && a.Outcome == IdentificationOutcome.Success).ToListAsync());
+
         private static async Task AssertNoStoredSecretAsync(MobileEmergencyHost host, string payload)
         {
             var token = payload[PatientQrToken.Prefix.Length..];
@@ -596,11 +600,10 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             Assert.Equal(
                 (AuditActionType.Read, AuditOutcome.Success, (Guid?)record.PatientId, (Guid?)emergency.Id, (Guid?)paramedic.UserId, paramedic.StaffId, (string?)null),
                 (audit.Action, audit.Outcome, audit.PatientId, audit.ClinicalEncounterId, audit.ActorIdentityUserId, audit.ActorStaffId, audit.ChangesJson));
-            var attempt = await host.Web.DbAsync(db => db.IdentificationAttempts.AsNoTracking().SingleAsync(a => a.ClinicalEncounterId == emergency.Id));
-            var row = Assert.Single(await QrRowsAsync(host, record.PatientId));
-            Assert.Equal(
-                (IdentificationMethod.QrCode, IdentificationOutcome.Success, (Guid?)record.PatientId, (Guid?)row.Id),
-                (attempt.Method, attempt.Outcome, attempt.PatientId, attempt.PatientIdentifierId));
+
+            // Candidate discovery is not an identification: no attempt at all, however many times it is resolved.
+            Assert.Equal(HttpStatusCode.OK, (await ResolveAsync(paramedic, emergency.Id, credential.Payload)).StatusCode);
+            Assert.Equal(0, await host.Web.DbAsync(db => db.IdentificationAttempts.CountAsync()));
             await AssertNoStoredSecretAsync(host, credential.Payload);
         }
 
@@ -636,8 +639,12 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             Assert.Equal((EmergencyQrIdentificationService.ConfirmOperation, paramedic.UserId, emergency.Id), (receipt.Operation, receipt.ActorUserId, receipt.ResourceId));
             Assert.Matches("^[0-9a-f]{64}$", receipt.RequestHash);
             Assert.NotEqual(HashOf(credential.Payload)[PatientQrToken.HashPrefix.Length..], receipt.RequestHash);
-            Assert.Single(await host.Web.DbAsync(db => db.IdentificationAttempts.AsNoTracking()
-                .Where(a => a.ClinicalEncounterId == emergency.Id && a.Outcome == IdentificationOutcome.Success).ToListAsync()));
+            // Confirmed directly, with no previous resolve.
+            var row = Assert.Single(await QrRowsAsync(host, record.PatientId));
+            var attempt = Assert.Single(await SuccessfulAttemptsAsync(host, emergency.Id));
+            Assert.Equal(
+                (IdentificationMethod.QrCode, (Guid?)record.PatientId, (Guid?)row.Id, (Guid?)paramedic.UserId, paramedic.StaffId),
+                (attempt.Method, attempt.PatientId, attempt.PatientIdentifierId, attempt.ActorIdentityUserId, attempt.PerformedByStaffId));
 
             // A replay is the same result, with nothing new, also once the QR has expired or been replaced.
             await IssueAsync(patient);
@@ -647,6 +654,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             Assert.Equal(record.PatientId, (await replay.ReadAsAsync<PrehospitalEmergencySummary>()).Patient!.Id);
             Assert.Equal(1, await host.Web.DbAsync(db => db.ClinicalAuditEntries.CountAsync(a => a.ClinicalEncounterId == emergency.Id && a.Action == AuditActionType.Identify)));
             Assert.Equal(1, await host.Web.DbAsync(db => db.IdempotencyReceipts.CountAsync(r => r.ClientRequestId == key)));
+            Assert.Single(await SuccessfulAttemptsAsync(host, emergency.Id));
 
             // The same key with another QR, and any other identification of it, is a controlled conflict.
             var other = PatientQrToken.Generate().Payload;
@@ -664,6 +672,73 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             });
             Assert.Equal(HttpStatusCode.Created, vitals.StatusCode);
             await AssertNoStoredSecretAsync(host, credential.Payload);
+        }
+
+        [SkippableFact]
+        public async Task ResolvingAndThenConfirmingRecordsOneSuccessfulAttemptAndOneRead()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            await using var host = await MobileEmergencyHost.StartAsync(_postgres);
+            var (record, patient) = await host.SignInPatientAsync("Alba");
+            var credential = await IssueAsync(patient);
+            var paramedic = await ParamedicAsync(host);
+            var emergency = await OpenAsync(paramedic);
+            var key = Guid.NewGuid();
+
+            Assert.Equal(HttpStatusCode.OK, (await ResolveAsync(paramedic, emergency.Id, credential.Payload)).StatusCode);
+            Assert.Empty(await SuccessfulAttemptsAsync(host, emergency.Id));
+
+            Assert.Equal(HttpStatusCode.OK, (await ConfirmAsync(paramedic, emergency.Id, credential.Payload, key)).StatusCode);
+            var attempt = Assert.Single(await SuccessfulAttemptsAsync(host, emergency.Id));
+            Assert.Equal((IdentificationMethod.QrCode, (Guid?)record.PatientId), (attempt.Method, attempt.PatientId));
+
+            Assert.Equal(HttpStatusCode.OK, (await ConfirmAsync(paramedic, emergency.Id, credential.Payload, key)).StatusCode);
+            Assert.Single(await SuccessfulAttemptsAsync(host, emergency.Id));
+            Assert.Equal(1, await host.Web.DbAsync(db => db.ClinicalAuditEntries.CountAsync(a => a.ClinicalEncounterId == emergency.Id && a.Action == AuditActionType.Identify)));
+            Assert.Equal(1, await host.Web.DbAsync(db => db.ClinicalAuditEntries.CountAsync(
+                a => a.ClinicalEncounterId == emergency.Id && a.EntityName == EmergencyQrIdentificationService.CandidateAuditResource)));
+            await AssertNoStoredSecretAsync(host, credential.Payload);
+        }
+
+        [SkippableFact]
+        public async Task AnInvalidQrAtConfirmationIsTheSameNotFoundAndASafeFailure()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var clock = Clock();
+            await using var host = await MobileEmergencyHost.StartAsync(_postgres, mobileServices: s => s.AddSingleton<TimeProvider>(clock));
+            var (_, patient) = await host.SignInPatientAsync("Alba");
+            var replaced = await IssueAsync(patient);
+            var expired = await IssueAsync(patient);
+            var paramedic = await ParamedicAsync(host);
+            var emergency = await OpenAsync(paramedic);
+            clock.Advance(PatientQrToken.Lifetime);
+
+            foreach (var (payload, reason) in new[]
+            {
+                ("not-a-qr", IdentificationFailureReason.NoMatch),
+                (PatientQrToken.Generate().Payload, IdentificationFailureReason.NoMatch),
+                (replaced.Payload, IdentificationFailureReason.InvalidCredential),
+                (expired.Payload, IdentificationFailureReason.InvalidCredential)
+            })
+            {
+                var key = Guid.NewGuid();
+                var before = await host.Web.DbAsync(db => db.IdentificationAttempts.CountAsync(a => a.FailureReason == reason));
+
+                Assert.Equal(HttpStatusCode.NotFound, (await ConfirmAsync(paramedic, emergency.Id, payload, key)).StatusCode);
+
+                Assert.Equal(before + 1, await host.Web.DbAsync(db => db.IdentificationAttempts.CountAsync(a => a.FailureReason == reason)));
+                Assert.Equal(0, await host.Web.DbAsync(db => db.IdempotencyReceipts.CountAsync(r => r.ClientRequestId == key)));
+            }
+
+            var attempts = await host.Web.DbAsync(db => db.IdentificationAttempts.AsNoTracking().ToListAsync());
+            Assert.Equal(4, attempts.Count);
+            Assert.All(attempts, a => Assert.Equal(
+                (IdentificationMethod.QrCode, IdentificationOutcome.Failure, (Guid?)null, (Guid?)null),
+                (a.Method, a.Outcome, a.PatientId, a.PatientIdentifierId)));
+            var encounter = await host.Web.DbAsync(db => db.ClinicalEncounters.AsNoTracking().SingleAsync(e => e.Id == emergency.Id));
+            Assert.Null(encounter.PatientId);
+            await AssertNoStoredSecretAsync(host, replaced.Payload);
+            await AssertNoStoredSecretAsync(host, expired.Payload);
         }
 
         [SkippableFact]
@@ -688,6 +763,8 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             var encounter = await host.Web.DbAsync(db => db.ClinicalEncounters.AsNoTracking().SingleAsync(e => e.Id == emergency.Id));
             Assert.Contains(encounter.PatientId!.Value, new[] { a.PatientId, b.PatientId });
             Assert.Equal(1, await host.Web.DbAsync(db => db.ClinicalAuditEntries.CountAsync(e => e.ClinicalEncounterId == emergency.Id && e.Action == AuditActionType.Identify)));
+            var attempt = Assert.Single(await SuccessfulAttemptsAsync(host, emergency.Id));
+            Assert.Equal(encounter.PatientId, attempt.PatientId);
         }
 
         // ---- Rate limits ----

@@ -19,10 +19,12 @@ namespace SCI_PH.Application.Features.Clinical
     // nothing by itself: the staff member must be authenticated, hold the permissions, be active clinical staff and have
     // access to the emergency, all checked BEFORE the QR is looked at, so nobody else learns anything from it.
     //
-    // Resolve shows a candidate and changes nothing in the emergency. Only the staff member's confirmation identifies it,
-    // and it resolves the QR again (no session, no patient id from the client) and goes through
+    // Resolve shows a candidate and changes nothing in the emergency: it is candidate discovery, recorded as a Read audit
+    // entry and not as a successful identification. Only the staff member's confirmation identifies it, with exactly one
+    // successful IdentificationAttempt: it resolves the QR again (no session, no patient id from the client) and goes through
     // EncounterService.IdentifyPatientAsync, the one way of linking a patient: same encounter, NN code kept, Identify audit
-    // entry and PatientId concurrency token.
+    // entry and PatientId concurrency token. A credential revoked between that lookup and the commit (milliseconds) can still
+    // identify: an accepted limit, as a QR only identifies, lasts 15 minutes and needs authorized staff and their confirmation.
     //
     // A QR that is invalid for any reason (malformed, other version, unknown, revoked, expired) is the same 404; only the
     // IdentificationAttempt tells them apart, internally and only as NoMatch or InvalidCredential, with no token or hash.
@@ -80,10 +82,8 @@ namespace SCI_PH.Application.Features.Clinical
             var profile = await _profiles.GetProfileAsync(credential.PatientId, cancellationToken)
                 ?? throw new InvalidOperationException("The patient of a QR credential was not found.");
 
-            var now = _time.GetUtcNow();
-            _writes.Add(Succeeded(actor, encounter.Id, credential, now));
             _writes.Add(ClinicalAuditEntry.Success(
-                actor.AuditActor, AuditActionType.Read, CandidateAuditResource, credential.Id.ToString(), now,
+                actor.AuditActor, AuditActionType.Read, CandidateAuditResource, credential.Id.ToString(), _time.GetUtcNow(),
                 new AuditContext(credential.PatientId, encounter.Id)));
             try
             {

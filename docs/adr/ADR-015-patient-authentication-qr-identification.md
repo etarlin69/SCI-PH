@@ -108,9 +108,14 @@ opcional, JWT, refresh rotado, logout y revocación de sesiones (ADR-006), y el 
 - **Personal:** autenticado, con `Emergencies.Operate`, `Patients.Read` y `Patients.Identify`, personal clínico activo y con
   acceso a esa emergencia, todo antes de mirar el QR. Sin atajo para el administrador: sin `ClinicalStaff` activo, `403`.
 - **Confirmación humana obligatoria.** Resolver no cambia la emergencia: devuelve solo nombre, fecha de nacimiento y documento
-  enmascarado. Confirmar vuelve a resolver el token en el servidor, sin sesión y sin confiar en el candidato anterior, y
-  usa `EncounterService.IdentifyPatientAsync`, la única vía de vincular un paciente: misma atención, código NN conservado,
-  misma auditoría y mismo control de concurrencia.
+  enmascarado, y como descubre un candidato sin identificar a nadie, queda como auditoría `Read` y **no** como
+  `IdentificationAttempt` correcto. Confirmar vuelve a resolver el token en el servidor, sin sesión y sin confiar en el
+  candidato anterior, registra **un** `IdentificationAttempt` correcto y usa `EncounterService.IdentifyPatientAsync`, la única
+  vía de vincular un paciente: misma atención, código NN conservado, misma auditoría y mismo control de concurrencia. Repetir
+  la misma confirmación no registra nada nuevo.
+- **Límite aceptado en V1:** un QR revocado entre la última comprobación y el commit de `confirm` (milisegundos) aún puede
+  identificar. No se añaden transacciones serializables ni bloqueos: el QR solo identifica, dura 15 minutos y exige personal
+  autorizado y su confirmación.
 - Un QR inválido por cualquier motivo (malformado, otra versión, desconocido, revocado o vencido) es el mismo `404`. Por
   dentro, `IdentificationAttempt` lo registra como `NoMatch` o `InvalidCredential`, sin token ni hash.
 - **Auditoría:** emitir y revocar van en la misma transacción que el cambio; resolver revela datos personales y falla
@@ -150,6 +155,8 @@ asistente de IA del paciente (no se conecta a la IA clínica) y la edición del 
 - **Integración HTTP real del área paramédica en MAUI:** `HttpParamedicApiService` todavía usa
   `MockParamedicApiService` internamente; es una vertical aparte (el backend paramédico no cambia aquí).
 - **QR #2:** escáner del paramédico (decisión 5).
+- **Endurecimiento común de la identificación:** si falla el guardado de una confirmación (documento, huella o QR), no se
+  identifica nada, pero la respuesta no es un `503` controlado. Conviene resolverlo para las tres vías, no solo para el QR.
 - **P1 — Web del hospital:** resolver un QR por escáner o pegándolo, con su propia ruta.
 - **P1 — Revocar el QR al corregir la identidad:** la futura desvinculación o corrección debe revocarlo.
 - **P1 — Botón para revocar el QR** en la app (el endpoint ya existe).

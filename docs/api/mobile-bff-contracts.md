@@ -406,8 +406,10 @@ referencias biométricas.
 }
 ```
 
-`document` es `null` si no tiene cédula ni pasaporte activos. Se registra un `IdentificationAttempt` (`QrCode`) y una auditoría
-`Read` (recurso `PatientQrCandidate`), sin token ni hash. **Falla cerrado:** sin esa auditoría, `503` genérico y sin candidato.
+`document` es `null` si no tiene cédula ni pasaporte activos. Se registra una auditoría `Read` (recurso `PatientQrCandidate`),
+sin token ni hash. **Falla cerrado:** sin esa auditoría, `503` genérico y sin candidato. Como no identifica a nadie, un `resolve`
+correcto no crea un `IdentificationAttempt`; un QR inválido crea uno fallido (`QrCode`, `NoMatch` o `InvalidCredential`), sin
+paciente, token ni hash.
 
 #### `POST /api/mobile/emergencies/{id}/identify/qr/confirm`
 
@@ -417,11 +419,12 @@ referencias biométricas.
 
 El paramédico confirmó. El servidor **vuelve a resolver** el QR (no hay sesión ni se confía en el candidato) e identifica con
 `EncounterService.IdentifyPatientAsync`, como el documento y la huella: misma atención, código NN conservado, auditoría
-`Identify` y control de concurrencia. Respuesta `200`: la misma forma que `GET /api/mobile/emergencies/{id}`.
+`Identify` y control de concurrencia. Crea **un** `IdentificationAttempt` correcto (`QrCode`) en la misma transacción, también
+sin `resolve` previo. Respuesta `200`: la misma forma que `GET /api/mobile/emergencies/{id}`.
 
 - **Idempotencia:** operación `prehospital-emergency.qr-confirm.v1`, clave (usuario, operación, `clientRequestId`). El recibo
   guarda un hash de la emergencia y de una huella del contenido, nunca el token ni el hash de la credencial. Repetir con la misma
-  clave y el mismo QR devuelve `200` sin nada nuevo, también si el QR ya venció o se sustituyó.
+  clave y el mismo QR devuelve `200` sin nada nuevo (ni intento, ni auditoría), también si el QR ya venció o se sustituyó.
 
 | Estado | Cuándo |
 |---|---|
