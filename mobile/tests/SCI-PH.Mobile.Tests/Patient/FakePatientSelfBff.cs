@@ -61,6 +61,12 @@ internal sealed class FakePatientSelfBff : HttpMessageHandler
     /// <summary>Estado forzado para todas las peticiones (por ejemplo 403 o 404).</summary>
     public HttpStatusCode? Status { get; set; }
 
+    /// <summary>Estados para las próximas peticiones, uno por petición, antes de <see cref="Status"/>.</summary>
+    public Queue<HttpStatusCode> NextStatuses { get; } = new();
+
+    /// <summary>Método y ruta de cada petición (el cuerpo no debe llevar nada).</summary>
+    public List<(HttpMethod Method, string Path, bool HasBody)> Requests { get; } = [];
+
     /// <summary>Las peticiones fallan sin respuesta, como sin conexión.</summary>
     public bool Unreachable { get; set; }
 
@@ -74,6 +80,7 @@ internal sealed class FakePatientSelfBff : HttpMessageHandler
         lock (Paths)
         {
             Paths.Add(request.RequestUri!.PathAndQuery);
+            Requests.Add((request.Method, request.RequestUri!.PathAndQuery, request.Content is not null));
         }
 
         var respondWith = Responses.TryGetValue(request.RequestUri!.AbsolutePath, out var json) ? json : null;
@@ -87,7 +94,8 @@ internal sealed class FakePatientSelfBff : HttpMessageHandler
             throw new HttpRequestException("unreachable");
         }
 
-        if (Status is { } status)
+        var forced = NextStatuses.TryDequeue(out var next) ? next : Status;
+        if (forced is { } status)
         {
             return new HttpResponseMessage(status)
             {

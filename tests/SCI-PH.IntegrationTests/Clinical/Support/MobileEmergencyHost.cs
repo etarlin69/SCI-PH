@@ -18,13 +18,35 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
     // The real Mobile BFF over the same migrated PostgreSQL database as a ClinicalApiHost (the Web BFF): accounts,
     // clinics and staff are prepared through the web host, the paramedic signs in on the mobile one. Every log line is
     // captured (Trace), so a test can check that nothing sensitive was written.
-    internal sealed class PostgresMobileBffFactory(string connectionString, CapturingLoggerProvider logs) : BffFactory<AuthController>
+    internal sealed class PostgresMobileBffFactory(
+        string connectionString,
+        CapturingLoggerProvider logs,
+        IReadOnlyDictionary<string, string?>? extraSettings = null,
+        Action<IServiceCollection>? extraServices = null) : BffFactory<AuthController>
     {
+        protected override IDictionary<string, string?> Settings
+        {
+            get
+            {
+                var settings = base.Settings;
+                foreach (var (key, value) in extraSettings ?? new Dictionary<string, string?>())
+                {
+                    settings[key] = value;
+                }
+
+                return settings;
+            }
+        }
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             base.ConfigureWebHost(builder);
             builder.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace).AddProvider(logs));
-            builder.ConfigureTestServices(services => services.UsePostgresStores(connectionString));
+            builder.ConfigureTestServices(services =>
+            {
+                services.UsePostgresStores(connectionString);
+                extraServices?.Invoke(services);
+            });
         }
     }
 
@@ -47,10 +69,11 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
         private readonly PostgresMobileBffFactory _mobile;
         private readonly PostgresDeviceApiFactory _device;
 
-        private MobileEmergencyHost(ClinicalApiHost web)
+        private MobileEmergencyHost(
+            ClinicalApiHost web, IReadOnlyDictionary<string, string?>? mobileSettings = null, Action<IServiceCollection>? mobileServices = null)
         {
             Web = web;
-            _mobile = new PostgresMobileBffFactory(web.ConnectionString, Logs);
+            _mobile = new PostgresMobileBffFactory(web.ConnectionString, Logs, mobileSettings, mobileServices);
             _device = new PostgresDeviceApiFactory(web.ConnectionString, Logs);
         }
 
@@ -61,8 +84,14 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
         // Log lines of the Mobile BFF and the Device API.
         public CapturingLoggerProvider Logs { get; } = new();
 
-        public static async Task<MobileEmergencyHost> StartAsync(PostgreSql.PostgresFixture postgres) =>
-            new(await ClinicalApiHost.StartAsync(postgres));
+        public IServiceProvider MobileServices => _mobile.Services;
+
+        // Extra settings and services apply to the Mobile BFF only (e.g. a low rate limit or a controlled clock).
+        public static async Task<MobileEmergencyHost> StartAsync(
+            PostgreSql.PostgresFixture postgres,
+            IReadOnlyDictionary<string, string?>? mobileSettings = null,
+            Action<IServiceCollection>? mobileServices = null) =>
+            new(await ClinicalApiHost.StartAsync(postgres), mobileSettings, mobileServices);
 
         public HttpClient Anonymous() => _mobile.CreateHttpsClient();
 
@@ -71,24 +100,33 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
             string role,
             Clinic[] clinics,
             bool asClinicalStaff = true,
-            ClinicalStaffType staffType = ClinicalStaffType.Paramedic)
+            ClinicalStaffType staffType = ClinicalStaffType.Paramedic,
+            bool staffActive = true)
         {
-            var (account, staffId) = await Web.CreateStaffAccountAsync(role, clinics, asClinicalStaff, staffType: staffType);
-            var login = await _mobile.CreateHttpsClient().PostAsJsonAsync("/api/mobile/auth/login", new LoginRequest(account.Email, account.Password));
-            login.EnsureSuccessStatusCode();
-            var session = await login.ReadAsAsync<MobileLoginResponse>();
-            return new StaffSession(_mobile.CreateHttpsClient().WithBearer(session.Session!.AccessToken), account.Id, staffId);
+            var (account, staffId) = await Web.CreateStaffAccountAsync(role, clinics, asClinicalStaff, staffActive, staffType);
+            return new StaffSession(await LoginAsync(account), account.Id, staffId);
         }
 
         // A Patient account linked to a seeded own record (ADR-015), signed in on the Mobile BFF.
         public async Task<(SeededPatientRecord Record, HttpClient Client)> SignInPatientAsync(string givenNames)
         {
+            var (record, client, _) = await SignInPatientAccountAsync(givenNames);
+            return (record, client);
+        }
+
+        public async Task<(SeededPatientRecord Record, HttpClient Client, Guid UserId)> SignInPatientAccountAsync(string givenNames)
+        {
             var account = await Web.Factory.CreateUserAsync(SecurityRoles.Patient);
             var record = await Web.DbAsync(db => PatientRecordSeed.SeedAsync(db, givenNames, account.Id));
+            return (record, await LoginAsync(account), account.Id);
+        }
+
+        public async Task<HttpClient> LoginAsync(TestAccount account)
+        {
             var login = await _mobile.CreateHttpsClient().PostAsJsonAsync("/api/mobile/auth/login", new LoginRequest(account.Email, account.Password));
             login.EnsureSuccessStatusCode();
             var session = await login.ReadAsAsync<MobileLoginResponse>();
-            return (record, _mobile.CreateHttpsClient().WithBearer(session.Session!.AccessToken));
+            return _mobile.CreateHttpsClient().WithBearer(session.Session!.AccessToken);
         }
 
         // A device credential as the administration would provision it (key returned once, only its hash stored).
