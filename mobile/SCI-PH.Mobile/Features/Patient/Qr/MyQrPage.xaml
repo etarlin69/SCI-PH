@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<ContentPage
+    x:Class="SCI_PH.Mobile.Features.Patient.Qr.MyQrPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Patient.ViewModels"
+    x:DataType="vm:MyQrViewModel"
+    Title="Mi QR"
+    BackgroundColor="{StaticResource PatientPageBackground}">
+
+    <ScrollView>
+
+        <VerticalStackLayout Padding="20" Spacing="18">
+
+            <Label
+                Text="Este código identifica tu expediente al personal autorizado."
+                FontSize="17"
+                FontAttributes="Bold"
+                TextColor="{StaticResource TitleText}"
+                HorizontalTextAlignment="Center" />
+
+            <ActivityIndicator
+                IsRunning="{Binding IsBusy}"
+                IsVisible="{Binding IsBusy}"
+                Color="{StaticResource ColorPrimary}" />
+
+            <Label
+                Text="Tu código venció. Generando uno nuevo..."
+                IsVisible="{Binding IsRenewing}"
+                TextColor="{StaticResource MutedText}"
+                HorizontalTextAlignment="Center" />
+
+            <Border
+                Style="{StaticResource PatientCardStyle}"
+                IsVisible="{Binding HasQr}"
+                HorizontalOptions="Center"
+                BackgroundColor="White">
+
+                <VerticalStackLayout Spacing="10">
+
+                    <!-- El QR se dibuja aquí en el dispositivo, desde el contenido opaco (MyQrPage.xaml.cs). -->
+                    <ContentView x:Name="QrHost" WidthRequest="280" HeightRequest="280" />
+
+                    <Label
+                        Text="{Binding ExpiresIn}"
+                        TextColor="{StaticResource MutedText}"
+                        HorizontalTextAlignment="Center" />
+
+                </VerticalStackLayout>
+
+            </Border>
+
+            <Label
+                Text="{Binding ErrorMessage}"
+                IsVisible="{Binding HasError}"
+                Style="{StaticResource ErrorTextStyle}" />
+
+            <Button
+                Text="Reintentar"
+                Command="{Binding RetryCommand}"
+                IsVisible="{Binding HasError}"
+                Style="{StaticResource PrimaryButtonStyle}" />
+
+            <Label
+                Text="El personal autorizado debe confirmar tu identidad. Mostrarlo en otro dispositivo sustituye este código. Necesitas conexión para generarlo."
+                FontSize="13"
+                TextColor="{StaticResource MutedText}"
+                HorizontalTextAlignment="Center" />
+
+        </VerticalStackLayout>
+
+    </ScrollView>
+
+</ContentPage>

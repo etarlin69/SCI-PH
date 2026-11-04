@@ -2,6 +2,7 @@ using SCI_PH.Mobile.Features.Patient.Documents;
 using SCI_PH.Mobile.Features.Patient.History;
 using SCI_PH.Mobile.Features.Patient.Home;
 using SCI_PH.Mobile.Features.Patient.Profile;
+using SCI_PH.Mobile.Features.Patient.Qr;
 using SCI_PH.Mobile.Features.Patient.Results;
 using SCI_PH.Mobile.Features.Patient.Services;
 using SCI_PH.Mobile.Features.Patient.Services.Interfaces;
@@ -13,7 +14,7 @@ public static class PatientServiceCollectionExtensions
 {
     /// <summary>
     /// Registra el módulo del paciente. Su sesión es la de la cuenta (inicio de sesión común, ADR-015): no hay sesión
-    /// propia del paciente ni acceso por QR o rostro. Los datos son los REALES de su expediente
+    /// propia del paciente ni acceso por QR o rostro ("Mi QR" solo lo identifica ante el personal). Los datos son los REALES de su expediente
     /// (<c>/api/mobile/patient/me</c>) con el cliente protegido común; Documentos es una pantalla de "todavía no
     /// disponible" y el asistente de IA no está en la app.
     /// </summary>
@@ -21,6 +22,7 @@ public static class PatientServiceCollectionExtensions
     {
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IPatientDataService, HttpPatientDataService>();
+        services.AddSingleton<IPatientQrService, HttpPatientQrService>();
 
         // Navegación y diálogos son los comunes de la app (AddCoreServices).
 
@@ -28,11 +30,13 @@ public static class PatientServiceCollectionExtensions
         services.AddTransient<ProfileViewModel>();
         services.AddTransient<HistoryViewModel>();
         services.AddTransient<ResultsViewModel>();
+        services.AddTransient<MyQrViewModel>();
 
         services.AddTransient<HomePage>();
         services.AddTransient<ProfilePage>();
         services.AddTransient<HistoryPage>();
         services.AddTransient<ResultsPage>();
+        services.AddTransient<MyQrPage>();
         services.AddTransient<DocumentsPage>();
 
         return services;
