@@ -45,6 +45,8 @@ namespace SCI_PH.Mobile.Extensions
             // autenticación, así el refresh nunca puede dispararse a sí mismo.
             services.AddSingleton<IMobileAuthApi>(_ =>
                 new MobileAuthApi(new MobileApiClient(MobileApiClient.CreateHttpClient(options))));
+            services.AddSingleton<ILocalSessionDataCleaner>(_ =>
+                new LegacyProfileDataCleaner(Preferences.Default, FileSystem.Current.AppDataDirectory));
             services.AddSingleton<MobileAuthService>();
             services.AddSingleton<IMobileAuthService>(sp => sp.GetRequiredService<MobileAuthService>());
             services.AddSingleton<IClinicalSessionRefresher>(sp => sp.GetRequiredService<MobileAuthService>());

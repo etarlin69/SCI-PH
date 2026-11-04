@@ -1,5 +1,6 @@
 using System.Net;
 using SCI_PH.Mobile.Common.Api;
+using SCI_PH.Mobile.Common.Authentication;
 using SCI_PH.Mobile.Features.Patient;
 using SCI_PH.Mobile.Features.Patient.Services;
 using SCI_PH.Mobile.Features.Patient.ViewModels;
@@ -11,6 +12,7 @@ namespace SCI_PH.Mobile.Tests.Patient;
 public class PatientFeatureTests
 {
     private readonly FakePatientSelfBff _bff = new();
+    private readonly ClinicalSessionService _session = PatientSession.SignedIn();
 
     private HttpPatientDataService Data() => new(_bff.Client());
 
@@ -35,7 +37,7 @@ public class PatientFeatureTests
     [Fact]
     public async Task HomeShowsTheRealSummary()
     {
-        var vm = new HomeViewModel(Data());
+        var vm = new HomeViewModel(Data(), _session);
 
         await vm.LoadCommand.ExecuteAsync(null);
 
@@ -50,7 +52,7 @@ public class PatientFeatureTests
     [Fact]
     public async Task HistoryTranslatesAllergiesDiagnosesPrescriptionsAndEncounters()
     {
-        var vm = new HistoryViewModel(Data());
+        var vm = new HistoryViewModel(Data(), _session);
 
         await vm.LoadCommand.ExecuteAsync(null);
 
@@ -69,7 +71,7 @@ public class PatientFeatureTests
     [Fact]
     public async Task ResultsShowValueSourceAndRangeAndAnUnknownTypeAsIs()
     {
-        var vm = new ResultsViewModel(Data());
+        var vm = new ResultsViewModel(Data(), _session);
 
         await vm.LoadCommand.ExecuteAsync(null);
 
@@ -101,8 +103,8 @@ public class PatientFeatureTests
             _bff.Responses[$"{FakePatientSelfBff.Me}/{route}"] = "[]";
         }
 
-        var results = new ResultsViewModel(Data());
-        var history = new HistoryViewModel(Data());
+        var results = new ResultsViewModel(Data(), _session);
+        var history = new HistoryViewModel(Data(), _session);
         await results.LoadCommand.ExecuteAsync(null);
         await history.LoadCommand.ExecuteAsync(null);
 
@@ -120,8 +122,8 @@ public class PatientFeatureTests
     public async Task AFailureShowsItsMessageAndNoData(HttpStatusCode status, string message)
     {
         _bff.Status = status;
-        var home = new HomeViewModel(Data());
-        var results = new ResultsViewModel(Data());
+        var home = new HomeViewModel(Data(), _session);
+        var results = new ResultsViewModel(Data(), _session);
 
         await home.LoadCommand.ExecuteAsync(null);
         await results.LoadCommand.ExecuteAsync(null);
@@ -135,13 +137,13 @@ public class PatientFeatureTests
     [Fact]
     public async Task WithoutConnectionTheScreensShowTheNetworkMessageAndNoFallbackData()
     {
-        var home = new HomeViewModel(Data());
+        var home = new HomeViewModel(Data(), _session);
         await home.LoadCommand.ExecuteAsync(null);
         Assert.NotNull(home.Summary);
 
         _bff.Unreachable = true;
         await home.LoadCommand.ExecuteAsync(null);
-        var history = new HistoryViewModel(Data());
+        var history = new HistoryViewModel(Data(), _session);
         await history.LoadCommand.ExecuteAsync(null);
 
         Assert.Equal(MobileApiErrorMessages.Network, home.ErrorMessage);

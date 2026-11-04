@@ -22,7 +22,7 @@ internal sealed class AuthHarness : IDisposable
         Tokens = new MauiSecureTokenStore(Storage);
 
         _publicHttp = Client(null);
-        Auth = new MobileAuthService(new MobileAuthApi(new MobileApiClient(_publicHttp)), Session, Tokens);
+        Auth = new MobileAuthService(new MobileAuthApi(new MobileApiClient(_publicHttp)), Session, Tokens, LocalData);
         Auth.SessionExpired += (_, _) => SessionExpiredCount++;
 
         _protectedHttp = Client(new AuthenticatedHttpHandler(Session, Auth));
@@ -36,6 +36,8 @@ internal sealed class AuthHarness : IDisposable
     public FakeSecureStorage Storage { get; }
 
     public MauiSecureTokenStore Tokens { get; }
+
+    public FakeLocalDataCleaner LocalData { get; } = new();
 
     public MobileAuthService Auth { get; }
 
@@ -73,6 +75,14 @@ internal sealed class AuthHarness : IDisposable
     }
 
     internal sealed record SignedIn(bool Ok);
+}
+
+/// <summary>Cuenta cada limpieza de los datos locales de una sesión.</summary>
+internal sealed class FakeLocalDataCleaner : ILocalSessionDataCleaner
+{
+    public int ClearCalls { get; private set; }
+
+    public void Clear() => ClearCalls++;
 }
 
 /// <summary><see cref="ISecureStorage"/> en memoria; puede simular un valor ilegible.</summary>

@@ -83,15 +83,18 @@ public sealed class MobileAuthService : IMobileAuthService, IClinicalSessionRefr
     private readonly IMobileAuthApi _api;
     private readonly IClinicalSessionService _session;
     private readonly ISecureTokenStore _tokens;
+    private readonly ILocalSessionDataCleaner _localData;
 
     // Serializa refresh, restauración y logout: el refresh token rota y no puede usarse dos veces.
     private readonly SemaphoreSlim _gate = new(1, 1);
 
-    public MobileAuthService(IMobileAuthApi api, IClinicalSessionService session, ISecureTokenStore tokens)
+    public MobileAuthService(
+        IMobileAuthApi api, IClinicalSessionService session, ISecureTokenStore tokens, ILocalSessionDataCleaner localData)
     {
         _api = api;
         _session = session;
         _tokens = tokens;
+        _localData = localData;
     }
 
     public event EventHandler? SessionExpired;
@@ -141,6 +144,9 @@ public sealed class MobileAuthService : IMobileAuthService, IClinicalSessionRefr
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            // Lo que una versión anterior dejó en el dispositivo se borra al arrancar, también con la sesión aún abierta.
+            _localData.Clear();
+
             var refreshToken = await _tokens.GetRefreshTokenAsync();
             if (refreshToken is null)
             {
@@ -326,6 +332,7 @@ public sealed class MobileAuthService : IMobileAuthService, IClinicalSessionRefr
     private async Task ClearLocalAsync()
     {
         _session.Clear();
+        _localData.Clear();
         await _tokens.ClearAsync();
     }
 

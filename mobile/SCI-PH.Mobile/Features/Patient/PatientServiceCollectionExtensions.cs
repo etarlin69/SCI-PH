@@ -23,10 +23,6 @@ public static class PatientServiceCollectionExtensions
         services.AddSingleton<IPatientDataService, HttpPatientDataService>();
 
         // Navegación y diálogos son los comunes de la app (AddCoreServices).
-        // Perfil: demostración local de foto y descripción.
-        services.AddSingleton(Preferences.Default);
-        services.AddSingleton(MediaPicker.Default);
-        services.AddSingleton(FileSystem.Current);
 
         services.AddTransient<HomeViewModel>();
         services.AddTransient<ProfileViewModel>();
