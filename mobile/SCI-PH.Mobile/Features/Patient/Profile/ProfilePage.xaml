@@ -48,8 +48,8 @@
                     ColumnDefinitions="*,*,*">
 
                     <VerticalStackLayout Grid.Column="0" HorizontalOptions="Center" Spacing="2">
-                        <Label Text="{Binding Profile.Consultations}" Style="{StaticResource MetricValueStyle}" />
-                        <Label Text="Consultas" Style="{StaticResource MetricLabelStyle}" />
+                        <Label Text="{Binding Profile.Encounters}" Style="{StaticResource MetricValueStyle}" />
+                        <Label Text="Atenciones" Style="{StaticResource MetricLabelStyle}" />
                     </VerticalStackLayout>
 
                     <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center" Spacing="2">
@@ -58,83 +58,34 @@
                     </VerticalStackLayout>
 
                     <VerticalStackLayout Grid.Column="2" HorizontalOptions="Center" Spacing="2">
-                        <Label Text="{Binding Profile.Documents}" Style="{StaticResource MetricValueStyle}" />
-                        <Label Text="Documentos" Style="{StaticResource MetricLabelStyle}" />
+                        <Label Text="{Binding Profile.ActiveAllergies}" Style="{StaticResource MetricValueStyle}" />
+                        <Label Text="Alergias activas" Style="{StaticResource MetricLabelStyle}" />
                     </VerticalStackLayout>
 
                 </Grid>
 
-                <!-- FOTO Y NOMBRE -->
-                <Grid
+                <!-- NOMBRE -->
+                <VerticalStackLayout
                     Grid.Row="1"
-                    ColumnDefinitions="Auto,*"
-                    ColumnSpacing="20">
+                    Spacing="5">
 
-                    <Grid
-                        WidthRequest="132"
-                        HeightRequest="132">
+                    <Label
+                        Text="{Binding Profile.DisplayName}"
+                        FontSize="29"
+                        FontAttributes="Bold"
+                        TextColor="White" />
 
-                        <Border
-                            WidthRequest="132"
-                            HeightRequest="132"
-                            BackgroundColor="White"
-                            Stroke="White"
-                            StrokeThickness="4">
+                    <Label
+                        Text="Cuenta del paciente"
+                        FontSize="15"
+                        TextColor="{StaticResource OnDarkMutedText}" />
 
-                            <Border.StrokeShape>
-                                <RoundRectangle CornerRadius="66" />
-                            </Border.StrokeShape>
+                    <Label
+                        Text="SCI-PH"
+                        FontSize="14"
+                        TextColor="{StaticResource OnDarkMutedText}" />
 
-                            <Image
-                                Source="{Binding PhotoSource}"
-                                Aspect="AspectFill"
-                                WidthRequest="132"
-                                HeightRequest="132" />
-
-                        </Border>
-
-                        <!-- EDITAR FOTO -->
-                        <Button
-                            Text="✎"
-                            Command="{Binding ChangePhotoCommand}"
-                            SemanticProperties.Description="Cambiar foto de perfil"
-                            WidthRequest="44"
-                            HeightRequest="44"
-                            CornerRadius="22"
-                            BackgroundColor="{StaticResource ColorSecondary}"
-                            TextColor="White"
-                            FontSize="18"
-                            FontAttributes="Bold"
-                            HorizontalOptions="End"
-                            VerticalOptions="End"
-                            Margin="0,0,2,2" />
-
-                    </Grid>
-
-                    <VerticalStackLayout
-                        Grid.Column="1"
-                        VerticalOptions="Center"
-                        Spacing="5">
-
-                        <Label
-                            Text="{Binding Profile.DisplayName}"
-                            FontSize="29"
-                            FontAttributes="Bold"
-                            TextColor="White" />
-
-                        <Label
-                            Text="Cuenta del paciente"
-                            FontSize="15"
-                            TextColor="{StaticResource OnDarkMutedText}" />
-
-                        <Label
-                            Text="SCI-PH"
-                            FontSize="14"
-                            TextColor="{StaticResource OnDarkMutedText}" />
-
-                    </VerticalStackLayout>
-
-                </Grid>
+                </VerticalStackLayout>
 
             </Grid>
 
@@ -153,69 +104,6 @@
                     IsVisible="{Binding HasError}"
                     Style="{StaticResource ErrorTextStyle}" />
 
-                <!-- SOBRE MI -->
-                <Border Style="{StaticResource PatientCardStyle}">
-
-                    <VerticalStackLayout Spacing="14">
-
-                        <Grid ColumnDefinitions="*,Auto">
-
-                            <Label
-                                Text="Sobre mí"
-                                FontSize="20"
-                                FontAttributes="Bold"
-                                TextColor="{StaticResource TitleText}"
-                                VerticalOptions="Center" />
-
-                            <Button
-                                Grid.Column="1"
-                                Text="Guardar"
-                                Command="{Binding SaveDescriptionCommand}"
-                                BackgroundColor="{StaticResource ColorPrimary}"
-                                TextColor="White"
-                                CornerRadius="11"
-                                HeightRequest="42"
-                                Padding="15,7" />
-
-                        </Grid>
-
-                        <Editor
-                            Text="{Binding DescriptionDraft}"
-                            MinimumHeightRequest="120"
-                            AutoSize="TextChanges"
-                            Placeholder="Escribe una breve descripción sobre ti..."
-                            PlaceholderColor="#8390A0"
-                            TextColor="{StaticResource TitleText}"
-                            BackgroundColor="{StaticResource PatientPageBackground}" />
-
-                        <Label
-                            Text="Demostración local: la foto y la descripción se guardan solo en este dispositivo."
-                            Style="{StaticResource CardMetaStyle}" />
-
-                    </VerticalStackLayout>
-
-                </Border>
-
-                <!-- DESCRIPCIÓN GUARDADA -->
-                <Border Style="{StaticResource PatientCardStyle}">
-
-                    <VerticalStackLayout Spacing="9">
-
-                        <Label
-                            Text="Descripción del perfil"
-                            FontSize="19"
-                            FontAttributes="Bold"
-                            TextColor="{StaticResource TitleText}" />
-
-                        <Label
-                            Text="{Binding Description}"
-                            Style="{StaticResource CardBodyStyle}"
-                            LineBreakMode="WordWrap" />
-
-                    </VerticalStackLayout>
-
-                </Border>
-
                 <!-- INFORMACIÓN PERSONAL -->
                 <Border Style="{StaticResource PatientCardStyle}">
 
@@ -226,6 +114,11 @@
                             FontSize="20"
                             FontAttributes="Bold"
                             TextColor="{StaticResource TitleText}" />
+
+                        <Label Text="Documento" Style="{StaticResource FieldLabelStyle}" />
+                        <Label Text="{Binding Profile.Document, TargetNullValue='—'}" Style="{StaticResource FieldValueStyle}" />
+
+                        <BoxView HeightRequest="1" Color="{StaticResource CardStroke}" />
 
                         <Label Text="Correo electrónico" Style="{StaticResource FieldLabelStyle}" />
                         <Label Text="{Binding Profile.Email, TargetNullValue='—'}" Style="{StaticResource FieldValueStyle}" />
@@ -243,7 +136,7 @@
                         <BoxView HeightRequest="1" Color="{StaticResource CardStroke}" />
 
                         <Label Text="Teléfono" Style="{StaticResource FieldLabelStyle}" />
-                        <Label Text="{Binding Profile.PhoneNumber}" Style="{StaticResource FieldValueStyle}" />
+                        <Label Text="{Binding Profile.PhoneNumber, TargetNullValue='—'}" Style="{StaticResource FieldValueStyle}" />
 
                     </VerticalStackLayout>
 

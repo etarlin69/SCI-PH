@@ -1,9 +1,9 @@
 namespace SCI_PH.Mobile.Common.Authentication;
 
 /// <summary>
-/// Sesión del personal clínico, solo en memoria: access token, su caducidad y el usuario de <c>/me</c>. El refresh
-/// token no vive aquí sino en <see cref="ISecureTokenStore"/>. Es independiente de la sesión del paciente
-/// (<c>IPatientSessionService</c>): cerrar una nunca toca la otra.
+/// Sesión de la cuenta autenticada (personal clínico o paciente), solo en memoria: access token, su caducidad y el
+/// usuario de <c>/me</c>. El refresh token no vive aquí sino en <see cref="ISecureTokenStore"/>. La app tiene una sola
+/// sesión; su <see cref="Area"/> decide si se muestra el área paramédica o la del paciente.
 /// </summary>
 public interface IClinicalSessionService
 {
@@ -18,6 +18,9 @@ public interface IClinicalSessionService
 
     /// <summary>Sesión autenticada con permiso para el área paramédica.</summary>
     bool CanOperateEmergencies { get; }
+
+    /// <summary>Área de la sesión autenticada; <see cref="AccountArea.None"/> sin sesión.</summary>
+    AccountArea Area { get; }
 
     /// <summary>Se dispara al iniciar, renovar o borrar la sesión.</summary>
     event EventHandler? SessionChanged;
@@ -59,6 +62,11 @@ public sealed class ClinicalSessionService : IClinicalSessionService
     public bool CanOperateEmergencies
     {
         get { lock (_gate) { return _accessToken is not null && _currentUser?.CanOperateEmergencies == true; } }
+    }
+
+    public AccountArea Area
+    {
+        get { lock (_gate) { return _accessToken is not null && _currentUser is not null ? _currentUser.Area : AccountArea.None; } }
     }
 
     public event EventHandler? SessionChanged;

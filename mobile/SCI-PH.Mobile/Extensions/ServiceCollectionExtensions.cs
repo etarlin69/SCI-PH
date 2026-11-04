@@ -25,7 +25,7 @@ namespace SCI_PH.Mobile.Extensions
 
             AddMobileBff(services);
 
-            // Arranque (restaura la sesión clínica) y entrada compartida (personal clínico / paciente).
+            // Arranque (restaura la sesión guardada) y entrada compartida (un solo inicio de sesión).
             services.AddTransient<StartupViewModel>();
             services.AddTransient<StartupPage>();
             services.AddTransient<EntryViewModel>();
@@ -45,6 +45,8 @@ namespace SCI_PH.Mobile.Extensions
             // autenticación, así el refresh nunca puede dispararse a sí mismo.
             services.AddSingleton<IMobileAuthApi>(_ =>
                 new MobileAuthApi(new MobileApiClient(MobileApiClient.CreateHttpClient(options))));
+            services.AddSingleton<ILocalSessionDataCleaner>(_ =>
+                new LegacyProfileDataCleaner(Preferences.Default, FileSystem.Current.AppDataDirectory));
             services.AddSingleton<MobileAuthService>();
             services.AddSingleton<IMobileAuthService>(sp => sp.GetRequiredService<MobileAuthService>());
             services.AddSingleton<IClinicalSessionRefresher>(sp => sp.GetRequiredService<MobileAuthService>());

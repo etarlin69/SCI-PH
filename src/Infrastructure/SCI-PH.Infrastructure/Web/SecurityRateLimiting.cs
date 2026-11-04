@@ -21,6 +21,8 @@ namespace SCI_PH.Infrastructure.Web
         public const string Device = "device";
         // Assisted clinical AI generation: per authenticated user (window + concurrency).
         public const string ClinicalAi = "clinical-ai";
+        // Patient self-service reads (Mobile BFF): abuse protection per authenticated user, not a clinical throughput limit.
+        public const string PatientSelfService = "patient-self-service";
     }
 
     // Per client IP (and per device code for devices). Account lockout already limits guessing per account,
@@ -38,6 +40,8 @@ namespace SCI_PH.Infrastructure.Web
         public int ClinicalAiPermitLimit { get; init; } = 10;
         public int ClinicalAiWindowSeconds { get; init; } = 60;
         public int ClinicalAiConcurrentRequests { get; init; } = 1;
+        public int PatientSelfServicePermitLimit { get; init; } = 60;
+        public int PatientSelfServiceWindowSeconds { get; init; } = 60;
     }
 
     public static class SecurityRateLimiting
@@ -56,6 +60,8 @@ namespace SCI_PH.Infrastructure.Web
                 limiter.AddPolicy(RateLimitPolicies.Device, context =>
                     Window(context, $"{context.Request.Headers[DeviceAuthenticationDefaults.DeviceIdHeader]}|{ClientIp(context)}", o => (o.DevicePermitLimit, o.DeviceWindowSeconds)));
                 limiter.AddPolicy(RateLimitPolicies.ClinicalAi, ClinicalAiPartition);
+                limiter.AddPolicy(RateLimitPolicies.PatientSelfService, context =>
+                    Window(context, UserPartition(context), o => (o.PatientSelfServicePermitLimit, o.PatientSelfServiceWindowSeconds)));
             });
 
             return services;
@@ -64,14 +70,19 @@ namespace SCI_PH.Infrastructure.Web
         // Behind a reverse proxy, configure ForwardedHeaders so RemoteIpAddress is the real client.
         private static string ClientIp(HttpContext context) => context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
-        // Per authenticated user (the JWT "sub", so UseAuthentication must run before UseRateLimiter): at most N requests per
-        // window AND M at the same time. A request without a user is partitioned by IP; authorization rejects it anyway.
+        // The authenticated user (the JWT "sub", so UseAuthentication must run before UseRateLimiter). A request without a
+        // user is partitioned by IP; authorization rejects it anyway.
+        private static string UserPartition(HttpContext context)
+        {
+            var userId = context.User.Identity?.IsAuthenticated == true ? context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value : null;
+            return userId is null ? $"anonymous|{ClientIp(context)}" : $"user|{userId}";
+        }
+
+        // Per authenticated user: at most N requests per window AND M at the same time.
         private static RateLimitPartition<string> ClinicalAiPartition(HttpContext context)
         {
             var options = context.RequestServices.GetRequiredService<IOptions<RateLimitingOptions>>().Value;
-            var userId = context.User.Identity?.IsAuthenticated == true ? context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value : null;
-            var key = userId is null ? $"anonymous|{ClientIp(context)}" : $"user|{userId}";
-            return RateLimitPartition.Get(key, _ => new WindowAndConcurrencyLimiter(
+            return RateLimitPartition.Get(UserPartition(context), _ => new WindowAndConcurrencyLimiter(
                 new FixedWindowRateLimiter(new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = options.ClinicalAiPermitLimit,

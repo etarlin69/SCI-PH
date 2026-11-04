@@ -102,11 +102,7 @@
         </CollectionView.ItemTemplate>
 
         <CollectionView.Footer>
-            <Label
-                Padding="0,17,0,20"
-                Text="Utiliza SCI-PH AI si deseas una explicación educativa de tus resultados."
-                FontSize="13"
-                TextColor="{StaticResource InfoText}" />
+            <BoxView HeightRequest="20" Color="Transparent" />
         </CollectionView.Footer>
 
     </CollectionView>

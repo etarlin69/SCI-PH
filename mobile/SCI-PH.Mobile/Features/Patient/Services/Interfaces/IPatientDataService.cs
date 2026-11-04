@@ -3,8 +3,9 @@ using SCI_PH.Mobile.Features.Patient.Models.Dtos;
 namespace SCI_PH.Mobile.Features.Patient.Services.Interfaces;
 
 /// <summary>
-/// Datos del paciente autenticado. No recibe un identificador de paciente: el backend lo deducirá de la sesión, de modo
-/// que la app nunca puede pedir los datos de otra persona. Hoy lo implementa el mock; después, el Mobile BFF.
+/// Datos del paciente autenticado. No recibe un identificador de paciente: el servidor lo deduce de la sesión
+/// (<c>/api/mobile/patient/me</c>, ADR-015), de modo que la app nunca puede pedir los datos de otra persona. Los fallos
+/// llegan como <c>MobileApiException</c>; nunca hay datos de respaldo simulados.
 /// </summary>
 public interface IPatientDataService
 {
@@ -13,8 +14,6 @@ public interface IPatientDataService
     Task<ClinicalHistoryDto> GetHistoryAsync(CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ResultItemDto>> GetResultsAsync(CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<DocumentItemDto>> GetDocumentsAsync(CancellationToken cancellationToken = default);
 
     Task<PatientProfileDto> GetProfileAsync(CancellationToken cancellationToken = default);
 }

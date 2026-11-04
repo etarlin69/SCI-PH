@@ -184,6 +184,10 @@ namespace SCI_PH.Infrastructure
                     policy.RequireAuthenticatedUser().RequireClaim(CustomClaimTypes.Permission, permission));
             }
 
+            // Entry gate only (ADR-015): the own-record boundary is PatientSelfService.
+            authorization.AddPolicy(AccessPolicies.PatientSelfService, policy =>
+                policy.RequireAuthenticatedUser().RequireClaim(CustomClaimTypes.Role, SecurityRoles.Patient));
+
             return services;
         }
 

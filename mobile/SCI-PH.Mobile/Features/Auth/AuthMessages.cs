@@ -1,6 +1,9 @@
 namespace SCI_PH.Mobile.Features.Auth;
 
-/// <summary>Textos del acceso del personal clínico. Los de red y servidor son los comunes de MobileApiErrorMessages.</summary>
+/// <summary>
+/// Textos del inicio de sesión (personal clínico y pacientes). Los de red y servidor son los comunes de
+/// MobileApiErrorMessages.
+/// </summary>
 public static class AuthMessages
 {
     public const string IdentifierRequired = "Ingresa tu correo o usuario.";
@@ -9,7 +12,8 @@ public static class AuthMessages
     /// <summary>401 del login: no distingue usuario inexistente, contraseña errónea, cuenta bloqueada o inactiva.</summary>
     public const string SignInFailed = "No fue posible iniciar sesión. Revisa tus credenciales e intenta nuevamente.";
 
-    public const string NoEmergencyAccess = "Tu cuenta no tiene acceso al módulo prehospitalario.";
+    /// <summary>Cuenta válida sin área en la app: ni paciente ni personal con acceso al módulo prehospitalario.</summary>
+    public const string NoMobileAccess = "Tu cuenta no tiene acceso a la app móvil de SCI-PH.";
 
     public const string CodeRequired = "Ingresa el código de 6 dígitos de tu aplicación autenticadora.";
     public const string RecoveryCodeRequired = "Ingresa un código de recuperación.";

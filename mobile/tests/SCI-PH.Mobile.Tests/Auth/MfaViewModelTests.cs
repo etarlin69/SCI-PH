@@ -108,6 +108,19 @@ public class MfaViewModelTests
     }
 
     [Fact]
+    public async Task APatientWithMfaEntersThePatientArea()
+    {
+        _auth.VerifyResult = () => new ClinicalSignInResult(ClinicalSignInStatus.Authenticated, Area: AccountArea.Patient);
+        var vm = Create();
+        vm.Code = "123456";
+
+        await vm.VerifyCommand.ExecuteAsync(null);
+
+        Assert.Equal(AuthRoutes.PatientArea, Assert.Single(_navigator.Navigations).Route);
+        Assert.Null(_pendingMfa.Current);
+    }
+
+    [Fact]
     public async Task AnExpiredChallengeIsNotSentAndRequiresANewLogin()
     {
         _clock.Now = _challenge.ExpiresAtUtc;
@@ -149,7 +162,7 @@ public class MfaViewModelTests
 
         await vm.VerifyCommand.ExecuteAsync(null);
 
-        Assert.Equal(AuthMessages.NoEmergencyAccess, vm.ErrorMessage);
+        Assert.Equal(AuthMessages.NoMobileAccess, vm.ErrorMessage);
         Assert.True(vm.IsChallengeClosed);
         Assert.Empty(_navigator.Navigations);
     }

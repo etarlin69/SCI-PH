@@ -117,18 +117,18 @@
                 <VerticalStackLayout Spacing="9">
 
                     <Label
-                        Text="Condiciones médicas"
+                        Text="Diagnósticos"
                         FontSize="19"
                         FontAttributes="Bold"
                         TextColor="{StaticResource TitleText}" />
 
                     <VerticalStackLayout
                         Spacing="9"
-                        BindableLayout.ItemsSource="{Binding History.Conditions}"
+                        BindableLayout.ItemsSource="{Binding History.Diagnoses}"
                         BindableLayout.ItemTemplate="{StaticResource HistoryItemTemplate}">
 
                         <BindableLayout.EmptyView>
-                            <Label Text="Sin condiciones registradas." Style="{StaticResource CardMetaStyle}" />
+                            <Label Text="Sin diagnósticos registrados." Style="{StaticResource CardMetaStyle}" />
                         </BindableLayout.EmptyView>
 
                     </VerticalStackLayout>
@@ -144,18 +144,18 @@
                 <VerticalStackLayout Spacing="9">
 
                     <Label
-                        Text="Medicamentos habituales"
+                        Text="Recetas"
                         FontSize="19"
                         FontAttributes="Bold"
                         TextColor="{StaticResource TitleText}" />
 
                     <VerticalStackLayout
                         Spacing="9"
-                        BindableLayout.ItemsSource="{Binding History.Medications}"
+                        BindableLayout.ItemsSource="{Binding History.Prescriptions}"
                         BindableLayout.ItemTemplate="{StaticResource HistoryItemTemplate}">
 
                         <BindableLayout.EmptyView>
-                            <Label Text="Sin medicamentos registrados." Style="{StaticResource CardMetaStyle}" />
+                            <Label Text="Sin recetas emitidas." Style="{StaticResource CardMetaStyle}" />
                         </BindableLayout.EmptyView>
 
                     </VerticalStackLayout>
@@ -167,7 +167,7 @@
             <!-- EPISODIOS -->
 
             <Label
-                Text="Episodios"
+                Text="Atenciones"
                 Style="{StaticResource PatientSectionTitleStyle}" />
 
             <VerticalStackLayout
@@ -175,7 +175,7 @@
                 BindableLayout.ItemsSource="{Binding History.Episodes}">
 
                 <BindableLayout.EmptyView>
-                    <Label Text="Sin episodios registrados." Style="{StaticResource CardMetaStyle}" />
+                    <Label Text="Sin atenciones registradas." Style="{StaticResource CardMetaStyle}" />
                 </BindableLayout.EmptyView>
 
                 <BindableLayout.ItemTemplate>

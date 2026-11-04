@@ -13,7 +13,6 @@
     xmlns:patientHistory="clr-namespace:SCI_PH.Mobile.Features.Patient.History"
     xmlns:patientResults="clr-namespace:SCI_PH.Mobile.Features.Patient.Results"
     xmlns:patientDocuments="clr-namespace:SCI_PH.Mobile.Features.Patient.Documents"
-    xmlns:patientAi="clr-namespace:SCI_PH.Mobile.Features.Patient.Ai"
     x:DataType="local:AppShell"
     Shell.BackgroundColor="{StaticResource SciNavy}"
     Shell.ForegroundColor="White"
@@ -23,12 +22,12 @@
     Title="SCI-PH">
 
     <!--
-        Una sola app para dos tipos de usuario (ver mobile/README.md):
-          - Personal clínico: login real contra el Mobile BFF (con MFA) y permiso Emergencies.Operate; los datos del
-            área paramédica siguen simulados.
-          - Paciente (Patient): QR + verificación facial, simulados hasta integrar el Mobile BFF.
-        Los flujos de acceso (ClinicalLogin → ClinicalMfa, QrAccess → FaceVerify) y el paramédico se apilan sobre la
-        entrada y los registra cada feature. Aquí solo se declaran el arranque, la entrada y el área del paciente.
+        Una sola app y un solo inicio de sesión para dos tipos de usuario (ver mobile/README.md y ADR-015):
+          - Personal clínico con permiso Emergencies.Operate: área paramédica.
+          - Paciente (rol Patient): área del paciente con su propio expediente (api/mobile/patient/me).
+        El QR y el rostro nunca inician una sesión. El login (ClinicalLogin → ClinicalMfa) y el flujo paramédico se
+        apilan sobre la entrada y los registra cada feature. Aquí solo se declaran el arranque, la entrada y el área del
+        paciente.
     -->
 
     <!-- CABECERA DEL MENÚ (área del paciente): nombre tomado de la sesión -->
@@ -91,10 +90,6 @@
 
     <FlyoutItem Title="Documentos" Route="{x:Static patient:PatientRoutes.Documents}">
         <ShellContent Title="Documentos" ContentTemplate="{DataTemplate patientDocuments:DocumentsPage}" />
-    </FlyoutItem>
-
-    <FlyoutItem Title="Asistente IA" Route="{x:Static patient:PatientRoutes.Assistant}">
-        <ShellContent Title="SCI-PH AI" ContentTemplate="{DataTemplate patientAi:AiAssistantPage}" />
     </FlyoutItem>
 
     <MenuItem Text="Cerrar sesión" Command="{Binding PatientLogoutCommand}" />

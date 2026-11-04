@@ -80,6 +80,17 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
             return new StaffSession(_mobile.CreateHttpsClient().WithBearer(session.Session!.AccessToken), account.Id, staffId);
         }
 
+        // A Patient account linked to a seeded own record (ADR-015), signed in on the Mobile BFF.
+        public async Task<(SeededPatientRecord Record, HttpClient Client)> SignInPatientAsync(string givenNames)
+        {
+            var account = await Web.Factory.CreateUserAsync(SecurityRoles.Patient);
+            var record = await Web.DbAsync(db => PatientRecordSeed.SeedAsync(db, givenNames, account.Id));
+            var login = await _mobile.CreateHttpsClient().PostAsJsonAsync("/api/mobile/auth/login", new LoginRequest(account.Email, account.Password));
+            login.EnsureSuccessStatusCode();
+            var session = await login.ReadAsAsync<MobileLoginResponse>();
+            return (record, _mobile.CreateHttpsClient().WithBearer(session.Session!.AccessToken));
+        }
+
         // A device credential as the administration would provision it (key returned once, only its hash stored).
         public async Task<TestReader> ProvisionReaderAsync(params string[] scopes)
         {

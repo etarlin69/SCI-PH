@@ -28,8 +28,6 @@
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SCI-PH registra la ubicación de la emergencia al crearla.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>SCI-PH usa tus fotos solo para la imagen de tu perfil.</string>
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/appicon.appiconset</string>
 </dict>

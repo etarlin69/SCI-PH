@@ -13,7 +13,7 @@
 
             <VerticalStackLayout Spacing="4">
                 <Label Text="SCI-PH" Style="{StaticResource SciTitle}" HorizontalTextAlignment="Center" />
-                <Label Text="Acceso personal clínico"
+                <Label Text="Inicia sesión con tu cuenta de SCI-PH"
                        Style="{StaticResource SciSubtitle}"
                        HorizontalTextAlignment="Center" />
             </VerticalStackLayout>

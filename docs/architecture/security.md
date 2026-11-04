@@ -118,6 +118,7 @@ ESP32 ─► HTTPS + X-Device-Id + X-Device-Key ─► DeviceApiKey ─► princ
 | `GET/POST /api/web/admin/staff…` | `ClinicalStaff.Manage` | listar, ver, alta, activar, desactivar, afiliaciones (abrir, finalizar); la cuenta del personal se crea con la invitación (`Users.Manage`) |
 | `POST /api/mobile/auth/login`, `/mfa/verify`, `/refresh`, `/logout` | Anónimo | Tokens en el cuerpo |
 | `GET /api/mobile/auth/me`, `POST /change-password`, `/revoke-sessions` | Autenticado | |
+| `GET /api/mobile/patient/me…` (perfil, resumen, atenciones, alergias, diagnósticos, recetas, resultados) | Política `PatientSelfService` (cuenta `Patient`) + vínculo `Patient.IdentityUserId` | expediente propio, solo lectura; sin `patientId` en la ruta; atención ajena `404`; cada lectura auditada (sin auditoría, `503` sin datos); límite `patient-self-service` por usuario (ADR-015) |
 | `POST /api/device/heartbeat` | Dispositivo con `Device.Heartbeat` | |
 | `GET /api/device/fingerprint/sessions/pending`, `POST …/{sessionId}/result` | Dispositivo con `Device.Fingerprint.Identify` | identificación por huella (ADR-009) |
 | `GET /api/device/fingerprint/enrollments/pending`, `POST …/{enrollmentId}/result` | Dispositivo con `Device.Fingerprint.Enroll` | registro de huellas (ADR-010) |
@@ -128,7 +129,7 @@ ESP32 ─► HTTPS + X-Device-Id + X-Device-Key ─► DeviceApiKey ─► princ
 
 Errores (ProblemDetails): 400 validación o enlace inválido, 401 sin credenciales o credenciales inválidas
 (siempre genérico), 403 sin permiso o CSRF rechazado, 409 conflicto (último administrador, duplicados),
-429 límite de peticiones.
+429 límite de peticiones, 503 (autoservicio del paciente) lectura que no se pudo auditar.
 
 ## Configuración
 
@@ -142,7 +143,7 @@ Errores (ProblemDetails): 400 validación o enlace inválido, 401 sin credencial
 | `Email:PickupDirectory` | User Secrets | Ruta absoluta fuera del repositorio (desarrollo) |
 | `Smtp:Host`, `Port`, `UseSsl`, `UserName`, `FromAddress`, `FromName` | `appsettings` / variables | |
 | `Smtp:Password` | User Secrets / `Smtp__Password` | Nunca en el repositorio |
-| `RateLimiting:*` | `appsettings` | Límites por política |
+| `RateLimiting:*` | `appsettings` | Límites por política. Las políticas por IP usan `RemoteIpAddress`: detrás de un proxy hace falta `ForwardedHeaders` (seguimiento P1, ADR-015); el límite del autoservicio del paciente va por usuario y no depende de la IP |
 | `DeviceAuthentication:RequireHttps` | `appsettings` | `false` solo en Development |
 | `IdentityBootstrap:*` | User Secrets / variables | Primer administrador |
 | `IdentityDevelopmentAccounts:*` | User Secrets / variables | Cuentas de prueba, una por rol excepto Administrator; solo Development (en otro entorno el Web BFF no arranca) |
@@ -150,6 +151,8 @@ Errores (ProblemDetails): 400 validación o enlace inválido, 401 sin credencial
 ## Reglas para el código nuevo
 
 - Proteger endpoints con `[Authorize(Policy = Permissions.X.Y)]`; nunca comparar strings de roles.
+  Una política con nombre (`AccessPolicies`) solo cuando no es un permiso: `PatientSelfService`, la puerta de entrada
+  del autoservicio del paciente (ADR-015), cuya frontera real es el expediente propio que decide `PatientSelfService`.
 - Datos de un paciente: `IAuthorizationService.AuthorizeAsync(User, patientId, PatientRecordRequirement.Read(...))`
   o `IPatientAccessAuthorizer`; nunca confiar en un `patientId` del cliente para un usuario Patient.
 - Endpoints públicos sensibles: `[EnableRateLimiting(...)]` y respuestas que no revelen si una cuenta existe.
