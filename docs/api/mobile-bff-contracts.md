@@ -79,25 +79,43 @@ decisión 2).
   orden determinista (atenciones por `startedAtUtc`, diagnósticos por `recordedAtUtc`, recetas por `issuedAtUtc`,
   resultados por `resultedAtUtc`, todos descendentes y desempatados por `id`; alergias por sustancia). Un historial más
   largo no muestra lo más antiguo: la paginación por cursor es un seguimiento P1.
-- **Visibilidad:** alergias de la **última versión** del historial; resultados **publicados** (`Final`, `Corrected`;
-  nunca `Pending` ni `Cancelled`); recetas **emitidas** (`Issued`, o `Cancelled` después de emitirse; nunca un
-  borrador, ni uno cancelado).
+- **Publicación (V1 conservadora, listas explícitas en `PatientSelfVisibility`):**
+  - alergias de la **última versión** del historial, sin sus notas;
+  - resultados **publicados** (`Final`, `Corrected`; nunca `Pending` ni `Cancelled`), sin interpretación;
+  - recetas **emitidas** (`Issued`, o `Cancelled` después de emitirse; nunca un borrador), sin las notas del prescriptor;
+  - diagnósticos solo si son `Definitive` **y** su atención está `Closed`: nunca presuntivos ni de atenciones abiertas o
+    canceladas;
+  - una atención cancelada aparece solo como tal, con sus metadatos: sus diagnósticos, resultados y recetas no se publican;
+  - sin motivo (`reason`) ni estado interno de la atención: `status` es `InProgress` (`Created`, `InProgress`,
+    `Transferred`, `Received`, `InEvolution`), `Completed` (`Closed`) o `Cancelled`;
+  - las notas clínicas, los signos vitales y los procedimientos no se publican y no tienen ruta.
+  El resumen de inicio usa las mismas consultas, así que sus conteos nunca revelan lo que el historial oculta.
+- **Auditoría:** cada lectura escribe una `ClinicalAuditEntry` (`Read`) con solo metadatos: cuenta, categoría
+  (`PatientProfile`, `PatientSummary`, `PatientEncounters`, `PatientEncounter`, `PatientAllergies`, `PatientDiagnoses`,
+  `PatientPrescriptions`, `PatientResults`), resultado y hora; nunca contenido del expediente. **Falla cerrado:** si la
+  entrada no se puede guardar, no sale ningún dato y la respuesta es un `503` genérico. Un rechazo dentro del servicio
+  (sin vínculo, atención que no es propia) se audita como `Failure` si se puede, sin cambiar la respuesta; el `401`
+  anónimo y el rechazo de la política (cuentas de personal) no generan entrada.
+- **Límite de peticiones:** política `patient-self-service`, **60 por minuto por usuario autenticado** (`sub`), sin cola:
+  cada paciente tiene su propio contador. Sin usuario autenticado cuenta por IP. Al superarlo: `429` con `Retry-After`. Login,
+  MFA y refresh siguen con su política `authentication` por IP.
 - **Fuera de alcance:** documentos (el almacenamiento aún no existe), citas, notificaciones, QR, rostro, edición del
   perfil y cualquier escritura (`POST`/`PUT`/`DELETE` → `405`).
 
 | Método | Ruta | Respuesta |
 |---|---|---|
-| `GET` | `/api/mobile/patient/me` | Perfil: `givenNames`, `familyNames`, `dateOfBirth`, `sex`, `identityStatus`, `document` (`type` + valor enmascarado `***1234`), `email`, `phone` |
+| `GET` | `/api/mobile/patient/me` | Perfil: `givenNames`, `familyNames`, `dateOfBirth`, `sex`, `document` (`type` + valor enmascarado `***1234`), `email`, `phone` |
 | `GET` | `/api/mobile/patient/me/summary` | `displayName`, `encounterCount`, `resultCount`, `latestEncounter`, `latestResult`, `activeAllergies` |
-| `GET` | `/api/mobile/patient/me/encounters` | Atenciones: `id`, `type`, `status`, `reason`, `startedAtUtc`, `endedAtUtc`, `clinicName` |
+| `GET` | `/api/mobile/patient/me/encounters` | Atenciones: `id`, `type`, `status`, `startedAtUtc`, `endedAtUtc`, `clinicName` |
 | `GET` | `/api/mobile/patient/me/encounters/{encounterId}` | `encounter` + sus `diagnoses`, `results` y `prescriptions`; `404` si no es propia |
 | `GET` | `/api/mobile/patient/me/allergies` | `id`, `substance`, `severity`, `status`, `reaction`, `onsetDate` |
-| `GET` | `/api/mobile/patient/me/diagnoses` | `id`, `encounterId`, `description`, `codeSystem`, `code`, `type`, `isPrimary`, `recordedAtUtc`, `confirmedAtUtc` |
-| `GET` | `/api/mobile/patient/me/prescriptions` | `id`, `encounterId`, `status`, `notes`, `issuedAtUtc`, `validUntilUtc`, `cancelledAtUtc`, `items[]` (`medicationName`, `presentation`, `concentration`, `dose`, `doseUnit`, `route`, `frequency`, `durationDays`, `instructions`) |
-| `GET` | `/api/mobile/patient/me/results` | `id`, `encounterId`, `type`, `status`, `name`, `codeSystem`, `code`, `resultText`, `numericValue`, `unit`, `referenceRange`, `resultedAtUtc` |
+| `GET` | `/api/mobile/patient/me/diagnoses` | `id`, `encounterId`, `description`, `type`, `recordedAtUtc` |
+| `GET` | `/api/mobile/patient/me/prescriptions` | `id`, `encounterId`, `status`, `issuedAtUtc`, `validUntilUtc`, `cancelledAtUtc`, `items[]` (`medicationName`, `presentation`, `concentration`, `dose`, `doseUnit`, `route`, `frequency`, `durationDays`, `instructions`) |
+| `GET` | `/api/mobile/patient/me/results` | `id`, `encounterId`, `type`, `status`, `name`, `resultText`, `numericValue`, `unit`, `referenceRange`, `resultedAtUtc` |
 
 **Errores:** `401` (sin token o token inválido), `403` (cuenta que no es de paciente o sin vínculo clínico), `404`
-(atención que no es propia), `405` (cualquier escritura).
+(atención que no es propia), `405` (cualquier escritura), `429` (límite por usuario), `503` (la lectura no se pudo
+auditar; genérico y sin datos).
 
 ---
 

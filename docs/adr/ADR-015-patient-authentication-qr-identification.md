@@ -44,6 +44,20 @@ opcional, JWT, refresh rotado, logout y revocación de sesiones (ADR-006), y el 
   escritura) y su propia ruta de aplicación (`PatientSelfService`): no finge ser `ClinicalStaff` y no relaja las reglas
   de personal, afiliación y clínica de los endpoints del personal. El personal tampoco entra en las rutas del paciente.
 - Todo es **solo lectura**: el paciente no escribe datos clínicos con su cuenta.
+- **Publicación conservadora en V1** (listas explícitas en `PatientSelfVisibility`, en contratos propios del paciente):
+  diagnósticos solo `Definitive` de una atención `Closed`; resultados `Final` y `Corrected`, sin interpretación; recetas
+  emitidas, sin las notas del prescriptor; alergias sin notas; atenciones sin motivo y con una clasificación propia
+  (`InProgress`, `Completed`, `Cancelled`) en lugar del estado interno. Una atención cancelada aparece solo como tal: nada
+  de lo registrado en ella se publica. Notas clínicas, signos vitales y procedimientos no se publican: no existe una
+  clasificación de visibilidad para ellos.
+- **Cada lectura se audita** (`ClinicalAuditEntry` `Read`, una por operación, solo metadatos) y **falla cerrado**: si la
+  entrada no se puede guardar, no sale ningún dato (`503` genérico). No es un camino de atención de emergencia y la
+  trazabilidad del acceso es obligatoria. Un rechazo dentro del servicio se audita como `Failure` si se puede.
+- **Límite por usuario autenticado** (`patient-self-service`, 60 por minuto, sin cola), para frenar abusos; no es un límite
+  clínico. Por eso el Mobile BFF ejecuta `UseAuthentication` antes de `UseRateLimiter`, como el Web BFF.
+- **La app no guarda datos del paciente en el dispositivo:** sin caché clínica, perfil de solo lectura y
+  `allowBackup="false"` en Android. Las pantallas se vacían al cerrar la sesión o cambiar de cuenta, y una respuesta tardía
+  de otra cuenta se descarta.
 
 ### 3. Formato del QR (siguiente PR)
 
@@ -53,6 +67,10 @@ opcional, JWT, refresh rotado, logout y revocación de sesiones (ADR-006), y el 
   datos médicos, rutas de Blob, JWT ni ningún token de autenticación.
 - Persistencia: un `PatientIdentifier` de tipo `QrCode` (índice único de valores activos, revocación, `ValidUntilUtc`)
   que guarda el **SHA-256** del token, nunca el token en claro, si las restricciones del modelo lo permiten.
+- **Otro dispositivo:** el paciente inicia sesión normalmente y la app pide su QR. El servidor no puede ni necesita recuperar
+  el token desde su hash, así que al pedirlo en otro dispositivo **emite uno nuevo y revoca el anterior**. El token en claro
+  existe solo en la app autenticada, preferiblemente en SecureStorage mientras es válido. Un QR impreso o una captura dejan
+  de valer al reemitir.
 
 ### 4. Vigencia del QR (siguiente PR)
 
@@ -87,6 +105,12 @@ asistente de IA del paciente (no se conecta a la IA clínica) y la edición del 
 
 ## Seguimientos
 
+- **P1 — `ForwardedHeaders`:** las políticas por IP (login, MFA, refresh) usan `RemoteIpAddress`; detrás de un proxy todos los
+  clientes compartirían contador hasta configurarlo. No afecta al límite por usuario del autoservicio.
+- **P1 — Corrección de identidad:** desvincular una cuenta mal vinculada, corregir un NN mal identificado y endurecer las
+  invitaciones.
+- **P1 — Recuperación de contraseña desde la app** y destino del paciente tras activar su cuenta.
+- **P1 — Condiciones crónicas y medicación domiciliaria** en el expediente propio.
 - **P1 — Paginación del historial del paciente:** hoy cada lista de `/api/mobile/patient/me` se corta en los 200
   elementos más recientes (orden determinista); falta una paginación por cursor.
 - **P1 — Seguridad: ventana del access token tras desactivar o revocar** (heredada de ADR-006): hasta 15 min de uso de

@@ -227,7 +227,7 @@ La app **nunca envía un id de paciente**: el servidor lo deduce de la cuenta (`
 | Pantalla | Qué muestra | Contrato |
 |---|---|---|
 | Inicio | Nombre, resultados publicados y atenciones; última atención y último resultado | `GET …/patient/me/summary` |
-| Mi perfil | Nombre, documento (enmascarado), email, sexo, fecha de nacimiento, teléfono y conteos; foto y descripción como demostración local (solo este dispositivo) | `GET …/patient/me` + `…/summary` |
+| Mi perfil | Nombre, documento (enmascarado), email, sexo, fecha de nacimiento, teléfono y conteos; solo lectura | `GET …/patient/me` + `…/summary` |
 | Historial clínico | Alergias (última versión del historial), diagnósticos, recetas emitidas y atenciones | `GET …/allergies`, `…/diagnoses`, `…/prescriptions`, `…/encounters` |
 | Resultados | Resultados publicados (finales o corregidos) con valor, tipo y rango de referencia | `GET …/patient/me/results` |
 | Documentos | "Todavía no disponible": no hay almacenamiento ni descarga de documentos | — |
@@ -246,8 +246,12 @@ Reglas:
 - Nada de acceso directo a PostgreSQL, a los DbContext, a Azure Blob Storage ni a proveedores biométricos: todo pasa
   por el Mobile BFF.
 - Los documentos se entregarán mediante el Mobile BFF, nunca con URLs permanentes.
-- No se guardan plantillas ni fotos biométricas en el dispositivo. El refresh token está en SecureStorage; Preferences
-  solo guarda la foto y la descripción locales del perfil de demostración, nunca datos clínicos.
+- No se guardan plantillas ni fotos biométricas en el dispositivo. El refresh token está en SecureStorage y Android no
+  respalda los datos de la app (`allowBackup="false"`). El área del paciente no guarda datos en el dispositivo: el perfil
+  es de solo lectura, y lo que versiones anteriores dejaron (foto y descripción de demostración) se borra al arrancar y al
+  cerrar la sesión.
+- Las pantallas del paciente se vacían al cerrar la sesión o cambiar de cuenta (`PatientRecordViewModel`) y descartan una
+  respuesta que llega tarde: el paciente B nunca ve datos del paciente A.
 - No se cachean datos clínicos en el dispositivo: cada pantalla los pide al abrirse.
 
 ## Compilar
