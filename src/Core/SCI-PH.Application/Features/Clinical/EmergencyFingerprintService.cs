@@ -281,7 +281,7 @@ namespace SCI_PH.Application.Features.Clinical
             await _readers.FindAsync(readerId, cancellationToken) is { } reader && IsReader(reader);
 
         // Only an NN emergency that is not cancelled or closed is identified here.
-        private static void EnsureIdentifiable(ClinicalEncounter encounter)
+        internal static void EnsureIdentifiable(ClinicalEncounter encounter)
         {
             if (encounter.IsPatientIdentified)
             {

@@ -65,6 +65,7 @@ namespace SCI_PH.Application
             services.AddScoped<IEncounterAccessService, EncounterAccessService>();
             services.AddScoped<PrehospitalEmergencyService>();
             services.AddScoped<EmergencyFingerprintService>();
+            services.AddScoped<EmergencyQrIdentificationService>();
             services.AddScoped<FingerprintEnrollmentService>();
             services.AddScoped<FingerprintRevocationService>();
 
