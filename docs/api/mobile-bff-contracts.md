@@ -383,7 +383,7 @@ documento sale **enmascarado** (`primaryIdentifier`); el número enviado nunca s
 
 ### Identificación por QR del paciente — Implementado (backend)
 
-[ADR-015](../adr/ADR-015-patient-authentication-qr-identification.md), decisión 5. La app todavía no escanea (QR #2). Mismos
+[ADR-015](../adr/ADR-015-patient-authentication-qr-identification.md), decisión 5. La app escanea con la cámara del paramédico (QR #2, `QrScannerPage`) y llama a estas dos rutas. Mismos
 permisos que el documento y la huella: `Emergencies.Operate` + `Patients.Read` + `Patients.Identify`, personal clínico activo
 y la regla de escritura prehospitalaria; todo se comprueba **antes** de mirar el QR. Sin atajo para el administrador.
 Límite `patient-qr-resolve`: **30 por minuto por usuario**, sin cola, compartido por las dos rutas. El QR viaja siempre en el

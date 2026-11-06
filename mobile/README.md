@@ -240,9 +240,10 @@ La app **nunca envía un id de paciente**: el servidor lo deduce de la cuenta (`
 - **Mi QR** ([ADR-015](../docs/adr/ADR-015-patient-authentication-qr-identification.md)): identifica al paciente ante el
   personal autorizado y **nunca inicia sesión ni da acceso por sí solo**. El contenido lo emite el servidor
   (`POST api/mobile/patient/me/qr`), vale 15 minutos, vive **solo en memoria** y se dibuja en el dispositivo. Sin red no hay QR y
-  nunca se muestra uno vencido. Al cerrar la sesión o cambiar de cuenta se borra, sin revocarlo en el servidor. Usa
-  `ZXing.Net.Maui.Controls` 0.6.0 **solo para generar**: registra `BarcodeGeneratorViewHandler` en lugar de
-  `UseBarcodeReader`, así que no hay lector, cámara ni permisos nuevos.
+  nunca se muestra uno vencido. Al cerrar la sesión o cambiar de cuenta se borra, sin revocarlo en el servidor. Se dibuja
+  con el generador de `ZXing.Net.Maui.Controls` 0.6.0 (negro sobre blanco, 280 × 280, dentro de una tarjeta blanca que hace
+  de zona de silencio). La app registra ZXing con `UseBarcodeReader()`, pero el área del paciente **nunca crea la cámara
+  ni pide su permiso**: solo lo hace el escáner del paramédico.
 - **Fuera de la app por ahora**: descarga de documentos, citas, notificaciones, edición del perfil y el asistente de IA (se quitó el chat
   simulado: no se muestran respuestas médicas falsas como reales).
 
@@ -258,6 +259,45 @@ Reglas:
 - Las pantallas del paciente se vacían al cerrar la sesión o cambiar de cuenta (`PatientRecordViewModel`) y descartan una
   respuesta que llega tarde: el paciente B nunca ve datos del paciente A.
 - No se cachean datos clínicos en el dispositivo: cada pantalla los pide al abrirse.
+
+## Escáner del QR del paciente (paramédico)
+
+QR #2 de [ADR-015](../docs/adr/ADR-015-patient-authentication-qr-identification.md): una vía más en "Identificar paciente",
+junto a huella, documento y NN ("Código QR del paciente" → "Escanear QR"), solo mientras la emergencia se puede identificar.
+
+| Paso | Qué ocurre | Contrato |
+|---|---|---|
+| Permiso | Al entrar, se consulta; si falta, se pide **una vez**. Denegado: explicación y "Intentar de nuevo" (solo a pedido). Denegado sin volver a preguntar: "Abrir configuración". Sin cámara: "Cámara no disponible." | — |
+| Lectura | Solo `QR_CODE`. La primera lectura gana (comparación atómica en el hilo de la cámara) y la detección se apaga en el acto. Un código sin el prefijo `sciphqr:v1:` muestra "Código no válido." y no llega al servidor. El contenido nunca se recorta ni se modifica. | — |
+| Candidato | Nombre, fecha de nacimiento y documento enmascarado por el servidor; nada se identifica. "Confirmar paciente", "Escanear nuevamente" o "Cancelar". | `POST …/emergencies/{id}/identify/qr/resolve` |
+| Confirmación | Solo al pulsar "Confirmar paciente". Una clave por candidato, la misma en cada reintento (sin respuesta, 503, 429). Al terminar vuelve a la identificación, que lee la emergencia del servidor (misma atención y código NN) y suelta una lectura de huella pendiente. | `POST …/emergencies/{id}/identify/qr/confirm` |
+
+- **Errores:** 404 (vencido, sustituido, revocado, desconocido: no se distingue) → "El código no es válido o ya expiró. Pide
+  al paciente actualizar su QR.", se borra el candidato y se vuelve a leer tras una pausa. 409 → se lee la emergencia: con
+  paciente, "La emergencia ya está identificada." y nunca se sustituye; sin él, un conflicto genérico. 429 → escáner
+  detenido con el tiempo de `Retry-After`, se reanuda a pedido. 403 → mensaje genérico. 401 → el refresh común
+  (`AuthenticatedHttpHandler`), sin lógica propia.
+- **Cámara:** la vista de ZXing solo existe con la página visible, la app en primer plano y el estado de lectura; con el
+  candidato, al confirmar, al salir o en segundo plano se desconecta. Al volver a primer plano nada se confirma solo.
+- **Sesión:** salir de la página o cambiar de cuenta descarta las respuestas tardías y borra candidato, contenido y clave.
+- **Plataformas:** Android (`CAMERA`, cámara no obligatoria) e iOS (`NSCameraUsageDescription`) piden el permiso del sistema;
+  Windows usa la cámara de ZXing y, si no hay cámara o la privacidad la bloquea, muestra "Cámara no disponible."; en
+  Mac Catalyst el escáner no se ofrece y no se declara la cámara. El APK es uno para paciente y paramédico: el permiso se
+  declara una vez, pero solo el escáner lo pide.
+
+**Validación (2026-11-05):**
+
+| Nivel | Estado |
+|---|---|
+| Código | Tests sin interfaz del escáner (`Paramedic/QrScannerTests`); builds Release de Android y Windows |
+| Cámara | La webcam integrada se abre con la misma comprobación que usa el escáner en Windows. **Lectura real con cámara: pendiente** (necesita una persona que muestre "Mi QR" a la cámara) |
+| Dispositivo físico | **No realizado: no hay un Android físico disponible.** Requisito antes de publicar |
+| iOS | Sin compilar ni ejecutar (requiere macOS) |
+
+Prueba manual pendiente: "Mi QR" en Windows o en el emulador (visible, sin recortes, cuenta atrás, renovación, error de red,
+"Reintentar", se borra al cerrar sesión) → escanear con Windows (webcam) o con un Android físico → candidato → confirmar →
+la emergencia queda identificada con su código NN → signos vitales, procedimiento, medicamento, observación y traslado.
+Comprobar también que el QR anterior tras reemitir, un QR vencido, un `sciphqr:v1:` inventado y un código ajeno se rechazan.
 
 ## Compilar
 
@@ -283,7 +323,9 @@ La app tiene además el target `net9.0` (sin `OutputType=Exe`): no es una app ni
 sin interfaz para que el proyecto de tests la referencie. Los tests usan fakes de `IAppNavigator`,
 `IAppDialogService` y de los servicios de cada feature, sin Shell, ventanas ni handlers. La autenticación se prueba
 con el cliente, el handler y el servicio reales contra un Mobile BFF en memoria (`Auth/FakeMobileBff`) y un
-`ISecureStorage` falso; el área del paciente, con `HttpPatientDataService` real contra `Patient/FakePatientSelfBff`. Sin tests de render XAML ni de dispositivo.
+`ISecureStorage` falso; el área del paciente, con `HttpPatientDataService` real contra `Patient/FakePatientSelfBff`; el escáner de QR, con `HttpParamedicApiService` real
+contra `Paramedic/FakeQrIdentificationBff` y un permiso de cámara falso (la página entrega lo leído: sin cámara). Sin tests
+de render XAML ni de dispositivo.
 
 ## CI
 
@@ -301,9 +343,9 @@ no firma con claves propias y no publica nada.
 
 ## Pendiente
 
-- Escáner del QR del paciente en el área paramédica (QR #2, [ADR-015](../docs/adr/ADR-015-patient-authentication-qr-identification.md),
-  decisión 5): cámara, permisos y flujo sobre los endpoints `identify/qr` ya existentes.
-- Probar "Mi QR" en un dispositivo real: el dibujo del QR y su lectura solo se han comprobado en pruebas sin interfaz.
+- Validación con cámara real del escáner de QR y de "Mi QR" en pantalla (ver
+  [Escáner del QR del paciente](#escáner-del-qr-del-paciente-paramédico)): pendiente con una persona delante de la cámara;
+  un Android físico es requisito antes de publicar.
 - Todo el área paramédica (apertura, lectura, identificación por documento y por huella, signos vitales,
   procedimientos, medicamentos, observaciones y traslado) ya es real.
 - Ubicación de la emergencia (contrato y almacenamiento por definir; ver ADR-008).

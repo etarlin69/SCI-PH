@@ -1,7 +1,8 @@
 # ADR-015: Autenticación del paciente e identificación por QR
 
 - **Estado:** Aceptado. Decisiones 1, 2 y 6 implementadas en `feature/patient-self-service`. Decisiones 3, 4 y 5
-  implementadas en `feature/patient-qr-identification` (QR #1), salvo el escáner del paramédico (QR #2).
+  implementadas en `feature/patient-qr-identification` (QR #1); el escáner del paramédico, en `feature/paramedic-qr-scanner`
+  (QR #2).
 - **Fecha:** 2026-11-01
 - **Relacionado:** [ADR-006](ADR-006-identity-security.md) (cuentas, MFA, refresh), [ADR-005](ADR-005-clinical-model.md)
   (`Patient.IdentityUserId`, `PatientIdentifier`), [ADR-012](ADR-012-face-verification.md) (rostro 1:1 asistido),
@@ -122,7 +123,12 @@ opcional, JWT, refresh rotado, logout y revocación de sesiones (ADR-006), y el 
   cerrado (`503` sin candidato). Nunca se audita ni se registra el token, su hash ni la imagen.
 - **Límites por usuario, sin cola:** `patient-qr` 10/min (emitir y revocar) y `patient-qr-resolve` 30/min (resolver y confirmar).
 - **QR #2:** escáner del paramédico con `ZXing.Net.Maui.Controls` **0.6.0** (la última versión comprobada para .NET 9; 0.7.4 y
-  posteriores piden .NET 10). QR #1 usa de ese paquete solo el generador: sin lector, cámara ni permisos.
+  posteriores piden .NET 10), registrado con `UseBarcodeReader()` (generador y lector). Una página propia sobre la
+  identificación; solo `QR_CODE`, una lectura por activación y solo el contenido `sciphqr:v1:` llega al servidor, tal cual.
+  Leer solo muestra el candidato; identifica únicamente "Confirmar paciente", con un `clientRequestId` por candidato que se
+  conserva en los reintentos. El permiso de cámara solo lo pide ese escáner (Android `CAMERA` con la cámara no obligatoria,
+  iOS `NSCameraUsageDescription`); Windows usa la cámara de ZXing; en Mac Catalyst el escáner no se ofrece y no se declara la
+  cámara. Detalle en [mobile/README.md](../../mobile/README.md#escáner-del-qr-del-paciente-paramédico).
 - Fuera de alcance: verificación facial 1:1 **asistida** tras el QR. El rostro sigue siendo 1:1, nunca 1:N, autenticación
   ni autorización; si llegara a usarse como autenticación autónoma, la prueba de vida sería **obligatoria** (ADR-012).
 
@@ -136,7 +142,7 @@ asistente de IA del paciente (no se conecta a la IA clínica) y la edición del 
 - La app tiene un solo inicio de sesión: la cuenta decide el área (paciente con rol `Patient`, paramédico con
   `Emergencies.Operate`). El paciente no recibe `Emergencies.Operate` ni ningún otro permiso para pasar el filtro.
 - Un QR filtrado no expone el expediente; su riesgo es la identificación, y se mitiga revocando y reemitiendo.
-- Mientras no exista el escáner (QR #2), el paciente ya ve su QR, pero el paramédico identifica por huella, documento o NN.
+- El QR es una vía más junto a huella, documento y NN: ninguna es requisito de otra, y en Mac Catalyst no se ofrece.
 - Como para el personal, un access token emitido antes de desactivar la cuenta o revocar sus sesiones sigue siendo
   válido hasta 15 min (ADR-006, sin lista negra); el refresh se rechaza de inmediato.
 
@@ -154,7 +160,8 @@ asistente de IA del paciente (no se conecta a la IA clínica) y la edición del 
   un token ya emitido. Endurecerla (security stamp o lista de revocación) es un cambio de ADR-006, no de esta vertical.
 - **Integración HTTP real del área paramédica en MAUI:** `HttpParamedicApiService` todavía usa
   `MockParamedicApiService` internamente; es una vertical aparte (el backend paramédico no cambia aquí).
-- **QR #2:** escáner del paramédico (decisión 5).
+- **QR #2 — validación con cámara real:** el escáner está implementado y probado sin interfaz, pero la lectura real (cámara de
+  Windows o Android, y un Android físico antes de publicar) queda pendiente; ver mobile/README.md.
 - **Endurecimiento común de la identificación:** si falla el guardado de una confirmación (documento, huella o QR), no se
   identifica nada, pero la respuesta no es un `503` controlado. Conviene resolverlo para las tres vías, no solo para el QR.
 - **P1 — Web del hospital:** resolver un QR por escáner o pegándolo, con su propia ruta.
