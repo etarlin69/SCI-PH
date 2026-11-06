@@ -10,7 +10,7 @@ namespace SCI_PH.Mobile.Features.Paramedic.Services;
 
 /// <summary>
 /// Servicio híbrido del área paramédica. REAL (Mobile BFF, con el cliente autenticado): abrir la emergencia, leerla,
-/// identificar al paciente por documento, registrar signos vitales, procedimientos, medicamentos administrados y
+/// identificar al paciente por documento o con su QR (resolver el candidato y confirmarlo), registrar signos vitales, procedimientos, medicamentos administrados y
 /// observaciones, y el traslado (solicitar, iniciar, cancelar). La identificación por huella es real y tiene su propio
 /// servicio (<see cref="HttpFingerprintIdentificationService"/>). Los fallos de las llamadas reales llegan como
 /// <see cref="MobileApiException"/>.
@@ -65,6 +65,25 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         {
             return null;
         }
+    }
+
+    // QR del paciente (ADR-015). El contenido escaneado va tal cual, solo en el cuerpo: nunca en la ruta, la consulta ni un
+    // registro. 404 (cualquier QR no válido), 409, 429 y el resto llegan como MobileApiException.
+    public async Task<QrCandidateDto> ResolveQrCandidateAsync(Guid emergencyId, string payload, CancellationToken cancellationToken = default)
+    {
+        var candidate = await _client.PostAsync<ResolveQrRequest, QrCandidateResponse>(
+            $"{Emergencies}/{emergencyId}/identify/qr/resolve", new ResolveQrRequest(payload), cancellationToken);
+        return new QrCandidateDto(candidate.DisplayName, candidate.DateOfBirth, candidate.Document?.Type, candidate.Document?.Value);
+    }
+
+    // 200: la MISMA emergencia, identificada (también al reintentar con la misma clave y el mismo QR).
+    public async Task<EmergencyDto> ConfirmQrIdentificationAsync(
+        Guid emergencyId, Guid clientRequestId, string payload, CancellationToken cancellationToken = default)
+    {
+        var emergency = ToDto(await _client.PostAsync<ConfirmQrRequest, EmergencyResponse>(
+            $"{Emergencies}/{emergencyId}/identify/qr/confirm", new ConfirmQrRequest(clientRequestId, payload), cancellationToken));
+        _mock.Adopt(emergency);
+        return emergency;
     }
 
     // Una toma: 1 a 7 valores en una sola petición, todo o nada. 201 (nueva) o 200 (reintento con la misma clave y los
@@ -157,6 +176,21 @@ public sealed class HttpParamedicApiService : IParamedicApiService
     private sealed record OpenEmergencyRequest(Guid ClientRequestId, DateTimeOffset StartedAt, string ChiefComplaint);
 
     private sealed record IdentifyByDocumentRequest(Guid ClientRequestId, PatientDocumentType DocumentType, string DocumentNumber);
+
+    // Contratos exactos del QR. ToString nunca imprime el contenido.
+    private sealed record ResolveQrRequest(string Payload)
+    {
+        public override string ToString() => nameof(ResolveQrRequest);
+    }
+
+    private sealed record ConfirmQrRequest(Guid ClientRequestId, string Payload)
+    {
+        public override string ToString() => nameof(ConfirmQrRequest);
+    }
+
+    private sealed record QrDocumentResponse(string? Type, string? Value);
+
+    private sealed record QrCandidateResponse(string DisplayName, DateOnly? DateOfBirth, QrDocumentResponse? Document);
 
     // Contrato exacto de la toma: los valores ausentes no se envían.
     private sealed record VitalSignsRequest(

@@ -102,6 +102,13 @@ internal sealed class RecordingParamedicApi : IParamedicApiService
         return Task.FromResult<EmergencyDto?>(new EmergencyDto { Id = emergencyId });
     }
 
+    public Task<QrCandidateDto> ResolveQrCandidateAsync(Guid emergencyId, string payload, CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException("The QR was not expected in this flow (test).");
+
+    public Task<EmergencyDto> ConfirmQrIdentificationAsync(
+        Guid emergencyId, Guid clientRequestId, string payload, CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException("The QR was not expected in this flow (test).");
+
     public Task RegisterVitalsAsync(Guid emergencyId, RegisterVitalsDto dto) => Task.CompletedTask;
 
     public Task RegisterProcedureAsync(Guid emergencyId, RegisterProcedureDto dto) => Task.CompletedTask;

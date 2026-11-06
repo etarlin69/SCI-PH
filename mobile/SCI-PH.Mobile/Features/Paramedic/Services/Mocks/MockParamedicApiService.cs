@@ -56,6 +56,23 @@ public class MockParamedicApiService : IParamedicApiService
         return emergency;
     }
 
+    // Solo para el modo mock: cualquier QR con el prefijo de SCI-PH es un candidato ficticio; la identificación es la real.
+    public async Task<QrCandidateDto> ResolveQrCandidateAsync(Guid emergencyId, string payload, CancellationToken cancellationToken = default)
+    {
+        await Task.Delay(SimulatedDelayMs, cancellationToken);
+        GetOrThrow(emergencyId);
+        return new QrCandidateDto("Paciente Ficticio", null, null, null);
+    }
+
+    public async Task<EmergencyDto> ConfirmQrIdentificationAsync(
+        Guid emergencyId, Guid clientRequestId, string payload, CancellationToken cancellationToken = default)
+    {
+        await Task.Delay(SimulatedDelayMs, cancellationToken);
+        var emergency = GetOrThrow(emergencyId);
+        emergency.Patient ??= new PatientSummaryDto { Id = Guid.NewGuid(), DisplayName = "Paciente Ficticio" };
+        return emergency;
+    }
+
     public async Task RegisterVitalsAsync(Guid emergencyId, RegisterVitalsDto dto)
     {
         await Task.Delay(SimulatedDelayMs);
