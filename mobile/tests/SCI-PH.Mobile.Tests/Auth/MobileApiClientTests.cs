@@ -53,6 +53,20 @@ public class MobileApiClientTests
         Assert.Equal("Demasiados intentos. Espera 2 minutos e intenta nuevamente.", MobileApiErrorMessages.For(ex));
     }
 
+    [Theory]
+    [InlineData(1, "1 segundo")]
+    [InlineData(2, "2 segundos")]
+    [InlineData(59, "59 segundos")]
+    [InlineData(60, "1 minuto")]
+    [InlineData(61, "2 minutos")]
+    [InlineData(120, "2 minutos")]
+    public void TheWaitAgreesInNumber(int seconds, string expected)
+    {
+        var ex = new MobileApiException(MobileApiError.TooManyRequests, HttpStatusCode.TooManyRequests, TimeSpan.FromSeconds(seconds));
+
+        Assert.Equal($"Demasiados intentos. Espera {expected} e intenta nuevamente.", MobileApiErrorMessages.For(ex));
+    }
+
     [Fact]
     public async Task ARefusedConnectionIsANetworkFailure()
     {
