@@ -142,6 +142,15 @@ public sealed partial class QrScannerViewModel : BaseViewModel
 
     public bool IsCompleted => State == QrScannerState.Completed;
 
+    /// <summary>
+    /// Volver atrás mientras se confirma: una confirmación enviada puede haberse aplicado, y la pantalla anterior leería la
+    /// emergencia antes de tiempo y la mostraría como NN. Se bloquea solo lo que hace el usuario (retroceder), nunca la salida
+    /// obligatoria al vencer la sesión, que va a otra raíz. La confirmación no se cancela.
+    /// </summary>
+    public bool BlocksNavigation(ShellNavigationSource source) =>
+        State == QrScannerState.Confirming
+        && source is ShellNavigationSource.Pop or ShellNavigationSource.PopToRoot or ShellNavigationSource.Remove;
+
     /// <summary>Con la identificación ya terminada la salida es "Volver", no "Cancelar": no hay nada que cancelar.</summary>
     public bool ShowCancel => !IsCompleted;
 

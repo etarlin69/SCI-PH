@@ -376,6 +376,16 @@ public class MyQrSurfaceTests
 
     // La app es una sola (paciente y paramédico): ZXing se registra una vez con UseBarcodeReader (generador y lector), pero
     // solo el escáner del paramédico crea la cámara o pide su permiso. Dibujar "Mi QR" nunca los toca.
+    // ZXing cuenta BarcodeMargin en módulos del QR y su valor por defecto es 1: los 4 módulos van en la propia imagen.
+    [Fact]
+    public void TheQrCarriesItsOwnFourModuleQuietZone()
+    {
+        var page = File.ReadAllText(AppFile("Features", "Patient", "Qr", "MyQrPage.xaml.cs"));
+
+        Assert.Contains("private const int QuietZoneModules = 4;", page);
+        Assert.Contains("BarcodeMargin = QuietZoneModules", page);
+    }
+
     [Fact]
     public void DrawingTheQrAsksForNoCameraOrScanner()
     {

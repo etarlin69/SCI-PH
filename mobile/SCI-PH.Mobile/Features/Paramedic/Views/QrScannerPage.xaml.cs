@@ -18,6 +18,7 @@ public partial class QrScannerPage : ContentPage
     private readonly QrScanGate _gate = new();
     private CameraBarcodeReaderView? _reader;
     private Window? _window;
+    private Shell? _shell;
 #if WINDOWS
     private Microsoft.UI.Xaml.Window? _platformWindow;
 #endif
@@ -37,6 +38,7 @@ public partial class QrScannerPage : ContentPage
         _visible = true;
         _foreground = true;
         AttachWindow();
+        AttachShell();
         await _viewModel.ActivateAsync();
         UpdateCamera();
     }
@@ -45,10 +47,42 @@ public partial class QrScannerPage : ContentPage
     {
         _visible = false;
         DetachWindow();
+        DetachShell();
         StopCamera();
         _viewModel.Deactivate();
         base.OnDisappearing();
     }
+
+    // Atrás de Shell (barra y botón del sistema) mientras se confirma: la petición sigue su curso y su respuesta decide.
+    private void AttachShell()
+    {
+        DetachShell();
+        _shell = Shell.Current;
+        if (_shell is not null)
+        {
+            _shell.Navigating += OnShellNavigating;
+        }
+    }
+
+    private void DetachShell()
+    {
+        if (_shell is not null)
+        {
+            _shell.Navigating -= OnShellNavigating;
+            _shell = null;
+        }
+    }
+
+    private void OnShellNavigating(object? sender, ShellNavigatingEventArgs e)
+    {
+        if (e.CanCancel && _viewModel.BlocksNavigation(e.Source))
+        {
+            e.Cancel();
+        }
+    }
+
+    protected override bool OnBackButtonPressed() =>
+        _viewModel.BlocksNavigation(ShellNavigationSource.Pop) || base.OnBackButtonPressed();
 
     private void AttachWindow()
     {

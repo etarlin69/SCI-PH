@@ -269,6 +269,85 @@ public class QrScannerTests
     }
 
     [Fact]
+    public async Task GoingBackIsBlockedOnlyWhileConfirmingAndNeverCancelsTheRequest()
+    {
+        var scanner = await CandidateAsync();
+        Assert.False(scanner.BlocksNavigation(ShellNavigationSource.Pop));
+        var confirmGate = _bff.ConfirmGate = new TaskCompletionSource();
+
+        var confirming = scanner.ConfirmCommand.ExecuteAsync(null);
+
+        Assert.Equal(QrScannerState.Confirming, scanner.State);
+        Assert.True(scanner.BlocksNavigation(ShellNavigationSource.Pop));
+        Assert.True(scanner.BlocksNavigation(ShellNavigationSource.PopToRoot));
+        Assert.True(scanner.BlocksNavigation(ShellNavigationSource.Remove));
+        Assert.Empty(_navigator.Navigations);
+        Assert.False(confirming.IsCompleted);
+
+        confirmGate.SetResult();
+        await confirming;
+
+        Assert.Equal(1, _bff.Confirms);
+        Assert.Equal(1, _bff.IdentificationsCommitted);
+        Assert.Equal(QrScannerState.Completed, scanner.State);
+        Assert.False(scanner.BlocksNavigation(ShellNavigationSource.Pop));
+        Assert.Equal("..", Assert.Single(_navigator.Navigations).Route);
+    }
+
+    // La salida al vencer la sesión va a otra raíz (//Entry): nunca se bloquea.
+    [Theory]
+    [InlineData(ShellNavigationSource.ShellItemChanged)]
+    [InlineData(ShellNavigationSource.ShellSectionChanged)]
+    [InlineData(ShellNavigationSource.ShellContentChanged)]
+    [InlineData(ShellNavigationSource.Unknown)]
+    public async Task TheMandatoryExitIsNeverBlockedWhileConfirming(ShellNavigationSource source)
+    {
+        var scanner = await CandidateAsync();
+        var confirmGate = _bff.ConfirmGate = new TaskCompletionSource();
+        var confirming = scanner.ConfirmCommand.ExecuteAsync(null);
+
+        Assert.False(scanner.BlocksNavigation(source));
+
+        confirmGate.SetResult();
+        await confirming;
+    }
+
+    [Fact]
+    public async Task ASessionChangeWhileConfirmingUnblocksAndDropsTheLateResult()
+    {
+        var scanner = await CandidateAsync();
+        var confirmGate = _bff.ConfirmGate = new TaskCompletionSource();
+        var confirming = scanner.ConfirmCommand.ExecuteAsync(null);
+
+        StaffSession.SignIn(_session, Guid.NewGuid());
+
+        Assert.False(scanner.BlocksNavigation(ShellNavigationSource.Pop));
+        Assert.Null(scanner.CandidateName);
+        confirmGate.SetResult();
+        await confirming;
+        Assert.Empty(_navigator.Navigations);
+        Assert.NotEqual(QrScannerState.Completed, scanner.State);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    public async Task AfterAFailedConfirmationGoingBackIsAllowedAgainAndTheKeyIsKept(HttpStatusCode status)
+    {
+        var scanner = await CandidateAsync();
+        _bff.NextStatuses.Enqueue(status);
+
+        await scanner.ConfirmCommand.ExecuteAsync(null);
+        Assert.Equal(QrScannerState.Candidate, scanner.State);
+        Assert.False(scanner.BlocksNavigation(ShellNavigationSource.Pop));
+        await scanner.ConfirmCommand.ExecuteAsync(null);
+
+        var keys = _bff.Bodies.Where(b => b.Contains("clientRequestId", StringComparison.OrdinalIgnoreCase)).Distinct().ToList();
+        Assert.Single(keys);
+        Assert.Equal(QrScannerState.Completed, scanner.State);
+    }
+
+    [Fact]
     public async Task ADoubleTapConfirmsOnce()
     {
         var scanner = await CandidateAsync();
