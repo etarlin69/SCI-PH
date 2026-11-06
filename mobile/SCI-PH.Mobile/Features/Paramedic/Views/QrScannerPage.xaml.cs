@@ -18,6 +18,9 @@ public partial class QrScannerPage : ContentPage
     private readonly QrScanGate _gate = new();
     private CameraBarcodeReaderView? _reader;
     private Window? _window;
+#if WINDOWS
+    private Microsoft.UI.Xaml.Window? _platformWindow;
+#endif
     private bool _visible;
     private bool _foreground = true;
 
@@ -57,8 +60,27 @@ public partial class QrScannerPage : ContentPage
         {
             _window.Stopped += OnWindowStopped;
             _window.Resumed += OnWindowResumed;
+#if WINDOWS
+            // En Windows, al restaurar una ventana minimizada puede no llegar Resumed: se mira lo contrario de Stopped, que
+            // MAUI obtiene de este mismo evento.
+            _platformWindow = _window.Handler?.PlatformView as Microsoft.UI.Xaml.Window;
+            if (_platformWindow is not null)
+            {
+                _platformWindow.VisibilityChanged += OnPlatformVisibilityChanged;
+            }
+#endif
         }
     }
+
+#if WINDOWS
+    private void OnPlatformVisibilityChanged(object sender, Microsoft.UI.Xaml.WindowVisibilityChangedEventArgs args)
+    {
+        if (args.Visible)
+        {
+            OnWindowResumed(sender, EventArgs.Empty);
+        }
+    }
+#endif
 
     private void DetachWindow()
     {
@@ -68,6 +90,14 @@ public partial class QrScannerPage : ContentPage
             _window.Resumed -= OnWindowResumed;
             _window = null;
         }
+
+#if WINDOWS
+        if (_platformWindow is not null)
+        {
+            _platformWindow.VisibilityChanged -= OnPlatformVisibilityChanged;
+            _platformWindow = null;
+        }
+#endif
     }
 
     // Segundo plano: la cámara se apaga. Nada se confirma al volver.
@@ -79,6 +109,12 @@ public partial class QrScannerPage : ContentPage
 
     private async void OnWindowResumed(object? sender, EventArgs e)
     {
+        // Sin haber pasado a segundo plano no hay nada que reanudar (en Windows pueden llegar los dos avisos).
+        if (_foreground)
+        {
+            return;
+        }
+
         _foreground = true;
         if (!_visible)
         {
