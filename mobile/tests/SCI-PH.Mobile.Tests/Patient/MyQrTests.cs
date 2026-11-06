@@ -394,7 +394,10 @@ public class MyQrSurfaceTests
         }
 
         // El permiso y la vista de cámara solo existen en el escáner del paramédico.
-        Assert.Contains("CameraBarcodeReaderView", File.ReadAllText(AppFile("Features", "Paramedic", "Views", "QrScannerPage.xaml.cs")));
+        var scanner = File.ReadAllText(AppFile("Features", "Paramedic", "Views", "QrScannerPage.xaml.cs"));
+        Assert.Contains("CameraBarcodeReaderView", scanner);
+        // En Android, Window es null en OnAppearing para una página de Shell: sin la ventana de la app, Stopped y Resumed no llegan.
+        Assert.Contains("Window ?? Application.Current?.Windows", scanner);
         Assert.DoesNotContain("camera", File.ReadAllText(AppFile("Platforms", "MacCatalyst", "Entitlements.plist")));
         Assert.DoesNotContain("NSCameraUsageDescription", File.ReadAllText(AppFile("Platforms", "MacCatalyst", "Info.plist")));
     }

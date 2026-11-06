@@ -50,7 +50,9 @@ public partial class QrScannerPage : ContentPage
     private void AttachWindow()
     {
         DetachWindow();
-        _window = Window;
+        // En Android, Window aún es null en OnAppearing para una página que Shell acaba de abrir: sin esta alternativa no
+        // llegarían Stopped ni Resumed (comprobado en el emulador). La app tiene una sola ventana.
+        _window = Window ?? Application.Current?.Windows.FirstOrDefault();
         if (_window is not null)
         {
             _window.Stopped += OnWindowStopped;

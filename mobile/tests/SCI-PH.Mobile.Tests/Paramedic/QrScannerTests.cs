@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using SCI_PH.Mobile.Common.Api;
 using SCI_PH.Mobile.Common.Authentication;
 using SCI_PH.Mobile.Features.Paramedic;
