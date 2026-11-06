@@ -83,6 +83,7 @@
 
             <Button Text="Cancelar"
                     Command="{Binding CancelCommand}"
+                    IsVisible="{Binding ShowCancel}"
                     Style="{StaticResource SciSecondaryButton}" />
 
         </VerticalStackLayout>

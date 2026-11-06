@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SCI_PH.Mobile.Common.Api;
@@ -71,6 +73,7 @@ public sealed partial class QrScannerViewModel : BaseViewModel
     // El QR del candidato (solo en memoria) y la clave de SU confirmación.
     private string? _payload;
     private Guid? _confirmRequestId;
+    private byte[]? _rejectedFingerprint;
 
     public QrScannerViewModel(
         IParamedicApiService api,
@@ -97,6 +100,7 @@ public sealed partial class QrScannerViewModel : BaseViewModel
     [NotifyPropertyChangedFor(nameof(IsPaused))]
     [NotifyPropertyChangedFor(nameof(IsUnavailable))]
     [NotifyPropertyChangedFor(nameof(IsCompleted))]
+    [NotifyPropertyChangedFor(nameof(ShowCancel))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     [NotifyCanExecuteChangedFor(nameof(RescanCommand))]
     [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
@@ -137,6 +141,9 @@ public sealed partial class QrScannerViewModel : BaseViewModel
     public bool IsUnavailable => State == QrScannerState.Unavailable;
 
     public bool IsCompleted => State == QrScannerState.Completed;
+
+    /// <summary>Con la identificación ya terminada la salida es "Volver", no "Cancelar": no hay nada que cancelar.</summary>
+    public bool ShowCancel => !IsCompleted;
 
     public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
 
@@ -228,12 +235,12 @@ public sealed partial class QrScannerViewModel : BaseViewModel
     {
         var generation = _generation;
         State = QrScannerState.Permission;
-        var status = await _camera.CheckAsync();
+        var status = await PermissionOrUnavailableAsync(_camera.CheckAsync);
         if (status == CameraPermissionStatus.Denied && allowRequest)
         {
             // La única petición sin que el paramédico la pida: al entrar por primera vez.
             _requestedPermission = true;
-            status = await _camera.RequestAsync();
+            status = await PermissionOrUnavailableAsync(_camera.RequestAsync);
         }
 
         if (generation == _generation)
@@ -242,10 +249,23 @@ public sealed partial class QrScannerViewModel : BaseViewModel
         }
     }
 
+    // Un fallo de la plataforma al consultar el permiso nunca cierra la app: es "Cámara no disponible".
+    private static async Task<CameraPermissionStatus> PermissionOrUnavailableAsync(Func<Task<CameraPermissionStatus>> permission)
+    {
+        try
+        {
+            return await permission();
+        }
+        catch (Exception)
+        {
+            return CameraPermissionStatus.Unavailable;
+        }
+    }
+
     private async Task RecheckPermissionAsync()
     {
         var generation = _generation;
-        var status = await _camera.CheckAsync();
+        var status = await PermissionOrUnavailableAsync(_camera.CheckAsync);
         if (generation == _generation && State == QrScannerState.PermissionDenied && status != CameraPermissionStatus.Denied)
         {
             ApplyPermission(status);
@@ -260,7 +280,7 @@ public sealed partial class QrScannerViewModel : BaseViewModel
     {
         var generation = _generation;
         _requestedPermission = true;
-        var status = await _camera.RequestAsync();
+        var status = await PermissionOrUnavailableAsync(_camera.RequestAsync);
         if (generation == _generation)
         {
             ApplyPermission(status);
@@ -319,8 +339,18 @@ public sealed partial class QrScannerViewModel : BaseViewModel
             return;
         }
 
+        // El código que el servidor acaba de rechazar sigue delante de la cámara: no se vuelve a enviar (cada envío gastaría el
+        // límite de peticiones y registraría otro intento fallido). Solo un código distinto, como el QR renovado, sale de aquí.
+        var fingerprint = Fingerprint(value);
+        if (_rejectedFingerprint is { } rejected && CryptographicOperations.FixedTimeEquals(rejected, fingerprint))
+        {
+            StartScanning(delayed: true);
+            return;
+        }
+
         var generation = _generation;
         var token = _visit?.Token ?? CancellationToken.None;
+        _rejectedFingerprint = null;
         _payload = value;
         _confirmRequestId = null;
         ErrorMessage = null;
@@ -345,6 +375,7 @@ public sealed partial class QrScannerViewModel : BaseViewModel
         }
         catch (MobileApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
+            _rejectedFingerprint = fingerprint;
             RestartAfterInvalidCode();
         }
         catch (MobileApiException ex) when (ex.Error == MobileApiError.Conflict)
@@ -379,6 +410,7 @@ public sealed partial class QrScannerViewModel : BaseViewModel
         var clientRequestId = _confirmRequestId.Value;
         ErrorMessage = null;
         State = QrScannerState.Confirming;
+        var confirmed = false;
         try
         {
             // Sin cancelar al salir: una confirmación enviada puede haberse aplicado; su resultado lo da el servidor.
@@ -390,7 +422,7 @@ public sealed partial class QrScannerViewModel : BaseViewModel
 
             Discard();
             State = QrScannerState.Completed;
-            await _navigator.GoToAsync("..");
+            confirmed = true;
         }
         catch (Exception) when (!IsCurrent(generation))
         {
@@ -398,6 +430,7 @@ public sealed partial class QrScannerViewModel : BaseViewModel
         catch (MobileApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
             // El QR venció o se sustituyó mientras tanto: nunca se confía en el candidato anterior.
+            _rejectedFingerprint = Fingerprint(payload);
             RestartAfterInvalidCode();
         }
         catch (MobileApiException ex) when (ex.Error == MobileApiError.Conflict)
@@ -419,6 +452,20 @@ public sealed partial class QrScannerViewModel : BaseViewModel
             // Sin respuesta, 503 o respuesta inesperada: pudo aplicarse. El reintento lleva la MISMA clave.
             State = QrScannerState.Candidate;
             ErrorMessage = ParamedicMessages.QrConfirmFailed;
+        }
+
+        if (!confirmed || !IsCurrent(generation))
+        {
+            return;
+        }
+
+        try
+        {
+            await _navigator.GoToAsync("..");
+        }
+        catch (Exception)
+        {
+            // Un fallo al navegar no es un fallo de la confirmación, que ya se aplicó: "Volver" sigue en pantalla.
         }
     }
 
@@ -549,6 +596,9 @@ public sealed partial class QrScannerViewModel : BaseViewModel
         CandidateDocument = null;
     }
 
+    // Solo la huella del código rechazado: el contenido no se conserva una vez descartado.
+    private static byte[] Fingerprint(string value) => SHA256.HashData(Encoding.UTF8.GetBytes(value));
+
     private bool IsCurrent(int generation) =>
         generation == Volatile.Read(ref _generation) && _owner is { } owner && _session.CurrentUser?.Id == owner;
 
@@ -579,6 +629,7 @@ public sealed partial class QrScannerViewModel : BaseViewModel
         Interlocked.Increment(ref _generation);
         _owner = user;
         _requestedPermission = false;
+        _rejectedFingerprint = null;
         Discard();
         IsDetecting = false;
         ErrorMessage = null;

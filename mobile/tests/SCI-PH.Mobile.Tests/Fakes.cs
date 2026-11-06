@@ -22,10 +22,13 @@ internal sealed class FakeNavigator : IAppNavigator
 {
     public List<(string Route, IDictionary<string, object>? Parameters)> Navigations { get; } = [];
 
+    /// <summary>La navegación falla (por ejemplo, la página ya no está en la pila).</summary>
+    public Exception? GoToException { get; set; }
+
     public Task GoToAsync(string route)
     {
         Navigations.Add((route, null));
-        return Task.CompletedTask;
+        return GoToException is { } failure ? Task.FromException(failure) : Task.CompletedTask;
     }
 
     public Task GoToAsync(string route, IDictionary<string, object> parameters)

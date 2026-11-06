@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using SCI_PH.Mobile.Common.Api;
 using SCI_PH.Mobile.Common.Authentication;
 using SCI_PH.Mobile.Features.Paramedic;
@@ -28,15 +28,23 @@ internal sealed class FakeCameraPermission : ICameraPermissionService
 
     public int SettingsOpened { get; private set; }
 
+    /// <summary>La plataforma falla al consultar o pedir el permiso.</summary>
+    public bool Throws { get; set; }
+
     public Task<CameraPermissionStatus> CheckAsync()
     {
         Checks++;
-        return Task.FromResult(CheckResult);
+        return Throws ? Task.FromException<CameraPermissionStatus>(new InvalidOperationException("camera")) : Task.FromResult(CheckResult);
     }
 
     public Task<CameraPermissionStatus> RequestAsync()
     {
         Requests++;
+        if (Throws)
+        {
+            return Task.FromException<CameraPermissionStatus>(new InvalidOperationException("camera"));
+        }
+
         var result = RequestResults.TryDequeue(out var next) ? next : CheckResult;
         CheckResult = result;
         return Task.FromResult(result);
@@ -612,6 +620,118 @@ public class QrScannerTests
         Assert.Equal(ParamedicMessages.CameraUnavailable, scanner.StatusMessage);
         Assert.Equal(0, _camera.Requests);
         Assert.False(scanner.IsCameraActive);
+    }
+
+    // Encontrado con la cámara virtual: un código rechazado que sigue delante de la cámara se reenviaba cada 2 s hasta el 429.
+    [Fact]
+    public async Task ARejectedCodeStillInFrontOfTheCameraIsNotSentAgain()
+    {
+        var scanner = await ScanningAsync();
+        var resolves = () => _bff.Paths.Count(p => p == ResolvePath);
+
+        await scanner.ProcessScanAsync(FakeQrIdentificationBff.PayloadB);
+        Assert.Equal(1, resolves());
+
+        for (var i = 0; i < 5; i++)
+        {
+            _delay.ReleaseAll();
+            Assert.True(scanner.IsDetecting);
+            await scanner.ProcessScanAsync(FakeQrIdentificationBff.PayloadB);
+            Assert.Equal(1, resolves());
+            Assert.Equal(ParamedicMessages.QrInvalidOrExpired, scanner.StatusMessage);
+            Assert.Equal(QrScannerState.Scanning, scanner.State);
+        }
+
+        // El QR renovado es otro código: se envía en cuanto se lee.
+        _delay.ReleaseAll();
+        await scanner.ProcessScanAsync(FakeQrIdentificationBff.PayloadA);
+
+        Assert.Equal(2, resolves());
+        Assert.Equal(QrScannerState.Candidate, scanner.State);
+    }
+
+    [Fact]
+    public async Task ARejectedCodeIsForgottenWithTheStaffSession()
+    {
+        var scanner = await ScanningAsync();
+        await scanner.ProcessScanAsync(FakeQrIdentificationBff.PayloadB);
+        _delay.ReleaseAll();
+
+        StaffSession.SignIn(_session, Guid.NewGuid());
+        await scanner.ActivateAsync();
+        await scanner.ProcessScanAsync(FakeQrIdentificationBff.PayloadB);
+
+        Assert.Equal(2, _bff.Paths.Count(p => p == ResolvePath));
+    }
+
+    [Fact]
+    public async Task ATemporaryFailureIsNotARejectionAndTheSameCodeCanBeSentAgain()
+    {
+        var scanner = await ScanningAsync();
+        _bff.NextStatuses.Enqueue(HttpStatusCode.ServiceUnavailable);
+
+        await scanner.ProcessScanAsync(FakeQrIdentificationBff.PayloadA);
+        Assert.Equal(QrScannerState.Paused, scanner.State);
+        scanner.RescanCommand.Execute(null);
+        await scanner.ProcessScanAsync(FakeQrIdentificationBff.PayloadA);
+
+        Assert.Equal(QrScannerState.Candidate, scanner.State);
+    }
+
+    [Fact]
+    public async Task APlatformFailureOnThePermissionIsUnavailableAndNeverACrash()
+    {
+        _camera.Throws = true;
+        var scanner = Scanner();
+
+        await scanner.ActivateAsync();
+
+        Assert.Equal(QrScannerState.Unavailable, scanner.State);
+        Assert.Equal(ParamedicMessages.CameraUnavailable, scanner.StatusMessage);
+        Assert.False(scanner.IsCameraActive);
+    }
+
+    [Fact]
+    public async Task WithoutAStaffSessionTheFlowCannotBeUsed()
+    {
+        var scanner = new QrScannerViewModel(
+            new HttpParamedicApiService(_bff.Client(), _mock), _camera, new ClinicalSessionService(), _navigator, _delay.Delay)
+        { EmergencyId = _emergencyId };
+
+        await scanner.ActivateAsync();
+        await scanner.ProcessScanAsync(FakeQrIdentificationBff.PayloadA);
+
+        Assert.Equal(QrScannerState.Unavailable, scanner.State);
+        Assert.False(scanner.IsCameraActive);
+        Assert.Equal(0, _camera.Checks + _camera.Requests);
+        Assert.Empty(_bff.Paths);
+    }
+
+    [Fact]
+    public async Task AFailedNavigationAfterConfirmingIsNotAFailedConfirmation()
+    {
+        var scanner = await CandidateAsync();
+        _navigator.GoToException = new InvalidOperationException("navigation");
+
+        await scanner.ConfirmCommand.ExecuteAsync(null);
+
+        Assert.Equal(QrScannerState.Completed, scanner.State);
+        Assert.Null(scanner.ErrorMessage);
+        Assert.False(scanner.ShowCancel);
+        Assert.Equal(1, _bff.Confirms);
+    }
+
+    [Fact]
+    public async Task AlreadyIdentifiedOffersOnlyTheWayBack()
+    {
+        var scanner = await ScanningAsync();
+        Assert.True(scanner.ShowCancel);
+        _bff.IdentifiedElsewhere = true;
+
+        await scanner.ProcessScanAsync(FakeQrIdentificationBff.PayloadA);
+
+        Assert.Equal(QrScannerState.Completed, scanner.State);
+        Assert.False(scanner.ShowCancel);
     }
 
     [Fact]
