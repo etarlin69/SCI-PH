@@ -241,8 +241,8 @@ La app **nunca envía un id de paciente**: el servidor lo deduce de la cuenta (`
   personal autorizado y **nunca inicia sesión ni da acceso por sí solo**. El contenido lo emite el servidor
   (`POST api/mobile/patient/me/qr`), vale 15 minutos, vive **solo en memoria** y se dibuja en el dispositivo. Sin red no hay QR y
   nunca se muestra uno vencido. Al cerrar la sesión o cambiar de cuenta se borra, sin revocarlo en el servidor. Se dibuja
-  con el generador de `ZXing.Net.Maui.Controls` 0.6.0 (negro sobre blanco, 280 × 280, dentro de una tarjeta blanca que hace
-  de zona de silencio). La app registra ZXing con `UseBarcodeReader()`, pero el área del paciente **nunca crea la cámara
+  con el generador de `ZXing.Net.Maui.Controls` 0.6.0 (negro sobre blanco, 280 × 280, con su propia zona de silencio de al
+  menos 4 módulos). La app registra ZXing con `UseBarcodeReader()`, pero el área del paciente **nunca crea la cámara
   ni pide su permiso**: solo lo hace el escáner del paramédico.
 - **Fuera de la app por ahora**: descarga de documentos, citas, notificaciones, edición del perfil y el asistente de IA (se quitó el chat
   simulado: no se muestran respuestas médicas falsas como reales).
@@ -270,7 +270,7 @@ junto a huella, documento y NN ("Código QR del paciente" → "Escanear QR"), so
 | Permiso | Al entrar, se consulta; si falta, se pide **una vez**. Denegado: explicación y "Intentar de nuevo" (solo a pedido). Denegado sin volver a preguntar: "Abrir configuración". Sin cámara: "Cámara no disponible." | — |
 | Lectura | Solo `QR_CODE`. La primera lectura gana (comparación atómica en el hilo de la cámara) y la detección se apaga en el acto. Un código sin el prefijo `sciphqr:v1:` muestra "Código no válido." y no llega al servidor. El contenido nunca se recorta ni se modifica. | — |
 | Candidato | Nombre, fecha de nacimiento y documento enmascarado por el servidor; nada se identifica. "Confirmar paciente", "Escanear nuevamente" o "Cancelar". | `POST …/emergencies/{id}/identify/qr/resolve` |
-| Confirmación | Solo al pulsar "Confirmar paciente". Una clave por candidato, la misma en cada reintento (sin respuesta, 503, 429). Al terminar vuelve a la identificación, que lee la emergencia del servidor (misma atención y código NN) y suelta una lectura de huella pendiente. | `POST …/emergencies/{id}/identify/qr/confirm` |
+| Confirmación | Solo al pulsar "Confirmar paciente". Una clave por candidato, la misma en cada reintento (sin respuesta, 503, 429). Mientras se confirma, Atrás no sale de la página ni cancela la petición (la salida al vencer la sesión sí ocurre). Al terminar vuelve a la identificación, que lee la emergencia del servidor (misma atención y código NN) y suelta una lectura de huella pendiente. | `POST …/emergencies/{id}/identify/qr/confirm` |
 
 - **Errores:** 404 (vencido, sustituido, revocado, desconocido: no se distingue) → "El código no es válido o ya expiró. Pide
   al paciente actualizar su QR.", se borra el candidato y se vuelve a leer tras una pausa; el mismo código rechazado no se
@@ -306,9 +306,14 @@ Comprobado con el emulador contra un Mobile BFF real sobre una base desechable:
   configuración (cámara detenida, sin reintentos solos); cancelar deja la emergencia en NN.
 - Permiso: solo se pide en el escáner, nunca en "Mi QR"; denegación, "Intentar de nuevo", denegación permanente,
   "Abrir configuración" y vuelta con el permiso concedido. Segundo plano: la cámara se libera y nada se confirma al volver.
+- Atrás mientras se confirma (respuesta retenida 12 s por un proxy de prueba): el botón del sistema y el de la barra no sacan
+  de la página, la confirmación no se cancela y la emergencia solo se lee tras la respuesta. Con 503 y con respuesta perdida
+  tras aplicarse, la misma clave y una sola identificación. Si la sesión vence mientras se confirma, la app sí vuelve a la entrada.
 - "Mi QR" (emulador y Windows): visible, sin recortes, negro sobre blanco, legible por dos decodificadores y por la cámara,
-  con cuenta atrás. La tarjeta blanca da unos 3,3 módulos de margen en el emulador y alrededor de 6 en Windows; no hizo falta
-  `BarcodeMargin`. En Windows: renovación real al vencer, error de red, "Reintentar" y borrado al cerrar sesión.
+  con cuenta atrás, y el contenido coincide con la credencial activa del servidor. `BarcodeMargin = 4` (ZXing lo cuenta en
+  módulos): la propia imagen lleva al menos 4 módulos de blanco, unos 6,5 a 6,8 a 280 × 280 por el redondeo de la escala. La
+  cámara del emulador lo leyó recortado al símbolo más 4 módulos. En Windows: renovación real al vencer, error de red,
+  "Reintentar" y borrado al cerrar sesión.
 
 Sin comprobar en ejecución: "Cámara no disponible." en Windows (sin cámara o bloqueada por privacidad), el APK Release en
 ejecución (exige HTTPS) y la lectura con una cámara y una luz reales.
