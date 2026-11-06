@@ -374,18 +374,29 @@ public class MyQrSurfaceTests
         Assert.DoesNotContain("Value=", File.ReadAllText(AppFile("Features", "Patient", "Qr", "MyQrPage.xaml")));
     }
 
+    // La app es una sola (paciente y paramédico): ZXing se registra una vez con UseBarcodeReader (generador y lector), pero
+    // solo el escáner del paramédico crea la cámara o pide su permiso. Dibujar "Mi QR" nunca los toca.
     [Fact]
     public void DrawingTheQrAsksForNoCameraOrScanner()
     {
         var program = File.ReadAllText(AppFile("MauiProgram.cs"));
-        var page = File.ReadAllText(AppFile("Features", "Patient", "Qr", "MyQrPage.xaml.cs"));
 
-        Assert.Contains("BarcodeGeneratorViewHandler", program);
-        Assert.DoesNotContain(".UseBarcodeReader", program);
+        Assert.Contains(".UseBarcodeReader()", program);
+        Assert.DoesNotContain("AddHandler(", program);
         Assert.DoesNotContain("CameraBarcodeReader", program);
-        Assert.DoesNotContain("CameraBarcodeReader", page);
-        Assert.DoesNotContain("android.permission.CAMERA", File.ReadAllText(AppFile("Platforms", "Android", "AndroidManifest.xml")));
-        Assert.DoesNotContain("NSCameraUsageDescription", File.ReadAllText(AppFile("Platforms", "iOS", "Info.plist")));
+
+        foreach (var file in new[] { new[] { "Qr", "MyQrPage.xaml.cs" }, ["Qr", "MyQrPage.xaml"], ["ViewModels", "MyQrViewModel.cs"] })
+        {
+            var source = File.ReadAllText(AppFile(["Features", "Patient", .. file]));
+            Assert.DoesNotContain("CameraBarcodeReader", source);
+            Assert.DoesNotContain("Permissions", source);
+            Assert.DoesNotContain("ICameraPermissionService", source);
+        }
+
+        // El permiso y la vista de cámara solo existen en el escáner del paramédico.
+        Assert.Contains("CameraBarcodeReaderView", File.ReadAllText(AppFile("Features", "Paramedic", "Views", "QrScannerPage.xaml.cs")));
+        Assert.DoesNotContain("camera", File.ReadAllText(AppFile("Platforms", "MacCatalyst", "Entitlements.plist")));
+        Assert.DoesNotContain("NSCameraUsageDescription", File.ReadAllText(AppFile("Platforms", "MacCatalyst", "Info.plist")));
     }
 
     [Fact]

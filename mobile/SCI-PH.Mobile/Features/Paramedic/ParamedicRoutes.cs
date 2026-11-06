@@ -11,6 +11,10 @@ public static class ParamedicRoutes
     public const string NewEmergency = "NewEmergency";
 
     public const string IdentifyPatient = "IdentifyPatient";
+
+    /// <summary>Escáner del QR del paciente, sobre la identificación (no se ofrece en Mac Catalyst).</summary>
+    public const string ScanQr = "ScanQr";
+
     public const string VitalSigns = "VitalSigns";
     public const string Procedures = "Procedures";
     public const string Medications = "Medications";

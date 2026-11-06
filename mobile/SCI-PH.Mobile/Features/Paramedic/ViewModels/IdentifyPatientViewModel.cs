@@ -25,6 +25,9 @@ public partial class IdentifyPatientViewModel : BaseViewModel
     private readonly IAppNavigator _navigator;
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
 
+    // Se abrió el escáner de QR: al volver, la emergencia se lee del servidor (la única fuente de verdad del resultado).
+    private bool _returningFromQrScanner;
+
     // Clave de idempotencia de la identificación por documento (no la de la apertura). Se genera al entrar al formulario y
     // se conserva entre reintentos, errores de red, 404 y 409; solo se descarta cuando la identificación se completa.
     private Guid? _documentRequestId;
@@ -41,12 +44,14 @@ public partial class IdentifyPatientViewModel : BaseViewModel
         IParamedicApiService api,
         IFingerprintIdentificationService fingerprints,
         IAppNavigator navigator,
-        Func<TimeSpan, CancellationToken, Task>? delay = null)
+        Func<TimeSpan, CancellationToken, Task>? delay = null,
+        ICameraPermissionService? camera = null)
     {
         _api = api;
         _fingerprints = fingerprints;
         _navigator = navigator;
         _delay = delay ?? Task.Delay;
+        IsQrScannerSupported = camera?.IsScannerSupported ?? false;
     }
 
     /// <summary>
@@ -69,6 +74,7 @@ public partial class IdentifyPatientViewModel : BaseViewModel
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanIdentify))]
     [NotifyPropertyChangedFor(nameof(ShowFingerprintPanel))]
+    [NotifyPropertyChangedFor(nameof(ShowQrOption))]
     private bool isIdentified;
 
     [ObservableProperty]
@@ -79,6 +85,12 @@ public partial class IdentifyPatientViewModel : BaseViewModel
     /// otra, porque en una emergencia la huella puede no ser posible. Una lectura en curso no bloquea las otras dos.
     /// </summary>
     public bool CanIdentify => !IsIdentified;
+
+    /// <summary>La plataforma ofrece el escáner de QR (no en Mac Catalyst).</summary>
+    public bool IsQrScannerSupported { get; }
+
+    /// <summary>"Código QR del paciente": otra vía más, solo mientras la emergencia se puede identificar.</summary>
+    public bool ShowQrOption => IsQrScannerSupported && !IsIdentified;
 
     // ---- Huella ----
     [ObservableProperty]
@@ -146,6 +158,7 @@ public partial class IdentifyPatientViewModel : BaseViewModel
         ConfirmFingerprintCommand.NotifyCanExecuteChanged();
         SubmitDocumentCommand.NotifyCanExecuteChanged();
         ContinueWithoutIdentifyingCommand.NotifyCanExecuteChanged();
+        ScanQrCommand.NotifyCanExecuteChanged();
     }
 
     // ---- Huella: lectores ----
@@ -437,6 +450,56 @@ public partial class IdentifyPatientViewModel : BaseViewModel
         CandidateName = null;
         CandidateBirthDate = null;
         FingerprintMessage = message;
+    }
+
+    // ---- QR del paciente ----
+
+    private bool CanScanQr() => !IsBusy && ShowQrOption;
+
+    // El escaneo, el candidato y la confirmación ocurren en su propia página; la emergencia es la misma.
+    [RelayCommand(CanExecute = nameof(CanScanQr))]
+    private async Task ScanQrAsync()
+    {
+        if (!ShowQrOption)
+        {
+            return;
+        }
+
+        ErrorMessage = null;
+        _returningFromQrScanner = true;
+        await _navigator.GoToAsync(
+            ParamedicRoutes.ScanQr,
+            new Dictionary<string, object> { ["EmergencyId"] = EmergencyId });
+    }
+
+    /// <summary>
+    /// La página vuelve a verse tras el escáner: si el servidor ya vincula un paciente a la emergencia, queda identificada (con
+    /// el mismo código NN y todo lo registrado) y la lectura de huella pendiente se suelta. Sin paciente, nada cambia.
+    /// </summary>
+    public async Task RefreshAfterQrScannerAsync()
+    {
+        if (!_returningFromQrScanner || IsIdentified)
+        {
+            return;
+        }
+
+        _returningFromQrScanner = false;
+        EmergencyDto? emergency;
+        try
+        {
+            emergency = await _api.GetEmergencyAsync(EmergencyId);
+        }
+        catch (Exception)
+        {
+            // Sin respuesta: sigue como estaba; si ya se identificó, otro intento lo mostrará (409 y relectura).
+            return;
+        }
+
+        if (emergency?.Patient is { } patient)
+        {
+            await CancelFingerprintQuietlyAsync();
+            ApplyIdentified(patient.DisplayName);
+        }
     }
 
     // ---- Documento ----

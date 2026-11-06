@@ -28,6 +28,8 @@
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SCI-PH registra la ubicación de la emergencia al crearla.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>SCI-PH usa la cámara para escanear el código QR de identificación del paciente.</string>
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/appicon.appiconset</string>
 </dict>

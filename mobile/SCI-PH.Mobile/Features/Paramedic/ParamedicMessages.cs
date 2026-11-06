@@ -108,6 +108,32 @@ public static class ParamedicMessages
     /// <summary>Sin conexión mientras se consulta la lectura: se sigue intentando hasta que venza.</summary>
     public const string FingerprintCheckingOffline = "Sin conexión. Se sigue consultando la lectura…";
 
+    /// <summary>El código leído no es de SCI-PH (no se envía al servidor).</summary>
+    public const string QrInvalidCode = "Código no válido.";
+
+    /// <summary>404: cualquier QR no válido (vencido, sustituido, revocado, desconocido). Nunca se distingue la causa.</summary>
+    public const string QrInvalidOrExpired = "El código no es válido o ya expiró. Pide al paciente actualizar su QR.";
+
+    /// <summary>409 y la emergencia, leída de nuevo, ya tiene paciente: nunca se sustituye.</summary>
+    public const string QrAlreadyIdentified = "La emergencia ya está identificada.";
+
+    /// <summary>409 y la emergencia sigue sin identificar (por ejemplo, el hospital ya la recibió).</summary>
+    public const string QrConflict = "No se pudo identificar con este código: la emergencia cambió. Vuelve a la identificación.";
+
+    public const string QrResolveFailed = "No se pudo leer el código en este momento. Intenta nuevamente.";
+
+    /// <summary>Sin respuesta o error temporal al confirmar: el reintento usa la misma solicitud y nunca identifica dos veces.</summary>
+    public const string QrConfirmFailed = "No se pudo confirmar al paciente. Intenta nuevamente: no se identificará dos veces.";
+
+    public const string CameraUnavailable = "Cámara no disponible.";
+
+    public const string QrScannerUnsupported = "La lectura de QR no está disponible en este dispositivo.";
+
+    public const string CameraPermissionDenied = "Se necesita permiso de cámara para escanear el QR del paciente.";
+
+    public const string CameraPermissionDeniedPermanently =
+        "El permiso de cámara está desactivado. Actívalo en la configuración de la app para escanear el QR.";
+
     /// <summary>Hora de la observación antes del primer intento de guardar: se fija automáticamente.</summary>
     public const string NoteTimePending = "Se registrará con la hora al guardar.";
 }

@@ -20,9 +20,9 @@ namespace SCI_PH.Mobile
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 })
-                // Solo dibujar el QR del paciente: sin el lector ni la cámara de UseBarcodeReader (el escáner es QR #2).
-                .ConfigureMauiHandlers(handlers =>
-                    handlers.AddHandler(typeof(BarcodeGeneratorView), typeof(BarcodeGeneratorViewHandler)));
+                // ZXing: dibuja "Mi QR" (generador) y lee el QR en el escáner del paramédico (cámara). Registrar el lector no
+                // abre la cámara ni pide permisos: solo la página del escáner crea la vista de cámara, tras el permiso.
+                .UseBarcodeReader();
 
 #if DEBUG
     		builder.Logging.AddDebug();

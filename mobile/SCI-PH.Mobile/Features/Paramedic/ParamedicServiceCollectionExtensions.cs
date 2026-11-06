@@ -10,16 +10,20 @@ public static class ParamedicServiceCollectionExtensions
 {
     public static IServiceCollection AddParamedicFeature(this IServiceCollection services)
     {
-        // Emergencia, identificación por documento y por huella, signos vitales, procedimientos, medicamentos,
+        // Emergencia, identificación por documento, por huella y con el QR del paciente, signos vitales, procedimientos, medicamentos,
         // observaciones, traslado y sus catálogos: Mobile BFF real.
         services.AddSingleton<MockParamedicApiService>();
         services.AddSingleton<IParamedicApiService, HttpParamedicApiService>();
         services.AddSingleton<IFingerprintIdentificationService, HttpFingerprintIdentificationService>();
         services.AddSingleton<IParamedicCatalogService, HttpParamedicCatalogService>();
 
+        // Identificación con el QR del paciente: el permiso de cámara solo lo pide el escáner del paramédico.
+        services.AddSingleton<ICameraPermissionService, MauiCameraPermissionService>();
+
         // ViewModels
         services.AddTransient<NewEmergencyViewModel>();
         services.AddTransient<IdentifyPatientViewModel>();
+        services.AddTransient<QrScannerViewModel>();
         services.AddTransient<VitalSignsViewModel>();
         services.AddTransient<ProceduresViewModel>();
         services.AddTransient<MedicationsViewModel>();
@@ -29,6 +33,7 @@ public static class ParamedicServiceCollectionExtensions
         // Views
         services.AddTransient<NewEmergencyPage>();
         services.AddTransient<IdentifyPatientPage>();
+        services.AddTransient<QrScannerPage>();
         services.AddTransient<VitalSignsPage>();
         services.AddTransient<ProceduresPage>();
         services.AddTransient<MedicationsPage>();
@@ -46,6 +51,7 @@ public static class ParamedicServiceCollectionExtensions
     {
         Routing.RegisterRoute(ParamedicRoutes.NewEmergency, typeof(NewEmergencyPage));
         Routing.RegisterRoute(ParamedicRoutes.IdentifyPatient, typeof(IdentifyPatientPage));
+        Routing.RegisterRoute(ParamedicRoutes.ScanQr, typeof(QrScannerPage));
         Routing.RegisterRoute(ParamedicRoutes.VitalSigns, typeof(VitalSignsPage));
         Routing.RegisterRoute(ParamedicRoutes.Procedures, typeof(ProceduresPage));
         Routing.RegisterRoute(ParamedicRoutes.Medications, typeof(MedicationsPage));

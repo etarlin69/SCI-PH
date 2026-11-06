@@ -13,10 +13,12 @@ public partial class IdentifyPatientPage : ContentPage
     }
 
     // La lectura de huella se consulta solo mientras la página se ve: nunca queda una consulta huérfana.
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
         _viewModel.ResumeFingerprintPolling();
+        // Al volver del escáner de QR: la emergencia se lee del servidor (si quedó identificada, la huella se suelta).
+        await _viewModel.RefreshAfterQrScannerAsync();
     }
 
     protected override void OnDisappearing()
