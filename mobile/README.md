@@ -273,7 +273,8 @@ junto a huella, documento y NN ("Código QR del paciente" → "Escanear QR"), so
 | Confirmación | Solo al pulsar "Confirmar paciente". Una clave por candidato, la misma en cada reintento (sin respuesta, 503, 429). Al terminar vuelve a la identificación, que lee la emergencia del servidor (misma atención y código NN) y suelta una lectura de huella pendiente. | `POST …/emergencies/{id}/identify/qr/confirm` |
 
 - **Errores:** 404 (vencido, sustituido, revocado, desconocido: no se distingue) → "El código no es válido o ya expiró. Pide
-  al paciente actualizar su QR.", se borra el candidato y se vuelve a leer tras una pausa. 409 → se lee la emergencia: con
+  al paciente actualizar su QR.", se borra el candidato y se vuelve a leer tras una pausa; el mismo código rechazado no se
+  reenvía mientras siga delante de la cámara (solo se guarda su hash), pero uno distinto, como el QR renovado, sí. 409 → se lee la emergencia: con
   paciente, "La emergencia ya está identificada." y nunca se sustituye; sin él, un conflicto genérico. 429 → escáner
   detenido con el tiempo de `Retry-After`, se reanuda a pedido. 403 → mensaje genérico. 401 → el refresh común
   (`AuthenticatedHttpHandler`), sin lógica propia.
@@ -290,14 +291,29 @@ junto a huella, documento y NN ("Código QR del paciente" → "Escanear QR"), so
 | Nivel | Estado |
 |---|---|
 | Código | Tests sin interfaz del escáner (`Paramedic/QrScannerTests`); builds Release de Android y Windows |
-| Cámara | La webcam integrada se abre con la misma comprobación que usa el escáner en Windows. **Lectura real con cámara: pendiente** (necesita una persona que muestre "Mi QR" a la cámara) |
+| Cámara: emulador Android (`pixel_7_-_api_35`, build Debug) | **Provisional.** Lecturas reales por la cámara del emulador (`virtualscene`), con el QR de "Mi QR" como póster de la escena: flujo completo y casos de abajo |
+| Cámara: Windows (webcam integrada, build Debug) | La vista en vivo, la liberación al minimizar o salir y la reactivación al restaurar funcionan. **Lectura real de un QR: no realizada** (la webcam no puede ver la pantalla del propio equipo; hace falta mostrarle el código) |
 | Dispositivo físico | **No realizado: no hay un Android físico disponible.** Requisito antes de publicar |
-| iOS | Sin compilar ni ejecutar (requiere macOS) |
+| iOS y Mac Catalyst | Solo compila el C# desde Windows, sin paquete de la app ni ejecución (requiere macOS) |
 
-Prueba manual pendiente: "Mi QR" en Windows o en el emulador (visible, sin recortes, cuenta atrás, renovación, error de red,
-"Reintentar", se borra al cerrar sesión) → escanear con Windows (webcam) o con un Android físico → candidato → confirmar →
-la emergencia queda identificada con su código NN → signos vitales, procedimiento, medicamento, observación y traslado.
-Comprobar también que el QR anterior tras reemitir, un QR vencido, un `sciphqr:v1:` inventado y un código ajeno se rechazan.
+Comprobado con el emulador contra un Mobile BFF real sobre una base desechable:
+
+- Flujo: "Mi QR" → NN → permiso → lectura → una sola resolución → candidato sin identificar → "Confirmar paciente" →
+  identificada con el mismo código NN → signos vitales, procedimiento, medicamento, observación y traslado iniciado.
+- Rechazos: QR vencido a los 15 minutos reales, QR anterior tras reemitir (también con su candidato en pantalla al
+  confirmar), `sciphqr:v1:` inventado (mismo mensaje), código ajeno (sin llamada), Code 128 (ignorado).
+- 409 real ("La emergencia ya está identificada.", sin sustituir ni identificar de nuevo); 429 real con un límite bajo por
+  configuración (cámara detenida, sin reintentos solos); cancelar deja la emergencia en NN.
+- Permiso: solo se pide en el escáner, nunca en "Mi QR"; denegación, "Intentar de nuevo", denegación permanente,
+  "Abrir configuración" y vuelta con el permiso concedido. Segundo plano: la cámara se libera y nada se confirma al volver.
+- "Mi QR" (emulador y Windows): visible, sin recortes, negro sobre blanco, legible por dos decodificadores y por la cámara,
+  con cuenta atrás. La tarjeta blanca da unos 3,3 módulos de margen en el emulador y alrededor de 6 en Windows; no hizo falta
+  `BarcodeMargin`. En Windows: renovación real al vencer, error de red, "Reintentar" y borrado al cerrar sesión.
+
+Sin comprobar en ejecución: "Cámara no disponible." en Windows (sin cámara o bloqueada por privacidad), el APK Release en
+ejecución (exige HTTPS) y la lectura con una cámara y una luz reales.
+
+Prueba pendiente: mostrar "Mi QR" a la webcam de Windows y a la cámara de un Android físico → candidato → confirmar.
 
 ## Compilar
 
@@ -343,8 +359,8 @@ no firma con claves propias y no publica nada.
 
 ## Pendiente
 
-- Validación con cámara real del escáner de QR y de "Mi QR" en pantalla (ver
-  [Escáner del QR del paciente](#escáner-del-qr-del-paciente-paramédico)): pendiente con una persona delante de la cámara;
+- Lectura del QR con una cámara física (ver
+  [Escáner del QR del paciente](#escáner-del-qr-del-paciente-paramédico)): probada solo con la cámara virtual del emulador;
   un Android físico es requisito antes de publicar.
 - Todo el área paramédica (apertura, lectura, identificación por documento y por huella, signos vitales,
   procedimientos, medicamentos, observaciones y traslado) ya es real.

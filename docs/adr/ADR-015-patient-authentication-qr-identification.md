@@ -160,8 +160,9 @@ asistente de IA del paciente (no se conecta a la IA clínica) y la edición del 
   un token ya emitido. Endurecerla (security stamp o lista de revocación) es un cambio de ADR-006, no de esta vertical.
 - **Integración HTTP real del área paramédica en MAUI:** `HttpParamedicApiService` todavía usa
   `MockParamedicApiService` internamente; es una vertical aparte (el backend paramédico no cambia aquí).
-- **QR #2 — validación con cámara real:** el escáner está implementado y probado sin interfaz, pero la lectura real (cámara de
-  Windows o Android, y un Android físico antes de publicar) queda pendiente; ver mobile/README.md.
+- **QR #2 — validación con cámara física:** el escáner está probado de extremo a extremo con la cámara virtual del emulador
+  Android (evidencia provisional), y en Windows la webcam real abre y se libera, pero la lectura de un QR con una cámara física
+  (webcam de Windows, y un Android físico antes de publicar) queda pendiente; ver mobile/README.md.
 - **Endurecimiento común de la identificación:** si falla el guardado de una confirmación (documento, huella o QR), no se
   identifica nada, pero la respuesta no es un `503` controlado. Conviene resolverlo para las tres vías, no solo para el QR.
 - **P1 — Web del hospital:** resolver un QR por escáner o pegándolo, con su propia ruta.
