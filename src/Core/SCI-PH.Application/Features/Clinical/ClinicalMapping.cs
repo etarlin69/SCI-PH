@@ -26,7 +26,7 @@ namespace SCI_PH.Application.Features.Clinical
         public static PatientRow ToRow(this Patient patient)
         {
             var identifier = patient.Identifiers
-                .Where(i => i.IsActive)
+                .Where(i => i.IsActive && i.Type != PatientIdentifierType.QrCode)
                 .OrderByDescending(i => i.IsPrimary)
                 .ThenBy(i => i.CreatedAtUtc)
                 .FirstOrDefault();

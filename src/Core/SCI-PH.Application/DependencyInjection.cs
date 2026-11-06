@@ -65,17 +65,20 @@ namespace SCI_PH.Application
             services.AddScoped<IEncounterAccessService, EncounterAccessService>();
             services.AddScoped<PrehospitalEmergencyService>();
             services.AddScoped<EmergencyFingerprintService>();
+            services.AddScoped<EmergencyQrIdentificationService>();
             services.AddScoped<FingerprintEnrollmentService>();
             services.AddScoped<FingerprintRevocationService>();
 
             return services;
         }
 
-        // Autoservicio del paciente (ADR-015, solo Mobile BFF): lectura de su propio expediente, resuelto desde la cuenta.
-        // Requiere AddAccountSecurity (IPatientAccessAuthorizer), AddJwtSecurity (ICurrentUser) y AddPersistence.
+        // Autoservicio del paciente (ADR-015, solo Mobile BFF): lectura de su propio expediente, resuelto desde la cuenta, y su
+        // propia credencial QR. Requiere AddAccountSecurity (IPatientAccessAuthorizer), AddJwtSecurity (ICurrentUser) y
+        // AddPersistence.
         public static IServiceCollection AddPatientSelfService(this IServiceCollection services)
         {
             services.AddScoped<PatientSelfService>();
+            services.AddScoped<PatientQrService>();
 
             return services;
         }

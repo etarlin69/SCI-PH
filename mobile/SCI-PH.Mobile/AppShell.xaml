@@ -10,6 +10,7 @@
     xmlns:patient="clr-namespace:SCI_PH.Mobile.Features.Patient"
     xmlns:patientHome="clr-namespace:SCI_PH.Mobile.Features.Patient.Home"
     xmlns:patientProfile="clr-namespace:SCI_PH.Mobile.Features.Patient.Profile"
+    xmlns:patientQr="clr-namespace:SCI_PH.Mobile.Features.Patient.Qr"
     xmlns:patientHistory="clr-namespace:SCI_PH.Mobile.Features.Patient.History"
     xmlns:patientResults="clr-namespace:SCI_PH.Mobile.Features.Patient.Results"
     xmlns:patientDocuments="clr-namespace:SCI_PH.Mobile.Features.Patient.Documents"
@@ -25,7 +26,7 @@
         Una sola app y un solo inicio de sesión para dos tipos de usuario (ver mobile/README.md y ADR-015):
           - Personal clínico con permiso Emergencies.Operate: área paramédica.
           - Paciente (rol Patient): área del paciente con su propio expediente (api/mobile/patient/me).
-        El QR y el rostro nunca inician una sesión. El login (ClinicalLogin → ClinicalMfa) y el flujo paramédico se
+        El QR (solo identifica) y el rostro nunca inician una sesión. El login (ClinicalLogin → ClinicalMfa) y el flujo paramédico se
         apilan sobre la entrada y los registra cada feature. Aquí solo se declaran el arranque, la entrada y el área del
         paciente.
     -->
@@ -78,6 +79,10 @@
 
     <FlyoutItem Title="Mi perfil" Route="{x:Static patient:PatientRoutes.Profile}">
         <ShellContent Title="Mi perfil" ContentTemplate="{DataTemplate patientProfile:ProfilePage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Mi QR" Route="{x:Static patient:PatientRoutes.MyQr}">
+        <ShellContent Title="Mi QR" ContentTemplate="{DataTemplate patientQr:MyQrPage}" />
     </FlyoutItem>
 
     <FlyoutItem Title="Historial clínico" Route="{x:Static patient:PatientRoutes.History}">

@@ -8,6 +8,7 @@ public static class PatientRoutes
 {
     public const string Home = "Home";
     public const string Profile = "Profile";
+    public const string MyQr = "MyQr";
     public const string History = "History";
     public const string Results = "Results";
     public const string Documents = "Documents";

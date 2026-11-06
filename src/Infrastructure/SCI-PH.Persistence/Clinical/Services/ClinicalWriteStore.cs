@@ -23,6 +23,8 @@ namespace SCI_PH.Persistence.Clinical.Services
         private static readonly IReadOnlyDictionary<string, string> _knownUniqueViolations = new Dictionary<string, string>
         {
             ["UX_PatientIdentifiers_ActiveValue"] = "An active identifier with this value already belongs to another patient.",
+            // The final guard of one active QR credential per patient: a concurrent issue committed first.
+            ["UX_PatientIdentifiers_ActivePrimary"] = "The patient's primary identifier was changed by another operation. Try again.",
             ["IX_ClinicalEncounters_TemporaryPatientCode"] = "The temporary patient code is already in use; retry the operation.",
             ["UX_ClinicalTransfers_ActivePerEncounter"] = "The encounter already has an active transfer.",
             [FingerprintIdentificationSessionConfiguration.ActivePerEncounterIndexName] = "The emergency already has an active fingerprint session.",

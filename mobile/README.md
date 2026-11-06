@@ -237,8 +237,13 @@ La app **nunca envía un id de paciente**: el servidor lo deduce de la cuenta (`
   Contacta a tu centro de salud."; 404 → "La información solicitada no está disponible."; sin conexión → el mensaje
   común de red. Un expediente vacío es un estado vacío, no un error. **Nunca hay datos simulados de respaldo**: si
   algo falla, la pantalla queda vacía con el mensaje.
-- **Fuera de la app por ahora**: QR del paciente (siguiente PR: la app lo **mostrará**, no escaneará un QR para
-  entrar), descarga de documentos, citas, notificaciones, edición del perfil y el asistente de IA (se quitó el chat
+- **Mi QR** ([ADR-015](../docs/adr/ADR-015-patient-authentication-qr-identification.md)): identifica al paciente ante el
+  personal autorizado y **nunca inicia sesión ni da acceso por sí solo**. El contenido lo emite el servidor
+  (`POST api/mobile/patient/me/qr`), vale 15 minutos, vive **solo en memoria** y se dibuja en el dispositivo. Sin red no hay QR y
+  nunca se muestra uno vencido. Al cerrar la sesión o cambiar de cuenta se borra, sin revocarlo en el servidor. Usa
+  `ZXing.Net.Maui.Controls` 0.6.0 **solo para generar**: registra `BarcodeGeneratorViewHandler` en lugar de
+  `UseBarcodeReader`, así que no hay lector, cámara ni permisos nuevos.
+- **Fuera de la app por ahora**: descarga de documentos, citas, notificaciones, edición del perfil y el asistente de IA (se quitó el chat
   simulado: no se muestran respuestas médicas falsas como reales).
 
 Reglas:
@@ -296,8 +301,9 @@ no firma con claves propias y no publica nada.
 
 ## Pendiente
 
-- QR del paciente como identificador ([ADR-015](../docs/adr/ADR-015-patient-authentication-qr-identification.md),
-  decisiones 3–5): la app del paciente lo muestra y el paramédico lo escanea (`ZXing.Net.Maui.Controls` 0.6.0).
+- Escáner del QR del paciente en el área paramédica (QR #2, [ADR-015](../docs/adr/ADR-015-patient-authentication-qr-identification.md),
+  decisión 5): cámara, permisos y flujo sobre los endpoints `identify/qr` ya existentes.
+- Probar "Mi QR" en un dispositivo real: el dibujo del QR y su lectura solo se han comprobado en pruebas sin interfaz.
 - Todo el área paramédica (apertura, lectura, identificación por documento y por huella, signos vitales,
   procedimientos, medicamentos, observaciones y traslado) ya es real.
 - Ubicación de la emergencia (contrato y almacenamiento por definir; ver ADR-008).
