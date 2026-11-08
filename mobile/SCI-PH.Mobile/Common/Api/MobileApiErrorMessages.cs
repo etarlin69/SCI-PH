@@ -37,7 +37,9 @@ public static class MobileApiErrorMessages
 
         var seconds = (int)Math.Ceiling(wait.TotalSeconds);
         return seconds < 60
-            ? $"Demasiados intentos. Espera {seconds} segundos e intenta nuevamente."
-            : $"Demasiados intentos. Espera {(int)Math.Ceiling(seconds / 60d)} minutos e intenta nuevamente.";
+            ? $"Demasiados intentos. Espera {Count(seconds, "segundo")} e intenta nuevamente."
+            : $"Demasiados intentos. Espera {Count((int)Math.Ceiling(seconds / 60d), "minuto")} e intenta nuevamente.";
     }
+
+    private static string Count(int value, string unit) => value == 1 ? $"1 {unit}" : $"{value} {unit}s";
 }

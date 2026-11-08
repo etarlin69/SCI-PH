@@ -36,7 +36,8 @@ public sealed class HttpPatientQrService : IPatientQrService
             throw new InvalidOperationException("The server returned an unexpected QR response.");
         }
 
-        // La duración sale de las dos horas del servidor: el reloj del dispositivo puede estar desajustado.
+        // La duración (15 minutos) sale de las dos marcas de tiempo del servidor, emisión y vencimiento: el reloj del
+        // dispositivo puede estar desajustado. El servidor sigue decidiendo si el QR es válido al escanearlo.
         return new PatientQrDto(response.Payload, lifetime);
     }
 

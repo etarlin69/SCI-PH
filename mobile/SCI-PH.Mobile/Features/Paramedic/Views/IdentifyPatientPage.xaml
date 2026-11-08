@@ -83,6 +83,18 @@
                 </VerticalStackLayout>
             </Border>
 
+            <!-- QR del paciente: otra vía, en su propia página (no se ofrece en Mac Catalyst). -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding ShowQrOption}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Código QR del paciente" Style="{StaticResource SciFieldLabel}" />
+                    <Label Text="Escanea el código de &quot;Mi QR&quot; en la app del paciente y confirma el candidato."
+                           Style="{StaticResource SciSubtitle}" />
+                    <Button Text="Escanear QR"
+                            Command="{Binding ScanQrCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
             <Border Style="{StaticResource SciCard}" IsVisible="{Binding CanIdentify}">
                 <VerticalStackLayout Spacing="14">
                     <Label Text="Otras opciones" Style="{StaticResource SciFieldLabel}" />

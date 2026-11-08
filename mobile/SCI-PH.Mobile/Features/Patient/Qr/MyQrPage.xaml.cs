@@ -7,6 +7,10 @@ namespace SCI_PH.Mobile.Features.Patient.Qr;
 
 public partial class MyQrPage : ContentPage
 {
+    // Zona de silencio dentro de la propia imagen, en módulos del QR (ZXing la suma al ancho del símbolo antes de escalar; su
+    // valor por defecto es 1): la lectura no depende del fondo blanco de la tarjeta.
+    private const int QuietZoneModules = 4;
+
     private readonly MyQrViewModel _viewModel;
     private readonly IDispatcherTimer _timer;
 
@@ -48,6 +52,7 @@ public partial class MyQrPage : ContentPage
                     WidthRequest = 280,
                     HeightRequest = 280,
                     Margin = 2,
+                    BarcodeMargin = QuietZoneModules,
                     Value = payload
                 }
                 : null;

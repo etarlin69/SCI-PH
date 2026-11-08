@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Paramedic.ViewModels"
+             x:Class="SCI_PH.Mobile.Features.Paramedic.Views.QrScannerPage"
+             x:DataType="vm:QrScannerViewModel"
+             Style="{StaticResource SciPage}"
+             Title="Escanear QR">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="18">
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Código QR del paciente" Style="{StaticResource SciTitle}" />
+                <Label Text="Pide al paciente abrir &quot;Mi QR&quot; y apunta la cámara al código."
+                       Style="{StaticResource SciSubtitle}" />
+            </VerticalStackLayout>
+
+            <!-- Error -->
+            <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding HasError}">
+                <Label Text="{Binding ErrorMessage}" TextColor="{StaticResource SciDanger}" FontSize="13" />
+            </Border>
+
+            <Label Text="{Binding StatusMessage}"
+                   IsVisible="{Binding HasStatusMessage}"
+                   TextColor="{StaticResource SciWarning}"
+                   FontAttributes="Bold" />
+
+            <ActivityIndicator IsRunning="{Binding IsWorking}"
+                               IsVisible="{Binding IsWorking}"
+                               Color="{StaticResource SciPrimary}" />
+
+            <!-- Cámara: la vista de ZXing solo existe mientras se escanea (QrScannerPage.xaml.cs). -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding IsCameraActive}" Padding="0">
+                <ContentView x:Name="CameraHost" HeightRequest="320" />
+            </Border>
+
+            <!-- Permiso de cámara -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding IsPermissionDenied}">
+                <VerticalStackLayout Spacing="12">
+                    <Button Text="Intentar de nuevo"
+                            Command="{Binding RetryPermissionCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                    <Button Text="Abrir configuración"
+                            Command="{Binding OpenSettingsCommand}"
+                            IsVisible="{Binding CanOpenSettings}"
+                            Style="{StaticResource SciSecondaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Candidato: solo se identifica al confirmar -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding HasCandidate}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Paciente encontrado" Style="{StaticResource SciFieldLabel}" />
+                    <Label Text="{Binding CandidateName}" Style="{StaticResource SciTitle}" />
+                    <Label Text="{Binding CandidateBirthDate, StringFormat='Fecha de nacimiento: {0}'}"
+                           IsVisible="{Binding CandidateBirthDate, Converter={StaticResource IsNotNullConverter}}"
+                           Style="{StaticResource SciSubtitle}" />
+                    <Label Text="{Binding CandidateDocument}"
+                           IsVisible="{Binding CandidateDocument, Converter={StaticResource IsNotNullConverter}}"
+                           Style="{StaticResource SciSubtitle}" />
+                    <Label Text="Verifica que sea la persona atendida antes de confirmar."
+                           Style="{StaticResource SciSubtitle}" />
+                    <Button Text="Confirmar paciente"
+                            Command="{Binding ConfirmCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                    <Button Text="Escanear nuevamente"
+                            Command="{Binding RescanCommand}"
+                            Style="{StaticResource SciSecondaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Detenido tras un error: se reanuda solo a pedido -->
+            <Button Text="Escanear nuevamente"
+                    Command="{Binding RescanCommand}"
+                    IsVisible="{Binding IsPaused}"
+                    Style="{StaticResource SciPrimaryButton}" />
+
+            <Button Text="Volver"
+                    Command="{Binding CancelCommand}"
+                    IsVisible="{Binding IsCompleted}"
+                    Style="{StaticResource SciPrimaryButton}" />
+
+            <Button Text="Cancelar"
+                    Command="{Binding CancelCommand}"
+                    IsVisible="{Binding ShowCancel}"
+                    Style="{StaticResource SciSecondaryButton}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
