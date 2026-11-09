@@ -2,7 +2,9 @@
 <!--
     Cabecera de la emergencia en curso, común a las pantallas del flujo (EmergencyWorkflowViewModel). Sin identificar: el
     código NN es lo principal. Identificada: el nombre del paciente, con el código NN debajo como trazabilidad. "Inicio"
-    vuelve al inicio del paramédico; la emergencia sigue en "Emergencias activas".
+    vuelve al inicio del paramédico; la emergencia sigue en "Emergencias activas". La identidad ocupa todo el ancho de la
+    tarjeta (debajo de "Inicio") para que el código NN completo quepa en una línea; en pantallas más estrechas se parte por
+    caracteres, nunca se recorta.
 -->
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
@@ -11,13 +13,13 @@
              x:DataType="vm:EmergencyWorkflowViewModel">
 
     <Border Style="{StaticResource SciCard}" Padding="14,10" AutomationId="EmergencyIdentityHeader">
-        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-            <VerticalStackLayout Spacing="2" VerticalOptions="Center">
-                <Label Text="Emergencia en curso" TextColor="{StaticResource SciTextMuted}" FontSize="12" />
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="2">
+            <Label Text="Emergencia en curso" TextColor="{StaticResource SciTextMuted}" FontSize="12" VerticalOptions="Center" />
+            <VerticalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="2">
                 <Label Text="{Binding Identity.Primary, FallbackValue='Cargando emergencia…', TargetNullValue='Cargando emergencia…'}"
                        AutomationId="EmergencyIdentityPrimary"
                        TextColor="{StaticResource SciText}"
-                       FontAttributes="Bold" FontSize="15"
+                       FontAttributes="Bold" FontSize="14"
                        LineBreakMode="CharacterWrap" />
                 <Label Text="{Binding Identity.Secondary}"
                        AutomationId="EmergencyIdentitySecondary"
@@ -32,7 +34,8 @@
                     Command="{Binding GoHomeCommand}"
                     Style="{StaticResource SciSecondaryButton}"
                     VerticalOptions="Center"
-                    Padding="14,6" />
+                    Padding="14,4"
+                    HeightRequest="40" />
         </Grid>
     </Border>
 
