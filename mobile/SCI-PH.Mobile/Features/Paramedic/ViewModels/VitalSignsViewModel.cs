@@ -114,7 +114,8 @@ public partial class VitalSignsViewModel : EmergencyWorkflowViewModel
     private bool CanSave() => !IsBusy && HasAnyValue && !HasAnyError;
 
     // REAL: una toma de 1 a 7 valores en una sola petición (todo o nada) sobre la MISMA emergencia. Registrada (201, o 200
-    // si el servidor ya la tenía con esta clave) → Procedimientos. Si falla, la pantalla queda como estaba.
+    // si el servidor ya la tenía con esta clave): se añade a "Tomas guardadas", el formulario se limpia y la pantalla sigue
+    // aquí para tomas sucesivas; solo "Continuar" avanza. Si falla, la pantalla queda como estaba.
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync()
     {
@@ -143,7 +144,6 @@ public partial class VitalSignsViewModel : EmergencyWorkflowViewModel
             SavedSummaries.Insert(0, BuildSummary(dto));
             SavedCount = SavedSummaries.Count;
             ClearForm();
-            await GoToProceduresAsync();
         }
         catch (MobileApiException ex) when (ex.Error == MobileApiError.Conflict)
         {

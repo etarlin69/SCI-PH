@@ -96,7 +96,8 @@ public partial class ProceduresViewModel : EmergencyWorkflowViewModel
     private bool CanSave() => !IsBusy && SelectedProcedure is not null && (Outcome?.Trim().Length ?? 0) <= OutcomeMaxLength;
 
     // REAL: un procedimiento ya realizado sobre la MISMA emergencia. Registrado (201, o 200 si el servidor ya lo tenía con
-    // esta clave) → Medicamentos. Si falla, la pantalla queda como estaba.
+    // esta clave): se añade a "Procedimientos registrados", el formulario se limpia y la pantalla sigue aquí para agregar
+    // otro; solo "Continuar a medicamentos" avanza. Si falla, la pantalla queda como estaba.
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync()
     {
@@ -125,7 +126,6 @@ public partial class ProceduresViewModel : EmergencyWorkflowViewModel
             SavedSummaries.Insert(0, summary);
             SavedCount = SavedSummaries.Count;
             ClearForm();
-            await GoToMedicationsAsync();
         }
         catch (MobileApiException ex) when (ex.Error == MobileApiError.Conflict)
         {
