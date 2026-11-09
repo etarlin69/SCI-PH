@@ -264,7 +264,7 @@ namespace SCI_PH.Application.Features.Clinical
             var now = _time.GetUtcNow();
             var transfer = ClinicalInput.Apply(() => ClinicalTransfer.Request(
                 encounter.Id, destination.Id, now, originClinicId: null, reason: reason, notes: notes));
-            StartIfCreated(encounter, now);
+            StartCareIfPending(encounter, now);
             _writes.Add(transfer);
             _writes.Add(ClinicalAuditEntry.Success(
                 actor.AuditActor, AuditActionType.Create, nameof(ClinicalTransfer), transfer.Id.ToString(), now,
@@ -467,7 +467,7 @@ namespace SCI_PH.Application.Features.Clinical
                 .Select(m => ClinicalInput.Apply(() => VitalSign.Record(encounter.Id, m.Type, m.Value, recordedAt, actor.StaffId)))
                 .ToList();
 
-            StartIfCreated(encounter, now);
+            StartCareIfPending(encounter, now);
             foreach (var vitalSign in vitalSigns)
             {
                 _writes.Add(vitalSign);
@@ -526,7 +526,7 @@ namespace SCI_PH.Application.Features.Clinical
                 encounter.Id, entry.Name, actor.StaffId, performedAt, performedAt, outcome, entry.Description,
                 PrehospitalProcedureCatalog.CodeSystem, entry.Code));
 
-            StartIfCreated(encounter, now);
+            StartCareIfPending(encounter, now);
             _writes.Add(procedure);
             _writes.Add(ClinicalAuditEntry.Success(
                 actor.AuditActor, AuditActionType.Create, nameof(ClinicalProcedure), procedure.Id.ToString(), now,
@@ -592,7 +592,7 @@ namespace SCI_PH.Application.Features.Clinical
                 encounter.Id, medication.Id, dose, doseUnit, route, administeredAt, actor.StaffId,
                 prescriptionId: null, prescriptionDetailId: null, notes: notes));
 
-            StartIfCreated(encounter, now);
+            StartCareIfPending(encounter, now);
             _writes.Add(administration);
             _writes.Add(ClinicalAuditEntry.Success(
                 actor.AuditActor, AuditActionType.Create, nameof(MedicationAdministration), administration.Id.ToString(), now,
@@ -639,7 +639,7 @@ namespace SCI_PH.Application.Features.Clinical
             var note = ClinicalInput.Apply(() => ClinicalNote.Write(
                 encounter.Id, actor.StaffId, ClinicalNoteType.Prehospital, content, occurredAt));
 
-            StartIfCreated(encounter, now);
+            StartCareIfPending(encounter, now);
             _writes.Add(note);
             _writes.Add(ClinicalAuditEntry.Success(
                 actor.AuditActor, AuditActionType.Create, nameof(ClinicalNote), note.Id.ToString(), now,
@@ -723,9 +723,10 @@ namespace SCI_PH.Application.Features.Clinical
 
         // The Domain never changes status before the start. An emergency opened with the device clock ahead (up to
         // 5 minutes, accepted) starts "after" the server's now, so the transition time, a server timestamp, is not
-        // earlier than the start. The device's time of the record is never changed.
-        private static void StartIfCreated(ClinicalEncounter encounter, DateTimeOffset now) =>
-            EncounterRecordService.StartIfCreated(encounter, NotBeforeStart(encounter, now));
+        // earlier than the start. The device's time of the record is never changed. In the field only Created -> InProgress
+        // applies: a Received emergency already has a clinic and accepts no mobile record (LoadForIdentificationAsync).
+        private static void StartCareIfPending(ClinicalEncounter encounter, DateTimeOffset now) =>
+            EncounterRecordService.StartCareIfPending(encounter, NotBeforeStart(encounter, now));
 
         // Saves the tracked record and its receipt. Returns the receipt of the request that committed instead when this one
         // lost: a concurrent request with the same key committed first (this one wrote nothing), or the encounter changed

@@ -23,6 +23,25 @@ namespace SCI_PH.Web.BFF.Controllers.Clinical
         public async Task<IActionResult> ListIncoming(Guid? clinicId, CancellationToken cancellationToken) =>
             Ok(await _transfers.ListIncomingAsync(clinicId, cancellationToken));
 
+        // Active clinics a patient can be sent to from the user's clinic (clinicId, required with several affiliations),
+        // that clinic excluded. Not the admin catalog: no Clinics.Manage, only id, name, type, municipality and province.
+        [HttpGet("destinations")]
+        [Authorize(Policy = Permissions.Transfers.Manage)]
+        [ProducesResponseType<IReadOnlyList<TransferDestinationSummary>>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> ListDestinations(Guid? clinicId, CancellationToken cancellationToken) =>
+            Ok(await _transfers.ListDestinationsAsync(clinicId, cancellationToken));
+
+        // Transfers of one encounter (active and historical, newest first), readable like the encounter itself.
+        [HttpGet("/api/web/encounters/{encounterId:guid}/transfers")]
+        [Authorize(Policy = Permissions.Transfers.Read)]
+        [Authorize(Policy = Permissions.Encounters.Read)]
+        [ProducesResponseType<IReadOnlyList<ClinicalTransferSummary>>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ListForEncounter(Guid encounterId, CancellationToken cancellationToken) =>
+            Ok(await _transfers.ListForEncounterAsync(encounterId, cancellationToken));
+
         [HttpGet("{id:guid}")]
         [Authorize(Policy = Permissions.Transfers.Read)]
         [ProducesResponseType<ClinicalTransferSummary>(StatusCodes.Status200OK)]

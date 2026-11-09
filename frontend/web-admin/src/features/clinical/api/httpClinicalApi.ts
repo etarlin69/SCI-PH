@@ -5,6 +5,7 @@ import type {
     ClinicalEncounterSummary,
     ClinicalNote,
     ClinicalTransfer,
+    TransferDestination,
     Diagnosis,
     EncounterAiSummary,
     FingerprintEnroller,
@@ -191,4 +192,23 @@ export const httpClinicalApi: ClinicalApi = {
     receiveTransfer: async (transferId) => {
         await apiRequest<ClinicalTransfer>(`${BASE}/transfers/${id(transferId)}/receive`, { method: 'POST' });
     },
+
+    // Activos e históricos de la atención; con los mismos permisos de lectura que la atención.
+    listEncounterTransfers: (encounterId, signal) =>
+        apiRequest<ClinicalTransfer[]>(`${BASE}/encounters/${id(encounterId)}/transfers`, { signal }),
+
+    // Destinos desde la clínica de la atención (el backend la valida y la excluye); no es el catálogo de administración.
+    listTransferDestinations: (fromClinicId, signal) =>
+        apiRequest<TransferDestination[]>(`${BASE}/transfers/destinations`, { query: { clinicId: fromClinicId ?? clinicIdForRequest() }, signal }),
+
+    // El origen es la clínica de la atención y quién solicita lo fija el backend desde la sesión.
+    requestTransfer: (encounterId, request) =>
+        apiRequest<ClinicalTransfer>(`${BASE}/encounters/${id(encounterId)}/transfers`, {
+            method: 'POST',
+            body: { destinationClinicId: request.destinationClinicId, reason: request.reason ?? null, notes: request.notes ?? null },
+        }),
+
+    dispatchTransfer: (transferId) => apiRequest<ClinicalTransfer>(`${BASE}/transfers/${id(transferId)}/dispatch`, { method: 'POST' }),
+
+    cancelTransfer: (transferId) => apiRequest<ClinicalTransfer>(`${BASE}/transfers/${id(transferId)}/cancel`, { method: 'POST' }),
 };
