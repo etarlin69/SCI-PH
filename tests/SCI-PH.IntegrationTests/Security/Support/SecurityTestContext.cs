@@ -26,7 +26,10 @@ namespace SCI_PH.IntegrationTests.Security.Support
     {
         private readonly ServiceProvider _provider;
 
-        public SecurityTestContext(IDictionary<string, string?>? settings = null, string? postgresConnectionString = null)
+        public SecurityTestContext(
+            IDictionary<string, string?>? settings = null,
+            string? postgresConnectionString = null,
+            RefreshReadBarrier? refreshReadBarrier = null)
         {
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(TestSettings.Create(settings)).Build();
 
@@ -46,6 +49,10 @@ namespace SCI_PH.IntegrationTests.Security.Support
 
             services.UseFakeEmail(Email);
             services.AddSingleton<TimeProvider>(Time);
+            if (refreshReadBarrier is not null)
+            {
+                services.AddRefreshReadBarrier(refreshReadBarrier);
+            }
             _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         }
 
@@ -85,6 +92,9 @@ namespace SCI_PH.IntegrationTests.Security.Support
 
         public Task<AuthenticationResult?> RefreshAsync(string refreshToken) =>
             With<AuthenticationService, AuthenticationResult?>(auth => auth.RefreshAsync(refreshToken, ClientContext.Unknown, CancellationToken.None));
+
+        public Task<RefreshOutcome> RefreshSessionAsync(string refreshToken) =>
+            With<AuthenticationService, RefreshOutcome>(auth => auth.RefreshSessionAsync(refreshToken, ClientContext.Unknown, CancellationToken.None));
 
         public Task<T> AuthenticationAsync<T>(Func<AuthenticationService, Task<T>> action) => With(action);
 

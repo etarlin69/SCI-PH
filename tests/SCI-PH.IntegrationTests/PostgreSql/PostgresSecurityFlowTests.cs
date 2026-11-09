@@ -49,6 +49,54 @@ namespace SCI_PH.IntegrationTests.PostgreSql
             Assert.True(await context.DbAsync(db => db.RefreshTokens.CountAsync(t => t.UserId == user.Id && t.RevokedAtUtc == null)) <= 1);
         }
 
+        // Two tabs, same cookie, both read it as active: every round has one winner, the rest lose the compare-and-set
+        // harmlessly. Atomic SaveChanges: the losers store no replacement, nothing is revoked, the winner's chain continues.
+        [SkippableFact]
+        public async Task ALostRotationRaceRevokesNothingAndStoresNoReplacement()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var barrier = new RefreshReadBarrier();
+            await using var context = new SecurityTestContext(
+                postgresConnectionString: await _postgres.CreateMigratedDatabaseAsync(), refreshReadBarrier: barrier);
+            var user = await context.CreateUserAsync(SecurityRoles.Nurse);
+            var current = (await context.LoginAsync(user.Email, user.Password))!.RefreshToken;
+
+            for (var round = 0; round < 5; round++)
+            {
+                barrier.Arm(3);
+                var token = current;
+                var outcomes = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => Task.Run(() => context.RefreshSessionAsync(token))));
+
+                var winner = Assert.Single(outcomes, o => o.Status == RefreshStatus.Succeeded);
+                Assert.Equal(2, outcomes.Count(o => o.Status == RefreshStatus.LostConcurrencyRace));
+                Assert.Equal(1, await context.DbAsync(db => db.RefreshTokens.CountAsync(t => t.UserId == user.Id && t.RevokedAtUtc == null)));
+                current = winner.Session!.RefreshToken;
+            }
+
+            Assert.Equal(6, await context.DbAsync(db => db.RefreshTokens.CountAsync(t => t.UserId == user.Id)));
+            Assert.False(await context.DbAsync(db => db.SecurityAuditEvents.AnyAsync(e =>
+                e.UserId == user.Id && e.EventType == SecurityAuditEventType.RefreshTokenReuseDetected)));
+            Assert.Equal(RefreshStatus.Succeeded, (await context.RefreshSessionAsync(current)).Status);
+        }
+
+        // A replay after a committed rotation is still reuse on the real database: family revoked, descendant dead.
+        [SkippableFact]
+        public async Task ReplayAfterACommittedRotationStillRevokesTheFamily()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            await using var context = new SecurityTestContext(postgresConnectionString: await _postgres.CreateMigratedDatabaseAsync());
+            var user = await context.CreateUserAsync(SecurityRoles.Doctor);
+            var t1 = (await context.LoginAsync(user.Email, user.Password))!.RefreshToken;
+            var t2 = (await context.RefreshSessionAsync(t1)).Session!.RefreshToken;
+
+            Assert.Equal(RefreshStatus.Failed, (await context.RefreshSessionAsync(t1)).Status);
+
+            Assert.True(await context.DbAsync(db => db.SecurityAuditEvents.AnyAsync(e =>
+                e.UserId == user.Id && e.EventType == SecurityAuditEventType.RefreshTokenReuseDetected)));
+            Assert.False(await context.DbAsync(db => db.RefreshTokens.AnyAsync(t => t.UserId == user.Id && t.RevokedAtUtc == null)));
+            Assert.Equal(RefreshStatus.Failed, (await context.RefreshSessionAsync(t2)).Status);
+        }
+
         [SkippableFact]
         public async Task TwoConcurrentVerificationsOfTheSameMfaChallengeYieldExactlyOneSession()
         {
