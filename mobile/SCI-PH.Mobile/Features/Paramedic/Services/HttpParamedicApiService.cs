@@ -185,6 +185,7 @@ public sealed class HttpParamedicApiService : IParamedicApiService
     {
         "Transferred" => EmergencyStatus.Transferred,
         "Closed" or "Cancelled" => EmergencyStatus.Closed,
+        "Received" or "InEvolution" => EmergencyStatus.HandedOff,
         _ => EmergencyStatus.Open
     };
 

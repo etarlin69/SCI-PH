@@ -32,6 +32,9 @@ public partial class TransferViewModel : EmergencyWorkflowViewModel
     // perdida, 400/403/404/409) para no crear dos traslados. Se renueva cuando la solicitud queda registrada.
     private Guid? _clientRequestId;
 
+    // Lecturas de la pantalla: solo la última, y solo de la emergencia que se está mostrando, cambia el estado.
+    private int _loadGeneration;
+
     public TransferViewModel(IParamedicApiService api, IParamedicCatalogService catalog, IAppNavigator navigator)
         : base(api, navigator)
     {
@@ -67,6 +70,14 @@ public partial class TransferViewModel : EmergencyWorkflowViewModel
 
     public bool HasSuccess => !string.IsNullOrWhiteSpace(SuccessMessage);
 
+    /// <summary>
+    /// "Identificar paciente": el paciente sigue NN y la emergencia todavía es del paramédico (sin recepción del hospital),
+    /// según la última lectura del servidor. Identificar no toca el traslado; tras la recepción el servidor ya no lo acepta.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(IdentifyPatientCommand))]
+    private bool canIdentifyPatient;
+
     public bool HasNoTransfer => Transfer is null;
     public bool HasTransfer => Transfer is not null;
     public bool IsRequested => Transfer?.Status == TransferStatus.Requested;
@@ -88,38 +99,58 @@ public partial class TransferViewModel : EmergencyWorkflowViewModel
         RequestCommand.NotifyCanExecuteChanged();
         StartCommand.NotifyCanExecuteChanged();
         CancelCommand.NotifyCanExecuteChanged();
+        IdentifyPatientCommand.NotifyCanExecuteChanged();
     }
 
     // Restaura el estado desde el servidor (activeTransfer) y carga los destinos si todavía no hay traslado.
     [RelayCommand]
     private async Task LoadAsync()
     {
+        var id = EmergencyId;
+        var generation = Interlocked.Increment(ref _loadGeneration);
         ErrorMessage = null;
         IsBusy = true;
         try
         {
-            var emergency = await _api.GetEmergencyAsync(EmergencyId);
+            var emergency = await _api.GetEmergencyAsync(id);
+            if (!IsCurrentLoad(id, generation))
+            {
+                return;
+            }
+
             if (emergency is not null)
             {
                 // La misma lectura sirve para la cabecera (código NN o paciente).
                 ApplyEmergency(emergency);
             }
 
+            CanIdentifyPatient = emergency is { Patient: null, Status: EmergencyStatus.Open or EmergencyStatus.Transferred };
             Transfer = emergency?.ActiveTransfer;
             if (Transfer is null && Destinations.Count == 0)
             {
-                foreach (var destination in await _catalog.GetTransferDestinationsAsync()) Destinations.Add(destination);
+                var destinations = await _catalog.GetTransferDestinationsAsync();
+                if (IsCurrentLoad(id, generation) && Destinations.Count == 0)
+                {
+                    foreach (var destination in destinations) Destinations.Add(destination);
+                }
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = ex is MobileApiException api && api.Error is not (MobileApiError.Server or MobileApiError.InvalidResponse)
-                ? MobileApiErrorMessages.For(api)
-                : ParamedicMessages.TransferDestinationsFailed;
+            if (IsCurrentLoad(id, generation))
+            {
+                CanIdentifyPatient = false;
+                ErrorMessage = ex is MobileApiException api && api.Error is not (MobileApiError.Server or MobileApiError.InvalidResponse)
+                    ? MobileApiErrorMessages.For(api)
+                    : ParamedicMessages.TransferDestinationsFailed;
+            }
         }
         finally
         {
-            IsBusy = false;
+            if (generation == Volatile.Read(ref _loadGeneration))
+            {
+                IsBusy = false;
+            }
         }
     }
 
@@ -164,6 +195,21 @@ public partial class TransferViewModel : EmergencyWorkflowViewModel
             if (Destinations.Count == 0) await LoadAsync();
         }
     }
+
+    private bool IsCurrentLoad(Guid id, int generation) =>
+        generation == Volatile.Read(ref _loadGeneration) && id == EmergencyId;
+
+    private bool CanOpenIdentification() => !IsBusy && CanIdentifyPatient;
+
+    // La identificación de SIEMPRE (huella, documento, QR) sobre la misma emergencia; al terminar vuelve aquí. El traslado
+    // no se toca: sigue solicitado o en curso.
+    [RelayCommand(CanExecute = nameof(CanOpenIdentification))]
+    private Task IdentifyPatientAsync() =>
+        _navigator.GoToAsync(ParamedicRoutes.IdentifyPatient, new Dictionary<string, object>
+        {
+            ["EmergencyId"] = EmergencyId,
+            [ParamedicRoutes.ReturnToTransfer] = true
+        });
 
     // Durante el traslado se sigue documentando sobre la misma emergencia.
     [RelayCommand]

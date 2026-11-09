@@ -107,7 +107,8 @@
                             Style="{StaticResource SciSecondaryButton}" />
                     <Label Text="Si no es posible identificarlo ahora, la atención continúa como paciente no identificado (NN) y puede identificarse después."
                            Style="{StaticResource SciSubtitle}" />
-                    <Button Text="Continuar sin identificar"
+                    <Button Text="{Binding ContinueWithoutIdentifyingText}"
+                            AutomationId="IdentifyContinueWithout"
                             Command="{Binding ContinueWithoutIdentifyingCommand}"
                             Style="{StaticResource SciSecondaryButton}" />
                 </VerticalStackLayout>
@@ -153,7 +154,8 @@
                                FontAttributes="Bold" FontSize="13" />
                     </Border>
                     <Label Text="{Binding PatientDisplayName}" Style="{StaticResource SciTitle}" />
-                    <Button Text="Continuar a signos vitales"
+                    <Button Text="{Binding ContinueText}"
+                            AutomationId="IdentifyContinue"
                             Command="{Binding ContinueCommand}"
                             Style="{StaticResource SciPrimaryButton}" />
                 </VerticalStackLayout>

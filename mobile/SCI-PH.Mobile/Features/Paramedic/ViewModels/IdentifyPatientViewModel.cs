@@ -12,6 +12,7 @@ using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
 
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
+[QueryProperty(nameof(ReturnsToTransfer), ParamedicRoutes.ReturnToTransfer)]
 public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
 {
     /// <summary>Cada cuánto se consulta la sesión de huella mientras espera al lector.</summary>
@@ -68,6 +69,18 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
 
     public IReadOnlyList<string> DocumentTypes { get; } = DocumentTypeByLabel.Keys.ToList();
 
+
+    /// <summary>
+    /// Abierta desde el traslado (paciente NN con el traslado ya solicitado o en curso): al terminar, con o sin
+    /// identificación, se vuelve al traslado en vez de avanzar a los signos vitales.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ContinueText), nameof(ContinueWithoutIdentifyingText))]
+    private bool returnsToTransfer;
+
+    public string ContinueText => ReturnsToTransfer ? "Volver al traslado" : "Continuar a signos vitales";
+
+    public string ContinueWithoutIdentifyingText => ReturnsToTransfer ? "Volver al traslado sin identificar" : "Continuar sin identificar";
 
     // ---- Resultado ----
     [ObservableProperty]
@@ -624,8 +637,11 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
         ShowDocumentForm = false;
     }
 
+    // Desde el traslado se vuelve a la MISMA pantalla de traslado (que relee la emergencia); si no, el siguiente paso.
     private Task GoToNextStepAsync() =>
-        _navigator.GoToAsync(
-            ParamedicRoutes.VitalSigns,
-            new Dictionary<string, object> { ["EmergencyId"] = EmergencyId });
+        ReturnsToTransfer
+            ? _navigator.GoToAsync(ParamedicRoutes.Back)
+            : _navigator.GoToAsync(
+                ParamedicRoutes.VitalSigns,
+                new Dictionary<string, object> { ["EmergencyId"] = EmergencyId });
 }

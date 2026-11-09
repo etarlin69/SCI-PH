@@ -149,7 +149,7 @@ public sealed partial class ParamedicHomeViewModel : BaseViewModel
         try
         {
             emergency = await _api.GetEmergencyAsync(item.Id);
-            unavailable = emergency is null || emergency.Status == EmergencyStatus.Closed;
+            unavailable = emergency is null || emergency.Status is EmergencyStatus.Closed or EmergencyStatus.HandedOff;
         }
         catch (Exception) when (!IsSameSession(session, owner))
         {

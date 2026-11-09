@@ -23,6 +23,15 @@ public static class ParamedicRoutes
 
     public const string IdentifyPatient = "IdentifyPatient";
 
+    /// <summary>
+    /// Parámetro de <see cref="IdentifyPatient"/> (bool): se abrió desde el traslado, así que al terminar vuelve a él en vez de
+    /// avanzar a los signos vitales.
+    /// </summary>
+    public const string ReturnToTransfer = "ReturnToTransfer";
+
+    /// <summary>Vuelve a la pantalla anterior de la pila (la que abrió la actual).</summary>
+    public const string Back = "..";
+
     /// <summary>Escáner del QR del paciente, sobre la identificación (no se ofrece en Mac Catalyst).</summary>
     public const string ScanQr = "ScanQr";
 

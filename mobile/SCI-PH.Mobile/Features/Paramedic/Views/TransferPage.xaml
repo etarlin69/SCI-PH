@@ -15,6 +15,19 @@
             <!-- Emergencia en curso: código NN o paciente (con el NN como trazabilidad) e "Inicio" -->
             <components:EmergencyIdentityHeader />
 
+            <!-- Paciente aún NN: se puede identificar durante el traslado (mientras el hospital no lo haya recibido) -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding CanIdentifyPatient}" AutomationId="TransferIdentifyCard">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Paciente sin identificar" Style="{StaticResource SciFieldLabel}" />
+                    <Label Text="Si obtienes su identidad durante el traslado, identifícalo ahora. El traslado no cambia."
+                           Style="{StaticResource SciSubtitle}" />
+                    <Button Text="Identificar paciente"
+                            AutomationId="TransferIdentifyPatient"
+                            Command="{Binding IdentifyPatientCommand}"
+                            Style="{StaticResource SciSecondaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
             <!-- Encabezado -->
             <VerticalStackLayout Spacing="4">
                 <Label Text="Traslado" Style="{StaticResource SciTitle}" />
