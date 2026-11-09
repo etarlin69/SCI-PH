@@ -205,6 +205,43 @@ namespace SCI_PH.Application.Features.Clinical
             return emergency with { ActiveTransfer = await ActiveTransferAsync(emergency.Id, cancellationToken) };
         }
 
+        // Most emergencies one paramedic's active list returns.
+        public const int ActiveEmergenciesLimit = 50;
+
+        // The paramedic's actionable emergencies, newest first: the cases this user can still continue in the field, with
+        // the same rule as every mobile record (LoadForRecordingAsync): prehospital, no clinic yet (once a clinic received
+        // it, the handoff ended the paramedic's writes), an open assignment of the current staff member and a status of
+        // PrehospitalRecordableStatuses (Transferred without clinic = on the way). The query enforces all of it; nothing
+        // is filtered by the app. An identified case also needs the patient rule of the GET (ReadAsync); one that fails it
+        // is left out rather than failing the whole list. Not active clinical staff: 403, as every mobile call.
+        public async Task<IReadOnlyList<ActivePrehospitalEmergencySummary>> ListActiveAsync(CancellationToken cancellationToken)
+        {
+            var actor = await _actor.GetAsync(cancellationToken);
+            var rows = await _reads.ListAssignedPrehospitalEmergenciesAsync(
+                actor.StaffId, PrehospitalRecordableStatuses, ActiveEmergenciesLimit, cancellationToken);
+
+            var result = new List<ActivePrehospitalEmergencySummary>(rows.Count);
+            foreach (var (encounter, activeTransferStatus) in rows)
+            {
+                if (encounter.PatientId is { } patientId
+                    && !await _patientAccess.CanReadAsync(patientId, Permissions.Encounters.Read, cancellationToken))
+                {
+                    continue;
+                }
+
+                result.Add(new ActivePrehospitalEmergencySummary(
+                    encounter.Id,
+                    encounter.TemporaryPatientCode,
+                    encounter.Patient is { } patient ? ClinicalMapping.DisplayName(patient) : null,
+                    encounter.Status,
+                    encounter.StartedAtUtc,
+                    encounter.Reason,
+                    activeTransferStatus));
+            }
+
+            return result;
+        }
+
         // Active clinics of the network a paramedic can take the patient to (no restriction by type). Only active clinical
         // staff use it (same actor rule as the other catalogs).
         public async Task<IReadOnlyList<TransferDestinationSummary>> ListTransferDestinationsAsync(CancellationToken cancellationToken)

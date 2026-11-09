@@ -5,6 +5,13 @@ public static class ParamedicMessages
 {
     public const string CreateEmergencyFailed = "No se pudo crear la emergencia. Intenta nuevamente.";
 
+    public const string ActiveEmergenciesFailed = "No se pudieron cargar las emergencias activas. Intenta nuevamente.";
+
+    public const string OpenEmergencyFailed = "No se pudo abrir la emergencia. Intenta nuevamente.";
+
+    /// <summary>Al retomarla, el servidor ya no la deja continuar (entregada al hospital, cerrada o sin acceso).</summary>
+    public const string EmergencyNoLongerActive = "Esa emergencia ya no está activa. La lista se actualizó.";
+
     /// <summary>409: el clientRequestId ya se usó con otros datos (por ejemplo, el motivo cambió tras un fallo de red).</summary>
     public const string EmergencyRequestReused =
         "La solicitud ya fue utilizada con datos diferentes. Vuelve a iniciar la creación de la emergencia.";

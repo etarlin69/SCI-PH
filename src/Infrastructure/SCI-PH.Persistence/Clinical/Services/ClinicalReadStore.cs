@@ -170,6 +170,39 @@ namespace SCI_PH.Persistence.Clinical.Services
                 a => a.ClinicalEncounterId == encounterId && a.ClinicalStaffId == staffId && a.UnassignedAtUtc == null,
                 cancellationToken);
 
+        public async Task<IReadOnlyList<AssignedEmergencyRow>> ListAssignedPrehospitalEmergenciesAsync(
+            Guid staffId,
+            IReadOnlyCollection<ClinicalEncounterStatus> statuses,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            var encounters = await ToRowsAsync(
+                _clinical.ClinicalEncounters.Where(e =>
+                    e.Type == ClinicalEncounterType.Prehospital
+                    && e.ClinicId == null
+                    && statuses.Contains(e.Status)
+                    && _clinical.EncounterStaffAssignments.Any(a =>
+                        a.ClinicalEncounterId == e.Id && a.ClinicalStaffId == staffId && a.UnassignedAtUtc == null)),
+                limit,
+                cancellationToken);
+            if (encounters.Count == 0)
+            {
+                return [];
+            }
+
+            // At most one active transfer per encounter (unique index).
+            var encounterIds = encounters.Select(e => e.Id).ToList();
+            var activeTransfers = await _clinical.ClinicalTransfers.AsNoTracking()
+                .Where(t => encounterIds.Contains(t.ClinicalEncounterId)
+                    && Domain.Entities.Transport.ClinicalTransfer.ActiveStatuses.Contains(t.Status))
+                .Select(t => new { t.ClinicalEncounterId, t.Status })
+                .ToDictionaryAsync(t => t.ClinicalEncounterId, t => t.Status, cancellationToken);
+
+            return encounters
+                .Select(e => new AssignedEmergencyRow(e, activeTransfers.TryGetValue(e.Id, out var status) ? status : null))
+                .ToList();
+        }
+
         public Task<IReadOnlyList<EncounterRow>> ListEncountersAsync(
             Guid clinicId,
             IReadOnlyCollection<ClinicalEncounterStatus> excludedStatuses,

@@ -21,6 +21,7 @@ public static class ParamedicServiceCollectionExtensions
         services.AddSingleton<ICameraPermissionService, MauiCameraPermissionService>();
 
         // ViewModels
+        services.AddTransient<ParamedicHomeViewModel>();
         services.AddTransient<NewEmergencyViewModel>();
         services.AddTransient<IdentifyPatientViewModel>();
         services.AddTransient<QrScannerViewModel>();
@@ -31,6 +32,7 @@ public static class ParamedicServiceCollectionExtensions
         services.AddTransient<TransferViewModel>();
 
         // Views
+        services.AddTransient<ParamedicHomePage>();
         services.AddTransient<NewEmergencyPage>();
         services.AddTransient<IdentifyPatientPage>();
         services.AddTransient<QrScannerPage>();
@@ -44,8 +46,8 @@ public static class ParamedicServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Registra las páginas del flujo: todas se apilan, empezando por <see cref="ParamedicRoutes.NewEmergency"/> sobre la
-    /// entrada compartida.
+    /// Registra las páginas del flujo: todas se apilan sobre el inicio del paramédico (<see cref="ParamedicRoutes.Home"/>,
+    /// un ShellContent de AppShell, que no se registra aquí).
     /// </summary>
     public static void RegisterParamedicRoutes()
     {

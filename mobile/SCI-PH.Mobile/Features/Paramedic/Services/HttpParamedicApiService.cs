@@ -49,6 +49,22 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         }
     }
 
+    // Solo las del paramédico actual que siguen en el campo; [] si no hay. 401/403 y el resto llegan como MobileApiException.
+    public async Task<IReadOnlyList<ActiveEmergencyDto>> GetActiveEmergenciesAsync(CancellationToken cancellationToken = default)
+    {
+        var items = await _client.GetAsync<List<ActiveEmergencyResponse>>($"{Emergencies}/active", cancellationToken);
+        return items.Select(i => new ActiveEmergencyDto
+        {
+            Id = i.Id,
+            TemporaryPatientCode = i.TemporaryPatientCode,
+            PatientDisplayName = i.PatientDisplayName,
+            Status = i.Status ?? string.Empty,
+            StartedAt = i.StartedAtUtc.UtcDateTime,
+            ChiefComplaint = i.ChiefComplaint,
+            ActiveTransferStatus = i.ActiveTransferStatus
+        }).ToList();
+    }
+
     // 200: la MISMA emergencia, ya identificada (también al reintentar con la misma clave). 404: ningún paciente tiene ese
     // documento; la emergencia sigue NN (null). 409 y el resto llegan como MobileApiException.
     public async Task<EmergencyDto?> IdentifyByDocumentAsync(Guid emergencyId, IdentifyByDocumentDto dto)
@@ -257,4 +273,13 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         DateTimeOffset? CancelledAtUtc);
 
     private sealed record EmergencyPatient(Guid Id, string? DisplayName);
+
+    private sealed record ActiveEmergencyResponse(
+        Guid Id,
+        string? TemporaryPatientCode,
+        string? PatientDisplayName,
+        string? Status,
+        DateTimeOffset StartedAtUtc,
+        string? ChiefComplaint,
+        TransferStatus? ActiveTransferStatus);
 }

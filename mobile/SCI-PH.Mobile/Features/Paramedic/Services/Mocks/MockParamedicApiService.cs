@@ -47,6 +47,10 @@ public class MockParamedicApiService : IParamedicApiService
         return _emergencies.TryGetValue(id, out var emergency) ? emergency : null;
     }
 
+    // El modo mock no tiene asignaciones: nunca inventa emergencias activas.
+    public Task<IReadOnlyList<ActiveEmergencyDto>> GetActiveEmergenciesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ActiveEmergencyDto>>([]);
+
     // Solo para el modo mock: cualquier documento encuentra un paciente ficticio.
     public async Task<EmergencyDto?> IdentifyByDocumentAsync(Guid emergencyId, IdentifyByDocumentDto dto)
     {

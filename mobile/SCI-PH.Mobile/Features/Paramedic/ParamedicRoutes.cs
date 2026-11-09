@@ -1,3 +1,5 @@
+using SCI_PH.Mobile.Common.Navigation;
+
 namespace SCI_PH.Mobile.Features.Paramedic;
 
 /// <summary>
@@ -7,7 +9,16 @@ namespace SCI_PH.Mobile.Features.Paramedic;
 /// </summary>
 public static class ParamedicRoutes
 {
-    /// <summary>Inicio del flujo; se apila sobre la entrada compartida ("Atrás" vuelve a elegir el acceso).</summary>
+    /// <summary>
+    /// Inicio del paramédico: raíz del área (sin flecha "Atrás"), con "Nueva emergencia" y "Emergencias activas". Es un
+    /// ShellContent de AppShell; el resto del flujo se apila sobre él.
+    /// </summary>
+    public const string Home = "ParamedicHome";
+
+    /// <summary>El inicio como ruta absoluta: reemplaza la pila (login, MFA o el flujo de una emergencia dejan de estar detrás).</summary>
+    public static string HomeRoot { get; } = AppRoutes.Root(Home);
+
+    /// <summary>Formulario de una emergencia nueva, sobre el inicio.</summary>
     public const string NewEmergency = "NewEmergency";
 
     public const string IdentifyPatient = "IdentifyPatient";
