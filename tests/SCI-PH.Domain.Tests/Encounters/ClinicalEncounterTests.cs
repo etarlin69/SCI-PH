@@ -165,6 +165,48 @@ namespace SCI_PH.Domain.Tests.Encounters
             Assert.True(encounter.CanChangeStatusTo(ClinicalEncounterStatus.Closed));
         }
 
+        // Hospital continuity: a received encounter is not sent on directly; care starts (InProgress) and then it can be
+        // transferred again, received at a second clinic, and continue there.
+        [Fact]
+        public void AReceivedEncounterStartsCareBeforeItCanBeTransferredAgain()
+        {
+            var (first, second) = (Guid.NewGuid(), Guid.NewGuid());
+            var encounter = ClinicalEncounter.CreateUnidentified(ClinicalEncounterType.Emergency, Start, ClinicId);
+            var code = encounter.TemporaryPatientCode;
+            encounter.ChangeStatus(ClinicalEncounterStatus.InProgress, Start);
+            encounter.ChangeStatus(ClinicalEncounterStatus.Transferred, Start.AddMinutes(10));
+            encounter.ReceiveAtClinic(first, Start.AddMinutes(40));
+
+            Assert.False(encounter.CanChangeStatusTo(ClinicalEncounterStatus.Transferred));
+            Assert.Throws<InvalidClinicalEncounterStateException>(() => encounter.ChangeStatus(ClinicalEncounterStatus.Transferred, Start.AddMinutes(45)));
+            Assert.Equal(ClinicalEncounterStatus.Received, encounter.Status);
+
+            encounter.ChangeStatus(ClinicalEncounterStatus.InProgress, Start.AddMinutes(50));
+            Assert.True(encounter.CanChangeStatusTo(ClinicalEncounterStatus.Transferred));
+            encounter.ChangeStatus(ClinicalEncounterStatus.Transferred, Start.AddHours(2));
+            encounter.ReceiveAtClinic(second, Start.AddHours(3));
+
+            Assert.Equal(ClinicalEncounterStatus.Received, encounter.Status);
+            Assert.Equal(second, encounter.ClinicId);
+            Assert.Equal(code, encounter.TemporaryPatientCode);
+            encounter.ChangeStatus(ClinicalEncounterStatus.InProgress, Start.AddHours(3).AddMinutes(5));
+            encounter.ChangeStatus(ClinicalEncounterStatus.Closed, Start.AddHours(6));
+            Assert.Equal(ClinicalEncounterStatus.Closed, encounter.Status);
+        }
+
+        [Fact]
+        public void AReceivedEncounterCanBeClosedWithoutStartingCare()
+        {
+            var encounter = ClinicalEncounter.CreateForPatient(Guid.NewGuid(), ClinicalEncounterType.Emergency, Start, ClinicId);
+            encounter.ChangeStatus(ClinicalEncounterStatus.InProgress, Start);
+            encounter.ChangeStatus(ClinicalEncounterStatus.Transferred, Start.AddMinutes(10));
+            encounter.ReceiveAtClinic(Guid.NewGuid(), Start.AddMinutes(40));
+
+            encounter.ChangeStatus(ClinicalEncounterStatus.Closed, Start.AddHours(1));
+
+            Assert.Equal(ClinicalEncounterStatus.Closed, encounter.Status);
+        }
+
         [Fact]
         public void PrehospitalCareWithoutClinicGetsTheDestinationClinicOnArrival()
         {
