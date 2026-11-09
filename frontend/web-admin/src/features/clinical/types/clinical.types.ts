@@ -345,6 +345,22 @@ export interface ClinicalTransfer {
     latestTriagePriority: TriagePriority | null;
 }
 
+/** Clínica activa a la que se puede trasladar al paciente (GET /api/web/transfers/destinations). Sin datos de administración. */
+export interface TransferDestination {
+    id: Guid;
+    name: string;
+    type: string;
+    municipality: string;
+    province: string;
+}
+
+/** POST /api/web/encounters/{id}/transfers: la clínica de origen la fija el backend (la de la atención). */
+export interface RequestTransferRequest {
+    destinationClinicId: Guid;
+    reason?: string | null;
+    notes?: string | null;
+}
+
 // ---- Huella digital (ADR-010) ----
 
 /** Lector donde se puede registrar una huella: activo, que registra e identifica. Sin claves ni scopes. */

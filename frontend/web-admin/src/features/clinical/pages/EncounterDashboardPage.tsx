@@ -5,6 +5,7 @@ import { Button, Card, Checkbox, EmptyState, Input, Select, Textarea } from '../
 import { clinicalApi } from '../api';
 import { ClinicSelector } from '../components/ClinicSelector';
 import { EncounterAiSummaryCard } from '../components/EncounterAiSummaryCard';
+import { EncounterTransferCard } from '../components/EncounterTransferCard';
 import { EncounterStatusBadge, TriagePriorityBadge } from '../components/ClinicalBadges';
 import { EncounterShell } from '../components/EncounterShell';
 import { EncounterSubject } from '../components/EncounterSubject';
@@ -21,26 +22,38 @@ import {
     NOTE_TYPE_LABELS,
     formatDateTimeUtc,
     acceptsClinicalRecords,
+    startsCare,
 } from '../utils/clinicalLabels';
 
 /** /hospital/atenciones: atenciones abiertas. /hospital/atenciones/:id: expediente de la atención. */
 export function EncounterDashboardPage() {
     const { encounterId } = useParams();
-    const canRead = useAuth().can(Permissions.Encounters.Read);
+    const { can } = useAuth();
+    const canRead = can(Permissions.Encounters.Read);
+    const canReadTransfers = can(Permissions.Transfers.Read);
     if (!encounterId) return <EncounterList />;
 
     return (
         <EncounterShell encounterId={encounterId}>
-            {(encounter) => (
-                <>
-                    <div className="grid gap-5 xl:grid-cols-2">
-                        <DiagnosesCard encounter={encounter} />
-                        <NotesCard encounter={encounter} />
-                    </div>
-                    {/* Resumen asistido (ADR-013): mismo acceso que leer la atención; uno nuevo por atención. */}
-                    {canRead && <EncounterAiSummaryCard key={encounter.id} encounterId={encounter.id} />}
-                </>
-            )}
+            {(encounter, reloadEncounter) => {
+                // El primer registro en esta clínica empieza la atención (Created/Received → InProgress, en el backend):
+                // se recarga la atención una vez para mostrar el estado nuevo (y habilitar el traslado).
+                const onRecorded = () => {
+                    if (startsCare(encounter.status)) reloadEncounter();
+                };
+                return (
+                    <>
+                        <div className="grid gap-5 xl:grid-cols-2">
+                            <DiagnosesCard encounter={encounter} onRecorded={onRecorded} />
+                            <NotesCard encounter={encounter} onRecorded={onRecorded} />
+                        </div>
+                        {/* Traslado saliente: leerlo requiere Transfers.Read; sus acciones, Transfers.Manage (dentro de la tarjeta). */}
+                        {canRead && canReadTransfers && <EncounterTransferCard encounter={encounter} onEncounterChanged={reloadEncounter} />}
+                        {/* Resumen asistido (ADR-013): mismo acceso que leer la atención; uno nuevo por atención. */}
+                        {canRead && <EncounterAiSummaryCard key={encounter.id} encounterId={encounter.id} />}
+                    </>
+                );
+            }}
         </EncounterShell>
     );
 }
@@ -112,7 +125,7 @@ const CODE_SYSTEMS = [
     { value: 'SNOMED-CT', label: 'SNOMED CT' },
 ];
 
-function DiagnosesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
+function DiagnosesCard({ encounter, onRecorded }: { encounter: ClinicalEncounterSummary; onRecorded: () => void }) {
     const canWrite = useAuth().can(Permissions.Diagnoses.Write);
     const feedback = useClinicalFeedback('diagnoses');
     const { state, reload } = useClinicalQuery(`diagnoses:${encounter.id}`, (signal) => clinicalApi.listDiagnoses(encounter.id, signal));
@@ -142,6 +155,7 @@ function DiagnosesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
             setType('');
             setIsPrimary(false);
             reload();
+            onRecorded();
         } catch (error) {
             feedback.failure('No se pudo registrar el diagnóstico.', error);
         } finally {
@@ -214,7 +228,7 @@ function DiagnosesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
 // Ayuda de redacción: inserta encabezados SOAP en el contenido. El contrato sigue siendo type + content.
 const SOAP_TEMPLATE = 'S: \nO: \nA: \nP: ';
 
-function NotesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
+function NotesCard({ encounter, onRecorded }: { encounter: ClinicalEncounterSummary; onRecorded: () => void }) {
     const canWrite = useAuth().can(Permissions.ClinicalNotes.Write);
     const feedback = useClinicalFeedback('notes');
     const { state, reload } = useClinicalQuery(`notes:${encounter.id}`, (signal) => clinicalApi.listNotes(encounter.id, signal));
@@ -238,6 +252,7 @@ function NotesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
             setContent('');
             occurredAt.reset();
             reload();
+            onRecorded();
         } catch (error) {
             feedback.failure('No se pudo registrar la nota.', error);
         } finally {

@@ -40,6 +40,14 @@ export const isEncounterOpen = (status: ClinicalEncounterStatus) => status !== '
 /** Estados que admiten registros clínicos (EncounterRecordService.RecordableStatuses). Solo orienta la UI; el backend decide. */
 export const RECORDABLE_STATUSES: ClinicalEncounterStatus[] = ['Created', 'InProgress', 'Received', 'InEvolution'];
 export const acceptsClinicalRecords = (status: ClinicalEncounterStatus) => RECORDABLE_STATUSES.includes(status);
+/**
+ * La atención aún no empezó en esta clínica (EncounterRecordService.CarePendingStatuses): el primer registro clínico la
+ * pasa a InProgress. La UI recarga entonces la atención para mostrar el estado nuevo.
+ */
+export const startsCare = (status: ClinicalEncounterStatus) => status === 'Created' || status === 'Received';
+/** Estados desde los que el Domain permite trasladar (→ Transferred). Solo orienta la UI; el backend decide (409). */
+export const TRANSFERABLE_STATUSES: ClinicalEncounterStatus[] = ['InProgress', 'InEvolution'];
+export const canBeTransferred = (status: ClinicalEncounterStatus) => TRANSFERABLE_STATUSES.includes(status);
 
 /** Escala de cinco niveles. El color es solo visual: al backend se envía la clave del enum. */
 export const TRIAGE_PRIORITIES: { value: TriagePriority; label: string; color: string; className: string }[] = [

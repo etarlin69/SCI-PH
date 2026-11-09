@@ -5,6 +5,8 @@ import type {
     ClinicalEncounterSummary,
     ClinicalNote,
     ClinicalTransfer,
+    RequestTransferRequest,
+    TransferDestination,
     CloseEncounterRequest,
     FingerprintEnroller,
     FingerprintEnrollment,
@@ -102,6 +104,16 @@ export interface ClinicalApi {
 
     listIncomingTransfers(signal?: AbortSignal): Promise<ClinicalTransfer[]>;
     receiveTransfer(transferId: Guid): Promise<void>;
+    /** Traslados de una atención (activos e históricos, el más reciente primero). */
+    listEncounterTransfers(encounterId: Guid, signal?: AbortSignal): Promise<ClinicalTransfer[]>;
+    /** Clínicas activas a las que trasladar desde fromClinicId (la de la atención, excluida; validada por el backend). Requiere Transfers.Manage. */
+    listTransferDestinations(fromClinicId: Guid | null, signal?: AbortSignal): Promise<TransferDestination[]>;
+    /** ClinicalTransfer.Request: la atención mantiene su estado hasta el despacho. */
+    requestTransfer(encounterId: Guid, request: RequestTransferRequest): Promise<ClinicalTransfer>;
+    /** Despacho desde la clínica de origen: traslado InTransit y atención Transferred. */
+    dispatchTransfer(transferId: Guid): Promise<ClinicalTransfer>;
+    /** Cancelación desde el origen; uno en camino devuelve la atención a InProgress. */
+    cancelTransfer(transferId: Guid): Promise<ClinicalTransfer>;
 }
 
 /** Error de la capa clínica. `status` sigue la semántica HTTP (401, 403, 404, 409, 500…) aunque venga del mock. */
@@ -139,6 +151,15 @@ const KNOWN_DETAILS: [RegExp, string][] = [
     [/^Medication .* was not found/i, 'El medicamento no existe en el catálogo.'],
     [/^Prescription(Detail)? .* was not found/i, 'La prescripción no existe en esta atención.'],
     [/Receive requires a InTransit transfer/i, 'El traslado ya fue recibido o todavía no está en camino.'],
+    [/Dispatch requires a Requested transfer/i, 'El traslado ya fue despachado, recibido o cancelado.'],
+    [/transfer cannot be cancelled/i, 'El traslado ya fue recibido o cancelado; no se puede cancelar.'],
+    [/status Received cannot be transferred/i, 'Registra primero la atención en este hospital (triage, signo vital, nota, diagnóstico o medicación) para poder trasladar al paciente.'],
+    [/cannot be transferred/i, 'La atención no puede trasladarse en su estado actual.'],
+    [/already has an active transfer/i, 'La atención ya tiene un traslado activo.'],
+    [/destination clinic is not active/i, 'La clínica de destino no está activa.'],
+    [/destination clinic must be different/i, 'La clínica de destino debe ser distinta de la de origen.'],
+    [/cannot manage this patient's transfers/i, 'No puedes gestionar los traslados de este paciente.'],
+    [/^Clinic .* was not found/i, 'La clínica de destino no existe.'],
     [/transfer does not involve a clinic/i, 'El traslado no tiene como origen ni destino una clínica a la que estés afiliado.'],
     [/^ClinicalTransfer .* was not found/i, 'El traslado no existe.'],
     [/changed by another operation/i, 'Otro usuario modificó este registro. Recarga e inténtalo de nuevo.'],
