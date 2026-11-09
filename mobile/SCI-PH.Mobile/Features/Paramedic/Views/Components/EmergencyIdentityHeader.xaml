@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Cabecera de la emergencia en curso, común a las pantallas del flujo (EmergencyWorkflowViewModel). Sin identificar: el
+    código NN es lo principal. Identificada: el nombre del paciente, con el código NN debajo como trazabilidad. "Inicio"
+    vuelve al inicio del paramédico; la emergencia sigue en "Emergencias activas".
+-->
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Paramedic.ViewModels"
+             x:Class="SCI_PH.Mobile.Features.Paramedic.Views.Components.EmergencyIdentityHeader"
+             x:DataType="vm:EmergencyWorkflowViewModel">
+
+    <Border Style="{StaticResource SciCard}" Padding="14,10" AutomationId="EmergencyIdentityHeader">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                <Label Text="Emergencia en curso" TextColor="{StaticResource SciTextMuted}" FontSize="12" />
+                <Label Text="{Binding Identity.Primary, FallbackValue='Cargando emergencia…', TargetNullValue='Cargando emergencia…'}"
+                       AutomationId="EmergencyIdentityPrimary"
+                       TextColor="{StaticResource SciText}"
+                       FontAttributes="Bold" FontSize="15"
+                       LineBreakMode="CharacterWrap" />
+                <Label Text="{Binding Identity.Secondary}"
+                       AutomationId="EmergencyIdentitySecondary"
+                       IsVisible="{Binding Identity.HasSecondary, FallbackValue=False}"
+                       TextColor="{StaticResource SciTextMuted}"
+                       FontSize="12"
+                       LineBreakMode="CharacterWrap" />
+            </VerticalStackLayout>
+            <Button Grid.Column="1"
+                    Text="Inicio"
+                    AutomationId="EmergencyGoHome"
+                    Command="{Binding GoHomeCommand}"
+                    Style="{StaticResource SciSecondaryButton}"
+                    VerticalOptions="Center"
+                    Padding="14,6" />
+        </Grid>
+    </Border>
+
+</ContentView>

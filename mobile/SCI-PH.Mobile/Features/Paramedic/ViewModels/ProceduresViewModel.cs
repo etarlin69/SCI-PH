@@ -12,7 +12,7 @@ using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
 
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
-public partial class ProceduresViewModel : BaseViewModel
+public partial class ProceduresViewModel : EmergencyWorkflowViewModel
 {
     /// <summary>Límite del resultado en el servidor (ClinicalProcedure.Outcome).</summary>
     public const int OutcomeMaxLength = 4000;
@@ -28,14 +28,13 @@ public partial class ProceduresViewModel : BaseViewModel
     private DateTime? _performedAt;
 
     public ProceduresViewModel(IParamedicApiService api, IParamedicCatalogService catalog, IAppNavigator navigator)
+        : base(api, navigator)
     {
         _api = api;
         _catalog = catalog;
         _navigator = navigator;
     }
 
-    [ObservableProperty]
-    private Guid emergencyId;
 
     public ObservableCollection<CatalogItemDto> CatalogItems { get; } = new();
     public ObservableCollection<string> SavedSummaries { get; } = new();

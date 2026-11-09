@@ -15,6 +15,8 @@ public partial class MedicationsPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        // Cabecera de la emergencia (código NN o paciente) desde el servidor; no bloquea el catálogo.
+        _ = _viewModel.RefreshIdentityAsync();
         await _viewModel.LoadCatalogCommand.ExecuteAsync(null);
     }
 }

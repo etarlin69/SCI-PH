@@ -18,7 +18,7 @@ namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
 /// estado se restaura desde el activeTransfer de la emergencia cada vez que se abre la pantalla.
 /// </summary>
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
-public partial class TransferViewModel : BaseViewModel
+public partial class TransferViewModel : EmergencyWorkflowViewModel
 {
     /// <summary>Límites del servidor (ClinicalTransfer.Reason y Notes).</summary>
     public const int ReasonMaxLength = 500;
@@ -33,14 +33,13 @@ public partial class TransferViewModel : BaseViewModel
     private Guid? _clientRequestId;
 
     public TransferViewModel(IParamedicApiService api, IParamedicCatalogService catalog, IAppNavigator navigator)
+        : base(api, navigator)
     {
         _api = api;
         _catalog = catalog;
         _navigator = navigator;
     }
 
-    [ObservableProperty]
-    private Guid emergencyId;
 
     public ObservableCollection<TransferDestinationDto> Destinations { get; } = new();
 
@@ -100,6 +99,12 @@ public partial class TransferViewModel : BaseViewModel
         try
         {
             var emergency = await _api.GetEmergencyAsync(EmergencyId);
+            if (emergency is not null)
+            {
+                // La misma lectura sirve para la cabecera (código NN o paciente).
+                ApplyEmergency(emergency);
+            }
+
             Transfer = emergency?.ActiveTransfer;
             if (Transfer is null && Destinations.Count == 0)
             {

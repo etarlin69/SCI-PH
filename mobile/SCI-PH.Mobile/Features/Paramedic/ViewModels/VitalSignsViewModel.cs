@@ -17,7 +17,7 @@ namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
 /// (VitalSignLimits) para detectar errores de tipeo; NO son umbrales clínicos ni diagnóstico.
 /// </summary>
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
-public partial class VitalSignsViewModel : BaseViewModel
+public partial class VitalSignsViewModel : EmergencyWorkflowViewModel
 {
     // Límites de plausibilidad (docs: SCI-PH.Domain/Constants/VitalSignLimits.cs)
     private const int HrMin = 0, HrMax = 300;
@@ -44,13 +44,12 @@ public partial class VitalSignsViewModel : BaseViewModel
     private DateTime? _recordedAt;
 
     public VitalSignsViewModel(IParamedicApiService api, IAppNavigator navigator)
+        : base(api, navigator)
     {
         _api = api;
         _navigator = navigator;
     }
 
-    [ObservableProperty]
-    private Guid emergencyId;
 
     // ---- Campos (texto, para validar mientras se escribe) ----
     [ObservableProperty] private string heartRate = string.Empty;
