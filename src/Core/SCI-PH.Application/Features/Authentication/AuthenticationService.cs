@@ -111,14 +111,22 @@ namespace SCI_PH.Application.Features.Authentication
             return result;
         }
 
-        public async Task<AuthenticationResult?> RefreshAsync(string refreshToken, ClientContext client, CancellationToken cancellationToken)
+        // Null for any failure, including a lost concurrent rotation (the Mobile BFF answers both with the generic 401).
+        public async Task<AuthenticationResult?> RefreshAsync(string refreshToken, ClientContext client, CancellationToken cancellationToken) =>
+            (await RefreshSessionAsync(refreshToken, client, cancellationToken)).Session;
+
+        // Rotation with an explicit outcome. LostConcurrencyRace: this request read the token while it was still current
+        // and another request rotated it first (two browser tabs sharing one cookie). Nothing is issued or revoked and it
+        // is audited as RefreshFailed/TokenRevoked, as before. A token presented AFTER its rotation was committed is read
+        // as Rotated by ValidateForRefreshAsync: reuse, family revoked, Failed.
+        public async Task<RefreshOutcome> RefreshSessionAsync(string refreshToken, ClientContext client, CancellationToken cancellationToken)
         {
             var stored = await _refreshTokens.FindByHashAsync(_tokens.HashRefreshToken(refreshToken), cancellationToken);
             var failure = await ValidateForRefreshAsync(stored, client, cancellationToken);
             if (failure is not null)
             {
                 await RecordAsync(SecurityAuditRecord.Failure(SecurityAuditEventType.RefreshFailed, stored?.UserId, failure.Value, client), cancellationToken);
-                return null;
+                return RefreshOutcome.Failed;
             }
 
             var account = await _identity.FindActiveAccountAsync(stored!.UserId, cancellationToken);
@@ -127,21 +135,22 @@ namespace SCI_PH.Application.Features.Authentication
                 await _refreshTokens.RevokeFamilyAsync(stored.FamilyId, RefreshTokenRevocationReason.AccountDeactivated, client.IpAddress, cancellationToken);
                 await RecordAsync(SecurityAuditRecord.Failure(
                     SecurityAuditEventType.RefreshFailed, stored.UserId, SecurityFailureReason.AccountInactive, client), cancellationToken);
-                return null;
+                return RefreshOutcome.Failed;
             }
 
             var replacement = _tokens.CreateRefreshToken();
-            var rotated = await _refreshTokens.RotateAsync(
+            var rotation = await _refreshTokens.RotateAsync(
                 stored.Id, ToNewToken(account.Id, stored.FamilyId, replacement, client), client.IpAddress, cancellationToken);
-            if (!rotated)
+            if (rotation != RefreshTokenRotationResult.Rotated)
             {
+                // Existing audit classification for both cases (no new enum value: the audit table constrains them).
                 await RecordAsync(SecurityAuditRecord.Failure(
                     SecurityAuditEventType.RefreshFailed, account.Id, SecurityFailureReason.TokenRevoked, client), cancellationToken);
-                return null;
+                return rotation == RefreshTokenRotationResult.LostConcurrencyRace ? RefreshOutcome.LostConcurrencyRace : RefreshOutcome.Failed;
             }
 
             await RecordAsync(SecurityAuditRecord.Success(SecurityAuditEventType.RefreshSucceeded, account.Id, client), cancellationToken);
-            return BuildResult(account, replacement);
+            return RefreshOutcome.Succeeded(BuildResult(account, replacement));
         }
 
         // Idempotent: unknown or already revoked tokens are ignored.

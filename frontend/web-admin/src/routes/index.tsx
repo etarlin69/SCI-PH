@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ComponentType, type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { ADMIN_PERMISSIONS, Permissions, RequireAuth, RequirePermission, SessionLoading, resolveHomeRoute, useAuth, type Permission } from '../auth';
+import { ADMIN_PERMISSIONS, Permissions, RequireAuth, RequirePermission, SessionLoading, SessionUnavailable, resolveHomeRoute, useAuth, type Permission } from '../auth';
 import { DEMO_ADMIN_PERMISSIONS, HOSPITAL_SCREEN_PERMISSIONS as H, Layout, firstAdminRoute, firstHospitalRoute } from '../components/common';
 import { LoadingSpinner } from '../components/shared';
 import ForbiddenPage from '../features/auth/pages/ForbiddenPage';
@@ -72,6 +72,7 @@ function AdminIndex() {
 function RootRedirect() {
   const { status, permissions } = useAuth();
   if (status === 'initializing') return <SessionLoading />;
+  if (status === 'unavailable') return <SessionUnavailable />;
   return <Navigate to={status === 'authenticated' ? resolveHomeRoute(permissions) : '/login'} replace />;
 }
 
