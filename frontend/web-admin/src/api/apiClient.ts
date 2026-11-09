@@ -50,12 +50,48 @@ export function setRefreshHandler(handler: (() => Promise<string | null>) | null
   refreshHandler = handler;
 }
 
-/** Renueva el access token. Todas las llamadas concurrentes comparten la misma promesa: un solo POST /refresh. */
+/**
+ * Nombre del Web Lock que serializa los refresh entre pestañas del mismo perfil del navegador. Es una constante: no
+ * contiene ningún dato del usuario ni de la sesión.
+ */
+export const REFRESH_LOCK_NAME = 'sciph-web-refresh';
+
+/** Espera máxima por el lock. Si otra pestaña lo retiene más (congelada, colgada), se renueva sin él. */
+export const REFRESH_LOCK_WAIT_MS = 10_000;
+
+type LockCapableNavigator = Navigator & { locks?: LockManager };
+
+/**
+ * Ejecuta `task` con el lock exclusivo `sciph-web-refresh` si el navegador tiene Web Locks; si no, directamente
+ * (comportamiento anterior, de una sola pestaña). Con el lock, cada pestaña envía la cookie vigente: la anterior ya
+ * guardó la de su Set-Cookie antes de soltarlo, así que nunca se presentan dos veces el mismo refresh token.
+ */
+function runWithRefreshLock<T>(task: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator === 'undefined' ? undefined : (navigator as LockCapableNavigator).locks;
+  if (!locks || typeof locks.request !== 'function') return task();
+
+  let started = false;
+  const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(REFRESH_LOCK_WAIT_MS) : undefined;
+  const locked = locks.request(REFRESH_LOCK_NAME, { mode: 'exclusive', signal }, () => {
+    started = true;
+    return task();
+  }) as Promise<T>;
+  return locked.catch((error: unknown) => {
+    // Solo si no se obtuvo el lock a tiempo; un error de la propia tarea se propaga tal cual (sin reintentos).
+    if (!started && error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')) return task();
+    throw error;
+  });
+}
+
+/**
+ * Renueva el access token. Todas las llamadas concurrentes de esta pestaña comparten la misma promesa (un solo
+ * POST /refresh) y, entre pestañas, el Web Lock las serializa.
+ */
 export function refreshAccessToken(): Promise<string | null> {
   if (!refreshHandler) return Promise.resolve(null);
   if (!refreshInFlight) {
     const handler = refreshHandler;
-    refreshInFlight = handler().finally(() => {
+    refreshInFlight = runWithRefreshLock(handler).finally(() => {
       refreshInFlight = null;
     });
   }
