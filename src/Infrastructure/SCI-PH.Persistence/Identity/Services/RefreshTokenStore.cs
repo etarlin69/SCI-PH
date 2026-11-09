@@ -33,8 +33,10 @@ namespace SCI_PH.Persistence.Identity.Services
             return token?.ToStored();
         }
 
-        // RevokedAtUtc is a concurrency token, so only one request can rotate a given token.
-        public async Task<bool> RotateAsync(
+        // RevokedAtUtc is a concurrency token, so only one request can rotate a given token. The caller read the token as
+        // active; if it is no longer active here (already revoked when loaded, or the update lost the compare-and-set),
+        // the committed revocation reason says whether another request rotated it (a lost race) or it was revoked.
+        public async Task<RefreshTokenRotationResult> RotateAsync(
             Guid currentTokenId,
             NewRefreshToken replacement,
             string? ipAddress,
@@ -44,7 +46,7 @@ namespace SCI_PH.Persistence.Identity.Services
                 t => t.Id == currentTokenId && t.RevokedAtUtc == null, cancellationToken);
             if (current is null)
             {
-                return false;
+                return await ClassifyInactiveAsync(currentTokenId, cancellationToken);
             }
 
             var now = _time.GetUtcNow();
@@ -55,13 +57,24 @@ namespace SCI_PH.Persistence.Identity.Services
             try
             {
                 await _db.SaveChangesAsync(cancellationToken);
-                return true;
+                return RefreshTokenRotationResult.Rotated;
             }
             catch (DbUpdateConcurrencyException)
             {
                 DetachRefreshTokens();
-                return false;
+                return await ClassifyInactiveAsync(currentTokenId, cancellationToken);
             }
+        }
+
+        private async Task<RefreshTokenRotationResult> ClassifyInactiveAsync(Guid tokenId, CancellationToken cancellationToken)
+        {
+            var reason = await _db.RefreshTokens.AsNoTracking()
+                .Where(t => t.Id == tokenId)
+                .Select(t => t.RevocationReason)
+                .SingleOrDefaultAsync(cancellationToken);
+            return reason == RefreshTokenRevocationReason.Rotated
+                ? RefreshTokenRotationResult.LostConcurrencyRace
+                : RefreshTokenRotationResult.Revoked;
         }
 
         public Task<int> RevokeFamilyAsync(
