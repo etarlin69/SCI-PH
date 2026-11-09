@@ -12,14 +12,14 @@ using SCI_PH.Domain.Exceptions;
 namespace SCI_PH.Application.Features.Clinical
 {
     // Clinical records of an encounter: triage, vital signs, clinical notes and diagnoses. The first real clinical record
-    // moves the encounter from Created to InProgress through ClinicalEncounter.ChangeStatus, in the same transaction as
-    // the record itself. Every record re-checks the encounter's concurrency tokens, so nothing is written after another
-    // transaction closed the encounter.
+    // at the encounter's clinic starts care (StartCareIfPending: Created or Received -> InProgress) through
+    // ClinicalEncounter.ChangeStatus, in the same transaction as the record itself. Every record re-checks the encounter's
+    // concurrency tokens, so nothing is written after another transaction closed the encounter.
     public sealed class EncounterRecordService
     {
         public const int MaxMeasurementsPerTriage = 20;
 
-        // Statuses that accept clinical records. Created is started by the record; Transferred, Closed and
+        // Statuses that accept clinical records. Created and Received are started by the record; Transferred, Closed and
         // Cancelled are conflicts.
         public static IReadOnlyCollection<ClinicalEncounterStatus> RecordableStatuses { get; } =
         [
@@ -95,7 +95,7 @@ namespace SCI_PH.Application.Features.Clinical
                     encounter.Id, m.Type, m.Value, m.MeasuredAtUtc, actor.StaffId, triage.Id)))
                 .ToList();
 
-            StartIfCreated(encounter, now);
+            StartCareIfPending(encounter, now);
             _writes.Add(triage);
             vitalSigns.ForEach(_writes.Add);
             _writes.Add(ClinicalAuditEntry.Success(
@@ -113,7 +113,7 @@ namespace SCI_PH.Application.Features.Clinical
             var vitalSign = ClinicalInput.Apply(() => VitalSign.Record(
                 encounter.Id, request.Type, request.Value, measuredAt, actor.StaffId));
 
-            StartIfCreated(encounter, now);
+            StartCareIfPending(encounter, now);
             _writes.Add(vitalSign);
             _writes.Add(ClinicalAuditEntry.Success(
                 actor.AuditActor, AuditActionType.Create, nameof(VitalSign), vitalSign.Id.ToString(), now,
@@ -142,7 +142,7 @@ namespace SCI_PH.Application.Features.Clinical
             var occurredAt = ClinicalInput.ClinicalTime(request.OccurredAtUtc, now, encounter.StartedAtUtc, "occurredAtUtc");
             var note = ClinicalInput.Apply(() => ClinicalNote.Write(encounter.Id, actor.StaffId, request.Type, request.Content, occurredAt));
 
-            StartIfCreated(encounter, now);
+            StartCareIfPending(encounter, now);
             _writes.Add(note);
             _writes.Add(ClinicalAuditEntry.Success(
                 actor.AuditActor, AuditActionType.Create, nameof(ClinicalNote), note.Id.ToString(), now,
@@ -159,7 +159,7 @@ namespace SCI_PH.Application.Features.Clinical
             var diagnosis = ClinicalInput.Apply(() => Diagnosis.Record(
                 encounter.Id, actor.StaffId, request.Description, request.Type, now, request.IsPrimary, request.CodeSystem, request.Code));
 
-            StartIfCreated(encounter, now);
+            StartCareIfPending(encounter, now);
             _writes.Add(diagnosis);
             _writes.Add(ClinicalAuditEntry.Success(
                 actor.AuditActor, AuditActionType.Create, nameof(Diagnosis), diagnosis.Id.ToString(), now,
@@ -203,10 +203,19 @@ namespace SCI_PH.Application.Features.Clinical
             return (actor, encounter, time.GetUtcNow());
         }
 
-        // Created -> InProgress only through the Domain transition; an encounter already in progress is left as is.
-        internal static void StartIfCreated(ClinicalEncounter encounter, DateTimeOffset now)
+        // Statuses in which care has not started at the encounter's current clinic: Created (nothing recorded yet) and
+        // Received (arrived from a transfer; the receiving clinic has not recorded anything yet).
+        public static IReadOnlyCollection<ClinicalEncounterStatus> CarePendingStatuses { get; } =
+            [ClinicalEncounterStatus.Created, ClinicalEncounterStatus.Received];
+
+        // The first real clinical record starts care: Created -> InProgress, and Received -> InProgress at the receiving
+        // clinic (so it can later transfer the patient again: Received -> Transferred is not a Domain transition). Only
+        // through the Domain transition, applied to the tracked encounter right before the record is added, so the status
+        // change and the record are saved by the same SaveChangesAsync (the Status concurrency token still applies). Any
+        // other status is left as is; LoadForRecordingAsync already rejected those that do not accept records.
+        internal static void StartCareIfPending(ClinicalEncounter encounter, DateTimeOffset now)
         {
-            if (encounter.Status != ClinicalEncounterStatus.Created)
+            if (!CarePendingStatuses.Contains(encounter.Status))
             {
                 return;
             }

@@ -13,7 +13,8 @@ namespace SCI_PH.Application.Features.Clinical
     // Medication catalog, prescriptions and medication administrations of an encounter. The Kardex is not stored: it is
     // the projection of the encounter's prescriptions (with their details) and its administrations. Writes follow the
     // same rules as the other clinical records (EncounterRecordService.LoadForRecordingAsync): clinic, patient rule,
-    // recordable status, Created -> InProgress, and the encounter's concurrency tokens re-checked inside the save.
+    // recordable status, care start (Created or Received -> InProgress, EncounterRecordService.StartCareIfPending), and
+    // the encounter's concurrency tokens re-checked inside the save.
     public sealed class MedicationService
     {
         public const int MaxDetailsPerPrescription = 20;
@@ -93,7 +94,7 @@ namespace SCI_PH.Application.Features.Clinical
 
             ClinicalInput.Apply(() => prescription.Issue(now));
 
-            EncounterRecordService.StartIfCreated(encounter, now);
+            EncounterRecordService.StartCareIfPending(encounter, now);
             _writes.Add(prescription);
             _writes.Add(ClinicalAuditEntry.Success(
                 actor.AuditActor, AuditActionType.Create, nameof(Prescription), prescription.Id.ToString(), now,
@@ -134,7 +135,7 @@ namespace SCI_PH.Application.Features.Clinical
                 encounter.Id, request.MedicationId, request.Dose, request.DoseUnit, request.Route, administeredAt, actor.StaffId,
                 request.PrescriptionId, request.PrescriptionDetailId, request.Notes));
 
-            EncounterRecordService.StartIfCreated(encounter, now);
+            EncounterRecordService.StartCareIfPending(encounter, now);
             _writes.Add(administration);
             _writes.Add(ClinicalAuditEntry.Success(
                 actor.AuditActor, AuditActionType.Create, nameof(MedicationAdministration), administration.Id.ToString(), now,
