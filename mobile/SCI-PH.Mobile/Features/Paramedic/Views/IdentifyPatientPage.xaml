@@ -124,6 +124,8 @@
                         <Border Style="{StaticResource SciField}">
                             <Picker ItemsSource="{Binding DocumentTypes}"
                                     SelectedItem="{Binding SelectedDocumentType}"
+                                    IsEnabled="{Binding IsDocumentEntry}"
+                                    AutomationId="DocumentType"
                                     BackgroundColor="Transparent"
                                     TextColor="{StaticResource SciText}" />
                         </Border>
@@ -134,14 +136,43 @@
                         <Border Style="{StaticResource SciField}">
                             <Entry Text="{Binding DocumentNumber}"
                                    Placeholder="Número del documento"
+                                   IsEnabled="{Binding IsDocumentEntry}"
+                                   AutomationId="DocumentNumber"
                                    Style="{StaticResource SciEntry}"
                                    MaxLength="30" />
                         </Border>
                     </VerticalStackLayout>
 
                     <Button Text="Buscar paciente"
-                            Command="{Binding SubmitDocumentCommand}"
+                            AutomationId="DocumentResolve"
+                            Command="{Binding ResolveDocumentCommand}"
+                            IsVisible="{Binding IsDocumentEntry}"
                             Style="{StaticResource SciPrimaryButton}" />
+
+                    <!-- Candidato: nada se identifica hasta "Confirmar paciente" -->
+                    <VerticalStackLayout Spacing="10" IsVisible="{Binding HasDocumentCandidate}" AutomationId="DocumentCandidate">
+                        <Label Text="¿Es este el paciente?" Style="{StaticResource SciFieldLabel}" />
+                        <Label Text="{Binding DocumentCandidateName}" AutomationId="DocumentCandidateName"
+                               Style="{StaticResource SciTitle}" />
+                        <Label Text="{Binding DocumentCandidateBirthDate, StringFormat='Nacimiento: {0}'}"
+                               AutomationId="DocumentCandidateBirthDate"
+                               TextColor="{StaticResource SciText}" FontSize="14" />
+                        <Label Text="{Binding DocumentCandidateDocument}" AutomationId="DocumentCandidateDocument"
+                               TextColor="{StaticResource SciText}" FontSize="14" />
+                        <Label Text="Verifica sus datos con el paciente o su documento antes de confirmar."
+                               Style="{StaticResource SciSubtitle}" />
+                        <Button Text="Confirmar paciente"
+                                AutomationId="DocumentConfirm"
+                                Command="{Binding ConfirmDocumentCommand}"
+                                Style="{StaticResource SciPrimaryButton}" />
+                        <Button Text="Buscar otro"
+                                AutomationId="DocumentSearchAnother"
+                                Command="{Binding CancelDocumentCandidateCommand}"
+                                Style="{StaticResource SciSecondaryButton}" />
+                    </VerticalStackLayout>
+
+                    <ActivityIndicator IsRunning="{Binding IsDocumentWorking}" IsVisible="{Binding IsDocumentWorking}"
+                                       Color="{StaticResource SciPrimary}" />
                 </VerticalStackLayout>
             </Border>
 

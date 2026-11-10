@@ -3,6 +3,7 @@ using System.Net;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SCI_PH.Mobile.Common.Api;
+using SCI_PH.Mobile.Common.Authentication;
 using SCI_PH.Mobile.Common.Navigation;
 using SCI_PH.Mobile.Common.ViewModels;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
@@ -10,6 +11,18 @@ using SCI_PH.Mobile.Features.Paramedic.Models.Enums;
 using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 
 namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
+
+/// <summary>Pasos de la identificación por documento: nada se identifica sin "Confirmar paciente".</summary>
+public enum DocumentIdentificationStep
+{
+    /// <summary>Tipo y número editables; "Buscar paciente".</summary>
+    Entry,
+    Resolving,
+
+    /// <summary>Candidato en pantalla (nombre, nacimiento, documento enmascarado): confirmar o buscar otro.</summary>
+    Candidate,
+    Confirming
+}
 
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
 [QueryProperty(nameof(ReturnsToTransfer), ParamedicRoutes.ReturnToTransfer)]
@@ -25,13 +38,23 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
     private readonly IFingerprintIdentificationService _fingerprints;
     private readonly IAppNavigator _navigator;
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
+    private readonly IClinicalSessionService? _clinicalSession;
 
     // Se abrió el escáner de QR: al volver, la emergencia se lee del servidor (la única fuente de verdad del resultado).
     private bool _returningFromQrScanner;
 
-    // Clave de idempotencia de la identificación por documento (no la de la apertura). Se genera al entrar al formulario y
-    // se conserva entre reintentos, errores de red, 404 y 409; solo se descarta cuando la identificación se completa.
+    // Documento del candidato tal como se buscó (solo en memoria, nunca registrado): la confirmación envía ESE documento,
+    // no lo que haya en el formulario, y el servidor lo vuelve a resolver. Sin id de paciente.
+    private (PatientDocumentType Type, string Number)? _documentCandidate;
+
+    // Clave de idempotencia de la CONFIRMACIÓN por documento (no la de la apertura): una por candidato, generada al confirmar
+    // por primera vez y conservada en los reintentos (sin respuesta, 503, 429), así repetir nunca identifica dos veces. Se
+    // descarta con el candidato (buscar otro, 404, 409) o cuando la identificación se completa.
     private Guid? _documentRequestId;
+
+    // Las respuestas de una búsqueda o confirmación ya sustituida (otra búsqueda, buscar otro, salir de la página) o de otra
+    // sesión se descartan.
+    private int _documentGeneration;
 
     // Claves de la sesión de huella: la de apertura vale para ESE lector hasta que la sesión termina; la de confirmación,
     // para ESA sesión. Así un reintento tras un fallo de red nunca abre otra sesión ni identifica dos veces.
@@ -46,9 +69,11 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
         IFingerprintIdentificationService fingerprints,
         IAppNavigator navigator,
         Func<TimeSpan, CancellationToken, Task>? delay = null,
-        ICameraPermissionService? camera = null)
+        ICameraPermissionService? camera = null,
+        IClinicalSessionService? clinicalSession = null)
         : base(api, navigator)
     {
+        _clinicalSession = clinicalSession;
         _api = api;
         _fingerprints = fingerprints;
         _navigator = navigator;
@@ -160,15 +185,38 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
     private string selectedDocumentType = "Cédula";
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SubmitDocumentCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ResolveDocumentCommand))]
     private string documentNumber = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDocumentEntry), nameof(HasDocumentCandidate), nameof(IsDocumentWorking))]
+    [NotifyCanExecuteChangedFor(nameof(ResolveDocumentCommand), nameof(ConfirmDocumentCommand), nameof(CancelDocumentCandidateCommand))]
+    private DocumentIdentificationStep documentStep = DocumentIdentificationStep.Entry;
+
+    [ObservableProperty]
+    private string? documentCandidateName;
+
+    [ObservableProperty]
+    private string? documentCandidateBirthDate;
+
+    [ObservableProperty]
+    private string? documentCandidateDocument;
+
+    /// <summary>El tipo y el número se pueden cambiar (no mientras se busca, hay candidato o se confirma).</summary>
+    public bool IsDocumentEntry => DocumentStep == DocumentIdentificationStep.Entry;
+
+    public bool HasDocumentCandidate => DocumentStep is DocumentIdentificationStep.Candidate or DocumentIdentificationStep.Confirming;
+
+    public bool IsDocumentWorking => DocumentStep is DocumentIdentificationStep.Resolving or DocumentIdentificationStep.Confirming;
 
     protected override void OnBusyChanged()
     {
         IdentifyByFingerprintCommand.NotifyCanExecuteChanged();
         StartFingerprintReadingCommand.NotifyCanExecuteChanged();
         ConfirmFingerprintCommand.NotifyCanExecuteChanged();
-        SubmitDocumentCommand.NotifyCanExecuteChanged();
+        ResolveDocumentCommand.NotifyCanExecuteChanged();
+        ConfirmDocumentCommand.NotifyCanExecuteChanged();
+        CancelDocumentCandidateCommand.NotifyCanExecuteChanged();
         ContinueWithoutIdentifyingCommand.NotifyCanExecuteChanged();
         ScanQrCommand.NotifyCanExecuteChanged();
     }
@@ -518,24 +566,23 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
         }
     }
 
-    // ---- Documento ----
+    // ---- Documento: buscar → candidato → confirmar ----
 
     [RelayCommand]
     private void OpenDocumentForm()
     {
         ErrorMessage = null;
-        _documentRequestId ??= Guid.NewGuid();
         ShowDocumentForm = true;
     }
 
-    private bool CanSubmitDocument() =>
-        !IsBusy && !string.IsNullOrWhiteSpace(DocumentNumber);
+    private bool CanResolveDocument() =>
+        !IsBusy && DocumentStep == DocumentIdentificationStep.Entry && !string.IsNullOrWhiteSpace(DocumentNumber);
 
-    // REAL: el servidor busca el documento y vincula al paciente la MISMA emergencia. El número va tal como se escribió
-    // (la normalización es del servidor). Sin coincidencia, la emergencia sigue NN: se puede corregir, reintentar o
-    // continuar sin identificar.
-    [RelayCommand(CanExecute = nameof(CanSubmitDocument))]
-    private async Task SubmitDocumentAsync()
+    // REAL: el servidor busca el documento y devuelve un candidato (nombre, nacimiento, documento enmascarado). La emergencia
+    // NO se identifica: solo "Confirmar paciente" lo hace. El número va tal como se escribió (la normalización es del
+    // servidor). Sin coincidencia, la emergencia sigue NN: se puede corregir, reintentar o continuar sin identificar.
+    [RelayCommand(CanExecute = nameof(CanResolveDocument))]
+    private async Task ResolveDocumentAsync()
     {
         if (!DocumentTypeByLabel.TryGetValue(SelectedDocumentType ?? string.Empty, out var documentType))
         {
@@ -543,47 +590,222 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
             return;
         }
 
+        var number = DocumentNumber;
+        var generation = Interlocked.Increment(ref _documentGeneration);
+        var owner = SessionOwner();
         ErrorMessage = null;
+        DocumentStep = DocumentIdentificationStep.Resolving;
         IsBusy = true;
         try
         {
-            _documentRequestId ??= Guid.NewGuid();
-            var emergency = await _api.IdentifyByDocumentAsync(EmergencyId, new IdentifyByDocumentDto
+            var candidate = await _api.ResolveDocumentCandidateAsync(EmergencyId, documentType, number);
+            if (!IsCurrentDocument(generation, owner))
             {
-                ClientRequestId = _documentRequestId.Value,
-                DocumentType = documentType,
-                DocumentNumber = DocumentNumber
-            });
-
-            if (emergency is null)
-            {
-                ErrorMessage = ParamedicMessages.PatientNotFoundByDocument;
                 return;
             }
 
+            _documentCandidate = (documentType, number);
             _documentRequestId = null;
-            await CancelFingerprintQuietlyAsync();
-            ApplyIdentified(emergency.Patient?.DisplayName);
-            ApplyEmergency(emergency);
+            DocumentCandidateName = candidate.DisplayName;
+            DocumentCandidateBirthDate = candidate.DateOfBirth?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
+                ?? ParamedicMessages.CandidateBirthDateUnknown;
+            DocumentCandidateDocument = $"{DocumentLabel(candidate.DocumentType ?? documentType.ToString())} {candidate.DocumentValue}";
+            DocumentStep = DocumentIdentificationStep.Candidate;
+        }
+        catch (Exception) when (!IsCurrentDocument(generation, owner))
+        {
+            // Respuesta de una búsqueda ya sustituida o de otra sesión: no es de esta pantalla.
+        }
+        catch (MobileApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            DocumentStep = DocumentIdentificationStep.Entry;
+            ErrorMessage = ParamedicMessages.PatientNotFoundByDocument;
         }
         catch (MobileApiException ex) when (ex.Error == MobileApiError.Conflict)
         {
-            // No se genera otra clave en silencio: podría identificar otra vez la emergencia.
-            ErrorMessage = ParamedicMessages.IdentificationConflict;
+            await ResolveDocumentConflictAsync(generation, owner);
         }
         catch (MobileApiException ex) when (ex.Error is not (MobileApiError.Server or MobileApiError.InvalidResponse))
         {
+            DocumentStep = DocumentIdentificationStep.Entry;
             ErrorMessage = MobileApiErrorMessages.For(ex);
         }
         catch (Exception)
         {
-            ErrorMessage = ParamedicMessages.IdentifyByDocumentFailed;
+            DocumentStep = DocumentIdentificationStep.Entry;
+            ErrorMessage = ParamedicMessages.DocumentResolveFailed;
         }
         finally
         {
-            IsBusy = false;
+            if (generation == Volatile.Read(ref _documentGeneration))
+            {
+                IsBusy = false;
+            }
         }
     }
+
+    private bool CanConfirmDocument() => !IsBusy && DocumentStep == DocumentIdentificationStep.Candidate;
+
+    // REAL: identifica la MISMA emergencia. Nunca se llama sola tras buscar: solo con "Confirmar paciente". El servidor vuelve
+    // a resolver el documento; la clave es la de ESTE candidato y se conserva si la respuesta se pierde.
+    [RelayCommand(CanExecute = nameof(CanConfirmDocument))]
+    private async Task ConfirmDocumentAsync()
+    {
+        if (DocumentStep != DocumentIdentificationStep.Candidate || _documentCandidate is not { } candidate)
+        {
+            return;
+        }
+
+        var generation = Volatile.Read(ref _documentGeneration);
+        var owner = SessionOwner();
+        _documentRequestId ??= Guid.NewGuid();
+        var clientRequestId = _documentRequestId.Value;
+        ErrorMessage = null;
+        DocumentStep = DocumentIdentificationStep.Confirming;
+        IsBusy = true;
+        try
+        {
+            var emergency = await _api.IdentifyByDocumentAsync(EmergencyId, new IdentifyByDocumentDto
+            {
+                ClientRequestId = clientRequestId,
+                DocumentType = candidate.Type,
+                DocumentNumber = candidate.Number
+            });
+            if (!IsCurrentDocument(generation, owner))
+            {
+                return;
+            }
+
+            if (emergency is null)
+            {
+                // El documento ya no corresponde a un paciente: nunca se confía en el candidato anterior.
+                DiscardDocumentCandidate();
+                ErrorMessage = ParamedicMessages.DocumentCandidateGone;
+                return;
+            }
+
+            await CancelFingerprintQuietlyAsync();
+            ApplyIdentified(emergency.Patient?.DisplayName);
+            ApplyEmergency(emergency);
+        }
+        catch (Exception) when (!IsCurrentDocument(generation, owner))
+        {
+        }
+        catch (MobileApiException ex) when (ex.Error == MobileApiError.Conflict)
+        {
+            await ResolveDocumentConflictAsync(generation, owner);
+        }
+        catch (MobileApiException ex) when (ex.Error == MobileApiError.TooManyRequests)
+        {
+            // Rechazada antes de procesarse: el mismo candidato y la misma clave, reintento manual.
+            DocumentStep = DocumentIdentificationStep.Candidate;
+            ErrorMessage = MobileApiErrorMessages.For(ex);
+        }
+        catch (MobileApiException ex) when (ex.Error is MobileApiError.Forbidden or MobileApiError.Unauthorized)
+        {
+            DiscardDocumentCandidate();
+            ErrorMessage = MobileApiErrorMessages.For(ex);
+        }
+        catch (Exception)
+        {
+            // Sin respuesta, 503 o respuesta inesperada: pudo aplicarse. El reintento lleva la MISMA clave.
+            DocumentStep = DocumentIdentificationStep.Candidate;
+            ErrorMessage = ParamedicMessages.DocumentConfirmFailed;
+        }
+        finally
+        {
+            if (generation == Volatile.Read(ref _documentGeneration))
+            {
+                IsBusy = false;
+            }
+        }
+    }
+
+    private bool CanCancelDocumentCandidate() => DocumentStep == DocumentIdentificationStep.Candidate;
+
+    // "Buscar otro": el candidato se olvida y no se escribe nada; el formulario queda para corregir el documento.
+    [RelayCommand(CanExecute = nameof(CanCancelDocumentCandidate))]
+    private void CancelDocumentCandidate()
+    {
+        DiscardDocumentCandidate();
+        ErrorMessage = null;
+    }
+
+    /// <summary>
+    /// La página dejó de verse: una búsqueda en curso se descarta. Una confirmación ya enviada pudo aplicarse: su resultado lo
+    /// da el servidor al volver (la cabecera relee la emergencia) y, si no se aplicó, el candidato sigue con la MISMA clave.
+    /// </summary>
+    public void DeactivateDocument()
+    {
+        Interlocked.Increment(ref _documentGeneration);
+        switch (DocumentStep)
+        {
+            case DocumentIdentificationStep.Resolving:
+                DocumentStep = DocumentIdentificationStep.Entry;
+                IsBusy = false;
+                break;
+            case DocumentIdentificationStep.Confirming:
+                DocumentStep = DocumentIdentificationStep.Candidate;
+                ErrorMessage = ParamedicMessages.DocumentConfirmFailed;
+                IsBusy = false;
+                break;
+        }
+    }
+
+    // 409 (ya identificada, recibida por el hospital o la emergencia cambió): se vuelve a leer. Con paciente, nunca se
+    // sustituye: se muestra el que tiene; sin él, un conflicto genérico y el documento se puede buscar de nuevo.
+    private async Task ResolveDocumentConflictAsync(int generation, Guid? owner)
+    {
+        DiscardDocumentCandidate();
+        EmergencyDto? emergency = null;
+        try
+        {
+            emergency = await _api.GetEmergencyAsync(EmergencyId);
+        }
+        catch (Exception)
+        {
+        }
+
+        if (!IsCurrentDocument(generation, owner))
+        {
+            return;
+        }
+
+        if (emergency?.Patient is { } patient)
+        {
+            await CancelFingerprintQuietlyAsync();
+            ApplyIdentified(patient.DisplayName);
+            ApplyEmergency(emergency);
+            ErrorMessage = ParamedicMessages.AlreadyIdentifiedByAnother;
+        }
+        else
+        {
+            ErrorMessage = ParamedicMessages.IdentificationConflict;
+        }
+    }
+
+    private void DiscardDocumentCandidate()
+    {
+        _documentCandidate = null;
+        _documentRequestId = null;
+        DocumentCandidateName = null;
+        DocumentCandidateBirthDate = null;
+        DocumentCandidateDocument = null;
+        DocumentStep = DocumentIdentificationStep.Entry;
+    }
+
+    private Guid? SessionOwner() => _clinicalSession?.CurrentUser?.Id;
+
+    private bool IsCurrentDocument(int generation, Guid? owner) =>
+        generation == Volatile.Read(ref _documentGeneration)
+        && (_clinicalSession is null || (owner is not null && _clinicalSession.CurrentUser?.Id == owner));
+
+    private static string DocumentLabel(string type) => type switch
+    {
+        "NationalId" => "Cédula",
+        "Passport" => "Pasaporte",
+        _ => "Documento"
+    };
 
     // La atención ya nace como paciente NN en el dominio: continuar sin identificar
     // no registra nada en el servidor; solo avanza al siguiente paso (y suelta el lector si había una lectura).
@@ -635,6 +857,7 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
         IsIdentified = true;
         FingerprintRequested = false;
         ShowDocumentForm = false;
+        DiscardDocumentCandidate();
     }
 
     // Desde el traslado se vuelve a la MISMA pantalla de traslado (que relee la emergencia); si no, el siguiente paso.

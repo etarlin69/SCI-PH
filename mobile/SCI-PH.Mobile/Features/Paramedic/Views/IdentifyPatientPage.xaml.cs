@@ -26,6 +26,8 @@ public partial class IdentifyPatientPage : ContentPage
     protected override void OnDisappearing()
     {
         _viewModel.StopFingerprintPolling();
+        // Una búsqueda de documento en curso se descarta; una confirmación enviada la resuelve el servidor al volver.
+        _viewModel.DeactivateDocument();
         base.OnDisappearing();
     }
 }

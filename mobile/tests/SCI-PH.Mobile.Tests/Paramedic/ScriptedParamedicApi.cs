@@ -2,6 +2,7 @@ using System.Net;
 using SCI_PH.Mobile.Common.Api;
 using SCI_PH.Mobile.Common.Authentication;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
+using SCI_PH.Mobile.Features.Paramedic.Models.Enums;
 using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 
 namespace SCI_PH.Mobile.Tests.Paramedic;
@@ -85,14 +86,37 @@ internal sealed class ScriptedParamedicApi : IParamedicApiService
             HttpStatusCode.NotFound => MobileApiError.InvalidResponse,
             HttpStatusCode.Conflict => MobileApiError.Conflict,
             HttpStatusCode.Unauthorized => MobileApiError.Unauthorized,
+            HttpStatusCode.TooManyRequests => MobileApiError.TooManyRequests,
             _ => MobileApiError.Server
         }, status);
 
     public Task<EmergencyDto> CreateEmergencyAsync(CreateEmergencyDto dto) => throw Unexpected();
 
-    /// <summary>La identificación devuelve el estado de la emergencia en el servidor (el test lo deja identificado).</summary>
-    public Task<EmergencyDto?> IdentifyByDocumentAsync(Guid emergencyId, IdentifyByDocumentDto dto) =>
-        Task.FromResult(Emergencies.GetValueOrDefault(emergencyId));
+    /// <summary>El candidato del documento: siempre el de <see cref="DocumentCandidate"/> (el test decide quién es).</summary>
+    public DocumentCandidateDto DocumentCandidate { get; set; } = new("Ana Pérez", new DateOnly(1985, 3, 14), "NationalId", "*******5678");
+
+    /// <summary>Lo que responden las próximas búsquedas / confirmaciones (en orden); sin nada en cola, la respuesta normal.</summary>
+    public Queue<Func<Task<DocumentCandidateDto>>> Resolves { get; } = new();
+
+    public Queue<Func<Task<EmergencyDto?>>> Confirms { get; } = new();
+
+    public List<(PatientDocumentType Type, string Number)> ResolveRequests { get; } = [];
+
+    public List<IdentifyByDocumentDto> ConfirmRequests { get; } = [];
+
+    public Task<DocumentCandidateDto> ResolveDocumentCandidateAsync(
+        Guid emergencyId, PatientDocumentType documentType, string documentNumber, CancellationToken cancellationToken = default)
+    {
+        ResolveRequests.Add((documentType, documentNumber));
+        return Resolves.TryDequeue(out var next) ? next() : Task.FromResult(DocumentCandidate);
+    }
+
+    /// <summary>La confirmación devuelve el estado de la emergencia en el servidor (el test lo deja identificado).</summary>
+    public Task<EmergencyDto?> IdentifyByDocumentAsync(Guid emergencyId, IdentifyByDocumentDto dto)
+    {
+        ConfirmRequests.Add(dto);
+        return Confirms.TryDequeue(out var next) ? next() : Task.FromResult(Emergencies.GetValueOrDefault(emergencyId));
+    }
 
     public Task<QrCandidateDto> ResolveQrCandidateAsync(Guid emergencyId, string payload, CancellationToken cancellationToken = default) =>
         throw Unexpected();

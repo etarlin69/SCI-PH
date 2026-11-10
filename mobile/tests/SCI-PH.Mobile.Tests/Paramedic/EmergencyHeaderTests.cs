@@ -85,7 +85,8 @@ public class EmergencyHeaderTests
         vm.DocumentNumber = "001-1234567-8";
         var reads = _api.Reads.Count;
 
-        await vm.SubmitDocumentCommand.ExecuteAsync(null);
+        await vm.ResolveDocumentCommand.ExecuteAsync(null);
+        await vm.ConfirmDocumentCommand.ExecuteAsync(null);
 
         Assert.True(vm.IsIdentified);
         Assert.Equal(("Ana Pérez", (string?)NnCode), (vm.Identity!.Primary, vm.Identity.Secondary));

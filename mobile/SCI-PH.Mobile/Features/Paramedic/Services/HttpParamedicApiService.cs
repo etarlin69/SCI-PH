@@ -65,8 +65,17 @@ public sealed class HttpParamedicApiService : IParamedicApiService
         }).ToList();
     }
 
-    // 200: la MISMA emergencia, ya identificada (también al reintentar con la misma clave). 404: ningún paciente tiene ese
-    // documento; la emergencia sigue NN (null). 409 y el resto llegan como MobileApiException.
+    // Candidato del documento: nunca identifica. 404 (ningún paciente), 409, 429 y el resto llegan como MobileApiException.
+    public async Task<DocumentCandidateDto> ResolveDocumentCandidateAsync(
+        Guid emergencyId, PatientDocumentType documentType, string documentNumber, CancellationToken cancellationToken = default)
+    {
+        var candidate = await _client.PostAsync<ResolveDocumentRequest, CandidateResponse>(
+            $"{Emergencies}/{emergencyId}/identify/document/resolve", new ResolveDocumentRequest(documentType, documentNumber), cancellationToken);
+        return new DocumentCandidateDto(candidate.DisplayName, candidate.DateOfBirth, candidate.Document?.Type, candidate.Document?.Value);
+    }
+
+    // Confirmación del candidato. 200: la MISMA emergencia, ya identificada (también al reintentar con la misma clave). 404:
+    // ningún paciente tiene ya ese documento; la emergencia sigue NN (null). 409, 429 y el resto llegan como MobileApiException.
     public async Task<EmergencyDto?> IdentifyByDocumentAsync(Guid emergencyId, IdentifyByDocumentDto dto)
     {
         var request = new IdentifyByDocumentRequest(dto.ClientRequestId, dto.DocumentType, dto.DocumentNumber);
@@ -192,7 +201,16 @@ public sealed class HttpParamedicApiService : IParamedicApiService
     // Contrato V1 exacto: sin ubicación, clínica, personal ni paciente (el servidor rechaza cualquier otro campo).
     private sealed record OpenEmergencyRequest(Guid ClientRequestId, DateTimeOffset StartedAt, string ChiefComplaint);
 
-    private sealed record IdentifyByDocumentRequest(Guid ClientRequestId, PatientDocumentType DocumentType, string DocumentNumber);
+    // Contratos exactos del documento: sin id de paciente. ToString nunca imprime el número.
+    private sealed record IdentifyByDocumentRequest(Guid ClientRequestId, PatientDocumentType DocumentType, string DocumentNumber)
+    {
+        public override string ToString() => nameof(IdentifyByDocumentRequest);
+    }
+
+    private sealed record ResolveDocumentRequest(PatientDocumentType DocumentType, string DocumentNumber)
+    {
+        public override string ToString() => nameof(ResolveDocumentRequest);
+    }
 
     // Contratos exactos del QR. ToString nunca imprime el contenido.
     private sealed record ResolveQrRequest(string Payload)
@@ -208,6 +226,9 @@ public sealed class HttpParamedicApiService : IParamedicApiService
     private sealed record QrDocumentResponse(string? Type, string? Value);
 
     private sealed record QrCandidateResponse(string DisplayName, DateOnly? DateOfBirth, QrDocumentResponse? Document);
+
+    // El candidato del documento: la misma forma que el del QR.
+    private sealed record CandidateResponse(string DisplayName, DateOnly? DateOfBirth, QrDocumentResponse? Document);
 
     // Contrato exacto de la toma: los valores ausentes no se envían.
     private sealed record VitalSignsRequest(
