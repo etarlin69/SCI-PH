@@ -17,7 +17,7 @@ namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
 /// (VitalSignLimits) para detectar errores de tipeo; NO son umbrales clínicos ni diagnóstico.
 /// </summary>
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
-public partial class VitalSignsViewModel : BaseViewModel
+public partial class VitalSignsViewModel : EmergencyWorkflowViewModel
 {
     // Límites de plausibilidad (docs: SCI-PH.Domain/Constants/VitalSignLimits.cs)
     private const int HrMin = 0, HrMax = 300;
@@ -44,13 +44,12 @@ public partial class VitalSignsViewModel : BaseViewModel
     private DateTime? _recordedAt;
 
     public VitalSignsViewModel(IParamedicApiService api, IAppNavigator navigator)
+        : base(api, navigator)
     {
         _api = api;
         _navigator = navigator;
     }
 
-    [ObservableProperty]
-    private Guid emergencyId;
 
     // ---- Campos (texto, para validar mientras se escribe) ----
     [ObservableProperty] private string heartRate = string.Empty;
@@ -115,7 +114,8 @@ public partial class VitalSignsViewModel : BaseViewModel
     private bool CanSave() => !IsBusy && HasAnyValue && !HasAnyError;
 
     // REAL: una toma de 1 a 7 valores en una sola petición (todo o nada) sobre la MISMA emergencia. Registrada (201, o 200
-    // si el servidor ya la tenía con esta clave) → Procedimientos. Si falla, la pantalla queda como estaba.
+    // si el servidor ya la tenía con esta clave): se añade a "Tomas guardadas", el formulario se limpia y la pantalla sigue
+    // aquí para tomas sucesivas; solo "Continuar" avanza. Si falla, la pantalla queda como estaba.
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync()
     {
@@ -144,7 +144,6 @@ public partial class VitalSignsViewModel : BaseViewModel
             SavedSummaries.Insert(0, BuildSummary(dto));
             SavedCount = SavedSummaries.Count;
             ClearForm();
-            await GoToProceduresAsync();
         }
         catch (MobileApiException ex) when (ex.Error == MobileApiError.Conflict)
         {

@@ -18,9 +18,9 @@ public static class AuthRoutes
     public const string Mfa = "ClinicalMfa";
 
     /// <summary>
-    /// Área paramédica tras autenticar: reemplaza la pila (login y MFA dejan de estar detrás) y deja la entrada como raíz.
+    /// Área paramédica tras autenticar: su inicio, como raíz (login y MFA dejan de estar detrás y no hay flecha "Atrás").
     /// </summary>
-    public static string ClinicalArea { get; } = $"{AppRoutes.Root(AppRoutes.Entry)}/{ParamedicRoutes.NewEmergency}";
+    public static string ClinicalArea { get; } = ParamedicRoutes.HomeRoot;
 
     /// <summary>Área del paciente tras autenticar: su inicio, como raíz (el menú lateral lleva al resto).</summary>
     public static string PatientArea { get; } = AppRoutes.Root(PatientRoutes.Home);

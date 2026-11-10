@@ -7,6 +7,12 @@ public interface IParamedicApiService
     Task<EmergencyDto> CreateEmergencyAsync(CreateEmergencyDto dto);
     Task<EmergencyDto?> GetEmergencyAsync(Guid id);
 
+    /// <summary>
+    /// Las emergencias que el paramédico actual aún puede continuar (asignadas y sin entregar), la más reciente primero. El
+    /// servidor decide qué está activo; la app no guarda ni filtra esta lista.
+    /// </summary>
+    Task<IReadOnlyList<ActiveEmergencyDto>> GetActiveEmergenciesAsync(CancellationToken cancellationToken = default);
+
     /// <summary>La misma emergencia ya identificada, o null si ningún paciente tiene ese documento (sigue NN).</summary>
     Task<EmergencyDto?> IdentifyByDocumentAsync(Guid emergencyId, IdentifyByDocumentDto dto);
 

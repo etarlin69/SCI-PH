@@ -88,8 +88,9 @@ public class VitalSignsTests
         Assert.True(vm.SaveCommand.CanExecute(null));
     }
 
+    // Serial readings: a recorded one is listed, the form is cleared and the screen stays for the next one.
     [Fact]
-    public async Task ARecordedReadingGoesToProceduresWithTheSameEmergency()
+    public async Task ARecordedReadingStaysOnVitalSignsForTheNextOne()
     {
         var vm = ViewModel();
         vm.HeartRate = "90";
@@ -98,13 +99,29 @@ public class VitalSignsTests
 
         Assert.Equal(HttpStatusCode.Created, Assert.Single(_bff.Answers));
         Assert.Null(vm.ErrorMessage);
-        var (route, parameters) = Assert.Single(_navigator.Navigations);
-        Assert.Equal(ParamedicRoutes.Procedures, route);
-        Assert.Equal(_emergencyId, parameters!["EmergencyId"]);
+        Assert.Empty(_navigator.Navigations);
+        Assert.Equal((1, string.Empty), (vm.SavedCount, vm.HeartRate));
         // The next reading is a new one: new key and new time.
         vm.HeartRate = "95";
         await vm.SaveCommand.ExecuteAsync(null);
         Assert.NotEqual(Body(0).GetProperty("clientRequestId").GetGuid(), Body(1).GetProperty("clientRequestId").GetGuid());
+        Assert.Equal(2, vm.SavedCount);
+        Assert.Empty(_navigator.Navigations);
+    }
+
+    // Only the explicit action leaves the screen, with the same emergency.
+    [Fact]
+    public async Task OnlyContinueGoesToProceduresWithTheSameEmergency()
+    {
+        var vm = ViewModel();
+        vm.HeartRate = "90";
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        await vm.ContinueCommand.ExecuteAsync(null);
+
+        var (route, parameters) = Assert.Single(_navigator.Navigations);
+        Assert.Equal(ParamedicRoutes.Procedures, route);
+        Assert.Equal(_emergencyId, parameters!["EmergencyId"]);
     }
 
     [Fact]
@@ -125,12 +142,13 @@ public class VitalSignsTests
 
         Assert.Single(_bff.Bodies);
         Assert.Equal(1, _bff.Recorded);
-        Assert.Single(_navigator.Navigations);
+        Assert.Equal(1, vm.SavedCount);
+        Assert.Empty(_navigator.Navigations);
     }
 
     // The server recorded it but the answer was lost: the retry with the same key and time is a replay (200).
     [Fact]
-    public async Task ALostResponseIsReplayedWithTheSameKeyAndTimeAndGoesToProcedures()
+    public async Task ALostResponseIsReplayedWithTheSameKeyAndTimeAndRecordedOnce()
     {
         var vm = ViewModel();
         vm.HeartRate = "90";
@@ -145,7 +163,8 @@ public class VitalSignsTests
         Assert.Equal(Body(0).GetProperty("clientRequestId").GetGuid(), Body(1).GetProperty("clientRequestId").GetGuid());
         Assert.Equal(Body(0).GetProperty("recordedAt").GetString(), Body(1).GetProperty("recordedAt").GetString());
         Assert.Equal(1, _bff.Recorded);
-        Assert.Equal(ParamedicRoutes.Procedures, Assert.Single(_navigator.Navigations).Route);
+        Assert.Equal(1, vm.SavedCount);
+        Assert.Empty(_navigator.Navigations);
     }
 
     [Theory]

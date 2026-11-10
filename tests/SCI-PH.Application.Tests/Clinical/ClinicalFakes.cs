@@ -327,6 +327,19 @@ namespace SCI_PH.Application.Tests.Clinical
 
         public void Add(IdempotencyReceipt receipt) => _pending.Add(receipt);
 
+        public Task<IReadOnlyList<AssignedEmergencyRow>> ListAssignedPrehospitalEmergenciesAsync(
+            Guid staffId, IReadOnlyCollection<ClinicalEncounterStatus> statuses, int limit, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<AssignedEmergencyRow>>(Encounters
+                .Where(e => e.Type == ClinicalEncounterType.Prehospital && e.ClinicId is null && statuses.Contains(e.Status)
+                    && Assignments.Any(a => a.ClinicalEncounterId == e.Id && a.ClinicalStaffId == staffId && a.IsActive))
+                .OrderByDescending(e => e.StartedAtUtc)
+                .Take(limit)
+                .Select(e => new AssignedEmergencyRow(
+                    ToRow(e),
+                    Transfers.Where(t => t.ClinicalEncounterId == e.Id && ClinicalTransfer.ActiveStatuses.Contains(t.Status))
+                        .Select(t => (ClinicalTransferStatus?)t.Status).SingleOrDefault()))
+                .ToList());
+
         public Task<IReadOnlyList<EncounterRow>> ListEncountersAsync(
             Guid clinicId, IReadOnlyCollection<ClinicalEncounterStatus> excludedStatuses, bool onlyUnidentified, int limit, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<EncounterRow>>(Encounters

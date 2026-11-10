@@ -19,6 +19,8 @@ public partial class IdentifyPatientPage : ContentPage
         _viewModel.ResumeFingerprintPolling();
         // Al volver del escáner de QR: la emergencia se lee del servidor (si quedó identificada, la huella se suelta).
         await _viewModel.RefreshAfterQrScannerAsync();
+        // Cabecera de la emergencia (código NN o paciente) desde el servidor.
+        await _viewModel.RefreshIdentityAsync();
     }
 
     protected override void OnDisappearing()

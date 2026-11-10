@@ -14,5 +14,11 @@ public enum EmergencyStatus
 {
     Open,
     Transferred,
-    Closed
+    Closed,
+
+    /// <summary>
+    /// Recibida por el hospital (Received o InEvolution en el servidor): la atención prehospitalaria terminó y la app ya no
+    /// registra ni identifica sobre ella.
+    /// </summary>
+    HandedOff
 }

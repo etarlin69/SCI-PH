@@ -66,6 +66,15 @@ namespace SCI_PH.Application.Abstractions.Clinical
         // The staff member has an open (not unassigned) EncounterStaffAssignment on the encounter.
         Task<bool> HasActiveStaffAssignmentAsync(Guid encounterId, Guid staffId, CancellationToken cancellationToken);
 
+        // Prehospital encounters still in the field (no clinic yet) in the given statuses, on which the staff member has an
+        // open (not unassigned) EncounterStaffAssignment, newest start first, at most limit; each with the status of its
+        // Requested or InTransit transfer, if any.
+        Task<IReadOnlyList<AssignedEmergencyRow>> ListAssignedPrehospitalEmergenciesAsync(
+            Guid staffId,
+            IReadOnlyCollection<ClinicalEncounterStatus> statuses,
+            int limit,
+            CancellationToken cancellationToken);
+
         Task<IReadOnlyList<EncounterRow>> ListEncountersAsync(
             Guid clinicId,
             IReadOnlyCollection<ClinicalEncounterStatus> excludedStatuses,

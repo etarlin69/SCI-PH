@@ -18,7 +18,7 @@ namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
 /// estado se restaura desde el activeTransfer de la emergencia cada vez que se abre la pantalla.
 /// </summary>
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
-public partial class TransferViewModel : BaseViewModel
+public partial class TransferViewModel : EmergencyWorkflowViewModel
 {
     /// <summary>Límites del servidor (ClinicalTransfer.Reason y Notes).</summary>
     public const int ReasonMaxLength = 500;
@@ -32,15 +32,17 @@ public partial class TransferViewModel : BaseViewModel
     // perdida, 400/403/404/409) para no crear dos traslados. Se renueva cuando la solicitud queda registrada.
     private Guid? _clientRequestId;
 
+    // Lecturas de la pantalla: solo la última, y solo de la emergencia que se está mostrando, cambia el estado.
+    private int _loadGeneration;
+
     public TransferViewModel(IParamedicApiService api, IParamedicCatalogService catalog, IAppNavigator navigator)
+        : base(api, navigator)
     {
         _api = api;
         _catalog = catalog;
         _navigator = navigator;
     }
 
-    [ObservableProperty]
-    private Guid emergencyId;
 
     public ObservableCollection<TransferDestinationDto> Destinations { get; } = new();
 
@@ -58,7 +60,7 @@ public partial class TransferViewModel : BaseViewModel
 
     /// <summary>El traslado solicitado o en curso; null mientras no hay ninguno.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasNoTransfer), nameof(HasTransfer), nameof(IsRequested), nameof(IsInTransit), nameof(StatusText), nameof(DestinationText))]
+    [NotifyPropertyChangedFor(nameof(HasNoTransfer), nameof(ShowRequestForm), nameof(HasTransfer), nameof(IsRequested), nameof(IsInTransit), nameof(StatusText), nameof(DestinationText))]
     [NotifyCanExecuteChangedFor(nameof(RequestCommand), nameof(StartCommand), nameof(CancelCommand))]
     private TransferDto? transfer;
 
@@ -68,7 +70,32 @@ public partial class TransferViewModel : BaseViewModel
 
     public bool HasSuccess => !string.IsNullOrWhiteSpace(SuccessMessage);
 
+    /// <summary>
+    /// "Identificar paciente": el paciente sigue NN y la emergencia todavía es del paramédico (sin recepción del hospital),
+    /// según la última lectura del servidor. Identificar no toca el traslado; tras la recepción el servidor ya no lo acepta.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(IdentifyPatientCommand))]
+    private bool canIdentifyPatient;
+
     public bool HasNoTransfer => Transfer is null;
+
+    /// <summary>
+    /// El hospital ya recibió la emergencia (última lectura del servidor): no se ofrece ninguna acción de traslado, solo el
+    /// aviso. Es una guía de la pantalla; el servidor sigue rechazando (409) cualquier paso tras la recepción.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowRequestForm), nameof(ShowInstructions))]
+    [NotifyCanExecuteChangedFor(nameof(RequestCommand), nameof(StartCommand), nameof(CancelCommand))]
+    private bool isHandedOff;
+
+    /// <summary>Las instrucciones del traslado, que dejan de aplicar tras la recepción.</summary>
+    public bool ShowInstructions => !IsHandedOff;
+
+    public string HandedOffMessage => ParamedicMessages.TransferHandedOff;
+
+    /// <summary>Formulario de solicitud (destino, motivo, notas): sin traslado activo y antes de la recepción.</summary>
+    public bool ShowRequestForm => Transfer is null && !IsHandedOff;
     public bool HasTransfer => Transfer is not null;
     public bool IsRequested => Transfer?.Status == TransferStatus.Requested;
     public bool IsInTransit => Transfer?.Status == TransferStatus.InTransit;
@@ -89,37 +116,64 @@ public partial class TransferViewModel : BaseViewModel
         RequestCommand.NotifyCanExecuteChanged();
         StartCommand.NotifyCanExecuteChanged();
         CancelCommand.NotifyCanExecuteChanged();
+        IdentifyPatientCommand.NotifyCanExecuteChanged();
     }
 
     // Restaura el estado desde el servidor (activeTransfer) y carga los destinos si todavía no hay traslado.
     [RelayCommand]
     private async Task LoadAsync()
     {
+        var id = EmergencyId;
+        var generation = Interlocked.Increment(ref _loadGeneration);
         ErrorMessage = null;
         IsBusy = true;
         try
         {
-            var emergency = await _api.GetEmergencyAsync(EmergencyId);
-            Transfer = emergency?.ActiveTransfer;
-            if (Transfer is null && Destinations.Count == 0)
+            var emergency = await _api.GetEmergencyAsync(id);
+            if (!IsCurrentLoad(id, generation))
             {
-                foreach (var destination in await _catalog.GetTransferDestinationsAsync()) Destinations.Add(destination);
+                return;
+            }
+
+            if (emergency is not null)
+            {
+                // La misma lectura sirve para la cabecera (código NN o paciente).
+                ApplyEmergency(emergency);
+            }
+
+            CanIdentifyPatient = emergency is { Patient: null, Status: EmergencyStatus.Open or EmergencyStatus.Transferred };
+            IsHandedOff = emergency?.Status == EmergencyStatus.HandedOff;
+            Transfer = IsHandedOff ? null : emergency?.ActiveTransfer;
+            if (Transfer is null && !IsHandedOff && Destinations.Count == 0)
+            {
+                var destinations = await _catalog.GetTransferDestinationsAsync();
+                if (IsCurrentLoad(id, generation) && Destinations.Count == 0)
+                {
+                    foreach (var destination in destinations) Destinations.Add(destination);
+                }
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = ex is MobileApiException api && api.Error is not (MobileApiError.Server or MobileApiError.InvalidResponse)
-                ? MobileApiErrorMessages.For(api)
-                : ParamedicMessages.TransferDestinationsFailed;
+            if (IsCurrentLoad(id, generation))
+            {
+                CanIdentifyPatient = false;
+                ErrorMessage = ex is MobileApiException api && api.Error is not (MobileApiError.Server or MobileApiError.InvalidResponse)
+                    ? MobileApiErrorMessages.For(api)
+                    : ParamedicMessages.TransferDestinationsFailed;
+            }
         }
         finally
         {
-            IsBusy = false;
+            if (generation == Volatile.Read(ref _loadGeneration))
+            {
+                IsBusy = false;
+            }
         }
     }
 
     private bool CanRequest() =>
-        !IsBusy && Transfer is null && SelectedDestination is not null
+        !IsBusy && !IsHandedOff && Transfer is null && SelectedDestination is not null
         && (Reason?.Trim().Length ?? 0) <= ReasonMaxLength && (Notes?.Trim().Length ?? 0) <= NotesMaxLength;
 
     [RelayCommand(CanExecute = nameof(CanRequest))]
@@ -138,14 +192,14 @@ public partial class TransferViewModel : BaseViewModel
         return result;
     }, ParamedicMessages.RequestTransferFailed);
 
-    private bool CanStart() => !IsBusy && IsRequested;
+    private bool CanStart() => !IsBusy && !IsHandedOff && IsRequested;
 
     // Sobre ESE traslado; repetirlo tras una respuesta perdida devuelve el mismo traslado en curso.
     [RelayCommand(CanExecute = nameof(CanStart))]
     private Task StartAsync() =>
         RunTransferAsync(() => _api.StartTransferAsync(EmergencyId, Transfer!.Id), ParamedicMessages.TransferStepFailed);
 
-    private bool CanCancel() => !IsBusy && (IsRequested || IsInTransit);
+    private bool CanCancel() => !IsBusy && !IsHandedOff && (IsRequested || IsInTransit);
 
     // Sobre ESE traslado; tras cancelarlo se puede solicitar otro destino.
     [RelayCommand(CanExecute = nameof(CanCancel))]
@@ -159,6 +213,21 @@ public partial class TransferViewModel : BaseViewModel
             if (Destinations.Count == 0) await LoadAsync();
         }
     }
+
+    private bool IsCurrentLoad(Guid id, int generation) =>
+        generation == Volatile.Read(ref _loadGeneration) && id == EmergencyId;
+
+    private bool CanOpenIdentification() => !IsBusy && CanIdentifyPatient;
+
+    // La identificación de SIEMPRE (huella, documento, QR) sobre la misma emergencia; al terminar vuelve aquí. El traslado
+    // no se toca: sigue solicitado o en curso.
+    [RelayCommand(CanExecute = nameof(CanOpenIdentification))]
+    private Task IdentifyPatientAsync() =>
+        _navigator.GoToAsync(ParamedicRoutes.IdentifyPatient, new Dictionary<string, object>
+        {
+            ["EmergencyId"] = EmergencyId,
+            [ParamedicRoutes.ReturnToTransfer] = true
+        });
 
     // Durante el traslado se sigue documentando sobre la misma emergencia.
     [RelayCommand]

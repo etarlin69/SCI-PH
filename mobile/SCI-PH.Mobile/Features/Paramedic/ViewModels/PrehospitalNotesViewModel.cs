@@ -16,7 +16,7 @@ namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
 /// La hora es automática y no editable.
 /// </summary>
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
-public partial class PrehospitalNotesViewModel : BaseViewModel
+public partial class PrehospitalNotesViewModel : EmergencyWorkflowViewModel
 {
     /// <summary>Límite de UX en el teléfono; el servidor admite hasta 8000 caracteres.</summary>
     public const int ContentMaxLength = 4000;
@@ -31,13 +31,12 @@ public partial class PrehospitalNotesViewModel : BaseViewModel
     private DateTime? _occurredAt;
 
     public PrehospitalNotesViewModel(IParamedicApiService api, IAppNavigator navigator)
+        : base(api, navigator)
     {
         _api = api;
         _navigator = navigator;
     }
 
-    [ObservableProperty]
-    private Guid emergencyId;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ContentCounter))]

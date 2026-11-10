@@ -21,7 +21,7 @@ public sealed record MedicationRouteOption(MedicationRoute Value, string Label);
 /// de dosis y unidad son los del servidor, no reglas clínicas.
 /// </summary>
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
-public partial class MedicationsViewModel : BaseViewModel
+public partial class MedicationsViewModel : EmergencyWorkflowViewModel
 {
     /// <summary>Límites del servidor (MedicationAdministration y su columna numeric(12,3)).</summary>
     public const int MaxDoseDecimals = 3;
@@ -48,6 +48,7 @@ public partial class MedicationsViewModel : BaseViewModel
     private DateTime? _administeredAt;
 
     public MedicationsViewModel(IParamedicApiService api, IParamedicCatalogService catalog, IAppNavigator navigator)
+        : base(api, navigator)
     {
         _api = api;
         _catalog = catalog;
@@ -75,8 +76,6 @@ public partial class MedicationsViewModel : BaseViewModel
     /// <summary>Ayuda de UI, no autoridad clínica: el servidor acepta cualquier unidad de 1 a 24 caracteres.</summary>
     public IReadOnlyList<string> DoseUnits { get; } = ["mg", "mcg", "g", "mL", "UI", "gotas", "inhalaciones", OtherDoseUnit];
 
-    [ObservableProperty]
-    private Guid emergencyId;
 
     public ObservableCollection<MedicationCatalogItemDto> CatalogItems { get; } = new();
     public ObservableCollection<string> SavedSummaries { get; } = new();

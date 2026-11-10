@@ -5,6 +5,13 @@ public static class ParamedicMessages
 {
     public const string CreateEmergencyFailed = "No se pudo crear la emergencia. Intenta nuevamente.";
 
+    public const string ActiveEmergenciesFailed = "No se pudieron cargar las emergencias activas. Intenta nuevamente.";
+
+    public const string OpenEmergencyFailed = "No se pudo abrir la emergencia. Intenta nuevamente.";
+
+    /// <summary>Al retomarla, el servidor ya no la deja continuar (entregada al hospital, cerrada o sin acceso).</summary>
+    public const string EmergencyNoLongerActive = "Esa emergencia ya no está activa. La lista se actualizó.";
+
     /// <summary>409: el clientRequestId ya se usó con otros datos (por ejemplo, el motivo cambió tras un fallo de red).</summary>
     public const string EmergencyRequestReused =
         "La solicitud ya fue utilizada con datos diferentes. Vuelve a iniciar la creación de la emergencia.";
@@ -73,6 +80,9 @@ public static class ParamedicMessages
         "No se pudo completar: el destino no está activo, ya hay otro traslado, el traslado cambió de estado o el hospital ya recibió al paciente.";
 
     public const string TransferCancelled = "Traslado cancelado. Puedes solicitar otro destino.";
+
+    /// <summary>La emergencia ya la recibió el hospital: el traslado queda solo de lectura.</summary>
+    public const string TransferHandedOff = "El caso ya fue recibido por el hospital. La atención prehospitalaria ha finalizado.";
 
     public const string FingerprintReadersFailed = "No se pudo cargar la lista de lectores de huella.";
 

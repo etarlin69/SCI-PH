@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Paramedic.ViewModels"
+             xmlns:components="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Views.Components"
              xmlns:dto="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Models.Dtos"
              x:Class="SCI_PH.Mobile.Features.Paramedic.Views.IdentifyPatientPage"
              x:DataType="vm:IdentifyPatientViewModel"
@@ -10,6 +11,9 @@
 
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="18">
+
+            <!-- Emergencia en curso: código NN o paciente (con el NN como trazabilidad) e "Inicio" -->
+            <components:EmergencyIdentityHeader />
 
             <!-- Encabezado -->
             <VerticalStackLayout Spacing="4">
@@ -103,7 +107,8 @@
                             Style="{StaticResource SciSecondaryButton}" />
                     <Label Text="Si no es posible identificarlo ahora, la atención continúa como paciente no identificado (NN) y puede identificarse después."
                            Style="{StaticResource SciSubtitle}" />
-                    <Button Text="Continuar sin identificar"
+                    <Button Text="{Binding ContinueWithoutIdentifyingText}"
+                            AutomationId="IdentifyContinueWithout"
                             Command="{Binding ContinueWithoutIdentifyingCommand}"
                             Style="{StaticResource SciSecondaryButton}" />
                 </VerticalStackLayout>
@@ -149,7 +154,8 @@
                                FontAttributes="Bold" FontSize="13" />
                     </Border>
                     <Label Text="{Binding PatientDisplayName}" Style="{StaticResource SciTitle}" />
-                    <Button Text="Continuar a signos vitales"
+                    <Button Text="{Binding ContinueText}"
+                            AutomationId="IdentifyContinue"
                             Command="{Binding ContinueCommand}"
                             Style="{StaticResource SciPrimaryButton}" />
                 </VerticalStackLayout>

@@ -26,7 +26,7 @@ public class ParamedicViewModelTests
         var (failed, retried) = (api.CreateRequests[0], api.CreateRequests[1]);
         Assert.Equal(failed.ClientRequestId, retried.ClientRequestId);
         Assert.Equal(failed.StartedAt, retried.StartedAt);
-        Assert.Equal(ParamedicRoutes.IdentifyPatient, Assert.Single(navigator.Navigations).Route);
+        Assert.Equal(NewEmergencyViewModel.IdentifyAfterCreate, Assert.Single(navigator.Navigations).Route);
 
         vm.ChiefComplaint = "Caída de altura";
         await vm.SaveCommand.ExecuteAsync(null);

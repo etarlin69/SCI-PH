@@ -36,6 +36,15 @@ namespace SCI_PH.Mobile.BFF.Controllers
                 : Ok(result.Emergency);
         }
 
+        // The current paramedic's actionable emergencies (assigned, still in the field), newest first; [] when there are none.
+        // Same policies as reading one emergency. Once a clinic received a case it is no longer listed.
+        [HttpGet("active")]
+        [Authorize(Policy = Permissions.Encounters.Read)]
+        [ProducesResponseType<IReadOnlyList<ActivePrehospitalEmergencySummary>>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> ListActive(CancellationToken cancellationToken) =>
+            Ok(await _emergencies.ListActiveAsync(cancellationToken));
+
         [HttpGet("{id:guid}")]
         [Authorize(Policy = Permissions.Encounters.Read)]
         [ProducesResponseType<PrehospitalEmergencySummary>(StatusCodes.Status200OK)]

@@ -126,28 +126,48 @@ public class ProceduresTests
         Assert.True(vm.SaveCommand.CanExecute(null));
     }
 
+    // "Puedes agregar varios": a recorded procedure is persisted, listed and the form reset, and the screen stays.
     [Fact]
-    public async Task ARecordedProcedureGoesToMedicationsWithTheSameEmergency()
+    public async Task ARecordedProcedureStaysOnProceduresWithTheFormReset()
     {
         var vm = await LoadedAsync();
+        vm.Outcome = "Saturación 96 %";
 
         await vm.SaveCommand.ExecuteAsync(null);
 
         Assert.Equal(HttpStatusCode.Created, Assert.Single(_bff.Answers));
+        Assert.Equal(1, _bff.Recorded);
         Assert.Null(vm.ErrorMessage);
-        var (route, parameters) = Assert.Single(_navigator.Navigations);
-        Assert.Equal(ParamedicRoutes.Medications, route);
-        Assert.Equal(_emergencyId, parameters!["EmergencyId"]);
-        Assert.Null(vm.SelectedProcedure);
+        Assert.Empty(_navigator.Navigations);
+        Assert.Equal((null, string.Empty), (vm.SelectedProcedure, vm.Outcome));
         Assert.Equal(1, vm.SavedCount);
+        Assert.Contains("Saturación 96 %", Assert.Single(vm.SavedSummaries));
 
-        // The next procedure is a new one: new key and new time.
+        // The next procedure is a new one: new key and new time; both are listed, newest first.
         vm.SelectedProcedure = vm.CatalogItems.Single(i => i.Code == "CPR");
         await Task.Delay(20);
         await vm.SaveCommand.ExecuteAsync(null);
         Assert.NotEqual(Body(0).GetProperty("clientRequestId").GetGuid(), Body(1).GetProperty("clientRequestId").GetGuid());
         Assert.NotEqual(Body(0).GetProperty("performedAt").GetString(), Body(1).GetProperty("performedAt").GetString());
         Assert.Equal(2, _bff.Recorded);
+        Assert.Equal(2, vm.SavedCount);
+        Assert.Contains(vm.CatalogItems.Single(i => i.Code == "CPR").Name, vm.SavedSummaries[0]);
+        Assert.Empty(_navigator.Navigations);
+    }
+
+    // Only "Continuar a medicamentos" leaves the screen, with the same emergency.
+    [Fact]
+    public async Task OnlyContinueGoesToMedicationsWithTheSameEmergency()
+    {
+        var vm = await LoadedAsync();
+        await vm.SaveCommand.ExecuteAsync(null);
+        Assert.Empty(_navigator.Navigations);
+
+        await vm.ContinueCommand.ExecuteAsync(null);
+
+        var (route, parameters) = Assert.Single(_navigator.Navigations);
+        Assert.Equal(ParamedicRoutes.Medications, route);
+        Assert.Equal(_emergencyId, parameters!["EmergencyId"]);
     }
 
     [Fact]
@@ -168,12 +188,13 @@ public class ProceduresTests
 
         Assert.Single(_bff.Bodies);
         Assert.Equal(1, _bff.Recorded);
-        Assert.Single(_navigator.Navigations);
+        Assert.Equal(1, vm.SavedCount);
+        Assert.Empty(_navigator.Navigations);
     }
 
     // The server recorded it but the answer was lost: the retry with the same key and time is a replay (200).
     [Fact]
-    public async Task ALostResponseIsReplayedWithTheSameKeyAndTimeAndGoesToMedications()
+    public async Task ALostResponseIsReplayedWithTheSameKeyAndTimeAndListedOnce()
     {
         var vm = await LoadedAsync();
         _bff.LostResponsesLeft = 1;
@@ -187,7 +208,8 @@ public class ProceduresTests
         Assert.Equal(Body(0).GetProperty("clientRequestId").GetGuid(), Body(1).GetProperty("clientRequestId").GetGuid());
         Assert.Equal(Body(0).GetProperty("performedAt").GetString(), Body(1).GetProperty("performedAt").GetString());
         Assert.Equal(1, _bff.Recorded);
-        Assert.Equal(ParamedicRoutes.Medications, Assert.Single(_navigator.Navigations).Route);
+        Assert.Equal(1, vm.SavedCount);
+        Assert.Empty(_navigator.Navigations);
     }
 
     [Theory]

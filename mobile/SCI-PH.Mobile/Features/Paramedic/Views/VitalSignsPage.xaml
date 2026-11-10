@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Paramedic.ViewModels"
+             xmlns:components="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Views.Components"
              x:Class="SCI_PH.Mobile.Features.Paramedic.Views.VitalSignsPage"
              x:DataType="vm:VitalSignsViewModel"
              Style="{StaticResource SciPage}"
@@ -9,6 +10,9 @@
 
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="18">
+
+            <!-- Emergencia en curso: código NN o paciente (con el NN como trazabilidad) e "Inicio" -->
+            <components:EmergencyIdentityHeader />
 
             <!-- Encabezado -->
             <VerticalStackLayout Spacing="4">

@@ -82,7 +82,7 @@ public class RealEmergencyTests
         await vm.SaveCommand.ExecuteAsync(null);
 
         Assert.False(vm.HasError);
-        Assert.Equal(ParamedicRoutes.IdentifyPatient, Assert.Single(_navigator.Navigations).Route);
+        Assert.Equal(NewEmergencyViewModel.IdentifyAfterCreate, Assert.Single(_navigator.Navigations).Route);
         Assert.Equal(1, _bff.Created);
         Assert.Equal("Dolor torácico", JsonDocument.Parse(_bff.Bodies[0]).RootElement.GetProperty("chiefComplaint").GetString());
         Assert.Equal(string.Empty, vm.ChiefComplaint);
@@ -111,7 +111,7 @@ public class RealEmergencyTests
         Assert.Equal(first.GetProperty("clientRequestId").GetGuid(), retry.GetProperty("clientRequestId").GetGuid());
         Assert.Equal(first.GetProperty("startedAt").GetString(), retry.GetProperty("startedAt").GetString());
         Assert.Equal(first.GetProperty("chiefComplaint").GetString(), retry.GetProperty("chiefComplaint").GetString());
-        Assert.Equal(ParamedicRoutes.IdentifyPatient, Assert.Single(_navigator.Navigations).Route);
+        Assert.Equal(NewEmergencyViewModel.IdentifyAfterCreate, Assert.Single(_navigator.Navigations).Route);
     }
 
     [Fact]

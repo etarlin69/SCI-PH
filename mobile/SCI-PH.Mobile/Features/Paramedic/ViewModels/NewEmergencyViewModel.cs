@@ -24,6 +24,9 @@ public partial class NewEmergencyViewModel : BaseViewModel
         _navigator = navigator;
     }
 
+    /// <summary>Ruta tras crearla: sale del formulario ("..") y abre la identificación de la emergencia creada.</summary>
+    public static string IdentifyAfterCreate { get; } = $"../{ParamedicRoutes.IdentifyPatient}";
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private string chiefComplaint = string.Empty;
@@ -54,8 +57,9 @@ public partial class NewEmergencyViewModel : BaseViewModel
             _startedAt = null;
             ChiefComplaint = string.Empty;
 
+            // El formulario se sustituye por la emergencia: "Atrás" vuelve al inicio, nunca a un formulario ya enviado.
             await _navigator.GoToAsync(
-                ParamedicRoutes.IdentifyPatient,
+                IdentifyAfterCreate,
                 new Dictionary<string, object> { ["EmergencyId"] = emergency.Id });
         }
         catch (MobileApiException ex) when (ex.Error == MobileApiError.Conflict)

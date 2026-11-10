@@ -12,7 +12,8 @@ using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 namespace SCI_PH.Mobile.Features.Paramedic.ViewModels;
 
 [QueryProperty(nameof(EmergencyId), "EmergencyId")]
-public partial class IdentifyPatientViewModel : BaseViewModel
+[QueryProperty(nameof(ReturnsToTransfer), ParamedicRoutes.ReturnToTransfer)]
+public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
 {
     /// <summary>Cada cuánto se consulta la sesión de huella mientras espera al lector.</summary>
     public static readonly TimeSpan FingerprintPollInterval = TimeSpan.FromSeconds(1);
@@ -46,6 +47,7 @@ public partial class IdentifyPatientViewModel : BaseViewModel
         IAppNavigator navigator,
         Func<TimeSpan, CancellationToken, Task>? delay = null,
         ICameraPermissionService? camera = null)
+        : base(api, navigator)
     {
         _api = api;
         _fingerprints = fingerprints;
@@ -67,8 +69,18 @@ public partial class IdentifyPatientViewModel : BaseViewModel
 
     public IReadOnlyList<string> DocumentTypes { get; } = DocumentTypeByLabel.Keys.ToList();
 
+
+    /// <summary>
+    /// Abierta desde el traslado (paciente NN con el traslado ya solicitado o en curso): al terminar, con o sin
+    /// identificación, se vuelve al traslado en vez de avanzar a los signos vitales.
+    /// </summary>
     [ObservableProperty]
-    private Guid emergencyId;
+    [NotifyPropertyChangedFor(nameof(ContinueText), nameof(ContinueWithoutIdentifyingText))]
+    private bool returnsToTransfer;
+
+    public string ContinueText => ReturnsToTransfer ? "Volver al traslado" : "Continuar a signos vitales";
+
+    public string ContinueWithoutIdentifyingText => ReturnsToTransfer ? "Volver al traslado sin identificar" : "Continuar sin identificar";
 
     // ---- Resultado ----
     [ObservableProperty]
@@ -266,6 +278,7 @@ public partial class IdentifyPatientViewModel : BaseViewModel
             var emergency = await _fingerprints.ConfirmAsync(EmergencyId, session.Id, _confirmRequestId.Value);
             EndFingerprintSession(message: null);
             ApplyIdentified(emergency.Patient?.DisplayName);
+            ApplyEmergency(emergency);
         }
         catch (MobileApiException ex) when (ex.Error == MobileApiError.Conflict)
         {
@@ -422,6 +435,8 @@ public partial class IdentifyPatientViewModel : BaseViewModel
                 var confirmedName = CandidateName;
                 EndFingerprintSession(message: null);
                 ApplyIdentified(confirmedName);
+                // La sesión no trae la emergencia: la cabecera se rehace con una lectura del servidor.
+                _ = RefreshIdentityAsync();
                 break;
             default:
                 // Matched sin candidato (la referencia se revocó o el lector ya no es válido) cuenta como sin coincidencia.
@@ -499,6 +514,7 @@ public partial class IdentifyPatientViewModel : BaseViewModel
         {
             await CancelFingerprintQuietlyAsync();
             ApplyIdentified(patient.DisplayName);
+            ApplyEmergency(emergency);
         }
     }
 
@@ -548,6 +564,7 @@ public partial class IdentifyPatientViewModel : BaseViewModel
             _documentRequestId = null;
             await CancelFingerprintQuietlyAsync();
             ApplyIdentified(emergency.Patient?.DisplayName);
+            ApplyEmergency(emergency);
         }
         catch (MobileApiException ex) when (ex.Error == MobileApiError.Conflict)
         {
@@ -620,8 +637,11 @@ public partial class IdentifyPatientViewModel : BaseViewModel
         ShowDocumentForm = false;
     }
 
+    // Desde el traslado se vuelve a la MISMA pantalla de traslado (que relee la emergencia); si no, el siguiente paso.
     private Task GoToNextStepAsync() =>
-        _navigator.GoToAsync(
-            ParamedicRoutes.VitalSigns,
-            new Dictionary<string, object> { ["EmergencyId"] = EmergencyId });
+        ReturnsToTransfer
+            ? _navigator.GoToAsync(ParamedicRoutes.Back)
+            : _navigator.GoToAsync(
+                ParamedicRoutes.VitalSigns,
+                new Dictionary<string, object> { ["EmergencyId"] = EmergencyId });
 }

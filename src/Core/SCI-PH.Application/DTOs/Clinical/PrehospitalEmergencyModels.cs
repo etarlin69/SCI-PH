@@ -163,6 +163,22 @@ namespace SCI_PH.Application.DTOs.Clinical
         PatientSummary? Patient,
         EmergencyTransferSummary? ActiveTransfer = null);
 
+    // One emergency of the paramedic's active list (GET api/mobile/emergencies/active): only what the list shows and the
+    // app needs to pick the case, never the full patient. PatientDisplayName is null while the patient is NN; the NN code
+    // stays after identification as traceability. ActiveTransferStatus: Requested or InTransit, null without an active
+    // transfer. To resume the case the app reads the emergency again (GET api/mobile/emergencies/{id}).
+    public sealed record ActivePrehospitalEmergencySummary(
+        Guid Id,
+        string? TemporaryPatientCode,
+        string? PatientDisplayName,
+        [property: JsonConverter(typeof(TextEnumConverter))] ClinicalEncounterStatus Status,
+        DateTimeOffset StartedAtUtc,
+        string? ChiefComplaint,
+        [property: JsonConverter(typeof(TextEnumConverter))] ClinicalTransferStatus? ActiveTransferStatus);
+
+    // Read-store row of an emergency assigned to a staff member, with the status of its active transfer (if any).
+    public sealed record AssignedEmergencyRow(EncounterRow Encounter, ClinicalTransferStatus? ActiveTransferStatus);
+
     // A clinic a paramedic can take the patient to: any active clinic of the network (no restriction by type).
     public sealed record TransferDestinationSummary(
         Guid Id,
