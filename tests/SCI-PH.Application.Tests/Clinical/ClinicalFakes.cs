@@ -76,6 +76,9 @@ namespace SCI_PH.Application.Tests.Clinical
         public List<IdempotencyReceipt> Receipts { get; } = [];
         // Runs at the start of SaveChangesAsync: lets a test commit a competing request first (a race).
         public Action? BeforeSave { get; set; }
+        // Runs after a receipt lookup has answered: lets a test commit a competing request right after this one found no
+        // receipt and before it loads anything else (the window between the lookup and the encounter load).
+        public Action? AfterReceiptLookup { get; set; }
         public List<Triage> Triages { get; } = [];
         public List<VitalSign> VitalSigns { get; } = [];
         public List<ClinicalNote> Notes { get; } = [];
@@ -322,8 +325,12 @@ namespace SCI_PH.Application.Tests.Clinical
         public Task<bool> HasActiveStaffAssignmentAsync(Guid encounterId, Guid staffId, CancellationToken cancellationToken) =>
             Task.FromResult(Assignments.Any(a => a.ClinicalEncounterId == encounterId && a.ClinicalStaffId == staffId && a.IsActive));
 
-        public Task<IdempotencyReceipt?> FindAsync(IdempotencyKey key, CancellationToken cancellationToken) =>
-            Task.FromResult(Receipts.SingleOrDefault(r => r.Key == key));
+        public Task<IdempotencyReceipt?> FindAsync(IdempotencyKey key, CancellationToken cancellationToken)
+        {
+            var found = Receipts.SingleOrDefault(r => r.Key == key);
+            AfterReceiptLookup?.Invoke();
+            return Task.FromResult(found);
+        }
 
         public void Add(IdempotencyReceipt receipt) => _pending.Add(receipt);
 

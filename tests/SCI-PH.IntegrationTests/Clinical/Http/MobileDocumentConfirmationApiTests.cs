@@ -396,5 +396,103 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             Assert.Null((await EncounterAsync(host, received.Id)).PatientId);
             Assert.Empty(await AttemptsAsync(host, received.Id));
         }
+
+        // ---- Same-key race, made deterministic: the loser holds its "no receipt" answer while the winner commits ----
+
+        private static Task<int> ConfirmReceiptsAsync(MobileEmergencyHost host, Guid clientRequestId) =>
+            host.Web.DbAsync(db => db.IdempotencyReceipts.CountAsync(
+                r => r.Operation == EmergencyDocumentIdentificationService.ConfirmOperation && r.ClientRequestId == clientRequestId));
+
+        // A double submit: the first confirmation looked up its receipt (none) and the SAME request committed before it
+        // loaded the emergency. It must replay the winner: 200 + 200, one identification, one attempt, one receipt.
+        [SkippableFact]
+        public async Task ASameKeyConfirmThatLosesTheRaceReplaysTheWinner()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var gate = new ReceiptLookupGate();
+            await using var host = await MobileEmergencyHost.StartAsync(_postgres, mobileServices: s => s.AddReceiptLookupGate(gate));
+            var patient = await SeedPatientAsync(host);
+            var paramedic = await ParamedicAsync(host);
+            var emergency = await OpenAsync(paramedic);
+            var key = Guid.NewGuid();
+
+            gate.Arm(EmergencyDocumentIdentificationService.ConfirmOperation, key);
+            var loser = ConfirmAsync(paramedic, emergency.Id, clientRequestId: key);
+            await gate.Reached;
+            // The same request (another spelling of the same document) runs to completion while the loser is held.
+            var winner = await ConfirmAsync(paramedic, emergency.Id, Normalized, clientRequestId: key);
+            Assert.Equal(HttpStatusCode.OK, winner.StatusCode);
+            gate.Release();
+            var replayed = await loser;
+
+            Assert.Equal(HttpStatusCode.OK, replayed.StatusCode);
+            var results = new[] { await winner.ReadAsAsync<PrehospitalEmergencySummary>(), await replayed.ReadAsAsync<PrehospitalEmergencySummary>() };
+            Assert.All(results, r => Assert.Equal((emergency.Id, emergency.TemporaryPatientCode, patient.Id), (r.Id, r.TemporaryPatientCode, r.Patient!.Id)));
+            var encounter = await EncounterAsync(host, emergency.Id);
+            Assert.Equal(((Guid?)patient.Id, emergency.TemporaryPatientCode), (encounter.PatientId, encounter.TemporaryPatientCode!.Value));
+            var success = Assert.Single(await AttemptsAsync(host, emergency.Id));
+            Assert.Equal((IdentificationOutcome.Success, IdentificationMethod.NationalId), (success.Outcome, success.Method));
+            Assert.Equal(1, await ConfirmReceiptsAsync(host, key));
+            Assert.Equal(1, await host.Web.DbAsync(db => db.ClinicalAuditEntries.CountAsync(a => a.ClinicalEncounterId == emergency.Id && a.Action == AuditActionType.Identify)));
+        }
+
+        // The same key with ANOTHER document committed in that window is not the same request: 409 for the loser, never a
+        // replay; the winner's patient stays.
+        [SkippableFact]
+        public async Task ASameKeyConfirmWithOtherDataThatLosesTheRaceIsAConflict()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var gate = new ReceiptLookupGate();
+            await using var host = await MobileEmergencyHost.StartAsync(_postgres, mobileServices: s => s.AddReceiptLookupGate(gate));
+            await SeedPatientAsync(host);
+            var other = await SeedPatientAsync(host, PatientIdentifierType.Passport, "RD7654321", "Luis");
+            var paramedic = await ParamedicAsync(host);
+            var emergency = await OpenAsync(paramedic);
+            var key = Guid.NewGuid();
+
+            gate.Arm(EmergencyDocumentIdentificationService.ConfirmOperation, key);
+            var loser = ConfirmAsync(paramedic, emergency.Id, clientRequestId: key);
+            await gate.Reached;
+            Assert.Equal(HttpStatusCode.OK, (await ConfirmAsync(paramedic, emergency.Id, "RD7654321", "Passport", key)).StatusCode);
+            gate.Release();
+
+            await AssertProblemAsync(await loser, HttpStatusCode.Conflict);
+            Assert.Equal(other.Id, (await EncounterAsync(host, emergency.Id)).PatientId);
+            var success = Assert.Single(await AttemptsAsync(host, emergency.Id));
+            Assert.Equal(IdentificationMethod.Passport, success.Method);
+            Assert.Equal(1, await ConfirmReceiptsAsync(host, key));
+        }
+
+        // Another METHOD (QR) identifying inside that window leaves no receipt of the document confirmation: the second
+        // lookup finds nothing and the loser stays a 409 with the QR patient kept.
+        [SkippableFact]
+        public async Task AQrIdentificationInsideTheRaceWindowIsStillAConflict()
+        {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
+            var gate = new ReceiptLookupGate();
+            await using var host = await MobileEmergencyHost.StartAsync(_postgres, mobileServices: s => s.AddReceiptLookupGate(gate));
+            await SeedPatientAsync(host);
+            var (qrRecord, qrPatient) = await host.SignInPatientAsync("Alba");
+            var issued = await qrPatient.PostAsync("/api/mobile/patient/me/qr", null);
+            Assert.Equal(HttpStatusCode.OK, issued.StatusCode);
+            using var credential = JsonDocument.Parse(await issued.Content.ReadAsStringAsync());
+            var payload = credential.RootElement.GetProperty("payload").GetString()!;
+            var paramedic = await ParamedicAsync(host);
+            var emergency = await OpenAsync(paramedic);
+            var key = Guid.NewGuid();
+
+            gate.Arm(EmergencyDocumentIdentificationService.ConfirmOperation, key);
+            var loser = ConfirmAsync(paramedic, emergency.Id, clientRequestId: key);
+            await gate.Reached;
+            Assert.Equal(HttpStatusCode.OK, (await paramedic.Client.PostAsJsonAsync(
+                $"{Emergencies}/{emergency.Id}/identify/qr/confirm", new { clientRequestId = Guid.NewGuid(), payload })).StatusCode);
+            gate.Release();
+
+            await AssertProblemAsync(await loser, HttpStatusCode.Conflict);
+            Assert.Equal(qrRecord.PatientId, (await EncounterAsync(host, emergency.Id)).PatientId);
+            var success = Assert.Single(await AttemptsAsync(host, emergency.Id), a => a.Outcome == IdentificationOutcome.Success);
+            Assert.Equal(IdentificationMethod.QrCode, success.Method);
+            Assert.Equal(0, await ConfirmReceiptsAsync(host, key));
+        }
     }
 }

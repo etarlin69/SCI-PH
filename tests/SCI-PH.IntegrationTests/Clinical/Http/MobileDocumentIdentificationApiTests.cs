@@ -290,6 +290,8 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 var results = await Task.WhenAll(responses.Select(r => r.ReadAsAsync<PrehospitalEmergencySummary>()));
                 Assert.All(results, r => Assert.Equal((opened.Id, patient.Id), (r.Id, r.Patient!.Id)));
                 Assert.Equal(1, await IdentifyAuditsAsync(host, opened.Id));
+                Assert.Equal(1, await host.Web.DbAsync(db => db.IdentificationAttempts.CountAsync(
+                    a => a.ClinicalEncounterId == opened.Id && a.Outcome == IdentificationOutcome.Success)));
             }
 
             Assert.Equal(5, await IdentifyReceiptsAsync(host));

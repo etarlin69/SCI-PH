@@ -311,6 +311,91 @@ namespace SCI_PH.Application.Tests.Clinical
             Assert.Single(harness.Store.Audit, a => a.Action == AuditActionType.Identify);
         }
 
+        // ---- Same-key race: the window between the receipt lookup and the encounter load ----
+
+        // A double submit: this request found no receipt, then the SAME request (same user, key and document) committed
+        // before this one loaded the emergency. It sees the emergency identified, finds the winner's receipt and replays
+        // it: the same 200 answer, with no second identification, attempt, receipt or audit entry.
+        [Fact]
+        public async Task ASameKeyConfirmThatLosesTheRaceReplaysTheWinner()
+        {
+            var (harness, emergency) = await OpenedAsync();
+            var patient = Seed(harness);
+            var code = emergency.TemporaryPatientCode!.Value;
+            var key = Guid.NewGuid();
+            harness.Store.AfterReceiptLookup = () =>
+            {
+                harness.Store.AfterReceiptLookup = null;
+                // Another spelling of the same document: the same normalized request.
+                harness.Documents.ConfirmAsync(emergency.Id, Confirm("00112345678", key: key), None).GetAwaiter().GetResult();
+            };
+
+            var loser = await harness.Documents.ConfirmAsync(emergency.Id, Confirm(key: key), None);
+
+            Assert.Equal((emergency.Id, patient.Id), (loser.Id, loser.Patient!.Id));
+            Assert.Equal(code, emergency.TemporaryPatientCode!.Value);
+            var success = Assert.Single(harness.Store.Attempts);
+            Assert.Equal((IdentificationOutcome.Success, IdentificationMethod.NationalId), (success.Outcome, success.Method));
+            Assert.Single(harness.Store.Receipts, r => r.Key.Operation == EmergencyDocumentIdentificationService.ConfirmOperation);
+            Assert.Single(harness.Store.Audit, a => a.Action == AuditActionType.Identify);
+        }
+
+        // The same key reused with ANOTHER document in that window is not the same request: 409, never a replay.
+        [Fact]
+        public async Task ASameKeyConfirmWithOtherDataThatLosesTheRaceIsAConflict()
+        {
+            var (harness, emergency) = await OpenedAsync();
+            Seed(harness);
+            var winner = Seed(harness, PatientIdentifierType.Passport, Passport, "Luis", "Gómez");
+            var key = Guid.NewGuid();
+            harness.Store.AfterReceiptLookup = () =>
+            {
+                harness.Store.AfterReceiptLookup = null;
+                harness.Documents.ConfirmAsync(emergency.Id, Confirm(Passport, PatientIdentifierType.Passport, key), None).GetAwaiter().GetResult();
+            };
+
+            var error = await Assert.ThrowsAsync<ResourceConflictException>(() =>
+                harness.Documents.ConfirmAsync(emergency.Id, Confirm(key: key), None));
+
+            Assert.Contains("different data", error.Message);
+            Assert.Equal(winner.Id, emergency.PatientId);
+            Assert.Single(harness.Store.Attempts, a => a.Outcome == IdentificationOutcome.Success);
+            Assert.Single(harness.Store.Receipts, r => r.Key.Operation == EmergencyDocumentIdentificationService.ConfirmOperation);
+        }
+
+        // Another METHOD identifying in that window leaves no receipt of this request: the second lookup finds nothing and
+        // the conflict stands (409, the fingerprint's patient kept).
+        [Fact]
+        public async Task AFingerprintIdentificationInsideTheRaceWindowIsStillAConflict()
+        {
+            var (harness, emergency) = await OpenedAsync();
+            Seed(harness);
+            var byFingerprint = Patient.Register("Luis", "Gómez", new DateOnly(1990, 1, 1), BiologicalSex.Male);
+            harness.Store.Patients.Add(byFingerprint);
+            var reader = harness.Readers.Add("ESP32-AMB-01");
+            harness.Store.BiometricReferences.Add(PatientBiometricReference.Register(
+                byFingerprint.Id, BiometricModality.Fingerprint, FingerprintReferences.Provider, FingerprintReferences.SubjectReference(reader.Id, 7)));
+            var session = (await harness.Fingerprints.OpenSessionAsync(
+                emergency.Id, new OpenFingerprintSessionRequest(Guid.NewGuid(), reader.Id), None)).Session;
+            await harness.ReaderSide.SubmitResultAsync(
+                reader.Id, reader.DeviceCode, session.Id, new SubmitFingerprintResultRequest(FingerprintCaptureOutcome.Match, 7), None);
+            harness.Store.AfterReceiptLookup = () =>
+            {
+                harness.Store.AfterReceiptLookup = null;
+                harness.Fingerprints.ConfirmAsync(emergency.Id, session.Id, new ConfirmFingerprintSessionRequest(Guid.NewGuid()), None)
+                    .GetAwaiter().GetResult();
+            };
+
+            var error = await Assert.ThrowsAsync<ResourceConflictException>(() => harness.Documents.ConfirmAsync(emergency.Id, Confirm(), None));
+
+            Assert.DoesNotContain("different data", error.Message);
+            Assert.Equal(byFingerprint.Id, emergency.PatientId);
+            var success = Assert.Single(harness.Store.Attempts, a => a.Outcome == IdentificationOutcome.Success);
+            Assert.Equal(IdentificationMethod.Fingerprint, success.Method);
+            Assert.DoesNotContain(harness.Store.Receipts, r => r.Key.Operation == EmergencyDocumentIdentificationService.ConfirmOperation);
+            Assert.Single(harness.Store.Audit, a => a.Action == AuditActionType.Identify);
+        }
+
         // After the handoff neither step is offered: 409 for the paramedic who took part, nothing written.
         [Theory]
         [InlineData(false)]
