@@ -32,11 +32,17 @@
             <VerticalStackLayout Spacing="4">
                 <Label Text="Traslado" Style="{StaticResource SciTitle}" />
                 <Label Text="Elige el destino, solicita el traslado e inícialo al salir. El hospital confirma la recepción."
+                       IsVisible="{Binding ShowInstructions}"
                        Style="{StaticResource SciSubtitle}" />
             </VerticalStackLayout>
 
+            <!-- Recibida por el hospital: solo lectura, sin acciones de traslado -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding IsHandedOff}" AutomationId="TransferHandedOff">
+                <Label Text="{Binding HandedOffMessage}" TextColor="{StaticResource SciText}" FontSize="14" />
+            </Border>
+
             <!-- Sin traslado: elegir destino y solicitar -->
-            <Border Style="{StaticResource SciCard}" IsVisible="{Binding HasNoTransfer}">
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding ShowRequestForm}">
                 <VerticalStackLayout Spacing="14">
                     <VerticalStackLayout Spacing="6">
                         <Label Text="Destino" Style="{StaticResource SciFieldLabel}" />

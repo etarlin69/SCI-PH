@@ -60,7 +60,7 @@ public partial class TransferViewModel : EmergencyWorkflowViewModel
 
     /// <summary>El traslado solicitado o en curso; null mientras no hay ninguno.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasNoTransfer), nameof(HasTransfer), nameof(IsRequested), nameof(IsInTransit), nameof(StatusText), nameof(DestinationText))]
+    [NotifyPropertyChangedFor(nameof(HasNoTransfer), nameof(ShowRequestForm), nameof(HasTransfer), nameof(IsRequested), nameof(IsInTransit), nameof(StatusText), nameof(DestinationText))]
     [NotifyCanExecuteChangedFor(nameof(RequestCommand), nameof(StartCommand), nameof(CancelCommand))]
     private TransferDto? transfer;
 
@@ -79,6 +79,23 @@ public partial class TransferViewModel : EmergencyWorkflowViewModel
     private bool canIdentifyPatient;
 
     public bool HasNoTransfer => Transfer is null;
+
+    /// <summary>
+    /// El hospital ya recibió la emergencia (última lectura del servidor): no se ofrece ninguna acción de traslado, solo el
+    /// aviso. Es una guía de la pantalla; el servidor sigue rechazando (409) cualquier paso tras la recepción.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowRequestForm), nameof(ShowInstructions))]
+    [NotifyCanExecuteChangedFor(nameof(RequestCommand), nameof(StartCommand), nameof(CancelCommand))]
+    private bool isHandedOff;
+
+    /// <summary>Las instrucciones del traslado, que dejan de aplicar tras la recepción.</summary>
+    public bool ShowInstructions => !IsHandedOff;
+
+    public string HandedOffMessage => ParamedicMessages.TransferHandedOff;
+
+    /// <summary>Formulario de solicitud (destino, motivo, notas): sin traslado activo y antes de la recepción.</summary>
+    public bool ShowRequestForm => Transfer is null && !IsHandedOff;
     public bool HasTransfer => Transfer is not null;
     public bool IsRequested => Transfer?.Status == TransferStatus.Requested;
     public bool IsInTransit => Transfer?.Status == TransferStatus.InTransit;
@@ -125,8 +142,9 @@ public partial class TransferViewModel : EmergencyWorkflowViewModel
             }
 
             CanIdentifyPatient = emergency is { Patient: null, Status: EmergencyStatus.Open or EmergencyStatus.Transferred };
-            Transfer = emergency?.ActiveTransfer;
-            if (Transfer is null && Destinations.Count == 0)
+            IsHandedOff = emergency?.Status == EmergencyStatus.HandedOff;
+            Transfer = IsHandedOff ? null : emergency?.ActiveTransfer;
+            if (Transfer is null && !IsHandedOff && Destinations.Count == 0)
             {
                 var destinations = await _catalog.GetTransferDestinationsAsync();
                 if (IsCurrentLoad(id, generation) && Destinations.Count == 0)
@@ -155,7 +173,7 @@ public partial class TransferViewModel : EmergencyWorkflowViewModel
     }
 
     private bool CanRequest() =>
-        !IsBusy && Transfer is null && SelectedDestination is not null
+        !IsBusy && !IsHandedOff && Transfer is null && SelectedDestination is not null
         && (Reason?.Trim().Length ?? 0) <= ReasonMaxLength && (Notes?.Trim().Length ?? 0) <= NotesMaxLength;
 
     [RelayCommand(CanExecute = nameof(CanRequest))]
@@ -174,14 +192,14 @@ public partial class TransferViewModel : EmergencyWorkflowViewModel
         return result;
     }, ParamedicMessages.RequestTransferFailed);
 
-    private bool CanStart() => !IsBusy && IsRequested;
+    private bool CanStart() => !IsBusy && !IsHandedOff && IsRequested;
 
     // Sobre ESE traslado; repetirlo tras una respuesta perdida devuelve el mismo traslado en curso.
     [RelayCommand(CanExecute = nameof(CanStart))]
     private Task StartAsync() =>
         RunTransferAsync(() => _api.StartTransferAsync(EmergencyId, Transfer!.Id), ParamedicMessages.TransferStepFailed);
 
-    private bool CanCancel() => !IsBusy && (IsRequested || IsInTransit);
+    private bool CanCancel() => !IsBusy && !IsHandedOff && (IsRequested || IsInTransit);
 
     // Sobre ESE traslado; tras cancelarlo se puede solicitar otro destino.
     [RelayCommand(CanExecute = nameof(CanCancel))]

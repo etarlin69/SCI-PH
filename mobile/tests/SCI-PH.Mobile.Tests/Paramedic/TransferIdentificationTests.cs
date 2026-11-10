@@ -277,3 +277,148 @@ public class EmergencyStatusContractTests
         Assert.Equal(expected, emergency!.Status);
     }
 }
+
+// Recibida por el hospital (HandedOff): el traslado queda en solo lectura, sin formulario, destino ni acciones. Es una guía
+// de la pantalla: el servidor sigue rechazando (409) cualquier paso tras la recepción.
+public class TransferHandoffTests
+{
+    private sealed class CountingCatalog : SCI_PH.Mobile.Features.Paramedic.Services.Interfaces.IParamedicCatalogService
+    {
+        public int DestinationCalls { get; private set; }
+
+        public Task<IReadOnlyList<CatalogItemDto>> GetProceduresAsync() => Task.FromResult<IReadOnlyList<CatalogItemDto>>([]);
+
+        public Task<IReadOnlyList<MedicationCatalogItemDto>> GetMedicationsAsync() =>
+            Task.FromResult<IReadOnlyList<MedicationCatalogItemDto>>([]);
+
+        public Task<IReadOnlyList<TransferDestinationDto>> GetTransferDestinationsAsync()
+        {
+            DestinationCalls++;
+            return Task.FromResult<IReadOnlyList<TransferDestinationDto>>([new TransferDestinationDto { Id = Guid.NewGuid(), Name = "Hospital QA" }]);
+        }
+    }
+
+    private readonly ScriptedParamedicApi _api = new();
+    private readonly CountingCatalog _catalog = new();
+    private readonly FakeNavigator _navigator = new();
+    private readonly Guid _emergencyId = Guid.NewGuid();
+
+    private EmergencyDto State(EmergencyStatus status, TransferStatus? transfer = null, string? patient = null) => new()
+    {
+        Id = _emergencyId,
+        TemporaryPatientCode = "NN-0123456789ABCDEF0123456789ABCDEF",
+        Status = status,
+        Patient = patient is null ? null : new PatientSummaryDto { Id = Guid.NewGuid(), DisplayName = patient },
+        ActiveTransfer = transfer is null ? null : new TransferDto
+        {
+            Id = Guid.NewGuid(),
+            Status = transfer.Value,
+            Destination = new TransferDestinationDto { Id = Guid.NewGuid(), Name = "Hospital QA" },
+            RequestedAt = DateTime.UtcNow
+        }
+    };
+
+    private EmergencyDto OnServer(EmergencyStatus status, TransferStatus? transfer = null, string? patient = null) =>
+        _api.Emergencies[_emergencyId] = State(status, transfer, patient);
+
+    private TransferViewModel Screen() => new(_api, _catalog, _navigator) { EmergencyId = _emergencyId };
+
+    private static void AssertReadOnlyCompletion(TransferViewModel vm)
+    {
+        Assert.True(vm.IsHandedOff);
+        Assert.Equal(ParamedicMessages.TransferHandedOff, vm.HandedOffMessage);
+        Assert.False(vm.ShowRequestForm);
+        Assert.False(vm.ShowInstructions);
+        Assert.False(vm.HasTransfer);
+        Assert.False(vm.IsInTransit);
+        Assert.Empty(vm.Destinations);
+        vm.SelectedDestination = new TransferDestinationDto { Id = Guid.NewGuid(), Name = "Hospital QA" };
+        Assert.False(vm.RequestCommand.CanExecute(null));
+        Assert.False(vm.StartCommand.CanExecute(null));
+        Assert.False(vm.CancelCommand.CanExecute(null));
+        Assert.False(vm.IdentifyPatientCommand.CanExecute(null));
+    }
+
+    // NN o identificado: después de la recepción la regla es la misma.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Ana Pérez")]
+    public async Task AHandedOffCaseShowsOnlyTheCompletionMessage(string? patient)
+    {
+        OnServer(EmergencyStatus.HandedOff, patient: patient);
+        var vm = Screen();
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        AssertReadOnlyCompletion(vm);
+        Assert.Equal(0, _catalog.DestinationCalls);
+    }
+
+    // Recibida mientras el paramédico tenía abierta la pantalla: al volver a leer desaparece el traslado y sus acciones.
+    [Fact]
+    public async Task AReceptionWhileTheScreenIsOpenRemovesTheTransferActions()
+    {
+        OnServer(EmergencyStatus.Transferred, TransferStatus.InTransit);
+        var vm = Screen();
+        await vm.LoadCommand.ExecuteAsync(null);
+        Assert.True(vm.CancelCommand.CanExecute(null));
+
+        OnServer(EmergencyStatus.HandedOff);
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        AssertReadOnlyCompletion(vm);
+    }
+
+    [Fact]
+    public async Task AnOpenCaseKeepsTheTransferRequest()
+    {
+        OnServer(EmergencyStatus.Open);
+        var vm = Screen();
+
+        await vm.LoadCommand.ExecuteAsync(null);
+        vm.SelectedDestination = vm.Destinations.Single();
+
+        Assert.False(vm.IsHandedOff);
+        Assert.True(vm.ShowRequestForm);
+        Assert.True(vm.ShowInstructions);
+        Assert.Equal(1, _catalog.DestinationCalls);
+        Assert.True(vm.RequestCommand.CanExecute(null));
+    }
+
+    [Theory]
+    [InlineData(TransferStatus.Requested, EmergencyStatus.Open)]
+    [InlineData(TransferStatus.InTransit, EmergencyStatus.Transferred)]
+    public async Task AnActiveTransferKeepsItsActions(TransferStatus transfer, EmergencyStatus status)
+    {
+        OnServer(status, transfer);
+        var vm = Screen();
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsHandedOff);
+        Assert.False(vm.ShowRequestForm);
+        Assert.True(vm.HasTransfer);
+        Assert.Equal(transfer == TransferStatus.Requested, vm.StartCommand.CanExecute(null));
+        Assert.True(vm.CancelCommand.CanExecute(null));
+    }
+
+    // Una lectura anterior (aún Open, sin traslado) que llega después de la que ya dice HandedOff no devuelve el formulario.
+    [Fact]
+    public async Task ALateOpenReadNeverRestoresTheActionsAfterTheHandoff()
+    {
+        var vm = Screen();
+        _api.HoldReads = true;
+        var older = vm.LoadCommand.ExecuteAsync(null);
+        var olderRead = _api.NextPendingRead();
+        var newer = vm.LoadCommand.ExecuteAsync(null);
+        _api.NextPendingRead().SetResult(State(EmergencyStatus.HandedOff));
+        await newer;
+
+        olderRead.SetResult(State(EmergencyStatus.Open));
+        await older;
+
+        AssertReadOnlyCompletion(vm);
+        Assert.Equal(0, _catalog.DestinationCalls);
+        Assert.False(vm.IsBusy);
+    }
+}

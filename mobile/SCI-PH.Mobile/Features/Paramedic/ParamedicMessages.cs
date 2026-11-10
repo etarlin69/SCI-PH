@@ -81,6 +81,9 @@ public static class ParamedicMessages
 
     public const string TransferCancelled = "Traslado cancelado. Puedes solicitar otro destino.";
 
+    /// <summary>La emergencia ya la recibió el hospital: el traslado queda solo de lectura.</summary>
+    public const string TransferHandedOff = "El caso ya fue recibido por el hospital. La atención prehospitalaria ha finalizado.";
+
     public const string FingerprintReadersFailed = "No se pudo cargar la lista de lectores de huella.";
 
     public const string NoFingerprintReaders = "No hay lectores de huella disponibles. Identifica con documento o continúa sin identificar.";
