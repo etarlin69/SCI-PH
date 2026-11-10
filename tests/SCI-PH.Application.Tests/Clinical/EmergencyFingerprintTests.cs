@@ -350,7 +350,7 @@ namespace SCI_PH.Application.Tests.Clinical
             var other = Patient.Register("Luis", "Gómez", new DateOnly(1990, 1, 1), BiologicalSex.Male);
             other.AddIdentifier(PatientIdentifierType.NationalId, "001-1234567-8", PatientIdentifierSource.Manual, isPrimary: true);
             s.Paramedic.Store.Patients.Add(other);
-            await s.Paramedic.Emergencies.IdentifyByDocumentAsync(
+            await s.Paramedic.Documents.ConfirmAsync(
                 s.Emergency.Id, new IdentifyEmergencyByDocumentRequest(Guid.NewGuid(), PatientIdentifierType.NationalId, "00112345678"), None);
 
             await Assert.ThrowsAsync<ResourceConflictException>(() => ConfirmAsync(s, session.Id));
@@ -487,7 +487,7 @@ namespace SCI_PH.Application.Tests.Clinical
 
             foreach (var write in new Func<Task>[]
             {
-                () => s.Paramedic.Emergencies.IdentifyByDocumentAsync(
+                () => s.Paramedic.Documents.ConfirmAsync(
                     s.Emergency.Id, new IdentifyEmergencyByDocumentRequest(Guid.NewGuid(), PatientIdentifierType.NationalId, "00112345678"), None),
                 () => ConfirmAsync(s, matched.Id),
                 () => s.Paramedic.Fingerprints.CancelSessionAsync(s.Emergency.Id, matched.Id, None),
@@ -562,7 +562,7 @@ namespace SCI_PH.Application.Tests.Clinical
 
             // The document identification is untouched.
             var document = s.Paramedic.SeedPatient();
-            var identified = await s.Paramedic.Emergencies.IdentifyByDocumentAsync(
+            var identified = await s.Paramedic.Documents.ConfirmAsync(
                 s.Emergency.Id, new IdentifyEmergencyByDocumentRequest(Guid.NewGuid(), PatientIdentifierType.NationalId, "00112345678"), None);
             Assert.Equal(document.Id, s.Emergency.PatientId);
             Assert.NotNull(identified.Patient);

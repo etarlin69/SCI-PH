@@ -1,6 +1,7 @@
 using SCI_PH.Mobile.Common.Dialogs;
 using SCI_PH.Mobile.Common.Navigation;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
+using SCI_PH.Mobile.Features.Paramedic.Models.Enums;
 using SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
 
 namespace SCI_PH.Mobile.Tests;
@@ -101,6 +102,15 @@ internal sealed class RecordingParamedicApi : IParamedicApiService
         Task.FromResult<IReadOnlyList<ActiveEmergencyDto>>([]);
 
     public int IdentifyByDocumentCalls { get; private set; }
+
+    public int ResolveDocumentCalls { get; private set; }
+
+    public Task<DocumentCandidateDto> ResolveDocumentCandidateAsync(
+        Guid emergencyId, PatientDocumentType documentType, string documentNumber, CancellationToken cancellationToken = default)
+    {
+        ResolveDocumentCalls++;
+        return Task.FromResult(new DocumentCandidateDto("Paciente", null, documentType.ToString(), "***5678"));
+    }
 
     public Task<EmergencyDto?> IdentifyByDocumentAsync(Guid emergencyId, IdentifyByDocumentDto dto)
     {

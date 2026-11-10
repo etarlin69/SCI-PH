@@ -1,3 +1,4 @@
+using SCI_PH.Mobile.Features.Paramedic.Models.Enums;
 using SCI_PH.Mobile.Features.Paramedic.Models.Dtos;
 
 namespace SCI_PH.Mobile.Features.Paramedic.Services.Interfaces;
@@ -13,7 +14,19 @@ public interface IParamedicApiService
     /// </summary>
     Task<IReadOnlyList<ActiveEmergencyDto>> GetActiveEmergenciesAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>La misma emergencia ya identificada, o null si ningún paciente tiene ese documento (sigue NN).</summary>
+    /// <summary>
+    /// El candidato del documento (nombre, nacimiento, documento enmascarado), sin identificar la emergencia. El número viaja
+    /// tal como se escribió y solo en el cuerpo. Ningún paciente con ese documento es un 404, como
+    /// <see cref="Common.Api.MobileApiException"/>.
+    /// </summary>
+    Task<DocumentCandidateDto> ResolveDocumentCandidateAsync(
+        Guid emergencyId, PatientDocumentType documentType, string documentNumber, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// El paramédico confirmó el candidato del documento: la MISMA emergencia, identificada (el servidor vuelve a resolver el
+    /// documento). Null si ningún paciente lo tiene ya (sigue NN). Repetirlo con la misma clave y el mismo documento devuelve la
+    /// misma emergencia.
+    /// </summary>
     Task<EmergencyDto?> IdentifyByDocumentAsync(Guid emergencyId, IdentifyByDocumentDto dto);
 
     /// <summary>

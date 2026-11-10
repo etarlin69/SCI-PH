@@ -40,7 +40,8 @@ namespace SCI_PH.IntegrationTests.Security.Support
                 ["RateLimiting:DevicePermitLimit"] = "10000",
                 ["RateLimiting:PatientSelfServicePermitLimit"] = "10000",
                 ["RateLimiting:PatientQrPermitLimit"] = "10000",
-                ["RateLimiting:PatientQrResolvePermitLimit"] = "10000"
+                ["RateLimiting:PatientQrResolvePermitLimit"] = "10000",
+                ["RateLimiting:PatientDocumentResolvePermitLimit"] = "10000"
             };
 
             foreach (var (key, value) in overrides ?? new Dictionary<string, string?>())

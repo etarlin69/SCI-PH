@@ -70,7 +70,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             host.Web.DbAsync(db => db.ClinicalAuditEntries.CountAsync(a => a.ClinicalEncounterId == emergencyId && a.Action == AuditActionType.Identify));
 
         private static Task<int> IdentifyReceiptsAsync(MobileEmergencyHost host) =>
-            host.Web.DbAsync(db => db.IdempotencyReceipts.CountAsync(r => r.Operation == PrehospitalEmergencyService.IdentifyByDocumentOperation));
+            host.Web.DbAsync(db => db.IdempotencyReceipts.CountAsync(r => r.Operation == EmergencyDocumentIdentificationService.ConfirmOperation));
 
         [SkippableFact]
         public async Task TheAssignedParamedicIdentifiesTheSameEmergencyByNationalIdAndByPassport()
@@ -115,7 +115,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 Assert.DoesNotContain(PatientIdentifier.Normalize(Enum.Parse<PatientIdentifierType>(type), typed), audit.ChangesJson);
 
                 var receipt = await host.Web.DbAsync(db => db.IdempotencyReceipts.AsNoTracking().SingleAsync(r => r.ClientRequestId == key));
-                Assert.Equal((PrehospitalEmergencyService.IdentifyByDocumentOperation, paramedic.UserId, opened.Id),
+                Assert.Equal((EmergencyDocumentIdentificationService.ConfirmOperation, paramedic.UserId, opened.Id),
                     (receipt.Operation, receipt.ActorUserId, receipt.ResourceId));
                 Assert.Matches("^[0-9a-f]{64}$", receipt.RequestHash);
             }
@@ -290,6 +290,8 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 var results = await Task.WhenAll(responses.Select(r => r.ReadAsAsync<PrehospitalEmergencySummary>()));
                 Assert.All(results, r => Assert.Equal((opened.Id, patient.Id), (r.Id, r.Patient!.Id)));
                 Assert.Equal(1, await IdentifyAuditsAsync(host, opened.Id));
+                Assert.Equal(1, await host.Web.DbAsync(db => db.IdentificationAttempts.CountAsync(
+                    a => a.ClinicalEncounterId == opened.Id && a.Outcome == IdentificationOutcome.Success)));
             }
 
             Assert.Equal(5, await IdentifyReceiptsAsync(host));
@@ -312,7 +314,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             var encounter = await other.ClinicalEncounters.SingleAsync(e => e.Id == opened.Id);
             encounter.IdentifyPatient(patient.Id, paramedic.StaffId!.Value, DateTimeOffset.UtcNow);
             other.IdempotencyReceipts.Add(IdempotencyReceiptEntry.From(new IdempotencyReceipt(
-                new IdempotencyKey(paramedic.UserId, PrehospitalEmergencyService.IdentifyByDocumentOperation, key),
+                new IdempotencyKey(paramedic.UserId, EmergencyDocumentIdentificationService.ConfirmOperation, key),
                 IdempotencyRequestHash.Compute(opened.Id.ToString("D"), "NationalId", "00112345678"), opened.Id, DateTimeOffset.UtcNow)));
             await other.SaveChangesAsync();
 

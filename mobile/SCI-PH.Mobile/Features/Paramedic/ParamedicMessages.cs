@@ -23,7 +23,20 @@ public static class ParamedicMessages
     public const string IdentificationConflict =
         "No se pudo identificar con este documento: la emergencia ya fue identificada o la solicitud se usó con otros datos.";
 
-    public const string IdentifyByDocumentFailed = "No se pudo identificar con el documento. Intenta nuevamente.";
+    /// <summary>La búsqueda del documento no respondió (sin conexión o error del servidor): nada cambió.</summary>
+    public const string DocumentResolveFailed = "No se pudo buscar el paciente en este momento. Intenta nuevamente.";
+
+    /// <summary>La confirmación no respondió: pudo aplicarse; el reintento usa la misma solicitud y nunca identifica dos veces.</summary>
+    public const string DocumentConfirmFailed = "No se pudo confirmar al paciente. Intenta nuevamente: no se identificará dos veces.";
+
+    /// <summary>404 al confirmar: el documento ya no corresponde a un paciente. La emergencia sigue NN.</summary>
+    public const string DocumentCandidateGone = "El documento ya no corresponde a un paciente. Búscalo de nuevo.";
+
+    /// <summary>409 y la emergencia ya tiene paciente (otra vía la identificó): se muestra ese paciente, nunca se sustituye.</summary>
+    public const string AlreadyIdentifiedByAnother = "La emergencia ya fue identificada. Se muestra el paciente registrado.";
+
+    /// <summary>El candidato no tiene fecha de nacimiento registrada.</summary>
+    public const string CandidateBirthDateUnknown = "No registrada";
 
     public const string DocumentTypeRequired = "Selecciona el tipo de documento.";
 

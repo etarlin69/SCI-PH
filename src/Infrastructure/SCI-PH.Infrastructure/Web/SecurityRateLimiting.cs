@@ -28,6 +28,10 @@ namespace SCI_PH.Infrastructure.Web
         // Resolving and confirming a patient QR (Mobile BFF): per authenticated staff member. Guessing a token is already
         // infeasible (256 random bits); this protects the candidate lookup from abuse.
         public const string PatientQrResolve = "patient-qr-resolve";
+        // Resolving and confirming a patient document (Mobile BFF): per authenticated staff member. Unlike a QR token, a
+        // document number can be guessed, so this is the brake on looking up who holds a document; every miss is also
+        // recorded as a failed IdentificationAttempt.
+        public const string PatientDocumentResolve = "patient-document-resolve";
     }
 
     // Per client IP (and per device code for devices). Account lockout already limits guessing per account,
@@ -51,6 +55,8 @@ namespace SCI_PH.Infrastructure.Web
         public int PatientQrWindowSeconds { get; init; } = 60;
         public int PatientQrResolvePermitLimit { get; init; } = 30;
         public int PatientQrResolveWindowSeconds { get; init; } = 60;
+        public int PatientDocumentResolvePermitLimit { get; init; } = 10;
+        public int PatientDocumentResolveWindowSeconds { get; init; } = 60;
     }
 
     public static class SecurityRateLimiting
@@ -75,6 +81,8 @@ namespace SCI_PH.Infrastructure.Web
                     Window(context, UserPartition(context), o => (o.PatientQrPermitLimit, o.PatientQrWindowSeconds)));
                 limiter.AddPolicy(RateLimitPolicies.PatientQrResolve, context =>
                     Window(context, UserPartition(context), o => (o.PatientQrResolvePermitLimit, o.PatientQrResolveWindowSeconds)));
+                limiter.AddPolicy(RateLimitPolicies.PatientDocumentResolve, context =>
+                    Window(context, UserPartition(context), o => (o.PatientDocumentResolvePermitLimit, o.PatientDocumentResolveWindowSeconds)));
             });
 
             return services;

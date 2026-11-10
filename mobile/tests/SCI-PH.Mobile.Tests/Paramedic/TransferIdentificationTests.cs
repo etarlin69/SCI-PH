@@ -126,7 +126,10 @@ public class TransferIdentificationTests
         identify.OpenDocumentFormCommand.Execute(null);
         identify.SelectedDocumentType = "Cédula";
         identify.DocumentNumber = "001-1234567-8";
-        await identify.SubmitDocumentCommand.ExecuteAsync(null);
+        await identify.ResolveDocumentCommand.ExecuteAsync(null);
+        Assert.True(identify.HasDocumentCandidate);
+        Assert.False(identify.IsIdentified);
+        await identify.ConfirmDocumentCommand.ExecuteAsync(null);
         Assert.True(identify.IsIdentified);
 
         await identify.ContinueCommand.ExecuteAsync(null);

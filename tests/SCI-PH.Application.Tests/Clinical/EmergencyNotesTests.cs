@@ -115,7 +115,7 @@ namespace SCI_PH.Application.Tests.Clinical
             var patient = Patient.Register("Ana", "Pérez", new DateOnly(1980, 1, 1), BiologicalSex.Female);
             patient.AddIdentifier(PatientIdentifierType.NationalId, "001-1234567-8", PatientIdentifierSource.Manual, isPrimary: true);
             harness.Store.Patients.Add(patient);
-            await harness.Emergencies.IdentifyByDocumentAsync(emergency.Id,
+            await harness.Documents.ConfirmAsync(emergency.Id,
                 new IdentifyEmergencyByDocumentRequest(Guid.NewGuid(), PatientIdentifierType.NationalId, "001-1234567-8"), None);
 
             await harness.Emergencies.RecordNoteAsync(emergency.Id, Note(), None);

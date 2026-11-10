@@ -27,14 +27,14 @@ namespace SCI_PH.Application.Features.Clinical
     // paramedic's base clinic is not where the emergency happens) and with an NN patient. The paramedic who opens it is
     // assigned to it (EncounterStaffAssignment, function Paramedic), which is what gives access to this concrete case
     // (IEncounterAccessService). On arrival, TransferService/ReceiveAtClinic sets the destination clinic on the SAME
-    // encounter. The NN patient can then be identified by document on that same encounter (EncounterService), and readings
+    // encounter. The NN patient can then be identified on that same encounter (by document: EmergencyDocumentIdentificationService;
+    // by QR or fingerprint: their services, all over EncounterService.IdentifyPatientAsync), and readings
     // of vital signs, completed procedures, administered medications and observations are recorded on it, identified or
     // not. Opening, identifying and recording are idempotent per (user, operation, clientRequestId): see IIdempotencyStore.
     public sealed class PrehospitalEmergencyService
     {
         // Server-controlled operation name of the idempotency receipts; a new version gets a new name.
         public const string OpenOperation = "prehospital-emergency.open.v1";
-        public const string IdentifyByDocumentOperation = "prehospital-emergency.identify-document.v1";
         public const string RecordVitalSignsOperation = "prehospital-emergency.vital-signs.v1";
         public const string RecordProcedureOperation = "prehospital-emergency.procedure.v1";
         public const string RecordMedicationAdministrationOperation = "prehospital-emergency.medication-administration.v1";
@@ -139,63 +139,6 @@ namespace SCI_PH.Application.Features.Clinical
             }
 
             return new OpenPrehospitalEmergencyResult(await ReadAsync(actor, encounter.Id, cancellationToken), Created: true);
-        }
-
-        // Links the NN patient of the emergency to the patient holding that document in the platform scope, on the SAME
-        // encounter (EncounterService.IdentifyPatientAsync: access, Domain rule, audit, PatientId concurrency token; the
-        // temporary code is kept). No patient is ever created: an unknown document is a 404 that leaves the emergency NN
-        // and writes nothing, not even a receipt, so the same document can be tried again once the patient exists.
-        // Same key and same payload again (also when it races the first one): the identified emergency, nothing new.
-        // Same key with another payload (document, type or emergency): 409. Already identified by another request: 409.
-        // Like every mobile write, only before the handoff (LoadForIdentificationAsync): once a clinic received the
-        // emergency, 409 for the paramedics who took part, also when affiliated with that clinic.
-        public async Task<PrehospitalEmergencySummary> IdentifyByDocumentAsync(
-            Guid emergencyId, IdentifyEmergencyByDocumentRequest request, CancellationToken cancellationToken)
-        {
-            var clientRequestId = ClinicalInput.Id(request.ClientRequestId, "clientRequestId");
-            var documentType = DocumentType(request.DocumentType);
-            var documentNumber = DocumentNumber(documentType, request.DocumentNumber);
-            var actor = await _actor.GetAsync(cancellationToken);
-            var key = new IdempotencyKey(actor.IdentityUserId, IdentifyByDocumentOperation, clientRequestId);
-            // The normalized value, never the raw one: equivalent spellings of the same document are the same request.
-            var requestHash = IdempotencyRequestHash.Compute(emergencyId.ToString("D"), documentType.ToString(), documentNumber);
-
-            if (await _receipts.FindAsync(key, cancellationToken) is { } existing)
-            {
-                return await ReplayAsync(actor, existing, requestHash, cancellationToken);
-            }
-
-            // Access to the emergency before the lookup: an unassigned user learns nothing about who holds a document.
-            await LoadForIdentificationAsync(actor, emergencyId, cancellationToken);
-            var emergency = await ReadAsync(actor, emergencyId, cancellationToken);
-            var patientId = await _reads.FindPatientIdByPlatformIdentifierAsync(documentType, documentNumber, cancellationToken)
-                ?? throw new ResourceNotFoundException(nameof(Patient), "No patient was found with this document.");
-
-            // Tracked only: written by the SaveChangesAsync of IdentifyPatientAsync, in the same transaction.
-            _receipts.Add(new IdempotencyReceipt(key, requestHash, emergency.Id, _time.GetUtcNow()));
-            try
-            {
-                await _encounters.IdentifyPatientAsync(emergency.Id, new IdentifyEncounterPatientRequest(patientId), cancellationToken);
-            }
-            catch (IdempotencyKeyCollisionException)
-            {
-                // A concurrent request with the same key committed first; this one wrote nothing.
-                var winner = await _receipts.FindAsync(key, cancellationToken)
-                    ?? throw new InvalidOperationException("The idempotency receipt that won the race was not found.");
-                return await ReplayAsync(actor, winner, requestHash, cancellationToken);
-            }
-            catch (ResourceConflictException)
-            {
-                // Already identified, or lost the PatientId race: a replay only if this same request is the one that won.
-                if (await _receipts.FindAsync(key, cancellationToken) is { } winner)
-                {
-                    return await ReplayAsync(actor, winner, requestHash, cancellationToken);
-                }
-
-                throw;
-            }
-
-            return await ReadAsync(actor, emergency.Id, cancellationToken);
         }
 
         // The emergency with its active transfer (Requested or InTransit), so the app can restore its transfer screen.
@@ -1039,13 +982,13 @@ namespace SCI_PH.Application.Features.Clinical
                 : throw new RequestValidationException($"doseUnit cannot exceed {FieldLengths.MeasurementUnit} characters.", "doseUnit");
         }
 
-        private static PatientIdentifierType DocumentType(PatientIdentifierType value) =>
+        internal static PatientIdentifierType DocumentType(PatientIdentifierType value) =>
             DocumentTypes.Contains(value)
                 ? value
                 : throw new RequestValidationException("documentType must be NationalId or Passport.", "documentType");
 
         // PatientIdentifier.Normalize, the same normalization as the stored identifiers. Errors never echo the value.
-        private static string DocumentNumber(PatientIdentifierType type, string? value)
+        internal static string DocumentNumber(PatientIdentifierType type, string? value)
         {
             if (value is { Length: > FieldLengths.IdentifierValue })
             {

@@ -7,7 +7,9 @@ using SCI_PH.Mobile.Tests.Auth;
 namespace SCI_PH.Mobile.Tests.Paramedic;
 
 /// <summary>
-/// POST api/mobile/emergencies/{id}/identify/document en memoria con el comportamiento del servidor real: 200 con la
+/// POST api/mobile/emergencies/{id}/identify/document/resolve en memoria: el candidato (nombre, nacimiento, documento
+/// enmascarado) sin guardar nada; 404 si ningún paciente tiene el documento; 409 si la emergencia ya está identificada.
+/// POST api/mobile/emergencies/{id}/identify/document (la confirmación) con el comportamiento del servidor real: 200 con la
 /// MISMA emergencia identificada; 200 de nuevo si se repite la clave con los mismos datos; 409 si la clave llega con otros
 /// datos o si la emergencia ya fue identificada por otra solicitud; 404 si ningún paciente tiene el documento (y no
 /// guarda nada). Puede fallar sin respuesta (antes o después de identificar).
@@ -28,6 +30,8 @@ internal sealed class FakeDocumentIdentificationBff : HttpMessageHandler
     public List<string> Paths { get; } = [];
 
     public int UnreachableLeft { get; set; }
+
+    public int ResolveCalls { get; private set; }
 
     public int LostResponsesLeft { get; set; }
 
@@ -50,8 +54,23 @@ internal sealed class FakeDocumentIdentificationBff : HttpMessageHandler
         Bodies.Add(body);
         var emergencyId = Guid.Parse(path.Split('/')[4]);
         var json = JsonDocument.Parse(body).RootElement;
-        var key = json.GetProperty("clientRequestId").GetGuid();
         var document = json.GetProperty("documentType").GetString() + "|" + json.GetProperty("documentNumber").GetString();
+
+        // Resolve: the candidate only; nothing is stored.
+        if (path.EndsWith("/resolve", StringComparison.Ordinal))
+        {
+            ResolveCalls++;
+            if (_identified.ContainsKey(emergencyId))
+            {
+                return FakeMobileBff.Problem(HttpStatusCode.Conflict, "Conflict.");
+            }
+
+            return Patients.TryGetValue(document, out var candidate)
+                ? Candidate(candidate.DisplayName, json.GetProperty("documentType").GetString()!)
+                : FakeMobileBff.Problem(HttpStatusCode.NotFound, "Not found.");
+        }
+
+        var key = json.GetProperty("clientRequestId").GetGuid();
         var payload = emergencyId + "|" + document;
 
         HttpResponseMessage response;
@@ -84,6 +103,16 @@ internal sealed class FakeDocumentIdentificationBff : HttpMessageHandler
 
         return response;
     }
+
+    private static HttpResponseMessage Candidate(string displayName, string documentType) => new(HttpStatusCode.OK)
+    {
+        Content = new StringContent(JsonSerializer.Serialize(new
+        {
+            displayName,
+            dateOfBirth = "1985-03-14",
+            document = new { type = documentType, value = "*******5678" }
+        }, Json), Encoding.UTF8, "application/json")
+    };
 
     private static HttpResponseMessage Respond(Guid emergencyId, (Guid Id, string DisplayName) patient) => new(HttpStatusCode.OK)
     {
