@@ -54,6 +54,9 @@ namespace SCI_PH.Application.DTOs.Clinical
 
     public sealed record PatientIdentifierRow(PatientIdentifierType Type, string NormalizedValue);
 
+    // An active identifier matched by its value, and the patient holding it. Never leaves the Application layer.
+    public sealed record PatientIdentifierMatch(Guid IdentifierId, Guid PatientId);
+
     // A patient's biometric reference; never its provider subject reference outside the read store.
     public sealed record BiometricReferenceRow(Guid Id, Guid PatientId);
 

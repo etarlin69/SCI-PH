@@ -317,7 +317,7 @@ namespace SCI_PH.Application.Tests.Clinical
             patient.AddIdentifier(PatientIdentifierType.NationalId, "001-1234567-8", PatientIdentifierSource.Manual, isPrimary: true);
             harness.Store.Patients.Add(patient);
 
-            await harness.Emergencies.IdentifyByDocumentAsync(emergency.Id,
+            await harness.Documents.ConfirmAsync(emergency.Id,
                 new IdentifyEmergencyByDocumentRequest(Guid.NewGuid(), PatientIdentifierType.NationalId, "001-1234567-8"), None);
             var cancelledLater = await harness.Emergencies.CancelTransferAsync(emergency.Id, harness.Store.Transfers.Single().Id, None);
 

@@ -76,7 +76,7 @@ namespace SCI_PH.Application.Tests.Clinical
             var harness = ClinicalHarness.ForRole(SecurityRoles.Paramedic);
             harness.SeedPatient();
             var emergency = await OpenAsync(harness);
-            await harness.Emergencies.IdentifyByDocumentAsync(
+            await harness.Documents.ConfirmAsync(
                 emergency.Id, new IdentifyEmergencyByDocumentRequest(Guid.NewGuid(), PatientIdentifierType.NationalId, "001-1234567-8"), None);
 
             var item = Assert.Single(await harness.Emergencies.ListActiveAsync(None));

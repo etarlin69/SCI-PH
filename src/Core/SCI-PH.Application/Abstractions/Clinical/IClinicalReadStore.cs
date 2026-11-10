@@ -21,10 +21,10 @@ namespace SCI_PH.Application.Abstractions.Clinical
         Task<IReadOnlyList<PatientRow>> FindPatientsByIdentifierAsync(
             PatientIdentifierType type, string normalizedValue, int limit, CancellationToken cancellationToken);
 
-        // The patient holding this active identifier in the SCI-PH platform scope (empty issuer). For identity-bearing
-        // types the unique index on (type, issuer, normalized value) guarantees 0 or 1; an identifier registered with
-        // another issuer is never matched.
-        Task<Guid?> FindPatientIdByPlatformIdentifierAsync(
+        // The active identifier with this value in the SCI-PH platform scope (empty issuer) and its patient. For
+        // identity-bearing types the unique index on (type, issuer, normalized value) guarantees 0 or 1; an identifier
+        // registered with another issuer is never matched.
+        Task<PatientIdentifierMatch?> FindPlatformIdentifierAsync(
             PatientIdentifierType type, string normalizedValue, CancellationToken cancellationToken);
 
         Task<IReadOnlyList<PatientRow>> FindPatientsByNameAsync(string term, int limit, CancellationToken cancellationToken);

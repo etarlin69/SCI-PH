@@ -304,11 +304,11 @@ namespace SCI_PH.Application.Tests.Clinical
                 .Where(p => p.Identifiers.Any(i => i.IsActive && i.Type == type && i.NormalizedValue == normalizedValue))
                 .Take(limit).Select(p => p.ToTestRow()).ToList());
 
-        public Task<Guid?> FindPatientIdByPlatformIdentifierAsync(
+        public Task<PatientIdentifierMatch?> FindPlatformIdentifierAsync(
             PatientIdentifierType type, string normalizedValue, CancellationToken cancellationToken) =>
             Task.FromResult(Patients.SelectMany(p => p.Identifiers)
                 .Where(i => i.IsActive && i.Type == type && i.Issuer == string.Empty && i.NormalizedValue == normalizedValue)
-                .Select(i => (Guid?)i.PatientId)
+                .Select(i => new PatientIdentifierMatch(i.Id, i.PatientId))
                 .SingleOrDefault());
 
         public Task<IReadOnlyList<PatientRow>> FindPatientsByNameAsync(string term, int limit, CancellationToken cancellationToken) =>
@@ -694,6 +694,7 @@ namespace SCI_PH.Application.Tests.Clinical
             Medications = new MedicationService(Actor, Store, Store, access, Time);
             Transfers = new TransferService(Actor, Store, Store, access, Time);
             Emergencies = new PrehospitalEmergencyService(Actor, encounterAccess, Store, Store, Store, access, Encounters, Time);
+            Documents = new EmergencyDocumentIdentificationService(Actor, Emergencies, Encounters, Store, access, Store, Store, Time, DocumentLogs);
             Fingerprints = new EmergencyFingerprintService(Actor, Emergencies, Encounters, Store, Store, Store, Store, Readers, Time);
             ReaderSide = new FingerprintReaderService(Store, Store, Store, Time);
             FingerprintEnrollments = new FingerprintEnrollmentService(Actor, access, Store, Store, Store, Store, Readers, Store, Time);
@@ -731,6 +732,8 @@ namespace SCI_PH.Application.Tests.Clinical
         public PatientFaceService Faces { get; }
         public TestClinicalAiProvider AiProvider { get; }
         public CapturingLogger<EncounterAiSummaryService> AiLogs { get; } = new();
+        public CapturingLogger<EmergencyDocumentIdentificationService> DocumentLogs { get; } = new();
+        public EmergencyDocumentIdentificationService Documents { get; }
         // The summary cache as the composition root registers it (dedicated, bounded), on this harness's clock.
         public MemoryCache AiCache { get; }
         public ClinicalAiMetrics AiMetrics { get; } = new();

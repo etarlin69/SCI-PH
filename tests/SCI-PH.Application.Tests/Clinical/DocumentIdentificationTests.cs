@@ -49,7 +49,7 @@ namespace SCI_PH.Application.Tests.Clinical
             harness.Time.Now = ClinicalHarness.Start.AddMinutes(5);
             var request = Document(number, type);
 
-            var result = await harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, request, None);
+            var result = await harness.Documents.ConfirmAsync(emergency.Id, request, None);
 
             var encounter = Assert.Single(harness.Store.Encounters);
             Assert.Equal(emergency.Id, encounter.Id);
@@ -64,8 +64,8 @@ namespace SCI_PH.Application.Tests.Clinical
 
             var audit = Assert.Single(harness.Store.Audit.Skip(auditsBefore));
             Assert.Equal((AuditActionType.Identify, emergency.Id, patient.Id), (audit.Action, audit.ClinicalEncounterId, audit.PatientId));
-            var receipt = harness.Store.Receipts.Single(r => r.Key.Operation == PrehospitalEmergencyService.IdentifyByDocumentOperation);
-            Assert.Equal(new IdempotencyKey(harness.User.UserId!.Value, PrehospitalEmergencyService.IdentifyByDocumentOperation, request.ClientRequestId), receipt.Key);
+            var receipt = harness.Store.Receipts.Single(r => r.Key.Operation == EmergencyDocumentIdentificationService.ConfirmOperation);
+            Assert.Equal(new IdempotencyKey(harness.User.UserId!.Value, EmergencyDocumentIdentificationService.ConfirmOperation, request.ClientRequestId), receipt.Key);
             Assert.Equal(emergency.Id, receipt.ResourceId);
 
             Assert.Equal(emergency.Id, result.Id);
@@ -84,26 +84,30 @@ namespace SCI_PH.Application.Tests.Clinical
             var (harness, emergency) = await OpenedEmergencyAsync();
             var patient = SeedPatient(harness, PatientIdentifierType.NationalId, "00112345678");
 
-            var result = await harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document(number), None);
+            var result = await harness.Documents.ConfirmAsync(emergency.Id, Document(number), None);
 
             Assert.Equal(patient.Id, result.Patient!.Id);
         }
 
-        // D1: only the platform scope (empty issuer). An identifier of another issuer is never a match.
+        // D1: only the platform scope (empty issuer). An identifier of another issuer is never a match. The miss is only a
+        // failed attempt (NoMatch, without patient or document): no receipt, no identification.
         [Fact]
-        public async Task AnIdentifierOfAnotherIssuerIsNotFoundAndNothingIsWritten()
+        public async Task AnIdentifierOfAnotherIssuerIsNotFoundAndOnlyTheMissIsRecorded()
         {
             var (harness, emergency) = await OpenedEmergencyAsync();
             SeedPatient(harness, PatientIdentifierType.Passport, "RD1234567", issuer: "DO");
             var saves = harness.Store.SaveCount;
 
             var error = await Assert.ThrowsAsync<ResourceNotFoundException>(() =>
-                harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document("RD1234567", PatientIdentifierType.Passport), None));
+                harness.Documents.ConfirmAsync(emergency.Id, Document("RD1234567", PatientIdentifierType.Passport), None));
 
             Assert.DoesNotContain("RD1234567", error.Message);
             Assert.Null(emergency.PatientId);
-            Assert.Equal(saves, harness.Store.SaveCount);
-            Assert.DoesNotContain(harness.Store.Receipts, r => r.Key.Operation == PrehospitalEmergencyService.IdentifyByDocumentOperation);
+            Assert.Equal(saves + 1, harness.Store.SaveCount);
+            var miss = Assert.Single(harness.Store.Attempts);
+            Assert.Equal((IdentificationMethod.Passport, IdentificationOutcome.Failure, IdentificationFailureReason.NoMatch, (Guid?)null, (Guid?)emergency.Id),
+                (miss.Method, miss.Outcome, miss.FailureReason, miss.PatientId, miss.ClinicalEncounterId));
+            Assert.DoesNotContain(harness.Store.Receipts, r => r.Key.Operation == EmergencyDocumentIdentificationService.ConfirmOperation);
             Assert.DoesNotContain(harness.Store.Audit, a => a.Action == AuditActionType.Identify);
         }
 
@@ -114,7 +118,7 @@ namespace SCI_PH.Application.Tests.Clinical
             SeedPatient(harness, PatientIdentifierType.Passport, "RD1234567", issuer: "DO");
             var platform = SeedPatient(harness, PatientIdentifierType.Passport, "RD1234567");
 
-            var result = await harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document("RD1234567", PatientIdentifierType.Passport), None);
+            var result = await harness.Documents.ConfirmAsync(emergency.Id, Document("RD1234567", PatientIdentifierType.Passport), None);
 
             Assert.Equal(platform.Id, result.Patient!.Id);
         }
@@ -126,12 +130,12 @@ namespace SCI_PH.Application.Tests.Clinical
             var (harness, emergency) = await OpenedEmergencyAsync();
             var request = Document("001-7654321-0");
 
-            await Assert.ThrowsAsync<ResourceNotFoundException>(() => harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, request, None));
+            await Assert.ThrowsAsync<ResourceNotFoundException>(() => harness.Documents.ConfirmAsync(emergency.Id, request, None));
             Assert.Null(emergency.PatientId);
             Assert.Empty(harness.Store.Patients);
 
             var patient = SeedPatient(harness, PatientIdentifierType.NationalId, "001-7654321-0");
-            var result = await harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, request, None);
+            var result = await harness.Documents.ConfirmAsync(emergency.Id, request, None);
             Assert.Equal(patient.Id, result.Patient!.Id);
         }
 
@@ -148,7 +152,7 @@ namespace SCI_PH.Application.Tests.Clinical
             SeedPatient(harness, PatientIdentifierType.InternalCode, "SCI-1");
 
             var error = await Assert.ThrowsAsync<RequestValidationException>(() =>
-                harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document("SCI-1", type), None));
+                harness.Documents.ConfirmAsync(emergency.Id, Document("SCI-1", type), None));
             Assert.Equal("documentType", error.Field);
             Assert.Null(emergency.PatientId);
         }
@@ -163,7 +167,7 @@ namespace SCI_PH.Application.Tests.Clinical
             var (harness, emergency) = await OpenedEmergencyAsync();
 
             var error = await Assert.ThrowsAsync<RequestValidationException>(() =>
-                harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document(number!), None));
+                harness.Documents.ConfirmAsync(emergency.Id, Document(number!), None));
             Assert.Equal("documentNumber", error.Field);
         }
 
@@ -173,7 +177,7 @@ namespace SCI_PH.Application.Tests.Clinical
             var (harness, emergency) = await OpenedEmergencyAsync();
 
             var error = await Assert.ThrowsAsync<RequestValidationException>(() =>
-                harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document(clientRequestId: Guid.Empty), None));
+                harness.Documents.ConfirmAsync(emergency.Id, Document(clientRequestId: Guid.Empty), None));
             Assert.Equal("clientRequestId", error.Field);
         }
 
@@ -184,16 +188,16 @@ namespace SCI_PH.Application.Tests.Clinical
             var (harness, emergency) = await OpenedEmergencyAsync();
             var patient = SeedPatient(harness, PatientIdentifierType.NationalId, "001-1234567-8");
             var key = Guid.NewGuid();
-            var first = await harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document("001-1234567-8", clientRequestId: key), None);
+            var first = await harness.Documents.ConfirmAsync(emergency.Id, Document("001-1234567-8", clientRequestId: key), None);
             var audits = harness.Store.Audit.Count;
             var saves = harness.Store.SaveCount;
 
-            var again = await harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document("00112345678", clientRequestId: key), None);
+            var again = await harness.Documents.ConfirmAsync(emergency.Id, Document("00112345678", clientRequestId: key), None);
 
             Assert.Equal((first.Id, patient.Id), (again.Id, again.Patient!.Id));
             Assert.Equal(audits, harness.Store.Audit.Count);
             Assert.Equal(saves, harness.Store.SaveCount);
-            Assert.Single(harness.Store.Receipts, r => r.Key.Operation == PrehospitalEmergencyService.IdentifyByDocumentOperation);
+            Assert.Single(harness.Store.Receipts, r => r.Key.Operation == EmergencyDocumentIdentificationService.ConfirmOperation);
         }
 
         [Fact]
@@ -206,15 +210,15 @@ namespace SCI_PH.Application.Tests.Clinical
             var other = await harness.Emergencies.OpenAsync(
                 new OpenPrehospitalEmergencyRequest(Guid.NewGuid(), ClinicalHarness.Start.AddMinutes(-5), "Caída"), None);
             var key = Guid.NewGuid();
-            await harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document("001-1234567-8", clientRequestId: key), None);
+            await harness.Documents.ConfirmAsync(emergency.Id, Document("001-1234567-8", clientRequestId: key), None);
             var audits = harness.Store.Audit.Count;
 
             await Assert.ThrowsAsync<ResourceConflictException>(() =>
-                harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document("001-7654321-0", clientRequestId: key), None));
+                harness.Documents.ConfirmAsync(emergency.Id, Document("001-7654321-0", clientRequestId: key), None));
             await Assert.ThrowsAsync<ResourceConflictException>(() =>
-                harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document("00112345678", PatientIdentifierType.Passport, key), None));
+                harness.Documents.ConfirmAsync(emergency.Id, Document("00112345678", PatientIdentifierType.Passport, key), None));
             await Assert.ThrowsAsync<ResourceConflictException>(() =>
-                harness.Emergencies.IdentifyByDocumentAsync(other.Emergency.Id, Document("001-1234567-8", clientRequestId: key), None));
+                harness.Documents.ConfirmAsync(other.Emergency.Id, Document("001-1234567-8", clientRequestId: key), None));
 
             Assert.Equal(patient.Id, emergency.PatientId);
             Assert.Null(harness.Store.Encounters.Single(e => e.Id == other.Emergency.Id).PatientId);
@@ -227,11 +231,11 @@ namespace SCI_PH.Application.Tests.Clinical
         {
             var (harness, emergency) = await OpenedEmergencyAsync();
             var patient = SeedPatient(harness, PatientIdentifierType.NationalId, "001-1234567-8");
-            await harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document(), None);
+            await harness.Documents.ConfirmAsync(emergency.Id, Document(), None);
             var audits = harness.Store.Audit.Count;
 
             await Assert.ThrowsAsync<ResourceConflictException>(() =>
-                harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document(), None));
+                harness.Documents.ConfirmAsync(emergency.Id, Document(), None));
 
             Assert.Equal(patient.Id, emergency.PatientId);
             Assert.Equal(audits, harness.Store.Audit.Count);
@@ -244,7 +248,7 @@ namespace SCI_PH.Application.Tests.Clinical
             var (harness, emergency) = await OpenedEmergencyAsync();
             var patient = SeedPatient(harness, PatientIdentifierType.NationalId, "001-1234567-8");
             var request = Document();
-            var key = new IdempotencyKey(harness.User.UserId!.Value, PrehospitalEmergencyService.IdentifyByDocumentOperation, request.ClientRequestId);
+            var key = new IdempotencyKey(harness.User.UserId!.Value, EmergencyDocumentIdentificationService.ConfirmOperation, request.ClientRequestId);
             var winnerHash = Common.Idempotency.IdempotencyRequestHash.Compute(emergency.Id.ToString("D"), "NationalId", "00112345678");
             harness.Store.BeforeSave = () =>
             {
@@ -252,7 +256,7 @@ namespace SCI_PH.Application.Tests.Clinical
                 harness.Store.Receipts.Add(new IdempotencyReceipt(key, winnerHash, emergency.Id, ClinicalHarness.Start));
             };
 
-            var result = await harness.Emergencies.IdentifyByDocumentAsync(emergency.Id, request, None);
+            var result = await harness.Documents.ConfirmAsync(emergency.Id, request, None);
 
             Assert.Equal((emergency.Id, patient.Id), (result.Id, result.Patient!.Id));
             Assert.Single(harness.Store.Receipts, r => r.Key == key);
@@ -268,7 +272,7 @@ namespace SCI_PH.Application.Tests.Clinical
             other.Staff.Add(other.User.UserId!.Value, true, Guid.NewGuid());
 
             await Assert.ThrowsAsync<AccessDeniedException>(() =>
-                other.Emergencies.IdentifyByDocumentAsync(emergency.Id, Document(), None));
+                other.Documents.ConfirmAsync(emergency.Id, Document(), None));
             Assert.Null(emergency.PatientId);
         }
 
@@ -280,7 +284,7 @@ namespace SCI_PH.Application.Tests.Clinical
             var hospital = harness.SeedEncounter();
 
             await Assert.ThrowsAsync<ResourceNotFoundException>(() =>
-                harness.Emergencies.IdentifyByDocumentAsync(hospital.Id, Document(), None));
+                harness.Documents.ConfirmAsync(hospital.Id, Document(), None));
             Assert.Null(hospital.PatientId);
         }
 
