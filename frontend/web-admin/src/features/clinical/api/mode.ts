@@ -10,6 +10,7 @@ export type ClinicalFeature =
     | 'vitalSigns'
     | 'notes'
     | 'diagnoses'
+    | 'procedures'
     | 'medications'
     | 'prescriptions'
     | 'administrations'
@@ -26,6 +27,7 @@ export const HTTP_CLINICAL_FEATURES: readonly ClinicalFeature[] = [
     'vitalSigns',
     'notes',
     'diagnoses',
+    'procedures',
     'discharge',
     'medications',
     'prescriptions',
