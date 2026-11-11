@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using SCI_PH.Application.Abstractions.AI;
 using SCI_PH.Application.Abstractions.Biometrics;
 using SCI_PH.Application.Abstractions.Security;
+using SCI_PH.Application.Abstractions.Storage;
 using SCI_PH.Application.Common.Security;
 using SCI_PH.Application.Features.Clinical;
 using Azure.Storage.Blobs;
@@ -19,6 +20,7 @@ using SCI_PH.Infrastructure.Biometrics.Face.OpenCv;
 using SCI_PH.Infrastructure.ClinicalAi;
 using SCI_PH.Infrastructure.Email;
 using SCI_PH.Infrastructure.Security;
+using SCI_PH.Infrastructure.Storage;
 using SCI_PH.Infrastructure.Web;
 
 namespace SCI_PH.Infrastructure
@@ -38,6 +40,29 @@ namespace SCI_PH.Infrastructure
 
             services.TryAddSingleton(TimeProvider.System);
             services.TryAddSingleton<ISecureTokenGenerator, SecureTokenGenerator>();
+            services.AddDocumentStorage(configuration);
+
+            return services;
+        }
+
+        // Where document contents live (DocumentStorage:Provider, see DocumentStorageOptions). Disabled unless configured.
+        private static IServiceCollection AddDocumentStorage(this IServiceCollection services, IConfiguration configuration)
+        {
+            services.AddOptions<DocumentStorageOptions>()
+                .Bind(configuration.GetSection(DocumentStorageOptions.SectionName))
+                .ValidateOnStart();
+            services.AddSingleton<IValidateOptions<DocumentStorageOptions>, DocumentStorageOptionsValidator>();
+            services.TryAddSingleton<IStorageService>(provider =>
+            {
+                var options = provider.GetRequiredService<IOptions<DocumentStorageOptions>>().Value;
+                return options.ResolvedProvider switch
+                {
+                    DocumentStorageOptions.AzureBlobProvider =>
+                        new BlobDocumentStorage(new BlobContainerClient(options.ConnectionString, options.Container)),
+                    DocumentStorageOptions.FileSystemProvider => new FileSystemDocumentStorage(options.RootPath!),
+                    _ => new DisabledDocumentStorage()
+                };
+            });
 
             return services;
         }
