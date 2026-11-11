@@ -114,6 +114,18 @@ describe('httpClinicalApi (Web BFF real)', () => {
     );
   });
 
+  it('los procedimientos se leen del BFF real, solo con GET', async () => {
+    const bff = createFakeBff({
+      [`GET /api/web/encounters/${ENCOUNTER}/procedures`]: () =>
+        json(200, [{ id: 'p1', encounterId: ENCOUNTER, name: 'Oxigenoterapia', codeSystem: 'SCI-PH-PREHOSP', code: 'OXYGEN-THERAPY', status: 'Completed', performedAtUtc: '2026-10-08T10:00:00Z', completedAtUtc: '2026-10-08T10:00:00Z', outcome: null, performedByDisplayName: 'Paramédico Prueba', prehospital: true }]),
+    });
+
+    const procedures = await httpClinicalApi.listProcedures(ENCOUNTER);
+
+    expect(procedures[0]).toMatchObject({ name: 'Oxigenoterapia', prehospital: true, performedByDisplayName: 'Paramédico Prueba' });
+    expect(bff.requests.map((r) => `${r.method} ${r.path}`)).toEqual([`GET /api/web/encounters/${ENCOUNTER}/procedures`]);
+  });
+
   it('notas, diagnósticos y cierre van al BFF real sin enviar autor ni staff', async () => {
     const bff = createFakeBff({
       [`GET /api/web/encounters/${ENCOUNTER}/notes`]: () => json(200, [{ id: 'n1', type: 'Evolution', content: 'Nota real', occurredAtUtc: '2026-10-08T10:00:00Z', createdAtUtc: '2026-10-08T10:00:01Z', authorStaffId: 's1', authorDisplayName: 'Dra. Prueba' }]),

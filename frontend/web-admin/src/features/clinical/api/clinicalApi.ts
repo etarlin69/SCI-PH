@@ -4,6 +4,7 @@ import type {
     ClinicalContext,
     ClinicalEncounterSummary,
     ClinicalNote,
+    ClinicalProcedure,
     ClinicalTransfer,
     RequestTransferRequest,
     TransferDestination,
@@ -86,6 +87,8 @@ export interface ClinicalApi {
     createNote(encounterId: Guid, request: CreateClinicalNoteRequest): Promise<ClinicalNote>;
     listDiagnoses(encounterId: Guid, signal?: AbortSignal): Promise<Diagnosis[]>;
     createDiagnosis(encounterId: Guid, request: CreateDiagnosisRequest): Promise<Diagnosis>;
+    /** Procedimientos de la atención (los prehospitalares incluidos), solo lectura; mismo acceso que leer la atención. */
+    listProcedures(encounterId: Guid, signal?: AbortSignal): Promise<ClinicalProcedure[]>;
 
     /** Catálogo global (activos e inactivos). */
     listMedications(signal?: AbortSignal): Promise<Medication[]>;
