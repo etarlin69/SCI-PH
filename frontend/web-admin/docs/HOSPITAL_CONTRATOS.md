@@ -62,6 +62,9 @@ Recepción **no** tiene `Encounters.Read`: tras crear una atención se queda en 
 | MedicationAdministrations | GET · POST | `/api/web/encounters/{id}/medication-administrations` | Medicación y egreso (Kardex) |
 | Transfers | GET | `/api/web/transfers/incoming?clinicId=` | Recepción, Transferencias |
 | Transfers | POST | `/api/web/transfers/{id}/receive` | Recepción, Transferencias |
+| Documents | GET | `/api/web/encounters/{id}/documents` | Expediente (Documents.Read) |
+| Documents | POST (multipart: `file`, `type`, `clientRequestId`) | `/api/web/encounters/{id}/documents` | Expediente (Documents.Upload + lectura de la atención; PDF/PNG/JPEG por contenido real, 10 MB) |
+| Documents | GET | `/api/web/encounters/{id}/documents/{documentId}/content` | Expediente: descarga como adjunto (`nosniff`) |
 
 El **Kardex** no es un recurso propio: la pantalla lo compone con las prescripciones emitidas (con sus líneas) y las
 administraciones registradas. Una administración puede vincularse a una línea prescrita (el medicamento debe ser el
