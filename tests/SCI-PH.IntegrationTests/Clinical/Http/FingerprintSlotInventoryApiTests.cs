@@ -248,7 +248,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 Assert.DoesNotContain(secret, raw, StringComparison.OrdinalIgnoreCase);
             }
 
-            var logs = s.Host.Logs.Text;
+            var logs = s.Host.Logs.TextWithoutCorrelationIds;
             Assert.Contains("Device fingerprint-slot-inventory", logs);
             Assert.Contains("2 slots", logs);
             foreach (var secret in new[] { "6143", "7919", "r307:device", s.Reader.Key, activePatient.ToString(), revokedPatient.ToString() })

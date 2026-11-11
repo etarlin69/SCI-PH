@@ -18,6 +18,7 @@ using SCI_PH.Persistence.Identity;
 using SCI_PH.Persistence.Identity.Models;
 using SCI_PH.Persistence.Identity.Seed;
 using SCI_PH.Persistence.Identity.Services;
+using SCI_PH.Persistence.HealthChecks;
 
 namespace SCI_PH.Persistence
 {
@@ -41,6 +42,11 @@ namespace SCI_PH.Persistence
             services.AddDbContext<ClinicalDbContext>(options =>
                 options.UseNpgsql(connectionString, npgsql =>
                     npgsql.MigrationsHistoryTable("__EFMigrationsHistory", ClinicalDbContext.Schema)));
+
+            services.AddHealthChecks()
+                .AddCheck<PostgreSqlReadinessHealthCheck>(
+                    "postgresql",
+                    tags: new[] { "ready" });
 
             services.TryAddSingleton(TimeProvider.System);
 

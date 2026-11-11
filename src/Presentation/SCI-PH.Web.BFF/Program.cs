@@ -3,6 +3,8 @@ using SCI_PH.Infrastructure;
 using SCI_PH.Infrastructure.Web;
 using SCI_PH.Persistence;
 using SCI_PH.Web.BFF.Errors;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using SCI_PH.Infrastructure.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +28,8 @@ builder.Services.AddInfrastructure(builder.Configuration)
     .AddClinicalAi(builder.Configuration);
 
 var app = builder.Build();
+
+app.UseRequestObservability();
 
 // Configure the HTTP request pipeline.
 // Errores no controlados y respuestas 4xx/5xx sin cuerpo se devuelven como ProblemDetails (RFC 7807).
@@ -52,7 +56,33 @@ app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHealthChecks("/health").AllowAnonymous();
+// Liveness only verifies that the ASP.NET process can answer requests.
+app.MapHealthChecks(
+        "/health/live",
+        new HealthCheckOptions
+        {
+            Predicate = _ => false
+        })
+    .AllowAnonymous();
+
+// Readiness verifies the dependencies required to serve traffic.
+app.MapHealthChecks(
+        "/health/ready",
+        new HealthCheckOptions
+        {
+            Predicate = healthCheck =>
+                healthCheck.Tags.Contains("ready")
+        })
+    .AllowAnonymous();
+
+// Keep the existing endpoint for compatibility.
+app.MapHealthChecks(
+        "/health",
+        new HealthCheckOptions
+        {
+            Predicate = _ => false
+        })
+    .AllowAnonymous();
 
 // Roles y permisos (y el administrador inicial si está configurado fuera del repositorio).
 // Solo se ejecuta con IdentityBootstrap:Enabled = true.
