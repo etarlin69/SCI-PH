@@ -61,6 +61,7 @@ namespace SCI_PH.Application
             services.AddScoped<EncounterService>();
             services.AddScoped<AdmissionService>();
             services.AddScoped<EncounterRecordService>();
+            services.AddScoped<EncounterResultService>();
             services.AddScoped<ClinicalDocumentService>();
             services.AddScoped<IDocumentService>(provider => provider.GetRequiredService<ClinicalDocumentService>());
             services.AddScoped<MedicationService>();
