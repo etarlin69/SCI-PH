@@ -66,6 +66,15 @@ namespace SCI_PH.Application.Features.Clinical
                 }
             }
 
+            // The contact email next to the document, so the patient can later be invited to the app. Email is not an
+            // identity-bearing type (it can be shared), so it never proves identity and is not checked for uniqueness.
+            if (!string.IsNullOrWhiteSpace(request.Email)
+                && !(request.Identifier is { Type: PatientIdentifierType.Email } first && string.Equals(first.Value?.Trim(), request.Email.Trim(), StringComparison.OrdinalIgnoreCase)))
+            {
+                ClinicalInput.Apply(() => patient.AddIdentifier(
+                    PatientIdentifierType.Email, request.Email, PatientIdentifierSource.Manual, isPrimary: request.Identifier is null), "email");
+            }
+
             _writes.Add(patient);
             _writes.Add(ClinicalAuditEntry.Success(
                 await AuditActorAsync(cancellationToken), AuditActionType.Create, nameof(Patient), patient.Id.ToString(), now,
