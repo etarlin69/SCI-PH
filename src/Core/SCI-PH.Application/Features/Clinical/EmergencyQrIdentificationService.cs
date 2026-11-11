@@ -117,7 +117,24 @@ namespace SCI_PH.Application.Features.Clinical
                 return await ReplayAsync(actor, existing, requestHash, cancellationToken);
             }
 
-            var encounter = await LoadIdentifiableAsync(actor, emergencyId, cancellationToken);
+            ClinicalEncounter encounter;
+            try
+            {
+                encounter = await LoadIdentifiableAsync(actor, emergencyId, cancellationToken);
+            }
+            catch (ResourceConflictException)
+            {
+                // The same request may have committed between the lookup above and this load (a double submit): only its
+                // own receipt (same user, operation and key) replays, and only with the same data. An identification by any
+                // other request or method has no such receipt and stays a 409.
+                if (await _receipts.FindAsync(key, cancellationToken) is { } winner)
+                {
+                    return await ReplayAsync(actor, winner, requestHash, cancellationToken);
+                }
+
+                throw;
+            }
+
             var credential = await FindValidAsync(actor, encounter.Id, request.Payload, cancellationToken);
             await EnsureCanReadAsync(credential.PatientId, cancellationToken);
 
