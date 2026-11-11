@@ -11,10 +11,26 @@ public sealed record PatientSummaryDto(
     EpisodeItemDto? LatestEpisode,
     ResultItemDto? LatestResult);
 
-/// <summary>Atención (episodio) del paciente.</summary>
-public sealed record EpisodeItemDto(string Title, string Facility, DateOnly Date, string Status)
+/// <summary>Atención (episodio) del paciente. El id solo sirve para abrir su detalle (una atención propia).</summary>
+public sealed record EpisodeItemDto(Guid Id, string Title, string Facility, DateOnly Date, string Status)
 {
     public string DateLabel => PatientDisplayFormats.ShortDate(Date);
+}
+
+/// <summary>
+/// Detalle de una atención propia: sus datos y lo publicado en ella (diagnósticos, resultados y recetas), con las mismas
+/// reglas de visibilidad que el historial. Las notas del personal, los procedimientos y los datos internos no se publican.
+/// </summary>
+public sealed record EncounterDetailDto(
+    EpisodeItemDto Episode,
+    DateOnly? EndedOn,
+    IReadOnlyList<ClinicalHistoryItemDto> Diagnoses,
+    IReadOnlyList<ResultItemDto> Results,
+    IReadOnlyList<ClinicalHistoryItemDto> Prescriptions)
+{
+    public string PeriodLabel => EndedOn is { } ended && ended != Episode.Date
+        ? $"{Episode.DateLabel} – {PatientDisplayFormats.ShortDate(ended)}"
+        : Episode.DateLabel;
 }
 
 /// <summary>Historial clínico: alergias, diagnósticos, recetas y atenciones.</summary>

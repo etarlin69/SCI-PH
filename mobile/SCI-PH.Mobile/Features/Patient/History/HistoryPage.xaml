@@ -183,21 +183,44 @@
 
                         <Border Style="{StaticResource PatientCardStyle}">
 
-                            <VerticalStackLayout Spacing="7">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    Command="{Binding OpenEncounterCommand, Source={RelativeSource AncestorType={x:Type vm:HistoryViewModel}}, x:DataType=vm:HistoryViewModel}"
+                                    CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+
+                                <VerticalStackLayout Spacing="7">
+
+                                    <Label
+                                        Text="{Binding Title}"
+                                        Style="{StaticResource CardTitleStyle}" />
+
+                                    <Label
+                                        Text="{Binding Facility}"
+                                        Style="{StaticResource CardBodyStyle}" />
+
+                                    <Label
+                                        Text="{Binding DateLabel}"
+                                        Style="{StaticResource CardMetaStyle}" />
+
+                                    <Label
+                                        Text="Ver detalle"
+                                        FontSize="13"
+                                        FontAttributes="Bold"
+                                        TextColor="{StaticResource ColorPrimary}" />
+
+                                </VerticalStackLayout>
 
                                 <Label
-                                    Text="{Binding Title}"
-                                    Style="{StaticResource CardTitleStyle}" />
+                                    Grid.Column="1"
+                                    Text="›"
+                                    FontSize="28"
+                                    VerticalOptions="Center"
+                                    TextColor="{StaticResource ColorPrimary}" />
 
-                                <Label
-                                    Text="{Binding Facility}"
-                                    Style="{StaticResource CardBodyStyle}" />
-
-                                <Label
-                                    Text="{Binding DateLabel}"
-                                    Style="{StaticResource CardMetaStyle}" />
-
-                            </VerticalStackLayout>
+                            </Grid>
 
                         </Border>
 

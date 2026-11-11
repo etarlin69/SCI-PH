@@ -23,7 +23,7 @@ public class PatientAccountIsolationTests
     {
         var data = new HttpPatientDataService(_bff.Client());
         return new Screens(
-            new HomeViewModel(data, _session), new HistoryViewModel(data, _session), new ResultsViewModel(data, _session), new ProfileViewModel(data, _session));
+            new HomeViewModel(data, _session), new HistoryViewModel(data, _session, new FakeNavigator()), new ResultsViewModel(data, _session), new ProfileViewModel(data, _session));
     }
 
     private static async Task LoadAllAsync(Screens screens)
