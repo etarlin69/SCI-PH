@@ -10,6 +10,10 @@ name: sci-ph
 x-backend-environment: &backend-environment
   ASPNETCORE_ENVIRONMENT: Development
   ConnectionStrings__SciPhDatabase: "Host=postgres;Port=5432;Database=${POSTGRES_DB:?Define POSTGRES_DB en .env};Username=${POSTGRES_USER:?Define POSTGRES_USER en .env};Password=${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}"
+  Logging__Console__FormatterName: json
+  Logging__Console__FormatterOptions__IncludeScopes: "true"
+  Logging__Console__FormatterOptions__UseUtcTimestamp: "true"
+  Logging__Console__FormatterOptions__TimestampFormat: "yyyy-MM-ddTHH:mm:ss.fffZ "
 
 services:
   postgres:
@@ -134,6 +138,20 @@ services:
       ClinicalDevelopmentSeed__Staff__3__Email: receptionist@sci-ph.test
     ports:
       - "127.0.0.1:${WEB_BFF_PORT:-5074}:8080"
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080 || exit 1;
+          printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3;
+          IFS= read -r line <&3 || exit 1;
+          case "$$line" in *" 200 "*) exit 0 ;; *) exit 1 ;; esac
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
       migrations:
         condition: service_completed_successfully
@@ -149,6 +167,20 @@ services:
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?Define JWT_SIGNING_KEY en .env}
     ports:
       - "127.0.0.1:${MOBILE_BFF_PORT:-5191}:8080"
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080 || exit 1;
+          printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3;
+          IFS= read -r line <&3 || exit 1;
+          case "$$line" in *" 200 "*) exit 0 ;; *) exit 1 ;; esac
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
       migrations:
         condition: service_completed_successfully
@@ -163,6 +195,20 @@ services:
       <<: *backend-environment
     ports:
       - "127.0.0.1:${DEVICE_API_PORT:-5139}:8080"
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080 || exit 1;
+          printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3;
+          IFS= read -r line <&3 || exit 1;
+          case "$$line" in *" 200 "*) exit 0 ;; *) exit 1 ;; esac
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
       migrations:
         condition: service_completed_successfully

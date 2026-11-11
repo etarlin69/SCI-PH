@@ -762,7 +762,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             };
             Assert.Equal(HttpStatusCode.OK, (await ConfirmAsync(paramedic, emergency.Id, sessionId)).StatusCode);
 
-            var logs = host.Logs.Text;
+            var logs = host.Logs.TextWithoutCorrelationIds;
             Assert.NotEmpty(logs);
             foreach (var secret in new[] { reader.Key, reference.SubjectReference, "r307:device", "7319" })
             {
