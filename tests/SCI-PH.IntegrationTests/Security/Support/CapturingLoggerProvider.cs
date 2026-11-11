@@ -10,6 +10,11 @@ namespace SCI_PH.IntegrationTests.Security.Support
 
         public string Text => string.Join('\n', _lines);
 
+        // The request log line carries a random hex X-Correlation-ID, which can contain a short number (a slot) by chance:
+        // tests looking for such numbers use this text, with every correlation id masked.
+        public string TextWithoutCorrelationIds =>
+            System.Text.RegularExpressions.Regex.Replace(Text, "CorrelationId=[0-9a-fA-F]+", "CorrelationId=<id>");
+
         public ILogger CreateLogger(string categoryName) => new CapturingLogger(this);
 
         public void Dispose()
