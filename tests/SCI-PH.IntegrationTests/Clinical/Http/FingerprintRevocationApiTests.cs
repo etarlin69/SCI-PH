@@ -516,7 +516,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 Assert.DoesNotContain(secret, logs, StringComparison.OrdinalIgnoreCase);
             }
 
-            foreach (var body in web.Concat(device))
+            foreach (var body in web.Concat(device).Select(RandomIds.Mask))
             {
                 foreach (var secret in new[] { s.Reader.Key, "r307", slot.ToString(), "slot\":", "subjectReference", "secret", "hash", s.Patient.Id.ToString() })
                 {

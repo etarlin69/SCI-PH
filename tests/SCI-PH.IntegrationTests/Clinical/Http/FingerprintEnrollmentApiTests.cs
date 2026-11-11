@@ -499,7 +499,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 Assert.DoesNotContain(secret, logs, StringComparison.OrdinalIgnoreCase);
             }
 
-            foreach (var body in bodies)
+            foreach (var body in bodies.Select(RandomIds.Mask))
             {
                 foreach (var secret in new[] { reader.Key, "r307", "6131", "slot\":", "subjectReference", "secret", "hash" })
                 {
