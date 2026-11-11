@@ -33,3 +33,12 @@ export function initials(name: string): string {
     .map((w) => w[0]?.toUpperCase() ?? '')
     .join('');
 }
+
+/**
+ * Cierra una oración con un solo punto: no añade otro si ya termina en puntuación final (también cuando termina en una
+ * hora con "a. m." / "p. m."). "Hola" → "Hola.", "11:03 a. m." → "11:03 a. m.", "¿Listo?" → "¿Listo?".
+ */
+export function endSentence(text: string): string {
+  const trimmed = text.trimEnd();
+  return /[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
