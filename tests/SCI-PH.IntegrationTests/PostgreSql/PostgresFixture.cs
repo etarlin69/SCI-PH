@@ -23,8 +23,9 @@ namespace SCI_PH.IntegrationTests.PostgreSql
         {
             try
             {
-                // Every test gets its own database and Web BFF host; the idle pooled connections of finished tests stay open
-                // for a while, so the shared test server needs more than the default 100 connections.
+                // Every test gets its own database and hosts, and the concurrency tests open several connections at once, so
+                // the shared test server keeps headroom above the default 100 connections. Each database's pool is released
+                // when its owner is disposed (ReleaseDatabase), so finished tests do not keep connections open.
                 _container = new PostgreSqlBuilder(Image).WithCommand("-c", "max_connections=400").Build();
                 await _container.StartAsync();
                 Available = true;
