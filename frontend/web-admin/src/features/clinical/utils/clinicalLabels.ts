@@ -75,6 +75,14 @@ export const VITAL_SIGNS: { type: VitalSignType; label: string; unit: string; un
     { type: 'Height', label: 'Talla', unit: 'cm', unitLabel: 'cm', min: 20, max: 280, step: 1 },
 ];
 
+/**
+ * Valor medido con su unidad. En las escalas (Glasgow, dolor) `unitLabel` es el rango del campo, no una unidad: se muestra
+ * sobre el máximo ("14/15", "7/10") en lugar de "14 3–15".
+ */
+export function formatVitalValue(value: number, meta: { unit: string; unitLabel: string; max: number }): string {
+    return meta.unit === '{score}' ? `${value}/${meta.max}` : `${value} ${meta.unitLabel}`;
+}
+
 export const vitalSignMeta = (type: VitalSignType) => VITAL_SIGNS.find((v) => v.type === type)!;
 
 export const NOTE_TYPE_LABELS: Record<ClinicalNoteType, string> = {

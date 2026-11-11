@@ -24,8 +24,15 @@ public abstract partial class BaseViewModel : ObservableObject
 
     partial void OnIsBusyChanged(bool value) => OnBusyChanged();
 
+    partial void OnErrorMessageChanged(string? value) => OnErrorChanged();
+
     /// <summary>Para que cada ViewModel reevalúe sus comandos cuando cambia <see cref="IsBusy"/>.</summary>
     protected virtual void OnBusyChanged()
+    {
+    }
+
+    /// <summary>Para que un ViewModel reevalúe lo que depende del error (por ejemplo, dónde mostrarlo).</summary>
+    protected virtual void OnErrorChanged()
     {
     }
 
