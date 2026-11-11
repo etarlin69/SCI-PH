@@ -4,6 +4,7 @@ import type {
     ClinicalContext,
     ClinicalEncounterSummary,
     ClinicalNote,
+    ClinicalProcedure,
     ClinicalTransfer,
     TransferDestination,
     Diagnosis,
@@ -150,6 +151,9 @@ export const httpClinicalApi: ClinicalApi = {
             method: 'POST',
             body: { description, type, isPrimary, codeSystem, code },
         }),
+
+    // Solo lectura: los registra el paramédico y viajan con la misma atención.
+    listProcedures: (encounterId, signal) => apiRequest<ClinicalProcedure[]>(`${BASE}/encounters/${id(encounterId)}/procedures`, { signal }),
 
     // ClinicalEncounter.ChangeStatus(Closed); la nota de egreso opcional se guarda como ClinicalNote Discharge.
     closeEncounter: (encounterId, { dischargeNote }) =>

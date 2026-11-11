@@ -55,6 +55,7 @@ Recepción **no** tiene `Encounters.Read`: tras crear una atención se queda en 
 | VitalSigns | GET · POST | `/api/web/encounters/{id}/vital-signs` | Triage |
 | ClinicalNotes | GET · POST | `/api/web/encounters/{id}/notes` | Expediente |
 | Diagnoses | GET · POST | `/api/web/encounters/{id}/diagnoses` | Expediente |
+| Procedures | GET (solo lectura) | `/api/web/encounters/{id}/procedures` | Expediente: los del paramédico (`prehospital: true`) en la misma atención, con quién lo realizó |
 | AI summary | POST (sin cuerpo) | `/api/web/encounters/{id}/ai-summary` | Expediente (resumen asistido, ADR-013) |
 | Encounters | POST | `/api/web/encounters/{id}/close` | Medicación y egreso |
 | Medications | GET | `/api/web/medications` | Medicación y egreso |

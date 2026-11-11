@@ -46,6 +46,17 @@ public sealed class HttpPatientDataService : IPatientDataService
             (await encounters).Select(ToEpisode).ToList());
     }
 
+    public async Task<EncounterDetailDto> GetEncounterAsync(Guid encounterId, CancellationToken cancellationToken = default)
+    {
+        var detail = await _client.GetAsync<EncounterDetailResponse>($"{Me}/encounters/{encounterId:D}", cancellationToken);
+        return new EncounterDetailDto(
+            ToEpisode(detail.Encounter),
+            detail.Encounter.EndedAtUtc is { } ended ? LocalDate(ended) : null,
+            detail.Diagnoses.Select(ToHistoryItem).ToList(),
+            detail.Results.Select(ToResult).ToList(),
+            detail.Prescriptions.SelectMany(ToHistoryItems).ToList());
+    }
+
     public async Task<IReadOnlyList<ResultItemDto>> GetResultsAsync(CancellationToken cancellationToken = default) =>
         (await _client.GetAsync<List<ResultResponse>>($"{Me}/results", cancellationToken)).Select(ToResult).ToList();
 
@@ -70,6 +81,7 @@ public sealed class HttpPatientDataService : IPatientDataService
     }
 
     private static EpisodeItemDto ToEpisode(EncounterResponse encounter) => new(
+        encounter.Id,
         PatientLabels.EncounterType(encounter.Type),
         encounter.ClinicName ?? PatientLabels.NoClinic(encounter.Type),
         LocalDate(encounter.StartedAtUtc),
@@ -150,6 +162,9 @@ public sealed class HttpPatientDataService : IPatientDataService
 
     private sealed record EncounterResponse(
         Guid Id, string Type, string Status, DateTimeOffset StartedAtUtc, DateTimeOffset? EndedAtUtc, string? ClinicName);
+
+    private sealed record EncounterDetailResponse(
+        EncounterResponse Encounter, List<DiagnosisResponse> Diagnoses, List<ResultResponse> Results, List<PrescriptionResponse> Prescriptions);
 
     private sealed record AllergyResponse(Guid Id, string Substance, string Severity, string Status, string? Reaction, DateOnly? OnsetDate);
 

@@ -13,6 +13,9 @@ public interface IPatientDataService
 
     Task<ClinicalHistoryDto> GetHistoryAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Una atención propia; la de otra persona o una inexistente es el mismo 404 del servidor.</summary>
+    Task<EncounterDetailDto> GetEncounterAsync(Guid encounterId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ResultItemDto>> GetResultsAsync(CancellationToken cancellationToken = default);
 
     Task<PatientProfileDto> GetProfileAsync(CancellationToken cancellationToken = default);

@@ -52,7 +52,7 @@ public class PatientFeatureTests
     [Fact]
     public async Task HistoryTranslatesAllergiesDiagnosesPrescriptionsAndEncounters()
     {
-        var vm = new HistoryViewModel(Data(), _session);
+        var vm = new HistoryViewModel(Data(), _session, new FakeNavigator());
 
         await vm.LoadCommand.ExecuteAsync(null);
 
@@ -104,7 +104,7 @@ public class PatientFeatureTests
         }
 
         var results = new ResultsViewModel(Data(), _session);
-        var history = new HistoryViewModel(Data(), _session);
+        var history = new HistoryViewModel(Data(), _session, new FakeNavigator());
         await results.LoadCommand.ExecuteAsync(null);
         await history.LoadCommand.ExecuteAsync(null);
 
@@ -144,7 +144,7 @@ public class PatientFeatureTests
 
         _bff.Unreachable = true;
         await home.LoadCommand.ExecuteAsync(null);
-        var history = new HistoryViewModel(Data(), _session);
+        var history = new HistoryViewModel(Data(), _session, new FakeNavigator());
         await history.LoadCommand.ExecuteAsync(null);
 
         Assert.Equal(MobileApiErrorMessages.Network, home.ErrorMessage);

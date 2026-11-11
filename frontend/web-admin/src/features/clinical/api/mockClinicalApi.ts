@@ -3,6 +3,7 @@ import type {
     ClinicalEncounterStatus,
     ClinicalEncounterSummary,
     ClinicalNote,
+    ClinicalProcedure,
     ClinicalTransfer,
     TransferDestination,
     Diagnosis,
@@ -106,6 +107,8 @@ const triages: Triage[] = [
 const vitalSigns: Record<Guid, VitalSign[]> = {};
 const notes: Record<Guid, ClinicalNote[]> = {};
 const diagnoses: Record<Guid, Diagnosis[]> = {};
+// Solo lectura: en la app real los registra el paramédico (Mobile BFF) y viajan con la atención.
+const procedures: Record<Guid, ClinicalProcedure[]> = {};
 const prescriptions: Record<Guid, Prescription[]> = {};
 const administrations: Record<Guid, MedicationAdministration[]> = {};
 
@@ -452,6 +455,10 @@ export const mockClinicalApi: ClinicalApi = {
 
     listDiagnoses(encounterId, signal) {
         return readRecords(encounterId, diagnoses, signal);
+    },
+
+    listProcedures(encounterId, signal) {
+        return readRecords(encounterId, procedures, signal);
     },
 
     createDiagnosis(encounterId, request) {

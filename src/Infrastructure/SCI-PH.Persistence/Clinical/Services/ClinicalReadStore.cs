@@ -295,7 +295,9 @@ namespace SCI_PH.Persistence.Clinical.Services
                 .Where(p => p.ClinicalEncounterId == encounterId)
                 .OrderByDescending(p => p.PerformedAtUtc.HasValue).ThenByDescending(p => p.PerformedAtUtc).ThenBy(p => p.Id)
                 .Select(p => new ClinicalProcedureSummary(
-                    p.Id, p.ClinicalEncounterId, p.Name, p.CodeSystem, p.Code, p.Status, p.PerformedAtUtc, p.CompletedAtUtc, p.Outcome))
+                    p.Id, p.ClinicalEncounterId, p.Name, p.CodeSystem, p.Code, p.Status, p.PerformedAtUtc, p.CompletedAtUtc, p.Outcome,
+                    _clinical.ClinicalStaffMembers.Where(s => s.Id == p.PerformedByStaffId)
+                        .Select(s => s.GivenNames + " " + s.FamilyNames).FirstOrDefault()))
                 .ToListAsync(cancellationToken);
 
         public Task<IReadOnlyList<TransferRow>> ListEncounterTransfersAsync(Guid encounterId, int limit, CancellationToken cancellationToken) =>

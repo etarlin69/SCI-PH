@@ -3,6 +3,7 @@ using SCI_PH.Mobile.Common.Authentication;
 using SCI_PH.Mobile.Common.Navigation;
 using SCI_PH.Mobile.Features.Auth;
 using SCI_PH.Mobile.Features.Paramedic;
+using SCI_PH.Mobile.Features.Patient;
 
 namespace SCI_PH.Mobile;
 
@@ -27,6 +28,7 @@ public partial class AppShell : Shell
         InitializeComponent();
         AuthServiceCollectionExtensions.RegisterAuthRoutes();
         ParamedicServiceCollectionExtensions.RegisterParamedicRoutes();
+        PatientServiceCollectionExtensions.RegisterPatientRoutes();
 
         BindingContext = this;
         _session.SessionChanged += (_, _) => MainThread.BeginInvokeOnMainThread(ApplySession);
