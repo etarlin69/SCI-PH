@@ -70,6 +70,7 @@ namespace SCI_PH.Persistence
             services.AddScoped<IClinicalReadStore, ClinicalReadStore>();
             services.AddScoped<IPatientSelfReadStore, PatientSelfReadStore>();
             services.AddScoped<IPatientQrCredentialStore, PatientQrCredentialStore>();
+            services.AddScoped<IClinicalResultStore, ClinicalResultStore>();
             services.AddScoped<IClinicalDocumentStore, ClinicalDocumentStore>();
             services.AddScoped<IClinicalOrganizationStore, ClinicalOrganizationStore>();
             services.AddScoped<IClinicalWriteStore, ClinicalWriteStore>();

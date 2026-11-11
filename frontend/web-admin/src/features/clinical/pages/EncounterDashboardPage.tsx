@@ -7,6 +7,7 @@ import { ClinicSelector } from '../components/ClinicSelector';
 import { EncounterDocumentsCard } from '../components/EncounterDocumentsCard';
 import { EncounterAiSummaryCard } from '../components/EncounterAiSummaryCard';
 import { EncounterTransferCard } from '../components/EncounterTransferCard';
+import { EncounterResultsCard } from '../components/EncounterResultsCard';
 import { EncounterStatusBadge, TriagePriorityBadge } from '../components/ClinicalBadges';
 import { EncounterShell } from '../components/EncounterShell';
 import { EncounterSubject } from '../components/EncounterSubject';
@@ -51,6 +52,8 @@ export function EncounterDashboardPage() {
                         </div>
                         {/* Lo que hizo la ambulancia, en la MISMA atención: solo lectura, mismo acceso que leer la atención. */}
                         {canRead && <ProceduresCard encounter={encounter} />}
+                        {/* Resultados (laboratorio, imagen…): leerlos es lectura clínica; cambiarlos, Results.Write. */}
+                        {canRead && !CLINICAL_API_IS_MOCK && <EncounterResultsCard encounter={encounter} />}
                         {/* Traslado saliente: leerlo requiere Transfers.Read; sus acciones, Transfers.Manage (dentro de la tarjeta). */}
                         {canRead && canReadTransfers && <EncounterTransferCard encounter={encounter} onEncounterChanged={reloadEncounter} />}
                         {/* Resumen asistido (ADR-013): mismo acceso que leer la atención; uno nuevo por atención. */}
