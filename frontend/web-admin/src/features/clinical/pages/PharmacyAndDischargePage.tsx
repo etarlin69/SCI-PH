@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Permissions, useAuth } from '../../../auth';
 import { useParams } from 'react-router-dom';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Select, Textarea } from '../../../components/shared';
+import { endSentence } from '../../../utils/formatters';
 import { clinicalApi } from '../api';
 import { EncounterShell } from '../components/EncounterShell';
 import { QueryView } from '../components/QueryView';
@@ -511,8 +512,10 @@ function DischargeCard({ encounter, onClosed }: { encounter: ClinicalEncounterSu
         return (
             <Card title="Egreso">
                 <p className="m-0 text-sm text-ink-muted">
-                    La atención está {ENCOUNTER_STATUS[encounter.status].label.toLowerCase()}
-                    {encounter.endedAtUtc && ` desde ${formatDateTimeUtc(encounter.endedAtUtc)}`}.
+                    {endSentence(
+                        `La atención está ${ENCOUNTER_STATUS[encounter.status].label.toLowerCase()}` +
+                            (encounter.endedAtUtc ? ` desde ${formatDateTimeUtc(encounter.endedAtUtc)}` : ''),
+                    )}
                 </p>
             </Card>
         );

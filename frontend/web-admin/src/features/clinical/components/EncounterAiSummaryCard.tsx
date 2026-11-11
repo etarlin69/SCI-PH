@@ -11,6 +11,7 @@ import type {
     EncounterAiSummary,
     Guid,
 } from '../types/clinical.types';
+import { endSentence } from '../../../utils/formatters';
 import { formatDateTimeUtc } from '../utils/clinicalLabels';
 import { SimulatedBadge } from './SimulatedBadge';
 
@@ -146,7 +147,7 @@ function SummaryView({ encounterId, summary }: { encounterId: Guid; summary: Enc
             )}
 
             <p className="m-0 text-xs text-ink-muted">
-                Generado el {formatDateTimeUtc(summary.generatedAtUtc)}. Instantánea de los datos disponibles al momento de
+                {endSentence(`Generado el ${formatDateTimeUtc(summary.generatedAtUtc)}`)} Instantánea de los datos disponibles al momento de
                 generación. No se actualiza automáticamente.
                 {summary.truncated && ' La atención tiene más registros de los que admite el resumen: solo se incluyeron los más recientes.'}
             </p>
