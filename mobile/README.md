@@ -231,7 +231,8 @@ La app **nunca envía un id de paciente**: el servidor lo deduce de la cuenta (`
 | Historial clínico | Alergias (última versión del historial), diagnósticos, recetas emitidas y atenciones | `GET …/allergies`, `…/diagnoses`, `…/prescriptions`, `…/encounters` |
 | Detalle de la atención | Al tocar una atención del historial: tipo, centro, estado, fechas y lo publicado en ella (diagnósticos, resultados y recetas). Solo viaja el id de la atención; la de otra persona o una inexistente es "no disponible" (404). Sin notas del personal ni procedimientos | `GET …/patient/me/encounters/{encounterId}` |
 | Resultados | Resultados publicados (finales o corregidos) con valor, tipo y rango de referencia | `GET …/patient/me/results` |
-| Documentos | "Todavía no disponible": no hay almacenamiento ni descarga de documentos | — |
+| Documentos | "Todavía no disponible": qué documentos puede ver el paciente es una decisión de producto pendiente | — |
+| Seguridad de la cuenta (menú lateral; en el área paramédica, "Cuenta") | Cambiar la contraseña (misma política que el servidor) o cerrar la sesión en todos los dispositivos. El servidor revoca todas las sesiones, también la de este dispositivo: se vuelve a la entrada | `POST …/auth/change-password`, `…/auth/revoke-sessions` |
 
 - **Errores**: 401 tras renovar la sesión → "Tu sesión terminó. Inicia sesión de nuevo." (la app vuelve a la
   entrada); 403 (cuenta sin expediente vinculado) → "Tu cuenta no tiene acceso a un expediente clínico en SCI-PH.

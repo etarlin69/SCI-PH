@@ -9,6 +9,7 @@
 
     <!-- Cierre de la sesión del personal clínico (ClinicalAccountViewModel; se enlaza en el code-behind). -->
     <ContentPage.ToolbarItems>
+        <ToolbarItem x:Name="AccountSecurityToolbarItem" Text="Cuenta" AutomationId="ClinicalAccountSecurity" Order="Secondary" />
         <ToolbarItem x:Name="LogoutToolbarItem" Text="Cerrar sesión" AutomationId="ClinicalLogout" />
     </ContentPage.ToolbarItems>
 
