@@ -25,12 +25,14 @@ namespace SCI_PH.IntegrationTests.Security.Support
     internal sealed class SecurityTestContext : IAsyncDisposable
     {
         private readonly ServiceProvider _provider;
+        private readonly string? _postgresConnectionString;
 
         public SecurityTestContext(
             IDictionary<string, string?>? settings = null,
             string? postgresConnectionString = null,
             RefreshReadBarrier? refreshReadBarrier = null)
         {
+            _postgresConnectionString = postgresConnectionString;
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(TestSettings.Create(settings)).Build();
 
             var services = new ServiceCollection();
@@ -148,7 +150,16 @@ namespace SCI_PH.IntegrationTests.Security.Support
                 return staff.Id;
             });
 
-        public ValueTask DisposeAsync() => _provider.DisposeAsync();
+        // Over PostgreSQL the context owns its test database: once the provider is disposed, the pool's idle connections are
+        // closed (issue #52).
+        public async ValueTask DisposeAsync()
+        {
+            await _provider.DisposeAsync();
+            if (_postgresConnectionString is not null)
+            {
+                PostgreSql.PostgresFixture.ReleaseDatabase(_postgresConnectionString);
+            }
+        }
 
         private static void AssertSucceeded(IdentityResult result) =>
             Assert.True(result.Succeeded, string.Join(", ", result.Errors.Select(error => error.Code)));

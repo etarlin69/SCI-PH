@@ -66,6 +66,29 @@ namespace SCI_PH.IntegrationTests.PostgreSql
             return connectionString;
         }
 
+        // Npgsql keeps one process-wide pool per connection string (no NpgsqlDataSource is involved), and disposing a host
+        // or a DbContext does not close it: its idle connections stay open until Npgsql prunes them (300 s by default).
+        // Every test has its own database, so its own pool; the owner of a test database (a host, a security context, a
+        // test) releases it once nothing uses it any more. Only that exact pool is cleared, never another test's.
+        public static void ReleaseDatabase(string connectionString)
+        {
+            using var connection = new NpgsqlConnection(connectionString);
+            NpgsqlConnection.ClearPool(connection);
+        }
+
+        // Server-side sessions (pg_stat_activity) currently connected to the database of the connection string, other than
+        // the one asking.
+        public async Task<long> CountConnectionsAsync(string connectionString)
+        {
+            var database = new NpgsqlConnectionStringBuilder(connectionString).Database;
+            await using var connection = new NpgsqlConnection(_container!.GetConnectionString());
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand(
+                "select count(*) from pg_stat_activity where datname = @database and pid <> pg_backend_pid()", connection);
+            command.Parameters.AddWithValue("database", database!);
+            return (long)(await command.ExecuteScalarAsync())!;
+        }
+
         public async Task DisposeAsync()
         {
             if (_container is not null)

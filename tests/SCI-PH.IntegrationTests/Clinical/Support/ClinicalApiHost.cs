@@ -190,6 +190,12 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
             return await action(db);
         }
 
-        public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
+        // The host owns the test database: once it is stopped, its pool's idle connections are closed (issue #52). A
+        // MobileEmergencyHost disposes this Web host last, after its Mobile BFF and Device API.
+        public async ValueTask DisposeAsync()
+        {
+            await _factory.DisposeAsync();
+            PostgresFixture.ReleaseDatabase(ConnectionString);
+        }
     }
 }
