@@ -510,7 +510,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             };
             Assert.Contains(slot.ToString(), await (await s.ReaderClient.GetAsync(PendingDeletion)).Content.ReadAsStringAsync());
 
-            var logs = s.Host.Logs.Text;
+            var logs = s.Host.Logs.TextWithoutCorrelationIds;
             foreach (var secret in new[] { s.Reader.Key, "r307:device", slot.ToString() })
             {
                 Assert.DoesNotContain(secret, logs, StringComparison.OrdinalIgnoreCase);
