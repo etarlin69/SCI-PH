@@ -229,6 +229,7 @@ La app **nunca envía un id de paciente**: el servidor lo deduce de la cuenta (`
 | Inicio | Nombre, resultados publicados y atenciones; última atención y último resultado | `GET …/patient/me/summary` |
 | Mi perfil | Nombre, documento (enmascarado), email, sexo, fecha de nacimiento, teléfono y conteos; solo lectura | `GET …/patient/me` + `…/summary` |
 | Historial clínico | Alergias (última versión del historial), diagnósticos, recetas emitidas y atenciones | `GET …/allergies`, `…/diagnoses`, `…/prescriptions`, `…/encounters` |
+| Detalle de la atención | Al tocar una atención del historial: tipo, centro, estado, fechas y lo publicado en ella (diagnósticos, resultados y recetas). Solo viaja el id de la atención; la de otra persona o una inexistente es "no disponible" (404). Sin notas del personal ni procedimientos | `GET …/patient/me/encounters/{encounterId}` |
 | Resultados | Resultados publicados (finales o corregidos) con valor, tipo y rango de referencia | `GET …/patient/me/results` |
 | Documentos | "Todavía no disponible": no hay almacenamiento ni descarga de documentos | — |
 

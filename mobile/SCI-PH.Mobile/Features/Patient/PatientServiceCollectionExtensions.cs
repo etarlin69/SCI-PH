@@ -31,6 +31,7 @@ public static class PatientServiceCollectionExtensions
         services.AddTransient<HistoryViewModel>();
         services.AddTransient<ResultsViewModel>();
         services.AddTransient<MyQrViewModel>();
+        services.AddTransient<EncounterDetailViewModel>();
 
         services.AddTransient<HomePage>();
         services.AddTransient<ProfilePage>();
@@ -38,7 +39,16 @@ public static class PatientServiceCollectionExtensions
         services.AddTransient<ResultsPage>();
         services.AddTransient<MyQrPage>();
         services.AddTransient<DocumentsPage>();
+        services.AddTransient<EncounterDetailPage>();
 
         return services;
+    }
+
+    /// <summary>
+    /// Rutas apiladas del área del paciente (no son secciones del menú). Se registran una vez, al crear el Shell.
+    /// </summary>
+    public static void RegisterPatientRoutes()
+    {
+        Routing.RegisterRoute(PatientRoutes.EncounterDetail, typeof(EncounterDetailPage));
     }
 }
