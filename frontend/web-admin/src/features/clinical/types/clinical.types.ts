@@ -198,6 +198,27 @@ export interface CreateDiagnosisRequest {
     isPrimary: boolean;
 }
 
+export type ClinicalProcedureStatus = 'Planned' | 'InProgress' | 'Completed' | 'Cancelled';
+
+/**
+ * Procedimiento de la atención (GET /encounters/{id}/procedures, solo lectura en la web). Hoy los registra el paramédico
+ * (Mobile BFF) y viajan con la MISMA atención; `prehospital` indica que vienen de la ambulancia.
+ */
+export interface ClinicalProcedure {
+    id: Guid;
+    encounterId: Guid;
+    name: string;
+    codeSystem: string | null;
+    code: string | null;
+    status: ClinicalProcedureStatus;
+    performedAtUtc: UtcDateTime | null;
+    completedAtUtc: UtcDateTime | null;
+    outcome: string | null;
+    /** Nombre de quien lo realizó (personal clínico), resuelto por el backend. */
+    performedByDisplayName: string | null;
+    prehospital: boolean;
+}
+
 export interface Diagnosis extends CreateDiagnosisRequest {
     id: Guid;
     encounterId?: Guid;

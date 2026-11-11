@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Permissions, useAuth } from '../../../auth';
 import { Link, useParams } from 'react-router-dom';
-import { Button, Card, Checkbox, EmptyState, Input, Select, Textarea } from '../../../components/shared';
+import { Badge, Button, Card, Checkbox, EmptyState, Input, Select, Textarea } from '../../../components/shared';
 import { clinicalApi } from '../api';
 import { ClinicSelector } from '../components/ClinicSelector';
 import { EncounterAiSummaryCard } from '../components/EncounterAiSummaryCard';
@@ -15,7 +15,7 @@ import { useClinicSelection } from '../hooks/useClinicSelection';
 import { useClinicalFeedback } from '../hooks/useClinicalFeedback';
 import { useClinicalQuery } from '../hooks/useClinicalQuery';
 import { useClinicalTime } from '../hooks/useClinicalTime';
-import type { ClinicalEncounterSummary, ClinicalNoteType, DiagnosisType } from '../types/clinical.types';
+import type { ClinicalEncounterSummary, ClinicalNoteType, ClinicalProcedure, DiagnosisType } from '../types/clinical.types';
 import {
     DIAGNOSIS_TYPE_LABELS,
     ENCOUNTER_TYPE_LABELS,
@@ -47,6 +47,8 @@ export function EncounterDashboardPage() {
                             <DiagnosesCard encounter={encounter} onRecorded={onRecorded} />
                             <NotesCard encounter={encounter} onRecorded={onRecorded} />
                         </div>
+                        {/* Lo que hizo la ambulancia, en la MISMA atención: solo lectura, mismo acceso que leer la atención. */}
+                        {canRead && <ProceduresCard encounter={encounter} />}
                         {/* Traslado saliente: leerlo requiere Transfers.Read; sus acciones, Transfers.Manage (dentro de la tarjeta). */}
                         {canRead && canReadTransfers && <EncounterTransferCard encounter={encounter} onEncounterChanged={reloadEncounter} />}
                         {/* Resumen asistido (ADR-013): mismo acceso que leer la atención; uno nuevo por atención. */}
@@ -227,6 +229,49 @@ function DiagnosesCard({ encounter, onRecorded }: { encounter: ClinicalEncounter
 
 // Ayuda de redacción: inserta encabezados SOAP en el contenido. El contrato sigue siendo type + content.
 const SOAP_TEMPLATE = 'S: \nO: \nA: \nP: ';
+
+/** Procedimientos de la atención; los prehospitalarios (ambulancia) se distinguen de los registrados en el hospital. */
+function ProceduresCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
+    const { state, reload } = useClinicalQuery(`procedures:${encounter.id}`, (signal) => clinicalApi.listProcedures(encounter.id, signal));
+
+    return (
+        <Card title="Procedimientos" actions={<SimulatedBadge feature="procedures" />}>
+            <QueryView
+                state={state}
+                onRetry={reload}
+                errorTitle="No se pudieron cargar los procedimientos."
+                isEmpty={(list) => list.length === 0}
+                empty={<EmptyState title="Sin procedimientos registrados" description="Los procedimientos de la atención prehospitalaria aparecen aquí." />}
+            >
+                {(list) => (
+                    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                        {list.map((p) => (
+                            <li key={p.id} className="flex flex-col gap-1 rounded-lg border border-line-soft p-3">
+                                <span className="flex flex-wrap items-center gap-2">
+                                    <span className="text-sm font-semibold text-ink">{p.name}</span>
+                                    {p.prehospital && <Badge tone="accent">Prehospitalario</Badge>}
+                                    {p.status !== 'Completed' && <Badge tone="neutral">{PROCEDURE_STATUS_LABELS[p.status]}</Badge>}
+                                </span>
+                                <span className="text-xs text-ink-muted">
+                                    {p.performedAtUtc ? formatDateTimeUtc(p.performedAtUtc) : 'Sin fecha'}
+                                    {p.performedByDisplayName && <> · {p.performedByDisplayName}</>}
+                                </span>
+                                {p.outcome && <p className="m-0 whitespace-pre-wrap text-sm text-ink-3">{p.outcome}</p>}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </QueryView>
+        </Card>
+    );
+}
+
+const PROCEDURE_STATUS_LABELS: Record<ClinicalProcedure['status'], string> = {
+    Planned: 'Planificado',
+    InProgress: 'En curso',
+    Completed: 'Completado',
+    Cancelled: 'Cancelado',
+};
 
 function NotesCard({ encounter, onRecorded }: { encounter: ClinicalEncounterSummary; onRecorded: () => void }) {
     const canWrite = useAuth().can(Permissions.ClinicalNotes.Write);

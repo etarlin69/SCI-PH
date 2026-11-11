@@ -135,6 +135,14 @@ namespace SCI_PH.Application.Features.Clinical
             return await _reads.ListDiagnosesAsync(encounterId, cancellationToken);
         }
 
+        // The procedures of the encounter, same read rule as its notes and diagnoses: the ones the paramedic recorded stay
+        // in the SAME encounter and are read by whoever holds it now (the receiving hospital), never by a clinic it left.
+        public async Task<IReadOnlyList<ClinicalProcedureSummary>> ListProceduresAsync(Guid encounterId, CancellationToken cancellationToken)
+        {
+            await EncounterService.GetReadableAsync(_actor, _reads, _patientAccess, encounterId, cancellationToken);
+            return await _reads.ListProceduresAsync(encounterId, cancellationToken);
+        }
+
         // ClinicalNote.Write by the current ClinicalStaff. Notes are immutable: corrections are new notes.
         public async Task<ClinicalNoteSummary> RecordNoteAsync(Guid encounterId, RecordClinicalNoteRequest request, CancellationToken cancellationToken)
         {
