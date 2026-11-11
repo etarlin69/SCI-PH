@@ -18,6 +18,7 @@ import {
     TRIAGE_PRIORITIES,
     VITAL_SIGNS,
     formatDateTimeUtc,
+    formatVitalValue,
     isEncounterOpen,
     vitalSignMeta,
 } from '../utils/clinicalLabels';
@@ -378,7 +379,7 @@ function TriageHistory({ encounter, onSaved }: { encounter: ClinicalEncounterSum
                                             <tr key={v.id}>
                                                 <td className="py-1.5 pr-3">{meta.label}</td>
                                                 <td className="tabular py-1.5 pr-3">
-                                                    {v.value} {meta.unitLabel}
+                                                    {formatVitalValue(v.value, meta)}
                                                 </td>
                                                 <td className="py-1.5 text-ink-muted">{formatDateTimeUtc(v.measuredAtUtc)}</td>
                                             </tr>

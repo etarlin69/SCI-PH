@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Badge, Button, Card, Checkbox, EmptyState, Input, Select, Textarea } from '../../../components/shared';
 import { CLINICAL_API_IS_MOCK, clinicalApi } from '../api';
 import { ClinicSelector } from '../components/ClinicSelector';
+import { EncounterDocumentsCard } from '../components/EncounterDocumentsCard';
 import { EncounterAiSummaryCard } from '../components/EncounterAiSummaryCard';
 import { EncounterTransferCard } from '../components/EncounterTransferCard';
 import { EncounterResultsCard } from '../components/EncounterResultsCard';
@@ -32,6 +33,7 @@ export function EncounterDashboardPage() {
     const { can } = useAuth();
     const canRead = can(Permissions.Encounters.Read);
     const canReadTransfers = can(Permissions.Transfers.Read);
+    const canReadDocuments = can(Permissions.Documents.Read);
     if (!encounterId) return <EncounterList />;
 
     return (
@@ -56,6 +58,8 @@ export function EncounterDashboardPage() {
                         {canRead && canReadTransfers && <EncounterTransferCard encounter={encounter} onEncounterChanged={reloadEncounter} />}
                         {/* Resumen asistido (ADR-013): mismo acceso que leer la atención; uno nuevo por atención. */}
                         {canRead && <EncounterAiSummaryCard key={encounter.id} encounterId={encounter.id} />}
+                        {/* Documentos (Document Service + almacenamiento): leerlos requiere Documents.Read; no hay mock. */}
+                        {canRead && canReadDocuments && !CLINICAL_API_IS_MOCK && <EncounterDocumentsCard encounter={encounter} />}
                     </>
                 );
             }}

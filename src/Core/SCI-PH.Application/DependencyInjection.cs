@@ -2,12 +2,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using SCI_PH.Application.Abstractions.Clinical;
+using SCI_PH.Application.Abstractions.Documents;
 using SCI_PH.Application.Abstractions.Security;
 using SCI_PH.Application.Features.Accounts;
 using SCI_PH.Application.Features.Authentication;
 using SCI_PH.Application.Features.Authorization;
 using SCI_PH.Application.Features.Clinical;
 using SCI_PH.Application.Features.Devices;
+using SCI_PH.Application.Features.Documents;
 
 namespace SCI_PH.Application
 {
@@ -60,6 +62,8 @@ namespace SCI_PH.Application
             services.AddScoped<AdmissionService>();
             services.AddScoped<EncounterRecordService>();
             services.AddScoped<EncounterResultService>();
+            services.AddScoped<ClinicalDocumentService>();
+            services.AddScoped<IDocumentService>(provider => provider.GetRequiredService<ClinicalDocumentService>());
             services.AddScoped<MedicationService>();
             services.AddScoped<TransferService>();
             services.AddScoped<ClinicalOrganizationService>();

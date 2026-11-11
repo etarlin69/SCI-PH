@@ -167,6 +167,26 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return body as T;
 }
 
+/**
+ * Descarga binaria (un documento) con la misma sesión que apiRequest: Bearer en memoria y un refresh ante 401. Nunca se
+ * guarda en el navegador: el llamador crea una URL de objeto y la libera. Los errores llegan como ApiError/NetworkError.
+ */
+export async function apiBlob(path: string, options: Omit<RequestOptions, 'body'> = {}): Promise<Blob> {
+  const tokenUsed = accessToken;
+  let response = await send(path, options, tokenUsed);
+  if (response.status === 401 && tokenUsed) {
+    const renewed = await refreshAccessToken();
+    if (renewed) response = await send(path, options, renewed);
+  }
+
+  if (!response.ok) {
+    const body = await readBody(response);
+    const problem: ProblemDetails | null = isProblemDetails(body) ? body : null;
+    throw new ApiError(response.status, problem, parseRetryAfter(response.headers.get('Retry-After')));
+  }
+  return response.blob();
+}
+
 /** Solo para tests: deja el módulo como recién cargado. */
 export function resetApiClientForTests(): void {
   accessToken = null;

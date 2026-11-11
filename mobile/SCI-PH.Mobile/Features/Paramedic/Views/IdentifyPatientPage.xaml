@@ -4,6 +4,7 @@
              xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Paramedic.ViewModels"
              xmlns:components="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Views.Components"
              xmlns:dto="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Models.Dtos"
+             xmlns:paramedic="clr-namespace:SCI_PH.Mobile.Features.Paramedic"
              x:Class="SCI_PH.Mobile.Features.Paramedic.Views.IdentifyPatientPage"
              x:DataType="vm:IdentifyPatientViewModel"
              Style="{StaticResource SciPage}"
@@ -22,10 +23,21 @@
                        Style="{StaticResource SciSubtitle}" />
             </VerticalStackLayout>
 
-            <!-- Error -->
-            <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding HasError}">
+            <!-- Error: arriba solo si no hay un formulario abierto (entonces se muestra dentro de él) -->
+            <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding ShowTopError}">
                 <Label Text="{Binding ErrorMessage}"
                        TextColor="{StaticResource SciDanger}" FontSize="13" />
+            </Border>
+
+            <!-- Recibida por el hospital: la atención prehospitalaria terminó; no queda ninguna acción aquí -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding IsHandedOff}" AutomationId="IdentifyHandedOff">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="{x:Static paramedic:ParamedicMessages.TransferHandedOff}"
+                           TextColor="{StaticResource SciText}" FontSize="15" />
+                    <Button Text="Volver al inicio"
+                            Command="{Binding GoHomeCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                </VerticalStackLayout>
             </Border>
 
             <!-- Loading -->
@@ -115,9 +127,15 @@
             </Border>
 
             <!-- Formulario de documento -->
-            <Border Style="{StaticResource SciCard}" IsVisible="{Binding ShowDocumentForm}">
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding ShowDocumentPanel}">
                 <VerticalStackLayout Spacing="14">
                     <Label Text="Identificación con documento" Style="{StaticResource SciFieldLabel}" />
+
+                    <!-- El error de la búsqueda o la confirmación, junto al formulario que se está usando -->
+                    <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding ShowDocumentError}" AutomationId="DocumentError">
+                        <Label Text="{Binding ErrorMessage}"
+                               TextColor="{StaticResource SciDanger}" FontSize="13" />
+                    </Border>
 
                     <VerticalStackLayout Spacing="6">
                         <Label Text="Tipo de documento" Style="{StaticResource SciFieldLabel}" />
@@ -177,7 +195,7 @@
             </Border>
 
             <!-- Resultado: identificado -->
-            <Border Style="{StaticResource SciCard}" IsVisible="{Binding IsIdentified}">
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding ShowIdentifiedResult}">
                 <VerticalStackLayout Spacing="14">
                     <Border Style="{StaticResource SciBadgeSuccess}" HorizontalOptions="Start">
                         <Label Text="Paciente identificado"
