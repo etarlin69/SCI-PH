@@ -416,6 +416,83 @@ public class DocumentIdentificationStateTests
         Assert.Empty(_api.ConfirmRequests);
     }
 
+    // The hospital received the case while the page was open: the 409 re-reads the emergency, which says HandedOff. Every
+    // identification action and "continue" disappear; only the explanation and "Volver al inicio" remain.
+    [Fact]
+    public async Task AConflictBecauseTheHospitalReceivedTheCaseHidesEveryAction()
+    {
+        var vm = ViewModel();
+        _api.Emergencies[_emergencyId].Status = EmergencyStatus.HandedOff;
+        _api.Resolves.Enqueue(Fails<DocumentCandidateDto>(HttpStatusCode.Conflict));
+
+        await vm.ResolveDocumentCommand.ExecuteAsync(null);
+
+        Assert.True(vm.IsHandedOff);
+        Assert.Null(vm.ErrorMessage);
+        Assert.False(vm.CanIdentify);
+        Assert.False(vm.ShowQrOption);
+        Assert.False(vm.ShowDocumentPanel);
+        Assert.False(vm.ShowFingerprintPanel);
+        Assert.False(vm.ShowIdentifiedResult);
+        Assert.Null(vm.DocumentCandidateName);
+        Assert.Empty(_api.ConfirmRequests);
+    }
+
+    [Fact]
+    public async Task AnEmergencyAlreadyHandedOffWhenThePageOpensOffersOnlyGoingHome()
+    {
+        var vm = ViewModel();
+        _api.Emergencies[_emergencyId].Status = EmergencyStatus.HandedOff;
+
+        await vm.RefreshIdentityAsync();
+
+        Assert.True(vm.IsHandedOff);
+        Assert.False(vm.CanIdentify);
+        await vm.GoHomeCommand.ExecuteAsync(null);
+        Assert.Equal(ParamedicRoutes.HomeRoot, Assert.Single(_navigator.Navigations).Route);
+    }
+
+    [Fact]
+    public async Task AnEmergencyStillInTheFieldKeepsItsActions()
+    {
+        var vm = ViewModel();
+
+        await vm.RefreshIdentityAsync();
+
+        Assert.False(vm.IsHandedOff);
+        Assert.True(vm.CanIdentify);
+        Assert.True(vm.ShowDocumentPanel);
+    }
+
+    // The error is shown next to the form in use: inside the document card while it is open, at the top otherwise.
+    [Fact]
+    public async Task ADocumentErrorIsShownInsideTheDocumentForm()
+    {
+        var vm = ViewModel();
+        _api.Resolves.Enqueue(Fails<DocumentCandidateDto>(HttpStatusCode.NotFound));
+
+        await vm.ResolveDocumentCommand.ExecuteAsync(null);
+
+        Assert.Equal(ParamedicMessages.PatientNotFoundByDocument, vm.ErrorMessage);
+        Assert.True(vm.ShowDocumentError);
+        Assert.False(vm.ShowTopError);
+    }
+
+    [Fact]
+    public void WithoutTheDocumentFormTheErrorIsShownAtTheTop()
+    {
+        OnServer();
+        var vm = new IdentifyPatientViewModel(_api, new CountingFingerprintService(), _navigator) { EmergencyId = _emergencyId };
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.ErrorMessage = ParamedicMessages.FingerprintReadersFailed;
+
+        Assert.True(vm.ShowTopError);
+        Assert.False(vm.ShowDocumentError);
+        Assert.Contains(nameof(vm.ShowTopError), changed);
+    }
+
     [Fact]
     public async Task TooManyRequestsKeepsTheCandidateAndItsKey()
     {

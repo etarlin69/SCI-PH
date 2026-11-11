@@ -112,22 +112,46 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
     [NotifyPropertyChangedFor(nameof(CanIdentify))]
     [NotifyPropertyChangedFor(nameof(ShowFingerprintPanel))]
     [NotifyPropertyChangedFor(nameof(ShowQrOption))]
+    [NotifyPropertyChangedFor(nameof(ShowIdentifiedResult))]
     private bool isIdentified;
 
     [ObservableProperty]
     private string? patientDisplayName;
 
     /// <summary>
+    /// El hospital ya recibió el caso (leído del servidor o deducido de un 409): la atención prehospitalaria terminó, así que
+    /// no se ofrece ninguna vía ni "continuar"; solo volver al inicio. El servidor ya rechaza cualquier identificación.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanIdentify), nameof(ShowQrOption), nameof(ShowFingerprintPanel), nameof(ShowDocumentPanel),
+        nameof(ShowTopError), nameof(ShowDocumentError), nameof(ShowIdentifiedResult))]
+    private bool isHandedOff;
+
+    /// <summary>
     /// Mientras no esté identificado se ofrecen las tres vías a la vez (huella, documento, NN): ninguna es requisito de
     /// otra, porque en una emergencia la huella puede no ser posible. Una lectura en curso no bloquea las otras dos.
     /// </summary>
-    public bool CanIdentify => !IsIdentified;
+    public bool CanIdentify => !IsIdentified && !IsHandedOff;
 
     /// <summary>La plataforma ofrece el escáner de QR (no en Mac Catalyst).</summary>
     public bool IsQrScannerSupported { get; }
 
     /// <summary>"Código QR del paciente": otra vía más, solo mientras la emergencia se puede identificar.</summary>
-    public bool ShowQrOption => IsQrScannerSupported && !IsIdentified;
+    public bool ShowQrOption => IsQrScannerSupported && CanIdentify;
+
+    /// <summary>El formulario de documento abierto, mientras se puede identificar.</summary>
+    public bool ShowDocumentPanel => ShowDocumentForm && !IsHandedOff;
+
+    /// <summary>
+    /// El error se muestra junto al formulario activo: con el documento abierto, dentro de su tarjeta (abajo, donde se está
+    /// escribiendo); si no, arriba.
+    /// </summary>
+    public bool ShowDocumentError => HasError && ShowDocumentPanel;
+
+    public bool ShowTopError => HasError && !ShowDocumentPanel;
+
+    /// <summary>"Paciente identificado" con su "continuar", salvo si el hospital ya recibió el caso.</summary>
+    public bool ShowIdentifiedResult => IsIdentified && !IsHandedOff;
 
     // ---- Huella ----
     [ObservableProperty]
@@ -166,7 +190,7 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
     [NotifyPropertyChangedFor(nameof(HasFingerprintMessage))]
     private string? fingerprintMessage;
 
-    public bool ShowFingerprintPanel => FingerprintRequested && !IsIdentified;
+    public bool ShowFingerprintPanel => FingerprintRequested && CanIdentify;
 
     public bool CanChooseReader => !IsWaitingForReader && !HasCandidate;
 
@@ -179,6 +203,7 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
 
     // ---- Formulario de documento ----
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowDocumentPanel), nameof(ShowTopError), nameof(ShowDocumentError))]
     private bool showDocumentForm;
 
     [ObservableProperty]
@@ -208,6 +233,39 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
     public bool HasDocumentCandidate => DocumentStep is DocumentIdentificationStep.Candidate or DocumentIdentificationStep.Confirming;
 
     public bool IsDocumentWorking => DocumentStep is DocumentIdentificationStep.Resolving or DocumentIdentificationStep.Confirming;
+
+    protected override void OnErrorChanged()
+    {
+        OnPropertyChanged(nameof(ShowTopError));
+        OnPropertyChanged(nameof(ShowDocumentError));
+    }
+
+    /// <summary>Cada lectura de la emergencia (al abrir la página o tras un 409) dice si el hospital ya la recibió.</summary>
+    protected override void OnEmergencyRead(EmergencyDto emergency)
+    {
+        base.OnEmergencyRead(emergency);
+        ApplyHandedOff(emergency);
+    }
+
+    // Recibida por el hospital: no queda nada que hacer aquí. Se suelta la lectura de huella y se olvida el candidato.
+    private bool ApplyHandedOff(EmergencyDto? emergency)
+    {
+        if (emergency?.Status != EmergencyStatus.HandedOff)
+        {
+            return false;
+        }
+
+        if (_session is { } session)
+        {
+            _ = CancelOnServerQuietlyAsync(session.Id);
+        }
+
+        EndFingerprintSession(message: null);
+        DiscardDocumentCandidate();
+        ErrorMessage = null;
+        IsHandedOff = true;
+        return true;
+    }
 
     protected override void OnBusyChanged()
     {
@@ -292,6 +350,8 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
         catch (MobileApiException ex) when (ex.Error == MobileApiError.Conflict)
         {
             ErrorMessage = ParamedicMessages.FingerprintOpenConflict;
+            // Puede ser que el hospital ya recibió el caso: la lectura de la emergencia lo dice.
+            await RefreshIdentityAsync();
         }
         catch (MobileApiException ex) when (ex.Error is not (MobileApiError.Server or MobileApiError.InvalidResponse))
         {
@@ -333,6 +393,7 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
             // No se genera otra clave en silencio: la sesión se vuelve a consultar para mostrar su estado real.
             ErrorMessage = ParamedicMessages.FingerprintConfirmConflict;
             await RefreshSessionAsync(session.Id);
+            await RefreshIdentityAsync();
         }
         catch (MobileApiException ex) when (ex.Error is not (MobileApiError.Server or MobileApiError.InvalidResponse))
         {
@@ -768,6 +829,12 @@ public partial class IdentifyPatientViewModel : EmergencyWorkflowViewModel
 
         if (!IsCurrentDocument(generation, owner))
         {
+            return;
+        }
+
+        if (emergency is not null && ApplyHandedOff(emergency))
+        {
+            ApplyEmergency(emergency);
             return;
         }
 
