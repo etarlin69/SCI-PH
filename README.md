@@ -2,7 +2,8 @@
 
 Backend de SCI-PH construido con **ASP.NET Core (.NET 9)** siguiendo **Onion Architecture**, con tres puntos de entrada (BFF / API) según el tipo de cliente.
 
-> Estado: arquitectura base. Todavía no hay funcionalidades de negocio implementadas.
+> Estado: candidato a versión (rama `develop`). Funcionalidad implementada y probada por capas; el nivel real de
+> validación de cada integración externa (IA, biometría, hardware, Azure) está en [Estado de las integraciones](#estado-de-las-integraciones).
 
 ## Stack
 
@@ -15,7 +16,7 @@ Backend de SCI-PH construido con **ASP.NET Core (.NET 9)** siguiendo **Onion Arc
 | Mobile | .NET MAUI |
 | Hardware | ESP32 + sensor de huella R307 |
 | Almacenamiento de archivos | Azure Blob Storage |
-| IA | Resumen asistido de la atención con revisión profesional (ADR-013; proveedor Azure OpenAI opcional, solo con permiso explícito y datos sintéticos, ADR-014) · asistente educativo del paciente (simulado). No diagnostica, no prescribe |
+| IA | Resumen asistido de la atención con revisión profesional (ADR-013; proveedor Azure OpenAI opcional, solo con permiso explícito y datos sintéticos, ADR-014). No diagnostica, no prescribe. La app del paciente no tiene asistente de IA |
 | Biometría | Verificación facial 1:1 · Identificación por huella para emergencias |
 
 ## Estructura
@@ -44,6 +45,33 @@ docs/
 ```
 
 Detalle en [docs/architecture/solution-structure.md](docs/architecture/solution-structure.md).
+
+## Funcionalidad
+
+| Área | Qué hace hoy | Cliente |
+|---|---|---|
+| Seguridad | Login con MFA (TOTP + códigos de recuperación), refresh rotatorio (cookie HttpOnly en web, SecureStorage en móvil), coordinación multi-pestaña, invitaciones de cuenta, cambio de contraseña y cierre de todas las sesiones | Web, Mobile |
+| Administración | Usuarios y roles, clínicas, personal clínico y afiliaciones, dispositivos (lectores) | Web |
+| Recepción | Registro de pacientes (documento + correo de contacto), búsqueda, atenciones, identificación de NN, invitación del paciente a la app | Web |
+| Emergencia prehospitalaria | Emergencia NN, signos vitales, procedimientos, medicación, notas, identificación por QR, documento (candidato + confirmación) y huella, traslado al hospital | Mobile (paramédico) |
+| Hospital | Recepción de traslados en la MISMA atención, triage, signos, notas, diagnósticos, procedimientos prehospitalarios, resultados (orden → final → corregido), documentos (PDF/PNG/JPEG), prescripción y Kardex, traslado entre hospitales, egreso, resumen asistido por IA | Web |
+| Paciente | Inicio, perfil, historial, detalle de cada atención, resultados publicados, "Mi QR", seguridad de la cuenta | Mobile |
+| Biometría | Huella (registro, identificación, revocación con borrado del slot) y verificación facial 1:1 asistida | Web, Mobile, Device API |
+| Operación | `/health`, `/health/live`, `/health/ready` (PostgreSQL), `X-Correlation-ID` y logs JSON en contenedores | Todos los backends |
+
+## Estado de las integraciones
+
+| Integración | Estado |
+|---|---|
+| IA clínica — proveedor Fake | Implementado y validado con proveedor simulado |
+| IA clínica — Azure OpenAI | Implementado; validado con transporte simulado. **Requiere credenciales reales** para la prueba E2E (omitida sin ellas) |
+| Rostro — OpenCV (YuNet + SFace) | Implementado; validado con los modelos reales sobre rostros sintéticos (`SCIPH_FACE_MODELS=1`). Precisión con cámara y personas reales: **no validada** |
+| Huella — Device API + simulador | Implementado y validado con el simulador (`tools/SCI-PH.Device.Simulator`) |
+| Huella — ESP32 + R307 físicos | Firmware compilado en CI. **Requiere hardware**: prueba física pendiente |
+| Documentos — Azure Blob | Implementado; validado contra Azurite (SDK de Azure). Azure real: **no validado** (sin credenciales) |
+| QR — cámara | Validado en emulador Android; dispositivo físico pendiente |
+
+Guion de demostración: [docs/demo/itla-demo.md](docs/demo/itla-demo.md).
 
 ## Requisitos
 
@@ -116,11 +144,11 @@ Para levantar todo (PostgreSQL, migraciones, BFFs, Device API y web-admin) en co
 
 ## Endpoints técnicos (perfil `http`, entorno Development)
 
-| Aplicación | Health | OpenAPI |
+| Aplicación | Health (liveness · readiness con PostgreSQL) | OpenAPI (solo Development) |
 |---|---|---|
-| Web BFF | http://localhost:5074/health | http://localhost:5074/openapi/v1.json |
-| Mobile BFF | http://localhost:5191/health | http://localhost:5191/openapi/v1.json |
-| Device API | http://localhost:5139/health | http://localhost:5139/openapi/v1.json |
+| Web BFF | `/health` · `/health/live` · `/health/ready` (http://localhost:5074) | http://localhost:5074/openapi/v1.json |
+| Mobile BFF | `/health` · `/health/live` · `/health/ready` (http://localhost:5191) | http://localhost:5191/openapi/v1.json |
+| Device API | `/health` · `/health/live` · `/health/ready` (http://localhost:5139) | http://localhost:5139/openapi/v1.json |
 
 ## Documentación
 

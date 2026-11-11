@@ -46,3 +46,18 @@ Reglas:
 **Pendiente**
 - Estrategia para desarrollo local (por ejemplo, Azurite) y para limpiar blobs huérfanos.
 - Política de retención y borrado.
+
+## Implementación (2026-11)
+
+- `IStorageService` (Application) con tres proveedores en Infrastructure, elegidos por `DocumentStorage:Provider`:
+  `AzureBlob` (contenedor privado; también Azurite en local), `FileSystem` (solo desarrollo, rechazado en Production) y
+  `Disabled` (por defecto: 503 genérico).
+- `ClinicalDocumentService` (`IDocumentService`): documentos de una **atención**; tipo detectado por el contenido real
+  (PDF/PNG/JPEG), 10 MB, nombre saneado (solo de visualización), ruta generada por el servidor, SHA-256, idempotencia
+  por `clientRequestId`, auditoría de subida y descarga. La descarga pasa por el BFF como adjunto (`nosniff`); no se
+  usan URLs SAS.
+- Si guardar la metadata falla, el objeto se borra (mejor esfuerzo). Una metadata sin objeto responde 404.
+
+**Sigue pendiente:** documentos del registro del paciente y su visibilidad en la app del paciente (decisión de producto),
+barrido periódico de blobs huérfanos, política de retención y borrado, y una prueba E2E contra Azure real (solo validado
+con Azurite).
