@@ -56,6 +56,8 @@ Recepción **no** tiene `Encounters.Read`: tras crear una atención se queda en 
 | ClinicalNotes | GET · POST | `/api/web/encounters/{id}/notes` | Expediente |
 | Diagnoses | GET · POST | `/api/web/encounters/{id}/diagnoses` | Expediente |
 | Procedures | GET (solo lectura) | `/api/web/encounters/{id}/procedures` | Expediente: los del paramédico (`prehospital: true`) en la misma atención, con quién lo realizó |
+| Results | GET · POST | `/api/web/encounters/{id}/results` | Expediente: órdenes y resultados (leer: Encounters.Read; pedir: Results.Write) |
+| Results | POST | `/api/web/encounters/{id}/results/{resultId}/final` · `/correct` · `/cancel` | Expediente: Pendiente → Final → Corregido, o Cancelado (Results.Write; 409 si el estado ya no lo permite) |
 | AI summary | POST (sin cuerpo) | `/api/web/encounters/{id}/ai-summary` | Expediente (resumen asistido, ADR-013) |
 | Encounters | POST | `/api/web/encounters/{id}/close` | Medicación y egreso |
 | Medications | GET | `/api/web/medications` | Medicación y egreso |
