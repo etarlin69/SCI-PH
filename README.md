@@ -84,6 +84,15 @@ Para levantar todo (PostgreSQL, migraciones, BFFs, Device API y web-admin) en co
    dotnet user-secrets set "Jwt:SigningKey" "<valor-aleatorio-generado-por-ti>" --project src/Presentation/SCI-PH.Mobile.BFF
    ```
 
+   **Documentos clínicos (opcional).** Sin configurar, adjuntar y descargar documentos responde 503 (`DocumentStorage:Provider`
+   vacío = `Disabled`). Para probarlos en local, una carpeta (solo fuera de Production) o Azure Blob/Azurite en el Web BFF:
+
+   ```bash
+   dotnet user-secrets set "DocumentStorage:Provider" "FileSystem" --project src/Presentation/SCI-PH.Web.BFF
+   dotnet user-secrets set "DocumentStorage:RootPath" "<carpeta-local-fuera-del-repo>" --project src/Presentation/SCI-PH.Web.BFF
+   # o: Provider "AzureBlob" + "DocumentStorage:ConnectionString" (Azurite: UseDevelopmentStorage=true) y "DocumentStorage:Container"
+   ```
+
    Roles, permisos, administrador inicial, email (SMTP o carpeta local `.eml` en desarrollo) y orígenes CORS: ver
    [Arquitectura de seguridad](docs/architecture/security.md#configuración). El front web usa la cookie `__Host-sciph-refresh`,
    que exige HTTPS: ejecuta el Web BFF con el perfil `https` cuando pruebes el front.

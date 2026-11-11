@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using SCI_PH.Application.Abstractions.Biometrics;
 using SCI_PH.Application.Abstractions.Clinical;
+using SCI_PH.Application.Abstractions.Documents;
 using SCI_PH.Application.Abstractions.Idempotency;
 using SCI_PH.Application.Abstractions.Security;
 using SCI_PH.Persistence.Clinical.Seed;
@@ -75,6 +76,7 @@ namespace SCI_PH.Persistence
             services.AddScoped<IClinicalReadStore, ClinicalReadStore>();
             services.AddScoped<IPatientSelfReadStore, PatientSelfReadStore>();
             services.AddScoped<IPatientQrCredentialStore, PatientQrCredentialStore>();
+            services.AddScoped<IClinicalDocumentStore, ClinicalDocumentStore>();
             services.AddScoped<IClinicalOrganizationStore, ClinicalOrganizationStore>();
             services.AddScoped<IClinicalWriteStore, ClinicalWriteStore>();
             services.AddScoped<IIdempotencyStore, ClinicalIdempotencyStore>();
