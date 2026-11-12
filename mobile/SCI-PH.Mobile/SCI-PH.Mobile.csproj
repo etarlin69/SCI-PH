@@ -63,10 +63,35 @@
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
-	<!-- Android, solo Debug: HTTP hacia el Mobile BFF local (10.0.2.2 y localhost). Release no lo incluye. -->
-	<ItemGroup Condition="'$(Configuration)' == 'Debug' And $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+	<!--
+		Android, solo Debug: HTTP hacia el Mobile BFF local (10.0.2.2 y localhost). Release no lo incluye.
+		Dispositivo físico por Wi-Fi (LocalDevice): con -p:MobileBffBaseUrl=http://<IPv4 privada>:<puerto> se genera en obj/
+		una copia que además permite HTTP solo hacia ese host. Únicamente IPv4 privadas (10/8, 172.16/12, 192.168/16); otro
+		host por HTTP detiene la compilación. Ninguna IP queda en el repositorio.
+	-->
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug' And $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' And $(MobileBffBaseUrl.StartsWith('http://'))">
+		<SciphLocalDeviceHost>$([System.Text.RegularExpressions.Regex]::Match('$(MobileBffBaseUrl)', '^http://((10\.\d{1,3}|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3})(:\d{1,5})?/?$').Groups[1].Value)</SciphLocalDeviceHost>
+		<SciphNetworkSecurityConfig>$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\sciph-local-device\network_security_config.xml</SciphNetworkSecurityConfig>
+	</PropertyGroup>
+
+	<ItemGroup Condition="'$(Configuration)' == 'Debug' And $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' And '$(SciphNetworkSecurityConfig)' == ''">
 		<AndroidResource Include="Platforms\Android\DebugResources\xml\network_security_config.xml" Link="Platforms\Android\Resources\xml\network_security_config.xml" />
 	</ItemGroup>
+
+	<ItemGroup Condition="'$(SciphNetworkSecurityConfig)' != ''">
+		<AndroidResource Include="$(SciphNetworkSecurityConfig)" Link="Platforms\Android\Resources\xml\network_security_config.xml" />
+	</ItemGroup>
+
+	<Target Name="SciphWriteLocalDeviceNetworkSecurityConfig" BeforeTargets="PrepareForBuild" Condition="'$(SciphNetworkSecurityConfig)' != ''">
+		<Error Condition="'$(SciphLocalDeviceHost)' == ''" Text="MobileBffBaseUrl por HTTP solo se admite hacia una IPv4 privada de la red local (http://10.x, 172.16-31.x o 192.168.x, con puerto opcional). Usa https:// para cualquier otro host." />
+		<PropertyGroup>
+			<_SciphDebugConfig>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\Platforms\Android\DebugResources\xml\network_security_config.xml'))</_SciphDebugConfig>
+			<_SciphLocalDeviceConfig>$(_SciphDebugConfig.Replace('&lt;domain includeSubdomains="false"&gt;localhost&lt;/domain&gt;', '&lt;domain includeSubdomains="false"&gt;localhost&lt;/domain&gt;%0D%0A        &lt;domain includeSubdomains="false"&gt;$(SciphLocalDeviceHost)&lt;/domain&gt;'))</_SciphLocalDeviceConfig>
+		</PropertyGroup>
+		<Error Condition="'$(_SciphLocalDeviceConfig)' == '$(_SciphDebugConfig)'" Text="No se pudo añadir el host local al network security config de Debug." />
+		<MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(SciphNetworkSecurityConfig)'))" />
+		<WriteLinesToFile File="$(SciphNetworkSecurityConfig)" Lines="$(_SciphLocalDeviceConfig)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+	</Target>
 
 	<!-- Dirección del Mobile BFF fijada al compilar (backend desplegado o dispositivo físico): -p:MobileBffBaseUrl=https://... -->
 	<ItemGroup Condition="'$(MobileBffBaseUrl)' != ''">

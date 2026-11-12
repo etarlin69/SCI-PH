@@ -136,7 +136,35 @@ validación TLS nunca se desactiva.
 Dispositivo Android físico, sin poner una IP en el repositorio:
 
 - Con cable (Debug): `adb reverse tcp:5191 tcp:5191` y compilar con `-p:MobileBffBaseUrl=http://localhost:5191`.
+- Por Wi-Fi en la misma red (LocalDevice, solo Debug): ver abajo.
 - O un Mobile BFF accesible por HTTPS: `-p:MobileBffBaseUrl=https://<host>`.
+
+#### LocalDevice: teléfono físico contra el PC por Wi-Fi (solo QA local)
+
+```bash
+# 1. Mobile BFF escuchando en la red local (no solo localhost); entorno Development, sin redirección a HTTPS
+dotnet run --project src/Presentation/SCI-PH.Mobile.BFF --launch-profile http --urls http://0.0.0.0:5191
+
+# 2. APK Debug instalable a mano, apuntando a la IPv4 del PC en esa red (ipconfig)
+dotnet build mobile/SCI-PH.Mobile/SCI-PH.Mobile.csproj -c Debug -f net9.0-android -p:TargetFrameworks=net9.0-android \
+  -p:MobileBffBaseUrl=http://<IPv4-del-PC>:5191 -p:EmbedAssembliesIntoApk=true -p:AndroidPackageFormat=apk
+# -> mobile/SCI-PH.Mobile/bin/Debug/net9.0-android/com.companyname.sciph.mobile-Signed.apk
+```
+
+- Con `MobileBffBaseUrl` por `http://` en Debug, la compilación genera en `obj/` una copia del network security config
+  de Debug que añade **solo ese host**. Únicamente se aceptan IPv4 privadas (10/8, 172.16/12, 192.168/16); cualquier
+  otro host por HTTP detiene la compilación. La IP nunca se guarda en el repositorio.
+- Release no cambia: sin network security config, `usesCleartextTraffic="false"` y `MobileApiOptions` rechaza `http://`.
+- Windows bloquea por defecto las conexiones entrantes: permite solo el puerto 5191 y solo desde la subred local, desde
+  una PowerShell de administrador:
+  `New-NetFirewallRule -DisplayName "SCI-PH Mobile BFF (LAN QA)" -Direction Inbound -Protocol TCP -LocalPort 5191 -RemoteAddress LocalSubnet -InterfaceAlias Wi-Fi -Action Allow`
+  y bórrala al terminar (`Remove-NetFirewallRule -DisplayName "SCI-PH Mobile BFF (LAN QA)"`).
+- Comprueba desde el navegador del teléfono `http://<IPv4-del-PC>:5191/health` antes de abrir la app. Si no responde:
+  red Wi-Fi con aislamiento de clientes, VPN del PC sin "permitir LAN", IP o puerto equivocados, o el firewall.
+- Solo funciona mientras el teléfono y el PC estén en la misma red; con datos móviles u otra Wi-Fi la URL deja de
+  responder. Para acceso desde cualquier sitio hace falta un Mobile BFF desplegado por HTTPS.
+- La web no se prueba por `http://<IP>`: la cookie de refresh es `__Host-`, `Secure` y `SameSite=Strict`, y el
+  navegador no la guarda sin HTTPS. Usa un origen HTTPS único (nginx `web` → `/api` → Web BFF).
 
 El Mobile BFF local corre con `dotnet run --project src/Presentation/SCI-PH.Mobile.BFF` (puerto 5191) o con
 `docker compose` (ver [docs/architecture/local-containers.md](../docs/architecture/local-containers.md)).
