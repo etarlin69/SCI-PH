@@ -108,6 +108,8 @@
         <ShellContent Title="Documentos" ContentTemplate="{DataTemplate patientDocuments:DocumentsPage}" />
     </FlyoutItem>
 
+    <MenuItem Text="Seguridad de la cuenta" Command="{Binding PatientAccountSecurityCommand}" />
+
     <MenuItem Text="Cerrar sesión" Command="{Binding PatientLogoutCommand}" />
 
 </Shell>

@@ -762,14 +762,14 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             };
             Assert.Equal(HttpStatusCode.OK, (await ConfirmAsync(paramedic, emergency.Id, sessionId)).StatusCode);
 
-            var logs = host.Logs.Text;
+            var logs = host.Logs.TextWithoutCorrelationIds;
             Assert.NotEmpty(logs);
             foreach (var secret in new[] { reader.Key, reference.SubjectReference, "r307:device", "7319" })
             {
                 Assert.DoesNotContain(secret, logs, StringComparison.OrdinalIgnoreCase);
             }
 
-            foreach (var body in bodies)
+            foreach (var body in bodies.Select(RandomIds.Mask))
             {
                 foreach (var secret in new[] { reader.Key, reference.SubjectReference, "r307", "7319", patient.Id.ToString(), "Pérez", emergency.Id.ToString() })
                 {

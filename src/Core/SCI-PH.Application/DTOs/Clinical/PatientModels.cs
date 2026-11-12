@@ -20,7 +20,9 @@ namespace SCI_PH.Application.DTOs.Clinical
         string FamilyNames,
         DateOnly? DateOfBirth,
         [property: JsonRequired, JsonConverter(typeof(TextEnumConverter))] BiologicalSex Sex,
-        PatientIdentifierInput? Identifier = null);
+        PatientIdentifierInput? Identifier = null,
+        // Optional contact email (a non-unique Email identifier): where a patient account invitation is sent (ADR-015).
+        string? Email = null);
 
     // Sent in the body so national ids or passports never appear in URLs or access logs.
     // With IdentifierType: exact match on the normalized value. Without it: name search (3+ characters).

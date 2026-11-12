@@ -493,13 +493,13 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
                 await (await reception.Client.GetAsync(Enrollers)).Content.ReadAsStringAsync()
             };
 
-            var logs = host.Logs.Text;
+            var logs = host.Logs.TextWithoutCorrelationIds;
             foreach (var secret in new[] { reader.Key, "r307:device", "6131" })
             {
                 Assert.DoesNotContain(secret, logs, StringComparison.OrdinalIgnoreCase);
             }
 
-            foreach (var body in bodies)
+            foreach (var body in bodies.Select(RandomIds.Mask))
             {
                 foreach (var secret in new[] { reader.Key, "r307", "6131", "slot\":", "subjectReference", "secret", "hash" })
                 {

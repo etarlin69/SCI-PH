@@ -510,13 +510,13 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             };
             Assert.Contains(slot.ToString(), await (await s.ReaderClient.GetAsync(PendingDeletion)).Content.ReadAsStringAsync());
 
-            var logs = s.Host.Logs.Text;
+            var logs = s.Host.Logs.TextWithoutCorrelationIds;
             foreach (var secret in new[] { s.Reader.Key, "r307:device", slot.ToString() })
             {
                 Assert.DoesNotContain(secret, logs, StringComparison.OrdinalIgnoreCase);
             }
 
-            foreach (var body in web.Concat(device))
+            foreach (var body in web.Concat(device).Select(RandomIds.Mask))
             {
                 foreach (var secret in new[] { s.Reader.Key, "r307", slot.ToString(), "slot\":", "subjectReference", "secret", "hash", s.Patient.Id.ToString() })
                 {

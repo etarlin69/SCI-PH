@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Auth.ViewModels"
+             x:Class="SCI_PH.Mobile.Features.Auth.Pages.AccountSecurityPage"
+             x:DataType="vm:AccountSecurityViewModel"
+             Style="{StaticResource SciPage}"
+             Title="Seguridad de la cuenta">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="18" MaximumWidthRequest="560">
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Seguridad de la cuenta" Style="{StaticResource SciTitle}" />
+                <Label Text="Al cambiar la contraseña o cerrar todas las sesiones, deberás iniciar sesión de nuevo en este y en los demás dispositivos."
+                       Style="{StaticResource SciSubtitle}" />
+            </VerticalStackLayout>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource SciPrimary}" />
+
+            <!-- Cambiar contraseña: el error se muestra en el mismo formulario -->
+            <Border Style="{StaticResource SciCard}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Cambiar contraseña" Style="{StaticResource SciFieldLabel}" FontSize="16" />
+
+                    <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding HasError}" AutomationId="AccountSecurityError">
+                        <Label Text="{Binding ErrorMessage}" TextColor="{StaticResource SciDanger}" FontSize="13" />
+                    </Border>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Contraseña actual" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding CurrentPassword}" IsPassword="True" MaxLength="256" AutomationId="CurrentPassword"
+                                   IsSpellCheckEnabled="False" IsTextPredictionEnabled="False" Style="{StaticResource SciEntry}" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Nueva contraseña" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding NewPassword}" IsPassword="True" MaxLength="256" AutomationId="NewPassword"
+                                   IsSpellCheckEnabled="False" IsTextPredictionEnabled="False" Style="{StaticResource SciEntry}" />
+                        </Border>
+                        <Label Text="Al menos 10 caracteres, con mayúscula, minúscula, número y símbolo."
+                               Style="{StaticResource SciSubtitle}" FontSize="12" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Confirmar nueva contraseña" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding ConfirmPassword}" IsPassword="True" MaxLength="256" AutomationId="ConfirmPassword"
+                                   IsSpellCheckEnabled="False" IsTextPredictionEnabled="False" Style="{StaticResource SciEntry}" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <Button Text="Cambiar contraseña"
+                            AutomationId="ChangePassword"
+                            Command="{Binding ChangePasswordCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Cerrar todas las sesiones -->
+            <Border Style="{StaticResource SciCard}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Sesiones" Style="{StaticResource SciFieldLabel}" FontSize="16" />
+                    <Label Text="Si perdiste un dispositivo o crees que alguien más usa tu cuenta, cierra la sesión en todos los dispositivos."
+                           Style="{StaticResource SciSubtitle}" />
+                    <Button Text="Cerrar sesión en todos los dispositivos"
+                            AutomationId="RevokeAllSessions"
+                            Command="{Binding RevokeAllSessionsCommand}"
+                            Style="{StaticResource SciSecondaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

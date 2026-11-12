@@ -42,6 +42,8 @@ export interface RegisterPatientRequest {
     dateOfBirth: DateOnly | null;
     sex: BiologicalSex;
     identifier: { type: PatientIdentifierType; value: string; issuer?: string | null } | null;
+    /** Correo de contacto opcional: a donde se envía la invitación a la app del paciente. */
+    email?: string | null;
 }
 
 // ---------------------------------------------------------------- Contexto clínico

@@ -12,6 +12,7 @@ public partial class ParamedicHomePage : ContentPage
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
         LogoutToolbarItem.Command = account.LogoutCommand;
+        AccountSecurityToolbarItem.Command = account.OpenAccountSecurityCommand;
     }
 
     // Cada vez que se ve (también al volver de una emergencia) la lista se pide de nuevo al servidor.

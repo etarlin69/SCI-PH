@@ -24,6 +24,11 @@ public partial class AppShell : Shell
         _session = session;
         _auth = auth;
         PatientLogoutCommand = new Command(async () => await LogoutPatientAsync());
+        PatientAccountSecurityCommand = new Command(async () =>
+        {
+            FlyoutIsPresented = false;
+            await GoToAsync(AuthRoutes.AccountSecurity);
+        });
 
         InitializeComponent();
         AuthServiceCollectionExtensions.RegisterAuthRoutes();
@@ -42,6 +47,8 @@ public partial class AppShell : Shell
     public string PatientDisplayName => _session.Area == AccountArea.Patient ? _session.CurrentUser?.UserName ?? string.Empty : string.Empty;
 
     public ICommand PatientLogoutCommand { get; }
+
+    public ICommand PatientAccountSecurityCommand { get; }
 
     private void ApplySession()
     {
