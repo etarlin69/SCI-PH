@@ -96,9 +96,10 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             }
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task ARealProviderSummaryIsExportedOnceThenServedFromTheCache()
         {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
             var s = await SetupAsync();
             await using var _ = s.Host;
             s.Azure.Then(() => ScriptedAzureOpenAi.Completion(Answer(), inputTokens: 2100, outputTokens: 350));
@@ -182,9 +183,10 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             AssertCleanLogs(s);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task ASemanticallyInvalidAnswerIsRegeneratedOnceThenAGeneric503()
         {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
             var s = await SetupAsync();
             await using var _ = s.Host;
             s.Azure.Then(() => ScriptedAzureOpenAi.Completion(Answer("V999"))).Then(() => ScriptedAzureOpenAi.Completion(Answer("V999")));
@@ -204,9 +206,10 @@ namespace SCI_PH.IntegrationTests.Clinical.Http
             AssertCleanLogs(s);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task ProviderErrorsAreTheGeneric503AndNeverTheProvidersStatus()
         {
+            Skip.IfNot(_postgres.Available, _postgres.SkipReason);
             var s = await SetupAsync();
             await using var _ = s.Host;
             s.Azure

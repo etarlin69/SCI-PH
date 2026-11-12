@@ -38,6 +38,12 @@ namespace SCI_PH.IntegrationTests.PostgreSql
 
         public async Task<string> CreateDatabaseAsync()
         {
+            // A test that forgot Skip.IfNot(Available) gets a clear message instead of a NullReferenceException (issue #45).
+            if (_container is null)
+            {
+                throw new InvalidOperationException($"PostgreSQL is not available: {SkipReason}");
+            }
+
             var name = $"sciph_test_{Guid.NewGuid():N}";
             await using (var connection = new NpgsqlConnection(_container!.GetConnectionString()))
             {
