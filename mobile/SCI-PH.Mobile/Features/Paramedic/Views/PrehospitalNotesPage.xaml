@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Paramedic.ViewModels"
+             xmlns:components="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Views.Components"
+             x:Class="SCI_PH.Mobile.Features.Paramedic.Views.PrehospitalNotesPage"
+             x:DataType="vm:PrehospitalNotesViewModel"
+             Style="{StaticResource SciPage}"
+             Title="Observaciones">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="18">
+
+            <!-- Emergencia en curso: código NN o paciente (con el NN como trazabilidad) e "Inicio" -->
+            <components:EmergencyIdentityHeader />
+
+            <!-- Encabezado -->
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Observaciones prehospitalarias" Style="{StaticResource SciTitle}" />
+                <Label Text="Registra lo observado durante la atención. Las observaciones no se editan: una corrección es otra observación."
+                       Style="{StaticResource SciSubtitle}" />
+            </VerticalStackLayout>
+
+            <!-- Formulario -->
+            <Border Style="{StaticResource SciCard}">
+                <VerticalStackLayout Spacing="14">
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Observación" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Editor Text="{Binding Content}"
+                                    Placeholder="Ej. Paciente consciente, orientado…"
+                                    Style="{StaticResource SciEditor}"
+                                    AutoSize="TextChanges"
+                                    MinimumHeightRequest="120"
+                                    MaxLength="4000" />
+                        </Border>
+                        <Label Text="{Binding ContentCounter}" FontSize="12" HorizontalOptions="End"
+                               TextColor="{StaticResource SciText}" />
+                    </VerticalStackLayout>
+
+                    <!-- Hora automática, solo lectura -->
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="Hora" Style="{StaticResource SciFieldLabel}" />
+                        <Label Text="{Binding OccurredAtText}" TextColor="{StaticResource SciText}" FontSize="14" />
+                    </VerticalStackLayout>
+
+                    <!-- Error -->
+                    <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding HasError}">
+                        <Label Text="{Binding ErrorMessage}"
+                               TextColor="{StaticResource SciDanger}" FontSize="13" />
+                    </Border>
+
+                    <!-- Éxito -->
+                    <Border Style="{StaticResource SciBadgeSuccess}" IsVisible="{Binding HasSuccess}" HorizontalOptions="Start">
+                        <Label Text="{Binding SuccessMessage}"
+                               TextColor="{StaticResource SciSuccess}"
+                               FontAttributes="Bold" FontSize="13" />
+                    </Border>
+
+                    <!-- Loading -->
+                    <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                       IsVisible="{Binding IsBusy}"
+                                       Color="{StaticResource SciPrimary}" />
+
+                    <Button Text="Guardar observación"
+                            Command="{Binding SaveCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Registradas en esta sesión -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding HasSaved}">
+                <VerticalStackLayout Spacing="10">
+                    <Border Style="{StaticResource SciBadgeSuccess}" HorizontalOptions="Start">
+                        <Label Text="Observaciones registradas"
+                               TextColor="{StaticResource SciSuccess}"
+                               FontAttributes="Bold" FontSize="13" />
+                    </Border>
+
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding SavedSummaries}" Spacing="6">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <Label Text="{Binding .}"
+                                       TextColor="{StaticResource SciText}"
+                                       FontSize="14" />
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Transferencia: todavía no existe (diálogo informativo). -->
+            <Button Text="Continuar"
+                    Command="{Binding ContinueCommand}"
+                    Style="{StaticResource SciSecondaryButton}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

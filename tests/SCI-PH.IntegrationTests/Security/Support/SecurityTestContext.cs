@@ -25,9 +25,14 @@ namespace SCI_PH.IntegrationTests.Security.Support
     internal sealed class SecurityTestContext : IAsyncDisposable
     {
         private readonly ServiceProvider _provider;
+        private readonly string? _postgresConnectionString;
 
-        public SecurityTestContext(IDictionary<string, string?>? settings = null, string? postgresConnectionString = null)
+        public SecurityTestContext(
+            IDictionary<string, string?>? settings = null,
+            string? postgresConnectionString = null,
+            RefreshReadBarrier? refreshReadBarrier = null)
         {
+            _postgresConnectionString = postgresConnectionString;
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(TestSettings.Create(settings)).Build();
 
             var services = new ServiceCollection();
@@ -46,6 +51,10 @@ namespace SCI_PH.IntegrationTests.Security.Support
 
             services.UseFakeEmail(Email);
             services.AddSingleton<TimeProvider>(Time);
+            if (refreshReadBarrier is not null)
+            {
+                services.AddRefreshReadBarrier(refreshReadBarrier);
+            }
             _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         }
 
@@ -85,6 +94,9 @@ namespace SCI_PH.IntegrationTests.Security.Support
 
         public Task<AuthenticationResult?> RefreshAsync(string refreshToken) =>
             With<AuthenticationService, AuthenticationResult?>(auth => auth.RefreshAsync(refreshToken, ClientContext.Unknown, CancellationToken.None));
+
+        public Task<RefreshOutcome> RefreshSessionAsync(string refreshToken) =>
+            With<AuthenticationService, RefreshOutcome>(auth => auth.RefreshSessionAsync(refreshToken, ClientContext.Unknown, CancellationToken.None));
 
         public Task<T> AuthenticationAsync<T>(Func<AuthenticationService, Task<T>> action) => With(action);
 
@@ -138,7 +150,16 @@ namespace SCI_PH.IntegrationTests.Security.Support
                 return staff.Id;
             });
 
-        public ValueTask DisposeAsync() => _provider.DisposeAsync();
+        // Over PostgreSQL the context owns its test database: once the provider is disposed, the pool's idle connections are
+        // closed (issue #52).
+        public async ValueTask DisposeAsync()
+        {
+            await _provider.DisposeAsync();
+            if (_postgresConnectionString is not null)
+            {
+                PostgreSql.PostgresFixture.ReleaseDatabase(_postgresConnectionString);
+            }
+        }
 
         private static void AssertSucceeded(IdentityResult result) =>
             Assert.True(result.Succeeded, string.Join(", ", result.Errors.Select(error => error.Code)));

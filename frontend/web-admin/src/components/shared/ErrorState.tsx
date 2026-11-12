@@ -1,6 +1,7 @@
 import { AlertTriangle, RotateCw } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { Button } from './Button';
+import { endSentence } from '../../utils/formatters';
 
 export interface ErrorStateProps {
   title?: string;
@@ -23,7 +24,7 @@ export function ErrorState({ title = 'No se pudieron cargar los datos', message,
       >
         <AlertTriangle size={18} className="shrink-0" aria-hidden="true" />
         <span className="min-w-0 flex-1">
-          <strong className="font-semibold">{title}.</strong> {message}
+          <strong className="font-semibold">{endSentence(title)}</strong> {message}
         </span>
         {onRetry && (
           <Button size="sm" variant="secondary" leftIcon={<RotateCw size={14} aria-hidden="true" />} onClick={onRetry}>

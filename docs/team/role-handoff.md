@@ -19,6 +19,8 @@ Este documento explica qué puede empezar a hacer cada rol **ahora**, sobre la a
 | 9 | Hardware / QA / DevOps | Firmware ESP32, `tests/`, `docker-compose.yml`, `.github/workflows/` |
 
 > La ubicación de los proyectos React y .NET MAUI (este repositorio en una carpeta nueva, o repositorios separados) la decide el Rol 1 antes de crearlos.
+>
+> **Mobile (decidido):** una sola app MAUI en `mobile/SCI-PH.Mobile/`, con su propia solución `mobile/SCI-PH.Mobile.sln`; el Rol 6 trabaja en `Features/Paramedic` y el Rol 7 en `Features/Patient` (ver [mobile/README.md](../../mobile/README.md)).
 
 ## Reglas comunes
 
@@ -139,23 +141,28 @@ Este documento explica qué puede empezar a hacer cada rol **ahora**, sobre la a
 
 ## Rol 7 — Mobile / Patient
 
-**Responsabilidades:** QR, facial, perfil, historial, resultados, documentos e IA.
+**Responsabilidades:** inicio de sesión del paciente con su cuenta, perfil, historial, resultados, QR (mostrarlo),
+documentos e IA ([ADR-015](../adr/ADR-015-patient-authentication-qr-identification.md)).
 
 **Toca principalmente**
 - El proyecto .NET MAUI (app del paciente)
 - [docs/api/mobile-bff-contracts.md](../api/mobile-bff-contracts.md), sección del paciente (solo mediante PR revisado)
 
 **Puede empezar ahora**
-- Pantallas de escaneo QR, captura facial y perfil con los contratos `POST /api/mobile/auth/qr/challenge`, `POST /api/mobile/auth/face/verify` y `GET /api/mobile/me` y mocks.
+- Pantallas del área del paciente sobre `/api/mobile/auth` y `/api/mobile/patient/me` (el paciente inicia sesión con su
+  cuenta; el QR y el rostro nunca crean una sesión, ADR-015).
 - Proponer los contratos de historial, resultados, documentos y asistente de IA.
 
 **No hace**
 - Guardar imágenes faciales en el dispositivo más de lo necesario.
-- Presentar la IA como diagnóstico: es un asistente **educativo**.
+- Usar el QR o el rostro como inicio de sesión, o enviar un `patientId` desde la app.
+- Presentar la IA como diagnóstico: es un asistente **educativo** (hoy un chat simulado sin backend; no usa el resumen
+  asistido del hospital, ver [ADR-013](../adr/ADR-013-clinical-ai-assistant.md)).
 
 ## Rol 8 — AI / Biometrics / OCR / QR
 
-**Responsabilidades:** IA educativa, Face Verification 1:1, OCR, QR y pruebas de proveedores.
+**Responsabilidades:** IA clínica asistida (resumen de la atención, [ADR-013](../adr/ADR-013-clinical-ai-assistant.md)), IA
+educativa, Face Verification 1:1, OCR, QR y pruebas de proveedores.
 
 **Toca principalmente**
 - `src/Core/SCI-PH.Application/Abstractions/` (`AI`, `Biometrics`, `OCR`, `QR`, `Storage`, `Documents`)
@@ -163,12 +170,17 @@ Este documento explica qué puede empezar a hacer cada rol **ahora**, sobre la a
 
 **Puede empezar ahora**
 - Evaluar proveedores de IA, verificación facial 1:1 y OCR, y documentar la comparación.
-- Proponer los métodos de `IAiAssistantService`, `IFaceVerificationService`, `IOcrService` e `IQrService` (hoy son interfaces vacías) mediante PR revisado por el Rol 1.
+- Proponer los métodos de `IOcrService` e `IQrService` (hoy son interfaces vacías) mediante PR revisado por el Rol 1.
+  `IClinicalAiService` e `IFaceVerificationService` ya tienen contrato (ADR-013, ADR-012): una operación de IA nueva es
+  otro método cerrado con su prompt versionado, nunca un prompt libre.
 - Implementaciones de prueba (fakes) en Infrastructure para que los BFF puedan integrarse sin proveedor real.
 
 **No hace**
 - Agregar el SDK de Azure u otros proveedores sin ADR y sin revisión.
-- Que la IA diagnostique o prescriba.
+- Que la IA diagnostique o prescriba, o que su salida se guarde como dato del expediente.
+- Enviar datos reales de pacientes a un proveedor externo sin el acuerdo de datos y la revisión de ADR-013 (decisión 12) y
+  [ADR-014](../adr/ADR-014-clinical-ai-real-provider.md) (decisión 4); habilitar `ClinicalAi:AllowExternalClinicalData` es
+  esa decisión, no un ajuste técnico.
 - Referenciar SDKs externos desde Domain o Application.
 
 ## Rol 9 — Hardware / QA / DevOps

@@ -10,9 +10,10 @@ namespace SCI_PH.Application.Abstractions.Security
 
         Task<StoredRefreshToken?> FindByHashAsync(string tokenHash, CancellationToken cancellationToken);
 
-        // Atomically revokes the current token and stores its replacement.
-        // Returns false when the current token was already revoked (for example, a concurrent refresh).
-        Task<bool> RotateAsync(Guid currentTokenId, NewRefreshToken replacement, string? ipAddress, CancellationToken cancellationToken);
+        // Atomically revokes the current token (read as active by the caller) and stores its replacement. When the token
+        // is no longer active at update time, tells a concurrent rotation of the same token (LostConcurrencyRace) apart
+        // from any other revocation (Revoked); in both cases nothing is written.
+        Task<RefreshTokenRotationResult> RotateAsync(Guid currentTokenId, NewRefreshToken replacement, string? ipAddress, CancellationToken cancellationToken);
 
         Task<int> RevokeFamilyAsync(Guid familyId, RefreshTokenRevocationReason reason, string? ipAddress, CancellationToken cancellationToken);
 

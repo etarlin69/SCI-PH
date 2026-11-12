@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="SCI_PH.Mobile.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:SCI_PH.Mobile"
+    xmlns:nav="clr-namespace:SCI_PH.Mobile.Common.Navigation"
+    xmlns:entry="clr-namespace:SCI_PH.Mobile.Common.Entry"
+    xmlns:startup="clr-namespace:SCI_PH.Mobile.Common.Startup"
+    xmlns:paramedic="clr-namespace:SCI_PH.Mobile.Features.Paramedic"
+    xmlns:paramedicViews="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Views"
+    xmlns:patient="clr-namespace:SCI_PH.Mobile.Features.Patient"
+    xmlns:patientHome="clr-namespace:SCI_PH.Mobile.Features.Patient.Home"
+    xmlns:patientProfile="clr-namespace:SCI_PH.Mobile.Features.Patient.Profile"
+    xmlns:patientQr="clr-namespace:SCI_PH.Mobile.Features.Patient.Qr"
+    xmlns:patientHistory="clr-namespace:SCI_PH.Mobile.Features.Patient.History"
+    xmlns:patientResults="clr-namespace:SCI_PH.Mobile.Features.Patient.Results"
+    xmlns:patientDocuments="clr-namespace:SCI_PH.Mobile.Features.Patient.Documents"
+    x:DataType="local:AppShell"
+    Shell.BackgroundColor="{StaticResource SciNavy}"
+    Shell.ForegroundColor="White"
+    Shell.TitleColor="White"
+    FlyoutBehavior="Disabled"
+    FlyoutBackgroundColor="{StaticResource SciNavy}"
+    Title="SCI-PH">
+
+    <!--
+        Una sola app y un solo inicio de sesión para dos tipos de usuario (ver mobile/README.md y ADR-015):
+          - Personal clínico con permiso Emergencies.Operate: área paramédica.
+          - Paciente (rol Patient): área del paciente con su propio expediente (api/mobile/patient/me).
+        El QR (solo identifica) y el rostro nunca inician una sesión. El login (ClinicalLogin → ClinicalMfa) se apila sobre la
+        entrada; el flujo de cada emergencia se apila sobre el inicio del paramédico. Cada feature registra sus rutas. Aquí
+        solo se declaran el arranque, la entrada, el inicio del paramédico y el área del paciente.
+    -->
+
+    <!-- CABECERA DEL MENÚ (área del paciente): nombre tomado de la sesión -->
+    <Shell.FlyoutHeader>
+        <Grid Padding="22,35,22,24" BackgroundColor="{StaticResource SciNavy}">
+            <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+                <Border
+                    WidthRequest="90"
+                    HeightRequest="90"
+                    BackgroundColor="White"
+                    Stroke="White"
+                    StrokeThickness="3">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="45" />
+                    </Border.StrokeShape>
+                    <Image Source="patient_avatar.png" Aspect="AspectFill" />
+                </Border>
+                <Label
+                    Text="{Binding PatientDisplayName}"
+                    FontSize="20"
+                    FontAttributes="Bold"
+                    TextColor="White"
+                    HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+        </Grid>
+    </Shell.FlyoutHeader>
+
+    <!-- ARRANQUE: restaura la sesión clínica guardada antes de mostrar nada más -->
+    <ShellContent
+        Title="SCI-PH"
+        Route="Startup"
+        ContentTemplate="{DataTemplate startup:StartupPage}"
+        Shell.FlyoutItemIsVisible="False" />
+
+    <!-- ENTRADA COMPARTIDA -->
+    <ShellContent
+        Title="SCI-PH"
+        Route="{x:Static nav:AppRoutes.Entry}"
+        ContentTemplate="{DataTemplate entry:EntryPage}"
+        Shell.FlyoutItemIsVisible="False" />
+
+    <!--
+        Paramedic (Rol 6): sin menú. Tras el login, su inicio es la raíz (sin flecha "Atrás"): "Nueva emergencia" y
+        "Emergencias activas". El flujo de una emergencia se apila sobre él (RegisterParamedicRoutes) y "Atrás" acaba
+        volviendo aquí.
+    -->
+    <ShellContent
+        Title="Atención prehospitalaria"
+        Route="{x:Static paramedic:ParamedicRoutes.Home}"
+        ContentTemplate="{DataTemplate paramedicViews:ParamedicHomePage}"
+        Shell.FlyoutItemIsVisible="False" />
+
+    <!-- Patient (Rol 7): área con sesión de paciente -->
+    <FlyoutItem Title="Inicio" Route="{x:Static patient:PatientRoutes.Home}">
+        <ShellContent Title="Inicio" ContentTemplate="{DataTemplate patientHome:HomePage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Mi perfil" Route="{x:Static patient:PatientRoutes.Profile}">
+        <ShellContent Title="Mi perfil" ContentTemplate="{DataTemplate patientProfile:ProfilePage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Mi QR" Route="{x:Static patient:PatientRoutes.MyQr}">
+        <ShellContent Title="Mi QR" ContentTemplate="{DataTemplate patientQr:MyQrPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Historial clínico" Route="{x:Static patient:PatientRoutes.History}">
+        <ShellContent Title="Historial clínico" ContentTemplate="{DataTemplate patientHistory:HistoryPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Resultados" Route="{x:Static patient:PatientRoutes.Results}">
+        <ShellContent Title="Resultados" ContentTemplate="{DataTemplate patientResults:ResultsPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Documentos" Route="{x:Static patient:PatientRoutes.Documents}">
+        <ShellContent Title="Documentos" ContentTemplate="{DataTemplate patientDocuments:DocumentsPage}" />
+    </FlyoutItem>
+
+    <MenuItem Text="Seguridad de la cuenta" Command="{Binding PatientAccountSecurityCommand}" />
+
+    <MenuItem Text="Cerrar sesión" Command="{Binding PatientLogoutCommand}" />
+
+</Shell>

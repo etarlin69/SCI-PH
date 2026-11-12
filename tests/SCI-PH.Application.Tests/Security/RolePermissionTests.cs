@@ -78,6 +78,15 @@ namespace SCI_PH.Application.Tests.Security
         }
 
         [Fact]
+        public void OnlyParamedicsOperateEmergencies()
+        {
+            // Administrator through Permissions.All; no other clinical or patient role works in the field.
+            Assert.Equal([SecurityRoles.Administrator, SecurityRoles.Paramedic],
+                SecurityRoles.All.Where(role => RolePermissions.For(role).Contains(Permissions.Emergencies.Operate)));
+            Assert.Contains(Permissions.Emergencies.Operate, Permissions.All);
+        }
+
+        [Fact]
         public void ReceptionistHasNoClinicalWriteOrReadAccess()
         {
             var receptionist = RolePermissions.For(SecurityRoles.Receptionist);

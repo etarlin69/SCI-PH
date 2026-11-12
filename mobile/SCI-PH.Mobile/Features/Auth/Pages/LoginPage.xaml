@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Auth.ViewModels"
+             x:Class="SCI_PH.Mobile.Features.Auth.Pages.LoginPage"
+             x:DataType="vm:LoginViewModel"
+             Style="{StaticResource SciPage}"
+             Shell.NavBarIsVisible="False"
+             Title="Acceso personal clínico">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="20" VerticalOptions="Center" MaximumWidthRequest="520">
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="SCI-PH" Style="{StaticResource SciTitle}" HorizontalTextAlignment="Center" />
+                <Label Text="Inicia sesión con tu cuenta de SCI-PH"
+                       Style="{StaticResource SciSubtitle}"
+                       HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+
+            <Border Style="{StaticResource SciCard}">
+                <VerticalStackLayout Spacing="14">
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Correo o usuario" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding Identifier}"
+                                   Keyboard="Email"
+                                   IsSpellCheckEnabled="False"
+                                   IsTextPredictionEnabled="False"
+                                   MaxLength="256"
+                                   ReturnType="Next"
+                                   AutomationId="LoginIdentifier"
+                                   Style="{StaticResource SciEntry}" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Contraseña" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding Password}"
+                                   IsPassword="True"
+                                   IsSpellCheckEnabled="False"
+                                   IsTextPredictionEnabled="False"
+                                   MaxLength="256"
+                                   ReturnType="Go"
+                                   ReturnCommand="{Binding LoginCommand}"
+                                   AutomationId="LoginPassword"
+                                   Style="{StaticResource SciEntry}" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding HasError}">
+                        <Label Text="{Binding ErrorMessage}"
+                               AutomationId="LoginError"
+                               TextColor="{StaticResource SciDanger}"
+                               FontSize="13" />
+                    </Border>
+
+                    <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                       IsVisible="{Binding IsBusy}"
+                                       Color="{StaticResource SciPrimary}" />
+
+                    <Button Text="Iniciar sesión"
+                            Command="{Binding LoginCommand}"
+                            AutomationId="LoginSubmit"
+                            Style="{StaticResource SciPrimaryButton}" />
+
+                    <Button Text="Volver"
+                            Command="{Binding BackCommand}"
+                            IsEnabled="{Binding IsNotBusy}"
+                            AutomationId="LoginBack"
+                            Style="{StaticResource SciSecondaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

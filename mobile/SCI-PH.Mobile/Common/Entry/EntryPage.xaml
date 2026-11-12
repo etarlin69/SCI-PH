@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Common.Entry"
+             x:Class="SCI_PH.Mobile.Common.Entry.EntryPage"
+             x:DataType="vm:EntryViewModel"
+             Style="{StaticResource SciPage}"
+             Shell.NavBarIsVisible="False"
+             Title="SCI-PH">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="20" VerticalOptions="Center" MaximumWidthRequest="520">
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="SCI-PH" Style="{StaticResource SciTitle}" HorizontalTextAlignment="Center" />
+                <Label Text="Inicia sesión con tu cuenta."
+                       Style="{StaticResource SciSubtitle}"
+                       HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+
+            <!-- Un solo inicio de sesión (ADR-015): la cuenta decide el área (paramédica o del paciente). -->
+            <Border Style="{StaticResource SciCard}">
+                <VerticalStackLayout Spacing="10">
+                    <Button Text="Iniciar sesión"
+                            AutomationId="EntrySignIn"
+                            Command="{Binding SignInCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                    <Label Text="Personal clínico: atención prehospitalaria. Pacientes: la cuenta que activaste con la invitación de tu centro de salud."
+                           Style="{StaticResource SciSubtitle}" FontSize="13" />
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

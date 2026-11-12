@@ -5,12 +5,17 @@ export const DeviceCredentialStatus = { Active: 1, Revoked: 2 } as const;
 export type DeviceCredentialStatusCode = (typeof DeviceCredentialStatus)[keyof typeof DeviceCredentialStatus];
 
 /** DeviceScopes del backend. */
-export const DeviceScopes = { Heartbeat: 'Device.Heartbeat', FingerprintIdentify: 'Device.Fingerprint.Identify' } as const;
+export const DeviceScopes = {
+  Heartbeat: 'Device.Heartbeat',
+  FingerprintIdentify: 'Device.Fingerprint.Identify',
+  FingerprintEnroll: 'Device.Fingerprint.Enroll',
+} as const;
 export type DeviceScope = (typeof DeviceScopes)[keyof typeof DeviceScopes];
 
 export const DEVICE_SCOPE_LABELS: Record<DeviceScope, string> = {
   'Device.Heartbeat': 'Latido (heartbeat)',
   'Device.Fingerprint.Identify': 'Identificación por huella',
+  'Device.Fingerprint.Enroll': 'Registro de huellas',
 };
 
 export interface DeviceSummary {

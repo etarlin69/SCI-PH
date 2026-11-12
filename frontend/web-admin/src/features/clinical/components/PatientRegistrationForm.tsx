@@ -20,6 +20,7 @@ export function PatientRegistrationForm({ onRegistered }: { onRegistered: (patie
     const [sex, setSex] = useState<BiologicalSex | ''>('');
     const [identifierType, setIdentifierType] = useState<PatientIdentifierType>('NationalId');
     const [identifierValue, setIdentifierValue] = useState('');
+    const [email, setEmail] = useState('');
     const [saving, setSaving] = useState(false);
     const today = new Date().toISOString().slice(0, 10);
 
@@ -34,6 +35,7 @@ export function PatientRegistrationForm({ onRegistered }: { onRegistered: (patie
                 dateOfBirth: dateOfBirth || null,
                 sex,
                 identifier: identifierValue.trim() ? { type: identifierType, value: identifierValue } : null,
+                email: email.trim() || null,
             });
             feedback.success('paciente registrado');
             setGivenNames('');
@@ -41,6 +43,7 @@ export function PatientRegistrationForm({ onRegistered }: { onRegistered: (patie
             setDateOfBirth('');
             setSex('');
             setIdentifierValue('');
+            setEmail('');
             onRegistered(patient);
         } catch (error) {
             feedback.failure('No se pudo registrar al paciente.', error);
@@ -74,6 +77,15 @@ export function PatientRegistrationForm({ onRegistered }: { onRegistered: (patie
                     onChange={(e) => setIdentifierValue(e.target.value)}
                     maxLength={250}
                     autoComplete="off"
+                />
+                <Input
+                    label="Correo electrónico (opcional)"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    maxLength={250}
+                    autoComplete="off"
+                    hint="Necesario para invitar al paciente a la app SCI-PH."
                 />
             </div>
             <Button type="submit" loading={saving} disabled={!givenNames.trim() || !familyNames.trim() || !sex} className="w-full sm:w-fit">

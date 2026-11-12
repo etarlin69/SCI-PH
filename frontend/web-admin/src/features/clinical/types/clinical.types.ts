@@ -42,6 +42,8 @@ export interface RegisterPatientRequest {
     dateOfBirth: DateOnly | null;
     sex: BiologicalSex;
     identifier: { type: PatientIdentifierType; value: string; issuer?: string | null } | null;
+    /** Correo de contacto opcional: a donde se envía la invitación a la app del paciente. */
+    email?: string | null;
 }
 
 // ---------------------------------------------------------------- Contexto clínico
@@ -198,6 +200,27 @@ export interface CreateDiagnosisRequest {
     isPrimary: boolean;
 }
 
+export type ClinicalProcedureStatus = 'Planned' | 'InProgress' | 'Completed' | 'Cancelled';
+
+/**
+ * Procedimiento de la atención (GET /encounters/{id}/procedures, solo lectura en la web). Hoy los registra el paramédico
+ * (Mobile BFF) y viajan con la MISMA atención; `prehospital` indica que vienen de la ambulancia.
+ */
+export interface ClinicalProcedure {
+    id: Guid;
+    encounterId: Guid;
+    name: string;
+    codeSystem: string | null;
+    code: string | null;
+    status: ClinicalProcedureStatus;
+    performedAtUtc: UtcDateTime | null;
+    completedAtUtc: UtcDateTime | null;
+    outcome: string | null;
+    /** Nombre de quien lo realizó (personal clínico), resuelto por el backend. */
+    performedByDisplayName: string | null;
+    prehospital: boolean;
+}
+
 export interface Diagnosis extends CreateDiagnosisRequest {
     id: Guid;
     encounterId?: Guid;
@@ -343,4 +366,152 @@ export interface ClinicalTransfer {
     reason: string | null;
     /** Prioridad del triage prehospitalario, si existe. */
     latestTriagePriority: TriagePriority | null;
+}
+
+/** Clínica activa a la que se puede trasladar al paciente (GET /api/web/transfers/destinations). Sin datos de administración. */
+export interface TransferDestination {
+    id: Guid;
+    name: string;
+    type: string;
+    municipality: string;
+    province: string;
+}
+
+/** POST /api/web/encounters/{id}/transfers: la clínica de origen la fija el backend (la de la atención). */
+export interface RequestTransferRequest {
+    destinationClinicId: Guid;
+    reason?: string | null;
+    notes?: string | null;
+}
+
+// ---- Huella digital (ADR-010) ----
+
+/** Lector donde se puede registrar una huella: activo, que registra e identifica. Sin claves ni scopes. */
+export interface FingerprintEnroller {
+    id: Guid;
+    code: string;
+    name: string;
+    lastSeenAtUtc: string | null;
+}
+
+export type BiometricReferenceStatus = 'Active' | 'Revoked';
+
+/**
+ * Limpieza física de una huella revocada en su lector (ADR-011). Derivada por el servidor; nunca incluye el slot.
+ * Pending: el lector aún debe borrar su copia. Completed: borrada. AttentionRequired: el lector no puede hacerlo (revocado,
+ * desconocido) o sigue fallando. NotRequired: revocada antes de existir la limpieza automática.
+ */
+export type FingerprintCleanupStatus = 'Pending' | 'Completed' | 'AttentionRequired' | 'NotRequired';
+
+/** Referencia de huella del paciente. Nunca incluye el slot ni la referencia interna del sensor. */
+export interface PatientFingerprint {
+    id: Guid;
+    status: BiometricReferenceStatus;
+    /** null si la referencia no nombra un lector conocido. available: el lector sigue activo y puede identificar. */
+    reader: { code: string; name: string; available: boolean } | null;
+    registeredAtUtc: string;
+    revokedAtUtc: string | null;
+    /** null mientras está activa. */
+    cleanup: FingerprintCleanupStatus | null;
+}
+
+/** Motivo opcional de la revocación; solo queda en la auditoría. */
+export type FingerprintRevocationReason = 'PatientRequest' | 'EnrollmentError' | 'ReaderReplaced' | 'Other';
+
+/**
+ * Referencia facial del paciente (ADR-012): verificación 1:1 asistida. Nunca incluye la referencia del proveedor, la
+ * plantilla, el puntaje ni el umbral. provider: nombre estable del proveedor (la UI muestra una etiqueta).
+ */
+export interface PatientFace {
+    id: Guid;
+    status: BiometricReferenceStatus;
+    provider: string;
+    registeredAtUtc: string;
+    revokedAtUtc: string | null;
+}
+
+export type FaceEnrollmentOutcome = 'Enrolled' | 'NoFace' | 'MultipleFaces' | 'LowQuality';
+
+/** face: solo con Enrolled. Las demás respuestas no crean nada. */
+export interface FaceEnrollmentResponse {
+    outcome: FaceEnrollmentOutcome;
+    face: PatientFace | null;
+}
+
+export type FaceVerificationOutcome = 'Match' | 'NoMatch' | 'NoFace' | 'MultipleFaces' | 'LowQuality';
+
+/** Solo el resultado: nunca un puntaje ni un umbral. */
+export interface FaceVerificationResponse {
+    verificationId: Guid;
+    outcome: FaceVerificationOutcome;
+}
+
+export type FaceRevocationReason = 'PatientRequest' | 'EnrollmentError' | 'ReferenceOutdated' | 'Other';
+
+export type FingerprintEnrollmentStatus = 'Pending' | 'Enrolled' | 'Failed' | 'Expired' | 'Cancelled';
+
+export interface FingerprintEnrollment {
+    id: Guid;
+    status: FingerprintEnrollmentStatus;
+    readerId: Guid;
+    expiresAtUtc: string;
+    /** Solo con Failed. */
+    failure: 'Failed' | 'LowQuality' | 'SensorError' | null;
+    biometricReferenceId: Guid | null;
+}
+
+/** Tipos de punto a revisar: solo sobre la DOCUMENTACIÓN, nunca un juicio clínico (ADR-013). */
+export type EncounterAiReviewPointKind = 'MissingDocumentation' | 'Inconsistency' | 'PendingItem';
+
+export type ClinicalAiSourceType =
+    | 'Triage'
+    | 'VitalSign'
+    | 'ClinicalNote'
+    | 'Diagnosis'
+    | 'Prescription'
+    | 'MedicationAdministration'
+    | 'ClinicalProcedure'
+    | 'ClinicalTransfer';
+
+/** Registro relacionado: el servidor comprobó que existe en esta atención, NO que respalde la frase. */
+export interface EncounterAiSourceReference {
+    type: ClinicalAiSourceType;
+    id: Guid;
+}
+
+export interface EncounterAiSection {
+    text: string;
+    sources: EncounterAiSourceReference[];
+}
+
+export interface EncounterAiReviewPoint {
+    kind: EncounterAiReviewPointKind;
+    text: string;
+    sources: EncounterAiSourceReference[];
+}
+
+/**
+ * Resumen asistido de una atención (ADR-013): generado por IA, requiere revisión profesional, efímero (no se guarda) e
+ * instantánea de los registros en generatedAtUtc. Sin diagnóstico, recomendación, tratamiento, gravedad ni confianza.
+ */
+export interface EncounterAiSummary {
+    aiGenerated: true;
+    requiresClinicianReview: true;
+    summary: string;
+    sections: {
+        course: EncounterAiSection | null;
+        vitalSigns: EncounterAiSection | null;
+        medications: EncounterAiSection | null;
+        procedures: EncounterAiSection | null;
+        notes: EncounterAiSection | null;
+        transfer: EncounterAiSection | null;
+    };
+    reviewPoints: EncounterAiReviewPoint[];
+    notDocumented: string[];
+    generatedAtUtc: string;
+    provider: string;
+    model: string;
+    promptVersion: string;
+    sourceFingerprint: string;
+    truncated: boolean;
 }

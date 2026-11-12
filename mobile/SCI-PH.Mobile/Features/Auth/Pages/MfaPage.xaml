@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Auth.ViewModels"
+             x:Class="SCI_PH.Mobile.Features.Auth.Pages.MfaPage"
+             x:DataType="vm:MfaViewModel"
+             Style="{StaticResource SciPage}"
+             Shell.NavBarIsVisible="False"
+             Title="Verificación en dos pasos">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="20" VerticalOptions="Center" MaximumWidthRequest="520">
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="SCI-PH" Style="{StaticResource SciTitle}" HorizontalTextAlignment="Center" />
+                <Label Text="Verificación en dos pasos"
+                       Style="{StaticResource SciSubtitle}"
+                       HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+
+            <Border Style="{StaticResource SciCard}">
+                <VerticalStackLayout Spacing="14">
+
+                    <!-- Código del autenticador (modo por defecto) -->
+                    <VerticalStackLayout Spacing="6" IsVisible="{Binding IsAuthenticatorMode}">
+                        <Label Text="Código del autenticador" Style="{StaticResource SciFieldLabel}" />
+                        <Label Text="Escribe el código de 6 dígitos que muestra tu aplicación autenticadora."
+                               Style="{StaticResource SciSubtitle}" FontSize="13" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding Code}"
+                                   Keyboard="Numeric"
+                                   MaxLength="7"
+                                   IsSpellCheckEnabled="False"
+                                   IsTextPredictionEnabled="False"
+                                   IsEnabled="{Binding CanEnterCode}"
+                                   ReturnType="Go"
+                                   ReturnCommand="{Binding VerifyCommand}"
+                                   AutomationId="MfaCode"
+                                   Style="{StaticResource SciEntry}" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <!-- Código de recuperación -->
+                    <VerticalStackLayout Spacing="6" IsVisible="{Binding IsRecoveryMode}">
+                        <Label Text="Código de recuperación" Style="{StaticResource SciFieldLabel}" />
+                        <Label Text="Cada código de recuperación sirve una sola vez."
+                               Style="{StaticResource SciSubtitle}" FontSize="13" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding RecoveryCode}"
+                                   MaxLength="32"
+                                   IsSpellCheckEnabled="False"
+                                   IsTextPredictionEnabled="False"
+                                   IsEnabled="{Binding CanEnterCode}"
+                                   ReturnType="Go"
+                                   ReturnCommand="{Binding VerifyCommand}"
+                                   AutomationId="MfaRecoveryCode"
+                                   Style="{StaticResource SciEntry}" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding HasError}">
+                        <Label Text="{Binding ErrorMessage}"
+                               AutomationId="MfaError"
+                               TextColor="{StaticResource SciDanger}"
+                               FontSize="13" />
+                    </Border>
+
+                    <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                       IsVisible="{Binding IsBusy}"
+                                       Color="{StaticResource SciPrimary}" />
+
+                    <Button Text="Verificar"
+                            Command="{Binding VerifyCommand}"
+                            IsVisible="{Binding IsAuthenticatorMode}"
+                            AutomationId="MfaVerify"
+                            Style="{StaticResource SciPrimaryButton}" />
+
+                    <Button Text="Verificar código de recuperación"
+                            Command="{Binding VerifyCommand}"
+                            IsVisible="{Binding IsRecoveryMode}"
+                            AutomationId="MfaVerifyRecovery"
+                            Style="{StaticResource SciPrimaryButton}" />
+
+                    <Button Text="Usar código de recuperación"
+                            Command="{Binding ToggleRecoveryModeCommand}"
+                            IsVisible="{Binding IsAuthenticatorMode}"
+                            IsEnabled="{Binding IsNotBusy}"
+                            AutomationId="MfaUseRecovery"
+                            Style="{StaticResource SciSecondaryButton}" />
+
+                    <Button Text="Usar código del autenticador"
+                            Command="{Binding ToggleRecoveryModeCommand}"
+                            IsVisible="{Binding IsRecoveryMode}"
+                            IsEnabled="{Binding IsNotBusy}"
+                            AutomationId="MfaUseAuthenticator"
+                            Style="{StaticResource SciSecondaryButton}" />
+
+                    <Button Text="Volver al login"
+                            Command="{Binding BackToLoginCommand}"
+                            IsEnabled="{Binding IsNotBusy}"
+                            AutomationId="MfaBack"
+                            Style="{StaticResource SciSecondaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

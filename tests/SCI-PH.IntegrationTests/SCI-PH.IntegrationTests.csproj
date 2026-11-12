@@ -14,6 +14,10 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.9" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <!-- Test-only native OpenCV for Linux CI runners (the Windows one comes with the Web BFF). Never published: the
+         production Linux runtime is the source-built one (scripts/biometrics/build-opencv-linux.sh). -->
+    <PackageReference Include="OpenCvSharp5.official.runtime.linux-x64.headless" Version="5.0.0.20261003" PrivateAssets="all" />
+    <PackageReference Include="Testcontainers.Azurite" Version="4.15.0" />
     <PackageReference Include="Testcontainers.PostgreSql" Version="4.15.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
@@ -32,5 +36,14 @@
     <ProjectReference Include="..\..\src\Presentation\SCI-PH.Mobile.BFF\SCI-PH.Mobile.BFF.csproj" />
     <ProjectReference Include="..\..\src\Presentation\SCI-PH.Device.API\SCI-PH.Device.API.csproj" />
   </ItemGroup>
+
+  <!-- OpenCvSharp5 ships a Roslyn analyzer built for a newer compiler than the .NET 9 SDK's (warning CS9057: it cannot
+       load). ExcludeAssets="analyzers" is not honored by SDK 9.0.305 for it, so only that package's analyzer is removed,
+       in this project only. -->
+  <Target Name="RemoveOpenCvSharpAnalyzer" AfterTargets="ResolveLockFileAnalyzers" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)" Condition="'%(Analyzer.NuGetPackageId)' == 'OpenCvSharp5'" />
+    </ItemGroup>
+  </Target>
 
 </Project>

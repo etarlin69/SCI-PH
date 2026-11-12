@@ -13,7 +13,8 @@ namespace SCI_PH.Application.Features.Clinical
     // Medication catalog, prescriptions and medication administrations of an encounter. The Kardex is not stored: it is
     // the projection of the encounter's prescriptions (with their details) and its administrations. Writes follow the
     // same rules as the other clinical records (EncounterRecordService.LoadForRecordingAsync): clinic, patient rule,
-    // recordable status, Created -> InProgress, and the encounter's concurrency tokens re-checked inside the save.
+    // recordable status, care start (Created or Received -> InProgress, EncounterRecordService.StartCareIfPending), and
+    // the encounter's concurrency tokens re-checked inside the save.
     public sealed class MedicationService
     {
         public const int MaxDetailsPerPrescription = 20;
@@ -93,7 +94,7 @@ namespace SCI_PH.Application.Features.Clinical
 
             ClinicalInput.Apply(() => prescription.Issue(now));
 
-            EncounterRecordService.StartIfCreated(encounter, now);
+            EncounterRecordService.StartCareIfPending(encounter, now);
             _writes.Add(prescription);
             _writes.Add(ClinicalAuditEntry.Success(
                 actor.AuditActor, AuditActionType.Create, nameof(Prescription), prescription.Id.ToString(), now,
@@ -134,7 +135,7 @@ namespace SCI_PH.Application.Features.Clinical
                 encounter.Id, request.MedicationId, request.Dose, request.DoseUnit, request.Route, administeredAt, actor.StaffId,
                 request.PrescriptionId, request.PrescriptionDetailId, request.Notes));
 
-            EncounterRecordService.StartIfCreated(encounter, now);
+            EncounterRecordService.StartCareIfPending(encounter, now);
             _writes.Add(administration);
             _writes.Add(ClinicalAuditEntry.Success(
                 actor.AuditActor, AuditActionType.Create, nameof(MedicationAdministration), administration.Id.ToString(), now,
@@ -147,12 +148,17 @@ namespace SCI_PH.Application.Features.Clinical
                 administration.AdministeredAtUtc, administration.AdministeredByStaffId, administration.Status, administration.Notes);
         }
 
-        // 404 for an unknown medication, 409 for one deactivated in the catalog.
-        private async Task<IReadOnlyDictionary<Guid, MedicationSummary>> LoadActiveMedicationsAsync(
-            IReadOnlyCollection<Guid> medicationIds, CancellationToken cancellationToken)
+        private Task<IReadOnlyDictionary<Guid, MedicationSummary>> LoadActiveMedicationsAsync(
+            IReadOnlyCollection<Guid> medicationIds, CancellationToken cancellationToken) =>
+            LoadActiveMedicationsAsync(_reads, medicationIds, cancellationToken);
+
+        // 404 for an unknown medication, 409 for one deactivated in the catalog. Shared with the prehospital
+        // administration (PrehospitalEmergencyService).
+        internal static async Task<IReadOnlyDictionary<Guid, MedicationSummary>> LoadActiveMedicationsAsync(
+            IClinicalReadStore reads, IReadOnlyCollection<Guid> medicationIds, CancellationToken cancellationToken)
         {
             var wanted = medicationIds.Distinct().ToList();
-            var found = (await _reads.FindMedicationsAsync(wanted, cancellationToken)).ToDictionary(m => m.Id);
+            var found = (await reads.FindMedicationsAsync(wanted, cancellationToken)).ToDictionary(m => m.Id);
             foreach (var id in wanted)
             {
                 if (!found.TryGetValue(id, out var medication))

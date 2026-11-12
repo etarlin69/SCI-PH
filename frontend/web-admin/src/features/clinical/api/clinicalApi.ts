@@ -4,8 +4,19 @@ import type {
     ClinicalContext,
     ClinicalEncounterSummary,
     ClinicalNote,
+    ClinicalProcedure,
     ClinicalTransfer,
+    RequestTransferRequest,
+    TransferDestination,
     CloseEncounterRequest,
+    FingerprintEnroller,
+    FingerprintEnrollment,
+    FingerprintRevocationReason,
+    FaceEnrollmentResponse,
+    FaceRevocationReason,
+    FaceVerificationResponse,
+    PatientFace,
+    PatientFingerprint,
     CreateClinicalNoteRequest,
     CreateDiagnosisRequest,
     CreateEncounterRequest,
@@ -13,6 +24,7 @@ import type {
     CreatePrescriptionRequest,
     CreateTriageRequest,
     Diagnosis,
+    EncounterAiSummary,
     Guid,
     Medication,
     MedicationAdministration,
@@ -36,6 +48,24 @@ export interface ClinicalApi {
 
     searchPatients(request: PatientSearchRequest, signal?: AbortSignal): Promise<PatientSummary[]>;
     registerPatient(request: RegisterPatientRequest): Promise<PatientSummary>;
+    getPatient(patientId: Guid, signal?: AbortSignal): Promise<PatientSummary>;
+
+    /** Huella digital (Biometrics.Manage). Lectores que registran e identifican. */
+    listFingerprintEnrollers(signal?: AbortSignal): Promise<FingerprintEnroller[]>;
+    listPatientFingerprints(patientId: Guid, signal?: AbortSignal): Promise<PatientFingerprint[]>;
+    /** clientRequestId: uno por intento, conservado en los reintentos. */
+    openFingerprintEnrollment(patientId: Guid, request: { clientRequestId: Guid; deviceId: Guid }): Promise<FingerprintEnrollment>;
+    getFingerprintEnrollment(patientId: Guid, enrollmentId: Guid, signal?: AbortSignal): Promise<FingerprintEnrollment>;
+    cancelFingerprintEnrollment(patientId: Guid, enrollmentId: Guid): Promise<FingerprintEnrollment>;
+    /** La huella deja de identificar de inmediato; el lector borra su copia después. Repetirlo devuelve el estado actual. */
+    revokePatientFingerprint(patientId: Guid, referenceId: Guid, reason?: FingerprintRevocationReason): Promise<PatientFingerprint>;
+
+    /** Rostro (ADR-012): verificación 1:1 asistida. Biometrics.Manage registra y revoca; Patients.Identify verifica. */
+    listPatientFaces(patientId: Guid, signal?: AbortSignal): Promise<PatientFace[]>;
+    /** capture: la imagen tomada con la cámara (nunca se guarda en el navegador). clientRequestId: uno por captura. */
+    enrollPatientFace(patientId: Guid, capture: Blob, clientRequestId: Guid): Promise<FaceEnrollmentResponse>;
+    verifyPatientFace(patientId: Guid, capture: Blob, clientRequestId: Guid): Promise<FaceVerificationResponse>;
+    revokePatientFace(patientId: Guid, referenceId: Guid, reason?: FaceRevocationReason): Promise<PatientFace>;
 
     /** Atenciones abiertas de la clínica activa (ni Closed ni Cancelled, ni en traslado). */
     listActiveEncounters(signal?: AbortSignal): Promise<ClinicalEncounterSummary[]>;
@@ -57,6 +87,8 @@ export interface ClinicalApi {
     createNote(encounterId: Guid, request: CreateClinicalNoteRequest): Promise<ClinicalNote>;
     listDiagnoses(encounterId: Guid, signal?: AbortSignal): Promise<Diagnosis[]>;
     createDiagnosis(encounterId: Guid, request: CreateDiagnosisRequest): Promise<Diagnosis>;
+    /** Procedimientos de la atención (los prehospitalares incluidos), solo lectura; mismo acceso que leer la atención. */
+    listProcedures(encounterId: Guid, signal?: AbortSignal): Promise<ClinicalProcedure[]>;
 
     /** Catálogo global (activos e inactivos). */
     listMedications(signal?: AbortSignal): Promise<Medication[]>;
@@ -67,8 +99,24 @@ export interface ClinicalApi {
     listMedicationAdministrations(encounterId: Guid, signal?: AbortSignal): Promise<MedicationAdministration[]>;
     createMedicationAdministration(encounterId: Guid, request: CreateMedicationAdministrationRequest): Promise<MedicationAdministration>;
 
+    /**
+     * Resumen asistido por IA de la atención (ADR-013): solo lectura, efímero, requiere revisión profesional. Sin
+     * opciones: proveedor, modelo y límites son del servidor. 429 por límite de uso; 503 si no está disponible.
+     */
+    generateEncounterAiSummary(encounterId: Guid, signal?: AbortSignal): Promise<EncounterAiSummary>;
+
     listIncomingTransfers(signal?: AbortSignal): Promise<ClinicalTransfer[]>;
     receiveTransfer(transferId: Guid): Promise<void>;
+    /** Traslados de una atención (activos e históricos, el más reciente primero). */
+    listEncounterTransfers(encounterId: Guid, signal?: AbortSignal): Promise<ClinicalTransfer[]>;
+    /** Clínicas activas a las que trasladar desde fromClinicId (la de la atención, excluida; validada por el backend). Requiere Transfers.Manage. */
+    listTransferDestinations(fromClinicId: Guid | null, signal?: AbortSignal): Promise<TransferDestination[]>;
+    /** ClinicalTransfer.Request: la atención mantiene su estado hasta el despacho. */
+    requestTransfer(encounterId: Guid, request: RequestTransferRequest): Promise<ClinicalTransfer>;
+    /** Despacho desde la clínica de origen: traslado InTransit y atención Transferred. */
+    dispatchTransfer(transferId: Guid): Promise<ClinicalTransfer>;
+    /** Cancelación desde el origen; uno en camino devuelve la atención a InProgress. */
+    cancelTransfer(transferId: Guid): Promise<ClinicalTransfer>;
 }
 
 /** Error de la capa clínica. `status` sigue la semántica HTTP (401, 403, 404, 409, 500…) aunque venga del mock. */
@@ -106,11 +154,32 @@ const KNOWN_DETAILS: [RegExp, string][] = [
     [/^Medication .* was not found/i, 'El medicamento no existe en el catálogo.'],
     [/^Prescription(Detail)? .* was not found/i, 'La prescripción no existe en esta atención.'],
     [/Receive requires a InTransit transfer/i, 'El traslado ya fue recibido o todavía no está en camino.'],
+    [/Dispatch requires a Requested transfer/i, 'El traslado ya fue despachado, recibido o cancelado.'],
+    [/transfer cannot be cancelled/i, 'El traslado ya fue recibido o cancelado; no se puede cancelar.'],
+    [/status Received cannot be transferred/i, 'Registra primero la atención en este hospital (triage, signo vital, nota, diagnóstico o medicación) para poder trasladar al paciente.'],
+    [/cannot be transferred/i, 'La atención no puede trasladarse en su estado actual.'],
+    [/already has an active transfer/i, 'La atención ya tiene un traslado activo.'],
+    [/destination clinic is not active/i, 'La clínica de destino no está activa.'],
+    [/destination clinic must be different/i, 'La clínica de destino debe ser distinta de la de origen.'],
+    [/cannot manage this patient's transfers/i, 'No puedes gestionar los traslados de este paciente.'],
+    [/^Clinic .* was not found/i, 'La clínica de destino no existe.'],
     [/transfer does not involve a clinic/i, 'El traslado no tiene como origen ni destino una clínica a la que estés afiliado.'],
     [/^ClinicalTransfer .* was not found/i, 'El traslado no existe.'],
     [/changed by another operation/i, 'Otro usuario modificó este registro. Recarga e inténtalo de nuevo.'],
     [/identifier with this value already belongs/i, 'Ya existe un paciente con ese identificador.'],
     [/needs at least 3 characters/i, 'Escribe al menos 3 caracteres para buscar por nombre.'],
+    [/already has an active fingerprint on this reader/i, 'El paciente ya tiene una huella activa en este lector.'],
+    [/already has a pending fingerprint enrollment/i, 'Ya hay un registro de huella en curso para este paciente.'],
+    [/busy with another enrollment/i, 'El lector está ocupado con otro registro. Inténtalo en unos minutos.'],
+    [/No active enrollment reader/i, 'El lector ya no está disponible. Elige otro.'],
+    [/cannot manage this patient's fingerprints/i, 'No puedes gestionar las huellas de este paciente.'],
+    [/completed fingerprint enrollment cannot be cancelled/i, 'El registro ya se completó; no se puede cancelar.'],
+    [/^PatientBiometricReference .* was not found/i, 'La referencia biométrica no existe para este paciente.'],
+    [/already has an active face reference/i, 'El paciente ya tiene un rostro registrado. Revócalo antes de registrar otro.'],
+    [/no active face reference/i, 'El paciente no tiene un rostro registrado activo.'],
+    [/face verification service is not available/i, 'La verificación facial no está disponible en este momento. Inténtalo más tarde.'],
+    [/^capture /i, 'La imagen no es válida. Toma la foto de nuevo con la cámara.'],
+    [/assisted summary is not available/i, 'El resumen asistido no está disponible en este momento. Inténtalo más tarde.'],
 ];
 
 /**

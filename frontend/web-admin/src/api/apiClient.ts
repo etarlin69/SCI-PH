@@ -23,6 +23,7 @@ export const CSRF_HEADER = 'X-SCIPH-CSRF';
 
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  /** JSON, o FormData (multipart/form-data: el navegador pone el Content-Type con su boundary). */
   body?: unknown;
   query?: Record<string, string | number | undefined | null>;
   /** Adjunta el Bearer y permite el refresh automático ante 401. Por defecto true. */
@@ -49,12 +50,48 @@ export function setRefreshHandler(handler: (() => Promise<string | null>) | null
   refreshHandler = handler;
 }
 
-/** Renueva el access token. Todas las llamadas concurrentes comparten la misma promesa: un solo POST /refresh. */
+/**
+ * Nombre del Web Lock que serializa los refresh entre pestañas del mismo perfil del navegador. Es una constante: no
+ * contiene ningún dato del usuario ni de la sesión.
+ */
+export const REFRESH_LOCK_NAME = 'sciph-web-refresh';
+
+/** Espera máxima por el lock. Si otra pestaña lo retiene más (congelada, colgada), se renueva sin él. */
+export const REFRESH_LOCK_WAIT_MS = 10_000;
+
+type LockCapableNavigator = Navigator & { locks?: LockManager };
+
+/**
+ * Ejecuta `task` con el lock exclusivo `sciph-web-refresh` si el navegador tiene Web Locks; si no, directamente
+ * (comportamiento anterior, de una sola pestaña). Con el lock, cada pestaña envía la cookie vigente: la anterior ya
+ * guardó la de su Set-Cookie antes de soltarlo, así que nunca se presentan dos veces el mismo refresh token.
+ */
+function runWithRefreshLock<T>(task: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator === 'undefined' ? undefined : (navigator as LockCapableNavigator).locks;
+  if (!locks || typeof locks.request !== 'function') return task();
+
+  let started = false;
+  const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(REFRESH_LOCK_WAIT_MS) : undefined;
+  const locked = locks.request(REFRESH_LOCK_NAME, { mode: 'exclusive', signal }, () => {
+    started = true;
+    return task();
+  }) as Promise<T>;
+  return locked.catch((error: unknown) => {
+    // Solo si no se obtuvo el lock a tiempo; un error de la propia tarea se propaga tal cual (sin reintentos).
+    if (!started && error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')) return task();
+    throw error;
+  });
+}
+
+/**
+ * Renueva el access token. Todas las llamadas concurrentes de esta pestaña comparten la misma promesa (un solo
+ * POST /refresh) y, entre pestañas, el Web Lock las serializa.
+ */
 export function refreshAccessToken(): Promise<string | null> {
   if (!refreshHandler) return Promise.resolve(null);
   if (!refreshInFlight) {
     const handler = refreshHandler;
-    refreshInFlight = handler().finally(() => {
+    refreshInFlight = runWithRefreshLock(handler).finally(() => {
       refreshInFlight = null;
     });
   }
@@ -91,7 +128,8 @@ async function readBody(response: Response): Promise<unknown> {
 
 async function send(path: string, options: RequestOptions, token: string | null): Promise<Response> {
   const headers: Record<string, string> = { Accept: 'application/json, application/problem+json' };
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  const isForm = options.body instanceof FormData;
+  if (options.body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
   if (options.csrf) headers[CSRF_HEADER] = '1';
   if (options.auth !== false && token) headers.Authorization = `Bearer ${token}`;
 
@@ -99,7 +137,7 @@ async function send(path: string, options: RequestOptions, token: string | null)
     return await fetch(buildUrl(path, options.query), {
       method: options.method ?? 'GET',
       headers,
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body: isForm ? (options.body as FormData) : options.body !== undefined ? JSON.stringify(options.body) : undefined,
       credentials: 'include',
       cache: 'no-store',
       signal: options.signal,
@@ -127,6 +165,26 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     throw new ApiError(response.status, problem, parseRetryAfter(response.headers.get('Retry-After')));
   }
   return body as T;
+}
+
+/**
+ * Descarga binaria (un documento) con la misma sesión que apiRequest: Bearer en memoria y un refresh ante 401. Nunca se
+ * guarda en el navegador: el llamador crea una URL de objeto y la libera. Los errores llegan como ApiError/NetworkError.
+ */
+export async function apiBlob(path: string, options: Omit<RequestOptions, 'body'> = {}): Promise<Blob> {
+  const tokenUsed = accessToken;
+  let response = await send(path, options, tokenUsed);
+  if (response.status === 401 && tokenUsed) {
+    const renewed = await refreshAccessToken();
+    if (renewed) response = await send(path, options, renewed);
+  }
+
+  if (!response.ok) {
+    const body = await readBody(response);
+    const problem: ProblemDetails | null = isProblemDetails(body) ? body : null;
+    throw new ApiError(response.status, problem, parseRetryAfter(response.headers.get('Retry-After')));
+  }
+  return response.blob();
 }
 
 /** Solo para tests: deja el módulo como recién cargado. */

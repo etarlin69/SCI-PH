@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<ContentPage
+    x:Class="SCI_PH.Mobile.Features.Patient.Profile.ProfilePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Patient.ViewModels"
+    x:DataType="vm:ProfileViewModel"
+    Title="Mi perfil"
+    BackgroundColor="{StaticResource PatientPageBackground}">
+
+    <ContentPage.Resources>
+        <Style x:Key="FieldLabelStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextColor" Value="{StaticResource MutedText}" />
+        </Style>
+        <Style x:Key="FieldValueStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="TextColor" Value="{StaticResource TitleText}" />
+        </Style>
+        <Style x:Key="MetricValueStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontAttributes" Value="Bold" />
+            <Setter Property="TextColor" Value="White" />
+            <Setter Property="HorizontalTextAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="MetricLabelStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextColor" Value="{StaticResource OnDarkMutedText}" />
+            <Setter Property="HorizontalTextAlignment" Value="Center" />
+        </Style>
+    </ContentPage.Resources>
+
+    <ScrollView>
+
+        <VerticalStackLayout Spacing="0">
+
+            <!-- CABECERA -->
+            <Grid
+                BackgroundColor="{StaticResource ColorPrimary}"
+                Padding="24,30,24,28"
+                RowDefinitions="Auto,Auto"
+                RowSpacing="24">
+
+                <!-- MÉTRICAS -->
+                <Grid
+                    Grid.Row="0"
+                    ColumnDefinitions="*,*,*">
+
+                    <VerticalStackLayout Grid.Column="0" HorizontalOptions="Center" Spacing="2">
+                        <Label Text="{Binding Profile.Encounters}" Style="{StaticResource MetricValueStyle}" />
+                        <Label Text="Atenciones" Style="{StaticResource MetricLabelStyle}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center" Spacing="2">
+                        <Label Text="{Binding Profile.Results}" Style="{StaticResource MetricValueStyle}" />
+                        <Label Text="Resultados" Style="{StaticResource MetricLabelStyle}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Grid.Column="2" HorizontalOptions="Center" Spacing="2">
+                        <Label Text="{Binding Profile.ActiveAllergies}" Style="{StaticResource MetricValueStyle}" />
+                        <Label Text="Alergias activas" Style="{StaticResource MetricLabelStyle}" />
+                    </VerticalStackLayout>
+
+                </Grid>
+
+                <!-- NOMBRE -->
+                <VerticalStackLayout
+                    Grid.Row="1"
+                    Spacing="5">
+
+                    <Label
+                        Text="{Binding Profile.DisplayName}"
+                        FontSize="29"
+                        FontAttributes="Bold"
+                        TextColor="White" />
+
+                    <Label
+                        Text="Cuenta del paciente"
+                        FontSize="15"
+                        TextColor="{StaticResource OnDarkMutedText}" />
+
+                    <Label
+                        Text="SCI-PH"
+                        FontSize="14"
+                        TextColor="{StaticResource OnDarkMutedText}" />
+
+                </VerticalStackLayout>
+
+            </Grid>
+
+            <!-- CONTENIDO -->
+            <VerticalStackLayout
+                Padding="20"
+                Spacing="18">
+
+                <ActivityIndicator
+                    IsRunning="{Binding IsBusy}"
+                    IsVisible="{Binding IsBusy}"
+                    Color="{StaticResource ColorPrimary}" />
+
+                <Label
+                    Text="{Binding ErrorMessage}"
+                    IsVisible="{Binding HasError}"
+                    Style="{StaticResource ErrorTextStyle}" />
+
+                <!-- INFORMACIÓN PERSONAL -->
+                <Border Style="{StaticResource PatientCardStyle}">
+
+                    <VerticalStackLayout Spacing="12">
+
+                        <Label
+                            Text="Información personal"
+                            FontSize="20"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource TitleText}" />
+
+                        <Label Text="Documento" Style="{StaticResource FieldLabelStyle}" />
+                        <Label Text="{Binding Profile.Document, TargetNullValue='—'}" Style="{StaticResource FieldValueStyle}" />
+
+                        <BoxView HeightRequest="1" Color="{StaticResource CardStroke}" />
+
+                        <Label Text="Correo electrónico" Style="{StaticResource FieldLabelStyle}" />
+                        <Label Text="{Binding Profile.Email, TargetNullValue='—'}" Style="{StaticResource FieldValueStyle}" />
+
+                        <BoxView HeightRequest="1" Color="{StaticResource CardStroke}" />
+
+                        <Label Text="Sexo" Style="{StaticResource FieldLabelStyle}" />
+                        <Label Text="{Binding Profile.Sex}" Style="{StaticResource FieldValueStyle}" />
+
+                        <BoxView HeightRequest="1" Color="{StaticResource CardStroke}" />
+
+                        <Label Text="Fecha de nacimiento" Style="{StaticResource FieldLabelStyle}" />
+                        <Label Text="{Binding Profile.BirthDateLabel}" Style="{StaticResource FieldValueStyle}" />
+
+                        <BoxView HeightRequest="1" Color="{StaticResource CardStroke}" />
+
+                        <Label Text="Teléfono" Style="{StaticResource FieldLabelStyle}" />
+                        <Label Text="{Binding Profile.PhoneNumber, TargetNullValue='—'}" Style="{StaticResource FieldValueStyle}" />
+
+                    </VerticalStackLayout>
+
+                </Border>
+
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+
+    </ScrollView>
+
+</ContentPage>

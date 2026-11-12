@@ -63,6 +63,28 @@ namespace SCI_PH.Application.Features.Clinical
             return rows.Select(ToSummary).ToList();
         }
 
+        // Transfers.Manage: active clinics the actor can send a patient to from the clinic it works in (clinicId, required
+        // with several affiliations and validated), which is excluded. The same projection the paramedic app uses: id, name,
+        // type, municipality and province; no admin clinic data, no Clinics.Manage. Only active clinical staff.
+        public async Task<IReadOnlyList<TransferDestinationSummary>> ListDestinationsAsync(Guid? clinicId, CancellationToken cancellationToken)
+        {
+            var actor = await _actor.GetAsync(cancellationToken);
+            var current = actor.ResolveClinic(clinicId);
+            var rows = await _reads.ListTransferDestinationsAsync(cancellationToken);
+            return rows.Where(d => d.Status == ClinicStatus.Active && d.Id != current).Select(d => d.ToSummary()).ToList();
+        }
+
+        // Transfers.Read + Encounters.Read: the transfers of one encounter, newest first (active and historical), so the
+        // encounter workspace can show and restore its transfer state. Same readability as the encounter itself: its
+        // current clinic must be one of the actor's and the patient rule must allow reading (an origin clinic that already
+        // handed the patient over no longer reads the encounter, as before).
+        public async Task<IReadOnlyList<ClinicalTransferSummary>> ListForEncounterAsync(Guid encounterId, CancellationToken cancellationToken)
+        {
+            var encounter = await EncounterService.GetReadableAsync(_actor, _reads, _patientAccess, encounterId, cancellationToken);
+            var rows = await _reads.ListEncounterTransfersAsync(encounter.Id, MaxListSize, cancellationToken);
+            return rows.Select(ToSummary).ToList();
+        }
+
         // Transfers.Read: visible to the origin and the destination clinic.
         public async Task<ClinicalTransferSummary> GetAsync(Guid transferId, CancellationToken cancellationToken)
         {

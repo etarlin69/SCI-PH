@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Paramedic.ViewModels"
+             xmlns:components="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Views.Components"
+             xmlns:dto="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Models.Dtos"
+             x:Class="SCI_PH.Mobile.Features.Paramedic.Views.TransferPage"
+             x:DataType="vm:TransferViewModel"
+             Style="{StaticResource SciPage}"
+             Title="Traslado">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="18">
+
+            <!-- Emergencia en curso: código NN o paciente (con el NN como trazabilidad) e "Inicio" -->
+            <components:EmergencyIdentityHeader />
+
+            <!-- Paciente aún NN: se puede identificar durante el traslado (mientras el hospital no lo haya recibido) -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding CanIdentifyPatient}" AutomationId="TransferIdentifyCard">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Paciente sin identificar" Style="{StaticResource SciFieldLabel}" />
+                    <Label Text="Si obtienes su identidad durante el traslado, identifícalo ahora. El traslado no cambia."
+                           Style="{StaticResource SciSubtitle}" />
+                    <Button Text="Identificar paciente"
+                            AutomationId="TransferIdentifyPatient"
+                            Command="{Binding IdentifyPatientCommand}"
+                            Style="{StaticResource SciSecondaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Encabezado -->
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Traslado" Style="{StaticResource SciTitle}" />
+                <Label Text="Elige el destino, solicita el traslado e inícialo al salir. El hospital confirma la recepción."
+                       IsVisible="{Binding ShowInstructions}"
+                       Style="{StaticResource SciSubtitle}" />
+            </VerticalStackLayout>
+
+            <!-- Recibida por el hospital: solo lectura, sin acciones de traslado -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding IsHandedOff}" AutomationId="TransferHandedOff">
+                <Label Text="{Binding HandedOffMessage}" TextColor="{StaticResource SciText}" FontSize="14" />
+            </Border>
+
+            <!-- Sin traslado: elegir destino y solicitar -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding ShowRequestForm}">
+                <VerticalStackLayout Spacing="14">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Destino" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Picker Title="Selecciona el destino"
+                                    ItemsSource="{Binding Destinations}"
+                                    ItemDisplayBinding="{Binding DisplayName, x:DataType=dto:TransferDestinationDto}"
+                                    SelectedItem="{Binding SelectedDestination}"
+                                    BackgroundColor="Transparent"
+                                    TextColor="{StaticResource SciText}" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Motivo (opcional)" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding Reason}" Placeholder="Ej. Trauma mayor"
+                                   Style="{StaticResource SciEntry}" MaxLength="500" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Notas (opcional)" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Editor Text="{Binding Notes}" Placeholder="Información para el hospital"
+                                    Style="{StaticResource SciEditor}" AutoSize="TextChanges"
+                                    MinimumHeightRequest="80" MaxLength="4000" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <Button Text="Solicitar traslado"
+                            Command="{Binding RequestCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Traslado solicitado o en curso -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding HasTransfer}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="{Binding DestinationText}" Style="{StaticResource SciFieldLabel}" />
+                    <Label Text="{Binding StatusText}" TextColor="{StaticResource SciText}" FontSize="14" />
+
+                    <Button Text="Iniciar traslado"
+                            Command="{Binding StartCommand}"
+                            IsVisible="{Binding IsRequested}"
+                            Style="{StaticResource SciPrimaryButton}" />
+
+                    <!-- En traslado: se sigue documentando sobre la misma emergencia -->
+                    <VerticalStackLayout Spacing="8" IsVisible="{Binding IsInTransit}">
+                        <Label Text="Registrar durante el traslado" Style="{StaticResource SciFieldLabel}" />
+                        <Button Text="Signos vitales" Command="{Binding GoToVitalSignsCommand}" Style="{StaticResource SciSecondaryButton}" />
+                        <Button Text="Procedimientos" Command="{Binding GoToProceduresCommand}" Style="{StaticResource SciSecondaryButton}" />
+                        <Button Text="Medicamentos" Command="{Binding GoToMedicationsCommand}" Style="{StaticResource SciSecondaryButton}" />
+                        <Button Text="Observaciones" Command="{Binding GoToNotesCommand}" Style="{StaticResource SciSecondaryButton}" />
+                    </VerticalStackLayout>
+
+                    <Button Text="Cancelar traslado"
+                            Command="{Binding CancelCommand}"
+                            Style="{StaticResource SciSecondaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Error -->
+            <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding HasError}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="{Binding ErrorMessage}" TextColor="{StaticResource SciDanger}" FontSize="13" />
+                    <Button Text="Volver a cargar" Command="{Binding LoadCommand}" Style="{StaticResource SciSecondaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Éxito -->
+            <Border Style="{StaticResource SciBadgeSuccess}" IsVisible="{Binding HasSuccess}" HorizontalOptions="Start">
+                <Label Text="{Binding SuccessMessage}" TextColor="{StaticResource SciSuccess}" FontAttributes="Bold" FontSize="13" />
+            </Border>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource SciPrimary}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

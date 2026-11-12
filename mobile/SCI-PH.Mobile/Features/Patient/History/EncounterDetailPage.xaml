@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<ContentPage
+    x:Class="SCI_PH.Mobile.Features.Patient.History.EncounterDetailPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Patient.ViewModels"
+    xmlns:dtos="clr-namespace:SCI_PH.Mobile.Features.Patient.Models.Dtos"
+    x:DataType="vm:EncounterDetailViewModel"
+    Title="Detalle de la atención"
+    BackgroundColor="{StaticResource PatientPageBackground}">
+
+    <ContentPage.Resources>
+        <DataTemplate x:Key="DetailItemTemplate" x:DataType="dtos:ClinicalHistoryItemDto">
+            <VerticalStackLayout Spacing="3">
+                <Label
+                    Text="{Binding Title}"
+                    FontSize="16"
+                    FontAttributes="Bold"
+                    TextColor="#24364F" />
+                <Label
+                    Text="{Binding Detail}"
+                    FontSize="13"
+                    TextColor="#69778A" />
+            </VerticalStackLayout>
+        </DataTemplate>
+    </ContentPage.Resources>
+
+    <!-- Listas cortas dentro de un ScrollView: BindableLayout evita anidar CollectionView con scroll propio. -->
+
+        <ScrollView>
+
+            <VerticalStackLayout
+                Padding="20"
+                Spacing="17">
+
+                <ActivityIndicator
+                    IsRunning="{Binding IsBusy}"
+                    IsVisible="{Binding IsBusy}"
+                    Color="{StaticResource ColorPrimary}" />
+
+                <Label
+                    Text="{Binding ErrorMessage}"
+                    IsVisible="{Binding HasError}"
+                    Style="{StaticResource ErrorTextStyle}" />
+
+                <VerticalStackLayout
+                    Spacing="17"
+                    IsVisible="{Binding Detail, Converter={StaticResource IsNotNullConverter}}">
+
+                    <!-- DATOS DE LA ATENCIÓN -->
+
+                    <Border Style="{StaticResource PatientCardStyle}">
+
+                        <VerticalStackLayout Spacing="7">
+
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+
+                                <Label
+                                    Text="{Binding Detail.Episode.Title}"
+                                    Style="{StaticResource CardTitleStyle}"
+                                    LineBreakMode="WordWrap" />
+
+                                <Border Grid.Column="1" Style="{StaticResource StatusBadgeStyle}" VerticalOptions="Start">
+                                    <Label
+                                        Text="{Binding Detail.Episode.Status}"
+                                        Style="{StaticResource StatusBadgeTextStyle}" />
+                                </Border>
+
+                            </Grid>
+
+                            <Label
+                                Text="{Binding Detail.Episode.Facility}"
+                                Style="{StaticResource CardBodyStyle}" />
+
+                            <Label
+                                Text="{Binding Detail.PeriodLabel}"
+                                Style="{StaticResource CardMetaStyle}" />
+
+                        </VerticalStackLayout>
+
+                    </Border>
+
+                    <!-- DIAGNÓSTICOS -->
+
+                    <Border Style="{StaticResource PatientCardStyle}">
+
+                        <VerticalStackLayout Spacing="9">
+
+                            <Label
+                                Text="Diagnósticos"
+                                FontSize="19"
+                                FontAttributes="Bold"
+                                TextColor="{StaticResource TitleText}" />
+
+                            <VerticalStackLayout
+                                Spacing="9"
+                                BindableLayout.ItemsSource="{Binding Detail.Diagnoses}"
+                                BindableLayout.ItemTemplate="{StaticResource DetailItemTemplate}">
+
+                                <BindableLayout.EmptyView>
+                                    <Label Text="Sin diagnósticos publicados en esta atención." Style="{StaticResource CardMetaStyle}" />
+                                </BindableLayout.EmptyView>
+
+                            </VerticalStackLayout>
+
+                        </VerticalStackLayout>
+
+                    </Border>
+
+                    <!-- RESULTADOS -->
+
+                    <Border Style="{StaticResource PatientCardStyle}">
+
+                        <VerticalStackLayout Spacing="9">
+
+                            <Label
+                                Text="Resultados"
+                                FontSize="19"
+                                FontAttributes="Bold"
+                                TextColor="{StaticResource TitleText}" />
+
+                            <VerticalStackLayout
+                                Spacing="12"
+                                BindableLayout.ItemsSource="{Binding Detail.Results}">
+
+                                <BindableLayout.EmptyView>
+                                    <Label Text="Sin resultados publicados en esta atención." Style="{StaticResource CardMetaStyle}" />
+                                </BindableLayout.EmptyView>
+
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="dtos:ResultItemDto">
+
+                                        <VerticalStackLayout Spacing="3">
+
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+
+                                                <Label
+                                                    Text="{Binding Name}"
+                                                    FontSize="16"
+                                                    FontAttributes="Bold"
+                                                    TextColor="#24364F"
+                                                    LineBreakMode="WordWrap" />
+
+                                                <Label
+                                                    Grid.Column="1"
+                                                    Text="{Binding Status}"
+                                                    FontSize="13"
+                                                    TextColor="#69778A" />
+
+                                            </Grid>
+
+                                            <Label
+                                                Text="{Binding Value}"
+                                                IsVisible="{Binding Value, Converter={StaticResource IsNotNullConverter}}"
+                                                FontSize="18"
+                                                FontAttributes="Bold"
+                                                TextColor="{StaticResource ColorPrimary}" />
+
+                                            <Label
+                                                Text="{Binding Source}"
+                                                IsVisible="{Binding Source, Converter={StaticResource IsNotNullConverter}}"
+                                                FontSize="13"
+                                                TextColor="#69778A" />
+
+                                            <Label
+                                                Text="{Binding Note}"
+                                                IsVisible="{Binding Note, Converter={StaticResource IsNotNullConverter}}"
+                                                FontSize="13"
+                                                TextColor="#69778A" />
+
+                                            <Label
+                                                Text="{Binding DateLabel}"
+                                                FontSize="13"
+                                                TextColor="#69778A" />
+
+                                        </VerticalStackLayout>
+
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+
+                            </VerticalStackLayout>
+
+                        </VerticalStackLayout>
+
+                    </Border>
+
+                    <!-- RECETAS -->
+
+                    <Border Style="{StaticResource PatientCardStyle}">
+
+                        <VerticalStackLayout Spacing="9">
+
+                            <Label
+                                Text="Recetas"
+                                FontSize="19"
+                                FontAttributes="Bold"
+                                TextColor="{StaticResource TitleText}" />
+
+                            <VerticalStackLayout
+                                Spacing="9"
+                                BindableLayout.ItemsSource="{Binding Detail.Prescriptions}"
+                                BindableLayout.ItemTemplate="{StaticResource DetailItemTemplate}">
+
+                                <BindableLayout.EmptyView>
+                                    <Label Text="Sin recetas emitidas en esta atención." Style="{StaticResource CardMetaStyle}" />
+                                </BindableLayout.EmptyView>
+
+                            </VerticalStackLayout>
+
+                        </VerticalStackLayout>
+
+                    </Border>
+
+                    <Label
+                        Text="Solo se muestra la información publicada para ti. Para más detalles, consulta a tu centro de salud."
+                        Style="{StaticResource CardMetaStyle}" />
+
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+
+        </ScrollView>
+
+</ContentPage>

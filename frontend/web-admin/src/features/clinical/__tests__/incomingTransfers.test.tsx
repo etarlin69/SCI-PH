@@ -159,4 +159,35 @@ describe('traslados entrantes reales', () => {
     expect(await screen.findByText(/No se pudieron cargar los traslados/, {}, WAIT)).toBeInTheDocument();
     expect(screen.getByText(/El registro pertenece a una clínica a la que no estás afiliado/)).toBeInTheDocument();
   });
+
+  // Traslado prehospitalario del Mobile BFF: sin clínica de origen y con paciente NN (solo el código temporal).
+  it('muestra el origen prehospitalario y el paciente NN, y recibe solo el que está en camino', async () => {
+    const prehospital = (id: string, status: ClinicalTransfer['status']): ClinicalTransfer => ({
+      ...transfer(id, status),
+      originClinic: null,
+      patient: null,
+      temporaryPatientCode: `NN-20261027-${id.toUpperCase()}`,
+    });
+    const incoming = [prehospital('ph-transit', 'InTransit'), prehospital('ph-requested', 'Requested')];
+    const user = userEvent.setup();
+    const { bff } = renderAs(DOCTOR, {
+      ...statefulBackend().routes,
+      'GET /api/web/transfers/incoming': () => json(200, incoming),
+      'POST /api/web/transfers/ph-transit/receive': () => json(200, { ...incoming[0], status: 'Received', encounterStatus: 'Received' }),
+    });
+
+    const card = await panel();
+    expect(await within(card).findAllByText(/Origen: Atención prehospitalaria/, {}, WAIT)).toHaveLength(2);
+    expect(within(card).getAllByText(/Paciente NN/)).toHaveLength(2);
+    expect(within(card).getAllByText('No identificado')).toHaveLength(2);
+    const buttons = within(card).getAllByRole('button', { name: 'Registrar llegada' });
+    expect(buttons.filter((b) => !b.hasAttribute('disabled'))).toHaveLength(1);
+
+    await user.click(buttons.find((b) => !b.hasAttribute('disabled'))!);
+    await user.click(within(await screen.findByRole('alertdialog', {}, WAIT)).getByRole('button', { name: 'Registrar llegada' }));
+
+    await waitFor(() => expect(bff.calls('POST /api/web/transfers/ph-transit/receive')).toHaveLength(1));
+    expect(bff.calls('POST /api/web/transfers/ph-requested/receive')).toHaveLength(0);
+    expect(await within(card).findByRole('link', { name: 'Abrir la atención' }, WAIT)).toHaveAttribute('href', '/hospital/atenciones/enc-ph-transit');
+  });
 });

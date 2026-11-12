@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Permissions, useAuth } from '../../../auth';
 import { useParams } from 'react-router-dom';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Select, Textarea } from '../../../components/shared';
+import { endSentence } from '../../../utils/formatters';
 import { clinicalApi } from '../api';
 import { EncounterShell } from '../components/EncounterShell';
 import { QueryView } from '../components/QueryView';
@@ -23,6 +24,7 @@ import {
     ENCOUNTER_STATUS,
     ROUTE_LABELS,
     acceptsClinicalRecords,
+    startsCare,
     formatDateTimeUtc,
     isEncounterOpen,
 } from '../utils/clinicalLabels';
@@ -39,16 +41,28 @@ export function PharmacyAndDischargePage() {
 
     return (
         <EncounterShell encounterId={encounterId}>
-            {(encounter, reloadEncounter) => <EncounterMedication encounter={encounter} onClosed={reloadEncounter} />}
+            {(encounter, reloadEncounter) => <EncounterMedication encounter={encounter} onClosed={reloadEncounter} onCareStarted={reloadEncounter} />}
         </EncounterShell>
     );
 }
 
-function EncounterMedication({ encounter, onClosed }: { encounter: ClinicalEncounterSummary; onClosed: () => void }) {
+function EncounterMedication({
+    encounter,
+    onClosed,
+    onCareStarted,
+}: {
+    encounter: ClinicalEncounterSummary;
+    onClosed: () => void;
+    onCareStarted: () => void;
+}) {
     const { can } = useAuth();
     const writable = acceptsClinicalRecords(encounter.status);
     const canPrescribe = can(Permissions.Prescriptions.Write);
     const canAdminister = can(Permissions.MedicationAdministrations.Write);
+    // El primer registro en esta clínica empieza la atención (Created/Received → InProgress): se recarga una vez.
+    const onRecorded = () => {
+        if (startsCare(encounter.status)) onCareStarted();
+    };
     // Una sola consulta por recurso, compartida por las tarjetas: lo que se emite aparece también en el Kardex.
     const prescriptions = useClinicalQuery(`prescriptions:${encounter.id}`, (signal) => clinicalApi.listPrescriptions(encounter.id, signal));
     const administrations = useClinicalQuery(`administrations:${encounter.id}`, (signal) =>
@@ -62,7 +76,13 @@ function EncounterMedication({ encounter, onClosed }: { encounter: ClinicalEncou
 
     return (
         <div className="grid gap-5 xl:grid-cols-2">
-            <PrescriptionsCard encounterId={encounter.id} prescriptions={prescriptions} catalog={catalog} canWrite={writable && canPrescribe} />
+            <PrescriptionsCard
+                encounterId={encounter.id}
+                prescriptions={prescriptions}
+                catalog={catalog}
+                canWrite={writable && canPrescribe}
+                onRecorded={onRecorded}
+            />
             <div className="flex flex-col gap-5">
                 <KardexCard
                     encounterId={encounter.id}
@@ -70,6 +90,7 @@ function EncounterMedication({ encounter, onClosed }: { encounter: ClinicalEncou
                     administrations={administrations}
                     catalog={catalog}
                     canWrite={writable && canAdminister}
+                    onRecorded={onRecorded}
                 />
                 <DischargeCard encounter={encounter} onClosed={onClosed} />
             </div>
@@ -124,11 +145,13 @@ function PrescriptionsCard({
     prescriptions,
     catalog,
     canWrite,
+    onRecorded,
 }: {
     encounterId: string;
     prescriptions: Query<Prescription[]>;
     catalog: Query<Medication[]>;
     canWrite: boolean;
+    onRecorded: () => void;
 }) {
     const feedback = useClinicalFeedback('prescriptions');
     const [medicationId, setMedicationId] = useState('');
@@ -175,6 +198,7 @@ function PrescriptionsCard({
             feedback.success('prescripción emitida');
             reset();
             prescriptions.reload();
+            onRecorded();
         } catch (error) {
             feedback.failure('No se pudo emitir la prescripción.', error);
         } finally {
@@ -266,12 +290,14 @@ function KardexCard({
     administrations,
     catalog,
     canWrite,
+    onRecorded,
 }: {
     encounterId: string;
     prescriptions: Query<Prescription[]>;
     administrations: Query<MedicationAdministration[]>;
     catalog: Query<Medication[]>;
     canWrite: boolean;
+    onRecorded: () => void;
 }) {
     // Líneas de prescripciones emitidas: son las que admiten administraciones.
     const lines =
@@ -342,6 +368,7 @@ function KardexCard({
                     catalog={catalog}
                     onSaved={() => {
                         administrations.reload();
+                        onRecorded();
                     }}
                 />
             )}
@@ -485,8 +512,10 @@ function DischargeCard({ encounter, onClosed }: { encounter: ClinicalEncounterSu
         return (
             <Card title="Egreso">
                 <p className="m-0 text-sm text-ink-muted">
-                    La atención está {ENCOUNTER_STATUS[encounter.status].label.toLowerCase()}
-                    {encounter.endedAtUtc && ` desde ${formatDateTimeUtc(encounter.endedAtUtc)}`}.
+                    {endSentence(
+                        `La atención está ${ENCOUNTER_STATUS[encounter.status].label.toLowerCase()}` +
+                            (encounter.endedAtUtc ? ` desde ${formatDateTimeUtc(encounter.endedAtUtc)}` : ''),
+                    )}
                 </p>
             </Card>
         );

@@ -54,11 +54,13 @@ namespace SCI_PH.Persistence.Contexts
             }
         }
 
-        // Applies only configurations of Identity entities (this assembly), never clinical ones from Domain.
+        // Applies only configurations of Identity entities (Identity.Models of this assembly), never clinical ones from
+        // Domain nor the clinical technical state of this assembly (e.g. idempotency receipts).
         private static bool ConfiguresIdentityEntity(Type configurationType) =>
             configurationType.GetInterfaces().Any(contract =>
                 contract.IsGenericType
                 && contract.GetGenericTypeDefinition() == typeof(IEntityTypeConfiguration<>)
-                && contract.GenericTypeArguments[0].Assembly == typeof(IdentityDbContext).Assembly);
+                && contract.GenericTypeArguments[0].Assembly == typeof(IdentityDbContext).Assembly
+                && contract.GenericTypeArguments[0].Namespace == typeof(ApplicationUser).Namespace);
     }
 }

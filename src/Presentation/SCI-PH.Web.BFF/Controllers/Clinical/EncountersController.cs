@@ -122,6 +122,15 @@ namespace SCI_PH.Web.BFF.Controllers.Clinical
             return CreatedAtAction(nameof(ListDiagnoses), new { id }, diagnosis);
         }
 
+        // Read-only here: procedures are recorded by the paramedic (Mobile BFF) and travel with the encounter.
+        [HttpGet("{id:guid}/procedures")]
+        [Authorize(Policy = Permissions.Encounters.Read)]
+        [ProducesResponseType<IReadOnlyList<ClinicalProcedureSummary>>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ListProcedures(Guid id, CancellationToken cancellationToken) =>
+            Ok(await _records.ListProceduresAsync(id, cancellationToken));
+
         [HttpGet("{id:guid}/triages")]
         [Authorize(Policy = Permissions.Encounters.Read)]
         [ProducesResponseType<IReadOnlyList<TriageSummary>>(StatusCodes.Status200OK)]

@@ -2,12 +2,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using SCI_PH.Application.Abstractions.Clinical;
+using SCI_PH.Application.Abstractions.Documents;
 using SCI_PH.Application.Abstractions.Security;
 using SCI_PH.Application.Features.Accounts;
 using SCI_PH.Application.Features.Authentication;
 using SCI_PH.Application.Features.Authorization;
 using SCI_PH.Application.Features.Clinical;
 using SCI_PH.Application.Features.Devices;
+using SCI_PH.Application.Features.Documents;
 
 namespace SCI_PH.Application
 {
@@ -49,8 +51,9 @@ namespace SCI_PH.Application
             return services;
         }
 
-        // Casos de uso clínicos (pacientes, atenciones, admisión, registros clínicos, medicación y traslados). Requiere AddAccountSecurity
-        // (IPatientAccessAuthorizer), AddJwtSecurity (ICurrentUser) y AddPersistence (stores clínicos).
+        // Casos de uso clínicos (pacientes, atenciones, admisión, registros clínicos, medicación, traslados y emergencia
+        // prehospitalaria, con su identificación por huella, y el enrolamiento de huellas). Requiere AddAccountSecurity (IPatientAccessAuthorizer), AddJwtSecurity (ICurrentUser) y
+        // AddPersistence (stores clínicos y recibos de idempotencia).
         public static IServiceCollection AddClinicalWorkflows(this IServiceCollection services)
         {
             services.AddScoped<ICurrentClinicalActor, CurrentClinicalActor>();
@@ -58,17 +61,64 @@ namespace SCI_PH.Application
             services.AddScoped<EncounterService>();
             services.AddScoped<AdmissionService>();
             services.AddScoped<EncounterRecordService>();
+            services.AddScoped<EncounterResultService>();
+            services.AddScoped<ClinicalDocumentService>();
+            services.AddScoped<IDocumentService>(provider => provider.GetRequiredService<ClinicalDocumentService>());
             services.AddScoped<MedicationService>();
             services.AddScoped<TransferService>();
             services.AddScoped<ClinicalOrganizationService>();
+            services.AddScoped<IEncounterAccessService, EncounterAccessService>();
+            services.AddScoped<PrehospitalEmergencyService>();
+            services.AddScoped<EmergencyFingerprintService>();
+            services.AddScoped<EmergencyQrIdentificationService>();
+            services.AddScoped<EmergencyDocumentIdentificationService>();
+            services.AddScoped<FingerprintEnrollmentService>();
+            services.AddScoped<FingerprintRevocationService>();
 
             return services;
         }
 
-        // Autenticación de dispositivos (solo Device API). Independiente de las cuentas humanas.
+        // Autoservicio del paciente (ADR-015, solo Mobile BFF): lectura de su propio expediente, resuelto desde la cuenta, y su
+        // propia credencial QR. Requiere AddAccountSecurity (IPatientAccessAuthorizer), AddJwtSecurity (ICurrentUser) y
+        // AddPersistence.
+        public static IServiceCollection AddPatientSelfService(this IServiceCollection services)
+        {
+            services.AddScoped<PatientSelfService>();
+            services.AddScoped<PatientQrService>();
+
+            return services;
+        }
+
+        // Assisted 1:1 face verification (ADR-012, Web BFF only). Requires a face provider and a capture normalizer
+        // (Infrastructure: AddFaceVerification).
+        public static IServiceCollection AddFaceVerificationWorkflow(this IServiceCollection services)
+        {
+            services.AddScoped<PatientFaceService>();
+            services.AddScoped<FaceTemplateCleanupService>();
+
+            return services;
+        }
+
+        // Assisted clinical AI (ADR-013, ADR-014, Web BFF only): closed, read-only operations and the "SCI-PH.ClinicalAi"
+        // meter (one per host). Requires a clinical AI provider and the summary cache (Infrastructure: AddClinicalAi) and
+        // AddClinicalWorkflows.
+        public static IServiceCollection AddClinicalAiWorkflow(this IServiceCollection services)
+        {
+            services.AddScoped<EncounterAiSummaryService>();
+            services.AddSingleton<ClinicalAiMetrics>();
+
+            return services;
+        }
+
+        // Autenticación de dispositivos y lado del lector de huella (solo Device API). Independiente de las cuentas humanas.
+        // Requiere AddPersistence (credenciales de dispositivo, sesiones de huella y stores clínicos).
         public static IServiceCollection AddDeviceSecurity(this IServiceCollection services)
         {
             services.AddScoped<DeviceAuthenticationService>();
+            services.AddScoped<FingerprintReaderService>();
+            services.AddScoped<FingerprintEnrollmentReaderService>();
+            services.AddScoped<FingerprintSlotDeletionReaderService>();
+            services.AddScoped<FingerprintSlotInventoryReaderService>();
 
             return services;
         }

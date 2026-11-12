@@ -23,6 +23,9 @@ namespace SCI_PH.Web.BFF.Controllers
     {
         private const string AuthenticationFailed = "Authentication failed.";
 
+        // ProblemDetails "code" of the retryable 409 of /refresh; the SPA retries only on this code.
+        public const string RefreshSupersededCode = "refresh-superseded";
+
         private readonly AuthenticationService _authentication;
         private readonly ICurrentUser _currentUser;
 
@@ -64,23 +67,35 @@ namespace SCI_PH.Web.BFF.Controllers
         }
 
         // The refresh token is read exclusively from the cookie; a token in the body is ignored.
+        // - 200: rotated; the new token replaces the cookie.
+        // - 401: invalid, expired, revoked or replayed token; the cookie is deleted.
+        // - 409 (code refresh-superseded): another request (another tab of the same browser) rotated this same token
+        //   while this one was in flight. Nothing is issued or revoked and the cookie is NOT touched: deleting it here
+        //   could erase the token the winning request just stored. The client may retry once with its current cookie.
         [AllowAnonymous]
         [CookieCsrfProtection]
         [EnableRateLimiting(RateLimitPolicies.Authentication)]
         [HttpPost("refresh")]
         [ProducesResponseType<WebSession>(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
         {
             var refreshToken = RefreshTokenCookie.Read(Request);
-            var session = refreshToken is null ? null : await _authentication.RefreshAsync(refreshToken, HttpContext.ToClientContext(), cancellationToken);
-            if (session is null)
-            {
-                RefreshTokenCookie.Delete(Response);
-                return AuthenticationFailedProblem();
-            }
+            var outcome = refreshToken is null
+                ? RefreshOutcome.Failed
+                : await _authentication.RefreshSessionAsync(refreshToken, HttpContext.ToClientContext(), cancellationToken);
 
-            return Ok(StartSession(session));
+            switch (outcome.Status)
+            {
+                case RefreshStatus.Succeeded:
+                    return Ok(StartSession(outcome.Session!));
+                case RefreshStatus.LostConcurrencyRace:
+                    return RefreshSupersededProblem();
+                default:
+                    RefreshTokenCookie.Delete(Response);
+                    return AuthenticationFailedProblem();
+            }
         }
 
         [AllowAnonymous]
@@ -147,5 +162,13 @@ namespace SCI_PH.Web.BFF.Controllers
         }
 
         private ObjectResult AuthenticationFailedProblem() => Problem(statusCode: StatusCodes.Status401Unauthorized, title: AuthenticationFailed);
+
+        private ObjectResult RefreshSupersededProblem()
+        {
+            var problem = ProblemDetailsFactory.CreateProblemDetails(
+                HttpContext, StatusCodes.Status409Conflict, title: "The session was refreshed by a concurrent request.");
+            problem.Extensions["code"] = RefreshSupersededCode;
+            return new ObjectResult(problem) { StatusCode = StatusCodes.Status409Conflict };
+        }
     }
 }

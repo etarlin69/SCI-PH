@@ -2,3 +2,6 @@
 # Aun así, el SQL de los CHECK de EF Core se escribe en una sola línea para que el modelo sea idéntico
 # en checkouts LF y CRLF (ver docs/adr/ADR-005-clinical-model.md).
 * text=auto
+
+# Los scripts de shell se ejecutan en Linux (también dentro de Docker): siempre LF, también en checkouts de Windows.
+*.sh text eol=lf

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { ADMIN_USER, NURSE_USER, createFakeBff, json, problem, session } from '../../test/fakeBff';
@@ -7,9 +7,9 @@ import { isSafeInternalPath, postLoginRoute, resolveHomeRoute } from '../modules
 import { RequireAuth } from '../RequireAuth';
 import { RequirePermission } from '../RequirePermission';
 
-function renderAt(path: string) {
+function renderAt(path: string, startupRetryDelaysMs?: number[]) {
   return render(
-    <AuthProvider>
+    <AuthProvider startupRetryDelaysMs={startupRetryDelaysMs}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/login" element={<p>Pantalla de login</p>} />
@@ -32,6 +32,21 @@ describe('RequireAuth / RequirePermission', () => {
     expect(screen.queryByText('Mi perfil')).not.toBeInTheDocument();
     release(problem(401, 'Authentication failed.'));
     expect(await screen.findByText('Pantalla de login')).toBeInTheDocument();
+  });
+
+  it('si la sesión no se pudo comprobar (429/red) no redirige al login: ofrece reintentar y recupera la sesión', async () => {
+    let limited = true;
+    createFakeBff({
+      'POST /api/web/auth/refresh': () => (limited ? problem(429, 'Too many requests.') : json(200, session(ADMIN_USER, 'ok'))),
+      'GET /api/web/auth/me': () => json(200, ADMIN_USER),
+    });
+    renderAt('/admin/perfil', []);
+    expect(await screen.findByText('No pudimos comprobar tu sesión')).toBeInTheDocument();
+    expect(screen.queryByText('Pantalla de login')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mi perfil')).not.toBeInTheDocument();
+    limited = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByText('Mi perfil')).toBeInTheDocument();
   });
 
   it('sin sesión redirige al login aunque se entre por URL directa', async () => {

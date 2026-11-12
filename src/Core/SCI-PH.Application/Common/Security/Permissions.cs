@@ -105,6 +105,20 @@ namespace SCI_PH.Application.Common.Security
             public const string Manage = "Transfers.Manage";
         }
 
+        // Prehospital care in the field (paramedic flow of the mobile app). The /api/mobile/emergencies endpoints will
+        // require it in addition to the clinical permissions of each action.
+        public static class Emergencies
+        {
+            public const string Operate = "Emergencies.Operate";
+        }
+
+        // Fingerprint references of a patient: enrollment (and, later, revocation) on a reader. Never a clinical record and
+        // never enough by itself: the actor must also be active clinical staff who can see the patient.
+        public static class Biometrics
+        {
+            public const string Manage = "Biometrics.Manage";
+        }
+
         public static class Documents
         {
             public const string Read = "Documents.Read";

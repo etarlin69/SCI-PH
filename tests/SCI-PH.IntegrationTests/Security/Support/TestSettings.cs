@@ -37,7 +37,11 @@ namespace SCI_PH.IntegrationTests.Security.Support
                 // High limits so functional tests never hit them; the rate-limit test lowers them explicitly.
                 ["RateLimiting:AuthenticationPermitLimit"] = "10000",
                 ["RateLimiting:AccountRecoveryPermitLimit"] = "10000",
-                ["RateLimiting:DevicePermitLimit"] = "10000"
+                ["RateLimiting:DevicePermitLimit"] = "10000",
+                ["RateLimiting:PatientSelfServicePermitLimit"] = "10000",
+                ["RateLimiting:PatientQrPermitLimit"] = "10000",
+                ["RateLimiting:PatientQrResolvePermitLimit"] = "10000",
+                ["RateLimiting:PatientDocumentResolvePermitLimit"] = "10000"
             };
 
             foreach (var (key, value) in overrides ?? new Dictionary<string, string?>())

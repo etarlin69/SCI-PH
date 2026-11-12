@@ -4,8 +4,17 @@ import type {
     ClinicalContext,
     ClinicalEncounterSummary,
     ClinicalNote,
+    ClinicalProcedure,
     ClinicalTransfer,
+    TransferDestination,
     Diagnosis,
+    EncounterAiSummary,
+    FingerprintEnroller,
+    FingerprintEnrollment,
+    FaceEnrollmentResponse,
+    FaceVerificationResponse,
+    PatientFace,
+    PatientFingerprint,
     Medication,
     MedicationAdministration,
     PatientSummary,
@@ -25,6 +34,14 @@ import { clinicIdForRequest } from './clinicSelection';
 
 const BASE = '/api/web';
 const id = (value: string) => encodeURIComponent(value);
+
+// multipart/form-data con exactamente dos partes: la captura y su clave. Nada más (el servidor rechaza cualquier otra).
+const faceForm = (capture: Blob, clientRequestId: string) => {
+    const form = new FormData();
+    form.append('capture', capture, 'capture.jpg');
+    form.append('clientRequestId', clientRequestId);
+    return form;
+};
 
 // Solo los campos del contrato: el BFF rechaza miembros desconocidos (p. ej. `unit`, que fija el Domain).
 const toMeasurement = ({ type, value, measuredAtUtc }: VitalSignInput): VitalSignInput => ({ type, value, measuredAtUtc });
@@ -46,6 +63,47 @@ export const httpClinicalApi: ClinicalApi = {
         apiRequest<PatientSummary[]>(`${BASE}/patients/search`, { method: 'POST', body: request, signal }),
 
     registerPatient: (request) => apiRequest<PatientSummary>(`${BASE}/patients`, { method: 'POST', body: request }),
+
+    getPatient: (patientId, signal) => apiRequest<PatientSummary>(`${BASE}/patients/${id(patientId)}`, { signal }),
+
+    listFingerprintEnrollers: (signal) => apiRequest<FingerprintEnroller[]>(`${BASE}/fingerprint-enrollers`, { signal }),
+
+    listPatientFingerprints: (patientId, signal) =>
+        apiRequest<PatientFingerprint[]>(`${BASE}/patients/${id(patientId)}/fingerprints`, { signal }),
+
+    // Solo clave y lector: el paciente va en la ruta y el personal sale de la sesión.
+    openFingerprintEnrollment: (patientId, { clientRequestId, deviceId }) =>
+        apiRequest<FingerprintEnrollment>(`${BASE}/patients/${id(patientId)}/fingerprints/enrollments`, {
+            method: 'POST',
+            body: { clientRequestId, deviceId },
+        }),
+
+    getFingerprintEnrollment: (patientId, enrollmentId, signal) =>
+        apiRequest<FingerprintEnrollment>(`${BASE}/patients/${id(patientId)}/fingerprints/enrollments/${id(enrollmentId)}`, { signal }),
+
+    cancelFingerprintEnrollment: (patientId, enrollmentId) =>
+        apiRequest<FingerprintEnrollment>(`${BASE}/patients/${id(patientId)}/fingerprints/enrollments/${id(enrollmentId)}/cancel`, {
+            method: 'POST',
+        }),
+
+    listPatientFaces: (patientId, signal) => apiRequest<PatientFace[]>(`${BASE}/patients/${id(patientId)}/faces`, { signal }),
+
+    // Solo la captura y su clave (multipart): paciente en la ruta; proveedor, umbral y referencia los decide el servidor.
+    enrollPatientFace: (patientId, capture, clientRequestId) =>
+        apiRequest<FaceEnrollmentResponse>(`${BASE}/patients/${id(patientId)}/faces/enroll`, { method: 'POST', body: faceForm(capture, clientRequestId) }),
+
+    verifyPatientFace: (patientId, capture, clientRequestId) =>
+        apiRequest<FaceVerificationResponse>(`${BASE}/patients/${id(patientId)}/faces/verify`, { method: 'POST', body: faceForm(capture, clientRequestId) }),
+
+    revokePatientFace: (patientId, referenceId, reason) =>
+        apiRequest<PatientFace>(`${BASE}/patients/${id(patientId)}/faces/${id(referenceId)}/revoke`, { method: 'POST', body: reason ? { reason } : {} }),
+
+    // Solo el motivo (opcional): paciente y referencia van en la ruta; el personal y la fecha los pone el servidor.
+    revokePatientFingerprint: (patientId, referenceId, reason) =>
+        apiRequest<PatientFingerprint>(`${BASE}/patients/${id(patientId)}/fingerprints/${id(referenceId)}/revoke`, {
+            method: 'POST',
+            body: reason ? { reason } : {},
+        }),
 
     listActiveEncounters: (signal) =>
         apiRequest<ClinicalEncounterSummary[]>(`${BASE}/encounters`, { query: { clinicId: clinicIdForRequest() }, signal }),
@@ -94,6 +152,9 @@ export const httpClinicalApi: ClinicalApi = {
             body: { description, type, isPrimary, codeSystem, code },
         }),
 
+    // Solo lectura: los registra el paramédico y viajan con la misma atención.
+    listProcedures: (encounterId, signal) => apiRequest<ClinicalProcedure[]>(`${BASE}/encounters/${id(encounterId)}/procedures`, { signal }),
+
     // ClinicalEncounter.ChangeStatus(Closed); la nota de egreso opcional se guarda como ClinicalNote Discharge.
     closeEncounter: (encounterId, { dischargeNote }) =>
         apiRequest<void>(`${BASE}/encounters/${id(encounterId)}/close`, { method: 'POST', body: { dischargeNote } }),
@@ -123,6 +184,10 @@ export const httpClinicalApi: ClinicalApi = {
             body: { medicationId, dose, doseUnit, route, administeredAtUtc, prescriptionId, prescriptionDetailId, notes },
         }),
 
+    // Resumen asistido (ADR-013): POST sin cuerpo; el servidor decide proveedor, modelo, prompt y límites.
+    generateEncounterAiSummary: (encounterId, signal) =>
+        apiRequest<EncounterAiSummary>(`${BASE}/encounters/${id(encounterId)}/ai-summary`, { method: 'POST', signal }),
+
     // Traslados con destino a las clínicas del usuario (Requested / InTransit).
     listIncomingTransfers: (signal) =>
         apiRequest<ClinicalTransfer[]>(`${BASE}/transfers/incoming`, { query: { clinicId: clinicIdForRequest() }, signal }),
@@ -131,4 +196,23 @@ export const httpClinicalApi: ClinicalApi = {
     receiveTransfer: async (transferId) => {
         await apiRequest<ClinicalTransfer>(`${BASE}/transfers/${id(transferId)}/receive`, { method: 'POST' });
     },
+
+    // Activos e históricos de la atención; con los mismos permisos de lectura que la atención.
+    listEncounterTransfers: (encounterId, signal) =>
+        apiRequest<ClinicalTransfer[]>(`${BASE}/encounters/${id(encounterId)}/transfers`, { signal }),
+
+    // Destinos desde la clínica de la atención (el backend la valida y la excluye); no es el catálogo de administración.
+    listTransferDestinations: (fromClinicId, signal) =>
+        apiRequest<TransferDestination[]>(`${BASE}/transfers/destinations`, { query: { clinicId: fromClinicId ?? clinicIdForRequest() }, signal }),
+
+    // El origen es la clínica de la atención y quién solicita lo fija el backend desde la sesión.
+    requestTransfer: (encounterId, request) =>
+        apiRequest<ClinicalTransfer>(`${BASE}/encounters/${id(encounterId)}/transfers`, {
+            method: 'POST',
+            body: { destinationClinicId: request.destinationClinicId, reason: request.reason ?? null, notes: request.notes ?? null },
+        }),
+
+    dispatchTransfer: (transferId) => apiRequest<ClinicalTransfer>(`${BASE}/transfers/${id(transferId)}/dispatch`, { method: 'POST' }),
+
+    cancelTransfer: (transferId) => apiRequest<ClinicalTransfer>(`${BASE}/transfers/${id(transferId)}/cancel`, { method: 'POST' }),
 };

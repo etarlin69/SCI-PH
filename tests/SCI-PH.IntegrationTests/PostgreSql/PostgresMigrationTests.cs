@@ -6,18 +6,30 @@ using Npgsql;
 namespace SCI_PH.IntegrationTests.PostgreSql
 {
     [Collection(PostgresCollection.Name)]
-    public sealed class PostgresMigrationTests
+    public sealed class PostgresMigrationTests : IDisposable
     {
         private const string InitialIdentity = "20260927232623_InitialIdentity";
         private readonly PostgresFixture _postgres;
 
         public PostgresMigrationTests(PostgresFixture postgres) => _postgres = postgres;
 
+        // The databases this test created: their pools are released when it ends (issue #52).
+        private readonly List<string> _databases = [];
+
+        public void Dispose() => _databases.ForEach(PostgresFixture.ReleaseDatabase);
+
+        private async Task<string> OwnAsync(Task<string> database)
+        {
+            var connectionString = await database;
+            _databases.Add(connectionString);
+            return connectionString;
+        }
+
         [SkippableFact]
         public async Task FreshDatabaseHasSeparateSchemasHistoriesAndNoCrossSchemaKeys()
         {
             Skip.IfNot(_postgres.Available, _postgres.SkipReason);
-            var connectionString = await _postgres.CreateMigratedDatabaseAsync();
+            var connectionString = await OwnAsync(_postgres.CreateMigratedDatabaseAsync());
             await using var connection = await OpenAsync(connectionString);
 
             var identityTables = await ListAsync(connection,
@@ -25,7 +37,9 @@ namespace SCI_PH.IntegrationTests.PostgreSql
             Assert.Equal(
                 new[] { "AccountInvitations", "AspNetRoleClaims", "AspNetRoles", "AspNetUserClaims", "AspNetUserLogins", "AspNetUserRoles", "AspNetUserTokens", "AspNetUsers", "DataProtectionKeys", "DeviceCredentials", "MfaLoginChallenges", "RefreshTokens", "SecurityAuditEvents", "__EFMigrationsHistory" }.Order(StringComparer.Ordinal),
                 identityTables.Order(StringComparer.Ordinal));
-            Assert.Equal(28, await ScalarAsync<long>(connection,
+            // 28 Domain tables + IdempotencyReceipts + FingerprintIdentificationSessions + FingerprintEnrollmentSessions
+            // + FingerprintSlotDeletionJobs + FaceTemplateDeletionJobs.
+            Assert.Equal(33, await ScalarAsync<long>(connection,
                 "select count(*) from information_schema.tables where table_schema = 'clinical' and table_name <> '__EFMigrationsHistory'"));
             Assert.Equal(0, await ScalarAsync<long>(connection,
                 "select count(*) from information_schema.tables where table_schema not in ('identity', 'clinical', 'pg_catalog', 'information_schema')"));
@@ -36,8 +50,10 @@ namespace SCI_PH.IntegrationTests.PostgreSql
                 where c.contype = 'f' and ns.nspname <> nr.nspname
                 """));
             Assert.Equal(4, await ScalarAsync<long>(connection, "select count(*) from identity.\"__EFMigrationsHistory\""));
-            // InitialClinical + EnforceSingleActiveTransferPerEncounter.
-            Assert.Equal(2, await ScalarAsync<long>(connection, "select count(*) from clinical.\"__EFMigrationsHistory\""));
+            // InitialClinical + EnforceSingleActiveTransferPerEncounter + AddClinicalIdempotencyReceipts
+            // + AddFingerprintIdentificationSessions + AddFingerprintEnrollmentSessions + AddFingerprintSlotDeletionJobs
+            // + AddActiveFaceReferencePerPatientIndex + AddFaceTemplateDeletionJobs.
+            Assert.Equal(8, await ScalarAsync<long>(connection, "select count(*) from clinical.\"__EFMigrationsHistory\""));
             Assert.Equal(0, await ScalarAsync<long>(connection,
                 "select count(*) from pg_index i join pg_class c on c.oid = i.indexrelid join pg_namespace n on n.oid = c.relnamespace where n.nspname in ('identity', 'clinical') and not i.indisvalid"));
 
@@ -51,7 +67,7 @@ namespace SCI_PH.IntegrationTests.PostgreSql
         public async Task UpgradeFromInitialIdentityKeepsExistingAccountsActive()
         {
             Skip.IfNot(_postgres.Available, _postgres.SkipReason);
-            var connectionString = await _postgres.CreateDatabaseAsync();
+            var connectionString = await OwnAsync(_postgres.CreateDatabaseAsync());
             await using (var identity = PostgresFixture.Identity(connectionString))
             {
                 await identity.GetService<IMigrator>().MigrateAsync(InitialIdentity);
@@ -79,7 +95,7 @@ namespace SCI_PH.IntegrationTests.PostgreSql
         public async Task ConstraintsAndUniqueIndexesRejectInvalidRows()
         {
             Skip.IfNot(_postgres.Available, _postgres.SkipReason);
-            var connectionString = await _postgres.CreateMigratedDatabaseAsync();
+            var connectionString = await OwnAsync(_postgres.CreateMigratedDatabaseAsync());
             await using var connection = await OpenAsync(connectionString);
             var hash = new string('a', 64);
             const string user = "insert into identity.\"AspNetUsers\" (\"Id\",\"UserName\",\"NormalizedUserName\",\"Email\",\"NormalizedEmail\",\"EmailConfirmed\",\"PhoneNumberConfirmed\",\"TwoFactorEnabled\",\"LockoutEnabled\",\"AccessFailedCount\",\"IsActive\",\"CreatedAtUtc\") values ";

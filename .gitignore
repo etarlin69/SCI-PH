@@ -489,3 +489,9 @@ $RECYCLE.BIN/
 .env
 .env.*
 !.env.example
+
+# Modelos faciales (ADR-012): se descargan y verifican con scripts/biometrics/fetch-face-models; nunca se versionan.
+.models/
+
+# Muestra Face Synthetics (Microsoft Research Use of Data Agreement): solo pruebas locales opt-in; nunca se versiona ni redistribuye.
+.fixtures/

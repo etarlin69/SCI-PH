@@ -20,7 +20,9 @@ namespace SCI_PH.Application.DTOs.Clinical
         string FamilyNames,
         DateOnly? DateOfBirth,
         [property: JsonRequired, JsonConverter(typeof(TextEnumConverter))] BiologicalSex Sex,
-        PatientIdentifierInput? Identifier = null);
+        PatientIdentifierInput? Identifier = null,
+        // Optional contact email (a non-unique Email identifier): where a patient account invitation is sent (ADR-015).
+        string? Email = null);
 
     // Sent in the body so national ids or passports never appear in URLs or access logs.
     // With IdentifierType: exact match on the normalized value. Without it: name search (3+ characters).
@@ -53,4 +55,19 @@ namespace SCI_PH.Application.DTOs.Clinical
         PatientIdentifierRow? PrimaryIdentifier);
 
     public sealed record PatientIdentifierRow(PatientIdentifierType Type, string NormalizedValue);
+
+    // An active identifier matched by its value, and the patient holding it. Never leaves the Application layer.
+    public sealed record PatientIdentifierMatch(Guid IdentifierId, Guid PatientId);
+
+    // A patient's biometric reference; never its provider subject reference outside the read store.
+    public sealed record BiometricReferenceRow(Guid Id, Guid PatientId);
+
+    // Read-store row of a face reference; SubjectReference (the provider's opaque key) stays inside Application.
+    public sealed record FaceReferenceRow(
+        Guid Id, string Provider, string SubjectReference, string? AlgorithmVersion, BiometricReferenceStatus Status,
+        DateTimeOffset CreatedAtUtc, DateTimeOffset? RevokedAtUtc);
+
+    // Read-store row of a fingerprint reference; SubjectReference stays inside Application.
+    public sealed record FingerprintReferenceRow(
+        Guid Id, string Provider, string SubjectReference, BiometricReferenceStatus Status, DateTimeOffset CreatedAtUtc, DateTimeOffset? RevokedAtUtc);
 }

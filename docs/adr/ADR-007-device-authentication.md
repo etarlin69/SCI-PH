@@ -31,8 +31,11 @@ para personas y obligaría a guardar credenciales humanas en el firmware.
   clave (la anterior deja de funcionar al instante, sin periodo de gracia) y revocar.
 - **Rate limiting** por dispositivo + IP (120/min). Se auditan los fallos (dispositivo desconocido, revocado o
   clave inválida), el alta, la rotación y la revocación, sin la clave.
-- Implementado: `POST /api/device/heartbeat` (actualiza último contacto y firmware). La identificación por
-  huella sigue pendiente del flujo biométrico (Rol 8).
+- Implementado: `POST /api/device/heartbeat` (actualiza último contacto y firmware) y la identificación por huella
+  (`GET /api/device/fingerprint/sessions/pending`, `POST …/{sessionId}/result`, scope `Device.Fingerprint.Identify`):
+  el lector se identifica por su credencial y nunca recibe datos clínicos ([ADR-009](ADR-009-fingerprint-identification.md)).
+  El registro de huellas usa el scope `Device.Fingerprint.Enroll` (`GET /api/device/fingerprint/enrollments/pending`,
+  `POST …/{enrollmentId}/result`, [ADR-010](ADR-010-fingerprint-enrollment.md)).
 
 ## Consecuencias
 

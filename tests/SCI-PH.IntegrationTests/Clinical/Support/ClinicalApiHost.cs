@@ -1,6 +1,8 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using SCI_PH.Application.DTOs.Security;
 using SCI_PH.Domain.Entities.Medications;
 using SCI_PH.Domain.Entities.Organizations;
@@ -16,13 +18,38 @@ using SCI_PH.Web.BFF.Controllers;
 namespace SCI_PH.IntegrationTests.Clinical.Support
 {
     // The real Web BFF over a migrated PostgreSQL database (Testcontainers): concurrency tokens, unique indexes,
-    // composite foreign keys and transactions behave as in production.
-    internal sealed class PostgresWebBffFactory(string connectionString) : BffFactory<AuthController>
+    // composite foreign keys and transactions behave as in production. Every log line is captured (Trace), so a test can
+    // check that nothing sensitive was written. Extra settings override the test defaults (e.g. a real face provider); extra
+    // services replace registrations (e.g. a recording decorator around a provider).
+    internal sealed class PostgresWebBffFactory(
+        string connectionString,
+        CapturingLoggerProvider logs,
+        IReadOnlyDictionary<string, string?>? extraSettings = null,
+        Action<IServiceCollection>? extraServices = null) : BffFactory<AuthController>
     {
+        protected override IDictionary<string, string?> Settings
+        {
+            get
+            {
+                var settings = base.Settings;
+                foreach (var (key, value) in extraSettings ?? new Dictionary<string, string?>())
+                {
+                    settings[key] = value;
+                }
+
+                return settings;
+            }
+        }
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             base.ConfigureWebHost(builder);
-            builder.ConfigureTestServices(services => services.UsePostgresStores(connectionString));
+            builder.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace).AddProvider(logs));
+            builder.ConfigureTestServices(services =>
+            {
+                services.UsePostgresStores(connectionString);
+                extraServices?.Invoke(services);
+            });
         }
     }
 
@@ -32,20 +59,25 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
     {
         private readonly PostgresWebBffFactory _factory;
 
-        private ClinicalApiHost(string connectionString)
+        private ClinicalApiHost(
+            string connectionString, IReadOnlyDictionary<string, string?>? settings = null, Action<IServiceCollection>? services = null)
         {
             ConnectionString = connectionString;
-            _factory = new PostgresWebBffFactory(connectionString);
+            _factory = new PostgresWebBffFactory(connectionString, Logs, settings, services);
         }
 
         public string ConnectionString { get; }
+
+        // Log lines of the Web BFF.
+        public CapturingLoggerProvider Logs { get; } = new();
 
         public IServiceProvider Services => _factory.Services;
 
         public PostgresWebBffFactory Factory => _factory;
 
-        public static async Task<ClinicalApiHost> StartAsync(PostgresFixture postgres) =>
-            new(await postgres.CreateMigratedDatabaseAsync());
+        public static async Task<ClinicalApiHost> StartAsync(
+            PostgresFixture postgres, IReadOnlyDictionary<string, string?>? settings = null, Action<IServiceCollection>? services = null) =>
+            new(await postgres.CreateMigratedDatabaseAsync(), settings, services);
 
         public HttpClient Anonymous() => _factory.CreateHttpsClient();
 
@@ -62,6 +94,21 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
 
         // Identity account with the role + (optionally) ClinicalStaff linked to it and affiliated with the clinics.
         public async Task<StaffSession> SignInAsync(
+            string role,
+            Clinic[] clinics,
+            bool asClinicalStaff = true,
+            bool staffActive = true,
+            ClinicalStaffType staffType = ClinicalStaffType.OtherClinical)
+        {
+            var (account, staffId) = await CreateStaffAccountAsync(role, clinics, asClinicalStaff, staffActive, staffType);
+            var login = await _factory.CreateHttpsClient().PostAsJsonAsync("/api/web/auth/login", new LoginRequest(account.Email, account.Password));
+            login.EnsureSuccessStatusCode();
+            var session = await login.ReadAsAsync<WebLoginResponse>();
+            return new StaffSession(_factory.CreateHttpsClient().WithBearer(session.Session!.AccessToken), account.Id, staffId);
+        }
+
+        // The account without signing in, for another host over the same database (e.g. the Mobile BFF).
+        public async Task<(TestAccount Account, Guid? StaffId)> CreateStaffAccountAsync(
             string role,
             Clinic[] clinics,
             bool asClinicalStaff = true,
@@ -89,10 +136,7 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
                 staffId = staff.Id;
             }
 
-            var login = await _factory.CreateHttpsClient().PostAsJsonAsync("/api/web/auth/login", new LoginRequest(account.Email, account.Password));
-            login.EnsureSuccessStatusCode();
-            var session = await login.ReadAsAsync<WebLoginResponse>();
-            return new StaffSession(_factory.CreateHttpsClient().WithBearer(session.Session!.AccessToken), account.Id, staffId);
+            return (account, staffId);
         }
 
         // Real web login of an existing account (e.g. one created through an invitation).
@@ -146,6 +190,12 @@ namespace SCI_PH.IntegrationTests.Clinical.Support
             return await action(db);
         }
 
-        public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
+        // The host owns the test database: once it is stopped, its pool's idle connections are closed (issue #52). A
+        // MobileEmergencyHost disposes this Web host last, after its Mobile BFF and Device API.
+        public async ValueTask DisposeAsync()
+        {
+            await _factory.DisposeAsync();
+            PostgresFixture.ReleaseDatabase(ConnectionString);
+        }
     }
 }

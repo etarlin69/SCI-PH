@@ -57,7 +57,8 @@ superior. El detalle de cada entidad está en [clinical-entities.md](../architec
   `Created`/`InProgress`. `Closed` y `Cancelled` son finales y fijan `EndedAtUtc`.
 - `PatientId` y `Status` son tokens de concurrencia: dos canales que identifiquen o cambien el estado a la vez
   producen `DbUpdateConcurrencyException` en lugar de sobrescribirse.
-- La clínica es obligatoria salvo en atención prehospitalaria.
+- La clínica es obligatoria salvo en atención prehospitalaria. El acceso a una atención prehospitalaria sin clínica
+  (por asignación) y la idempotencia de su apertura se deciden en [ADR-008](ADR-008-prehospital-emergency.md).
 
 ### 4. Registros de la atención
 
@@ -104,11 +105,17 @@ superior. El detalle de cada entidad está en [clinical-entities.md](../architec
 ### 9. Biometría e intentos de identificación
 
 - `PatientBiometricReference` guarda solo la referencia del proveedor externo, su estado y revocación; nunca
-  imágenes, huellas ni plantillas.
+  imágenes, huellas ni plantillas. El esquema `clinical` no guarda imagen, embedding, plantilla ni vector; si un
+  proveedor necesita una plantilla (rostro, [ADR-012](ADR-012-face-verification.md)), la guarda en **su propio almacén
+  privado**, cifrada, y SCI-PH solo conserva la referencia opaca que ese proveedor devuelve.
 - `IdentificationAttempt` registra cualquier método (QR, cédula, pasaporte, código interno, teléfono, rostro,
   huella, manual) con resultado `Success`/`Failure`, motivo de fallo, dispositivo y actor. Un éxito exige
   paciente; el identificador o la referencia biométrica coincidente deben pertenecer a ese paciente (FK
   compuesta). Un intento exitoso **no** vincula la atención por sí solo.
+- La identificación por huella en emergencias usa ambas entidades sin cambiarlas: referencias `R307` por lector y
+  slot, un intento por resultado del lector y la confirmación del paramédico ([ADR-009](ADR-009-fingerprint-identification.md)).
+  El registro de huellas crea esas referencias desde el Web ([ADR-010](ADR-010-fingerprint-enrollment.md)); la unicidad
+  de la referencia del proveedor solo aplica a las activas, para conservar la historia de las revocadas.
 
 ### 10. Auditoría
 

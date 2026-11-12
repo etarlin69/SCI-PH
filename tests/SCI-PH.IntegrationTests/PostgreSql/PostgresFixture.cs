@@ -23,8 +23,9 @@ namespace SCI_PH.IntegrationTests.PostgreSql
         {
             try
             {
-                // Every test gets its own database and Web BFF host; the idle pooled connections of finished tests stay open
-                // for a while, so the shared test server needs more than the default 100 connections.
+                // Every test gets its own database and hosts, and the concurrency tests open several connections at once, so
+                // the shared test server keeps headroom above the default 100 connections. Each database's pool is released
+                // when its owner is disposed (ReleaseDatabase), so finished tests do not keep connections open.
                 _container = new PostgreSqlBuilder(Image).WithCommand("-c", "max_connections=400").Build();
                 await _container.StartAsync();
                 Available = true;
@@ -37,6 +38,12 @@ namespace SCI_PH.IntegrationTests.PostgreSql
 
         public async Task<string> CreateDatabaseAsync()
         {
+            // A test that forgot Skip.IfNot(Available) gets a clear message instead of a NullReferenceException (issue #45).
+            if (_container is null)
+            {
+                throw new InvalidOperationException($"PostgreSQL is not available: {SkipReason}");
+            }
+
             var name = $"sciph_test_{Guid.NewGuid():N}";
             await using (var connection = new NpgsqlConnection(_container!.GetConnectionString()))
             {
@@ -64,6 +71,29 @@ namespace SCI_PH.IntegrationTests.PostgreSql
             await using var clinical = Clinical(connectionString);
             await clinical.Database.MigrateAsync();
             return connectionString;
+        }
+
+        // Npgsql keeps one process-wide pool per connection string (no NpgsqlDataSource is involved), and disposing a host
+        // or a DbContext does not close it: its idle connections stay open until Npgsql prunes them (300 s by default).
+        // Every test has its own database, so its own pool; the owner of a test database (a host, a security context, a
+        // test) releases it once nothing uses it any more. Only that exact pool is cleared, never another test's.
+        public static void ReleaseDatabase(string connectionString)
+        {
+            using var connection = new NpgsqlConnection(connectionString);
+            NpgsqlConnection.ClearPool(connection);
+        }
+
+        // Server-side sessions (pg_stat_activity) currently connected to the database of the connection string, other than
+        // the one asking.
+        public async Task<long> CountConnectionsAsync(string connectionString)
+        {
+            var database = new NpgsqlConnectionStringBuilder(connectionString).Database;
+            await using var connection = new NpgsqlConnection(_container!.GetConnectionString());
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand(
+                "select count(*) from pg_stat_activity where datname = @database and pid <> pg_backend_pid()", connection);
+            command.Parameters.AddWithValue("database", database!);
+            return (long)(await command.ExecuteScalarAsync())!;
         }
 
         public async Task DisposeAsync()

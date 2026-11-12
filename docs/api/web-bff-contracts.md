@@ -36,7 +36,7 @@ Reglas comunes:
 |---|---|---|---|---|
 | `GET` | `/api/web/clinical/context` | autenticado + ClinicalStaff | — | `{ staffId, clinics: [{ id, name }] }` |
 | `POST` | `/api/web/patients` | `Patients.Create` | `{ givenNames, familyNames, dateOfBirth?, sex, identifier?: { type, value, issuer? } }` | 201 `PatientSummary` + `Location` · 409 identificador duplicado |
-| `GET` | `/api/web/patients/{id}` | `Patients.Read` | — | `PatientSummary` |
+| `GET` | `/api/web/patients/{id}` | `Patients.Read` | — | `PatientSummary` (también lo usa el detalle del paciente) |
 | `POST` | `/api/web/patients/search` | `Patients.Read` | `{ identifierType?, value }` (identificador: match por `NormalizedValue`; sin tipo: nombre, mín. 3) | `PatientSummary[]` (identificador enmascarado `***1234`, salvo `InternalCode`) |
 | `GET` | `/api/web/encounters?clinicId=` | `Encounters.Read` | — | `EncounterSummary[]` abiertas (sin Closed/Cancelled/Transferred) |
 | `GET` | `/api/web/encounters/{id}` | `Encounters.Read` | — | `EncounterSummary` |
@@ -112,6 +112,129 @@ recepción desde el cliente.
   que se acaba de despachar). Cancelar un traslado `Requested` no toca la atención y no compite con cerrarla.
 - `ClinicalTransferSummary`: `{ id, encounterId, status, originClinic: { id, name }?, destinationClinic: { id, name }, ambulance: { id, code, callSign }?, requestedAtUtc, sentAtUtc, sentByStaffId, receivedAtUtc, receivedByStaffId, cancelledAtUtc, patient: PatientSummary?, temporaryPatientCode, reason, notes, latestTriagePriority, encounterStatus }`
   (identificador del paciente enmascarado).
+
+---
+
+## Web Hospital — huella digital (implementado)
+
+Registro (enrolamiento) de huellas de un paciente en un lector ([ADR-010](../adr/ADR-010-fingerprint-enrollment.md)) y su
+revocación ([ADR-011](../adr/ADR-011-fingerprint-revocation.md)).
+Permiso `Biometrics.Manage` **y** personal clínico activo que pueda ver al paciente (`Patients.Read`); sin atajo por
+rol. El lector guarda la plantilla en su sensor; SCI-PH solo guarda a qué paciente pertenece. Nunca se devuelven el slot,
+la referencia interna (`SubjectReference`), plantillas, claves ni scopes.
+
+| Método | Ruta | Request | Response |
+|---|---|---|---|
+| `GET` | `/api/web/fingerprint-enrollers` | — | `[{ id, code, name, lastSeenAtUtc }]`: lectores **activos** con `Device.Fingerprint.Enroll` **y** `Device.Fingerprint.Identify` |
+| `GET` | `/api/web/patients/{patientId}/fingerprints` | — | `[PatientFingerprint]`, más recientes primero |
+| `POST` | `/api/web/patients/{patientId}/fingerprints/enrollments` | `{ clientRequestId, deviceId }` | 201 `FingerprintEnrollment` · 200 reintento · 400 · 403 · 404 paciente o lector no elegible · 409 |
+| `GET` | `/api/web/patients/{patientId}/fingerprints/enrollments/{enrollmentId}` | — | `FingerprintEnrollment` (404 si es de otro paciente) |
+| `POST` | `/api/web/patients/{patientId}/fingerprints/enrollments/{enrollmentId}/cancel` | — | 200 `FingerprintEnrollment` · 409 si ya está `Enrolled` |
+| `POST` | `/api/web/patients/{patientId}/fingerprints/{referenceId}/revoke` | `{ reason? }` (opcional; sin cuerpo también) | 200 `PatientFingerprint` (también si ya estaba revocada) · 400 · 403 · 404 |
+
+- `PatientFingerprint`: `{ id, status: Active|Revoked, reader: { code, name, available }?, registeredAtUtc, revokedAtUtc,
+  cleanup: null|Pending|Completed|AttentionRequired|NotRequired }`. `cleanup` es `null` mientras está activa y, revocada,
+  el estado (derivado) del borrado en su lector: `AttentionRequired` si el lector está revocado, no existe, no puede
+  borrar o lleva 5 intentos fallidos, o si la referencia no permite saber lector y slot; `NotRequired` si se revocó antes
+  de existir el borrado automático.
+
+- `FingerprintEnrollment`: `{ id, status: Pending|Enrolled|Failed|Expired|Cancelled, readerId, expiresAtUtc, failure:
+  Failed|LowQuality|SensorError (solo Failed), biometricReferenceId (solo Enrolled) }`.
+- **Abrir:** una sesión `Pending` de 120 s (duración del prototipo), su auditoría y el recibo en una transacción. No se
+  aceptan `patientId`, `staffId`, `slot`, `subjectReference`, `provider`, `modality`, `status` ni fechas en el cuerpo
+  (400). 409 si el paciente ya tiene una huella activa en ese lector, si ya hay un registro pendiente del paciente o del
+  lector, o si la clave se usó con otro paciente o lector. Idempotencia: `fingerprint-enrollment.open.v1` (hash del
+  paciente y el lector; el recibo apunta a la sesión).
+- **Resultado** (lo informa el lector, ver el Device API): `Enrolled` crea la referencia (`RegisteredByStaffId` = quien
+  abrió el registro) en la misma transacción; `Failed`/`LowQuality`/`SensorError` terminan en `Failed`. Otro intento es
+  otro registro.
+- **Cancelar:** `Pending → Cancelled` (auditada una sola vez); ya `Cancelled`, `Expired` o `Failed`: 200 sin cambios;
+  `Enrolled`: 409 (la referencia no se toca; la revocación es otra operación).
+- **Revocar:** `Active → Revoked` con su auditoría y **un** trabajo de borrado para el lector, en una transacción; desde
+  esa respuesta la huella no identifica a nadie. `reason`: `PatientRequest`, `EnrollmentError`, `ReaderReplaced` u
+  `Other`, solo en la auditoría (sin texto libre). Otro campo (`slot`, `subjectReference`, `deviceId`, `status`,
+  `revokedAt`, `staffId`, `patientId`) o un motivo desconocido: 400. Ya revocada: 200 con su estado y nada escrito (nunca
+  un trabajo de reparación). Referencia de otro paciente, no de huella o inexistente: 404. Sin reintento manual de la
+  limpieza: el lector reintenta solo.
+- **Vencimiento:** un registro `Pending` vencido se cierra como `Expired` al consultarlo o cancelarlo.
+- La UI (detalle del paciente, `/hospital/pacientes/{id}`) pide una confirmación operacional antes de abrir, consulta
+  cada segundo mientras está `Pending` y deja de hacerlo al terminar o al salir. No es un registro de consentimiento.
+  "Revocar huella" pide confirmación (con motivo opcional), muestra la huella `Revocada` al instante y la limpieza del
+  lector aparte; nunca la presenta como válida mientras se limpia.
+
+---
+
+## Web Hospital — rostro (implementado)
+
+Verificación facial **1:1 asistida** de un paciente conocido ([ADR-012](../adr/ADR-012-face-verification.md)): solo
+contra la referencia facial activa de **ese** paciente, nunca una búsqueda entre pacientes. **Sin prueba de vida:** ayuda
+al personal presente; no es una autenticación ni una prueba legal de identidad. No identifica atenciones ni cambia nada
+clínico. Personal clínico activo que pueda ver al paciente (`Patients.Read`); sin atajo por rol. Nunca se devuelven la
+referencia del proveedor (`SubjectReference`), la plantilla, el puntaje ni el umbral.
+
+| Método | Ruta | Permiso | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/web/patients/{patientId}/faces` | `Biometrics.Manage` o `Patients.Identify` | — | `[PatientFace]`, más recientes primero |
+| `POST` | `/api/web/patients/{patientId}/faces/enroll` | `Biometrics.Manage` | multipart: `capture`, `clientRequestId` | 201 `{ outcome: Enrolled, face }` · 200 reintento o `{ outcome: NoFace\|MultipleFaces\|LowQuality, face: null }` · 400 · 403 · 404 · 409 · 503 |
+| `POST` | `/api/web/patients/{patientId}/faces/verify` | `Patients.Identify` | multipart: `capture`, `clientRequestId` | 200 `{ verificationId, outcome: Match\|NoMatch\|NoFace\|MultipleFaces\|LowQuality }` · 400 · 403 · 404 · 409 sin rostro activo · 503 (también rostro de otro proveedor) |
+| `POST` | `/api/web/patients/{patientId}/faces/{referenceId}/revoke` | `Biometrics.Manage` | `{ reason? }` (opcional; sin cuerpo también) | 200 `PatientFace` (también si ya estaba revocado) · 400 · 403 · 404 |
+
+- `PatientFace`: `{ id, status: Active|Revoked, provider, registeredAtUtc, revokedAtUtc }`. `provider` es el nombre
+  estable del proveedor (la UI muestra una etiqueta).
+- **Captura:** `multipart/form-data` con exactamente `capture` (la imagen) y `clientRequestId`; cualquier otro campo
+  (`patientId`, `provider`, `threshold`, `referenceId`, otro archivo) es 400; JSON es 415. Máximo 2 MB; JPEG o PNG por
+  sus bytes y decodificación real; lado menor ≥ 480 px, ningún lado > 4096 px. El servidor aplica la orientación, quita
+  los metadatos y re-codifica; la imagen nunca se guarda.
+- **Registro:** una referencia facial activa por paciente (409 si ya existe, también con registros simultáneos). El mismo
+  `clientRequestId` con la misma imagen devuelve la misma referencia sin volver a llamar al proveedor; con otra imagen, 409.
+- **Verificación:** todos los resultados biométricos son 200. El mismo `clientRequestId` con la misma imagen devuelve el
+  resultado registrado sin llamar al proveedor; con otra imagen, 409. Se registra en la auditoría (`FaceVerification`).
+- **Revocación:** `reason`: `PatientRequest`, `EnrollmentError`, `ReferenceOutdated` u `Other` (solo en la auditoría).
+  Desde esa respuesta el rostro no se usa para verificar; la plantilla del proveedor se borra después con un job durable
+  que se reintenta hasta completarse (no cambia la respuesta).
+- **503:** el proveedor facial no está disponible, su plantilla falta o no se puede leer, o el rostro activo pertenece a
+  otro proveedor o versión de algoritmo (hay que registrarlo de nuevo); mensaje genérico, sin detalles internos y nunca
+  un `NoMatch`.
+- La UI usa la cámara del equipo (`getUserMedia`, sin selector de archivos), la apaga en cuanto toma la foto y no guarda
+  la captura en el navegador. Muestra solo "Coincide", "No coincide" o la calidad; nunca un porcentaje.
+
+---
+
+## Web Hospital — resumen asistido por IA (implementado)
+
+Resumen **asistido** de una atención con puntos de documentación a revisar ([ADR-013](../adr/ADR-013-clinical-ai-assistant.md)).
+Generado por IA, **requiere revisión profesional**, de solo lectura y **efímero**: no se guarda, no crea notas,
+diagnósticos ni órdenes y no cambia la atención. Mismo acceso que leer la atención; sin permiso propio.
+
+| Método | Ruta | Permiso | Request | Response |
+|---|---|---|---|---|
+| `POST` | `/api/web/encounters/{encounterId}/ai-summary` | `Encounters.Read` + acceso a la atención | sin cuerpo o `{}` | 200 `EncounterAiSummary` · 400 · 401 · 403 · 404 · 429 · 503 |
+
+- `EncounterAiSummary`: `{ aiGenerated: true, requiresClinicianReview: true, summary, sections: { course, vitalSigns,
+  medications, procedures, notes, transfer }, reviewPoints: [{ kind, text, sources }], notDocumented: [string],
+  generatedAtUtc, provider, model, promptVersion, sourceFingerprint, truncated }`. Cada sección es `{ text, sources }` o
+  `null`; `kind`: `MissingDocumentation`, `Inconsistency` o `PendingItem`; `sources`: `[{ type, id }]` con `type` entre
+  `Triage`, `VitalSign`, `ClinicalNote`, `Diagnosis`, `Prescription`, `MedicationAdministration`, `ClinicalProcedure` y
+  `ClinicalTransfer`. Sin diagnóstico sugerido, recomendación, tratamiento, gravedad ni confianza.
+- **Registros relacionados:** existen en esta atención (el servidor lo comprueba), pero no demuestran que la frase esté
+  respaldada por ellos; sirven para navegar.
+- **Instantánea** de los registros en `generatedAtUtc` (`sourceFingerprint` identifica esa entrada); no se actualiza sola.
+  `truncated`: la atención tenía más registros de los que admite el resumen y solo se incluyeron los más recientes.
+- **Cuerpo sin opciones:** cualquier miembro (`model`, `prompt`, `temperature`, `provider`, `maxTokens`, `systemPrompt`,
+  `patientId`, datos clínicos) es 400. Proveedor, modelo, prompt y límites son del servidor.
+- **429:** 10 generaciones por minuto y una a la vez por usuario, con `Retry-After` (también cuentan las peticiones
+  rechazadas).
+- **503:** proveedor deshabilitado o no disponible, tiempo agotado, filtro de contenido, negativa, cuota o límite del
+  proveedor, o respuesta del proveedor inválida; mensaje genérico, sin detalles internos. Nunca se propaga el estado HTTP
+  del proveedor (un 429 del proveedor también es 503; solo nuestro limitador responde 429).
+- `provider`/`model`: el proveedor configurado en el servidor (`SCIPH-AiFake`/`fake-summary-v1`, o `AzureOpenAI` y la
+  versión del modelo desplegado, [ADR-014](../adr/ADR-014-clinical-ai-real-provider.md)); nunca el nombre del despliegue.
+  Con un proveedor externo, repetir la misma petición dentro de 10 minutos, con la misma entrada, devuelve el mismo resumen
+  (mismo `generatedAtUtc`) sin generarlo de nuevo.
+- Cada intento queda en la auditoría (`ClinicalAiEncounterSummary`: `Read`, o `Export` cuando la entrada se envió a un
+  proveedor externo; éxito o fallo) solo con metadatos: nunca el contenido generado ni datos clínicos.
+- La UI muestra todo como texto plano, con el aviso fijo "Generado por IA · Requiere revisión profesional" y la hora de
+  generación.
 
 ---
 

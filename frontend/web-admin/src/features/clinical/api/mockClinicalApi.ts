@@ -3,7 +3,9 @@ import type {
     ClinicalEncounterStatus,
     ClinicalEncounterSummary,
     ClinicalNote,
+    ClinicalProcedure,
     ClinicalTransfer,
+    TransferDestination,
     Diagnosis,
     Guid,
     Medication,
@@ -105,6 +107,8 @@ const triages: Triage[] = [
 const vitalSigns: Record<Guid, VitalSign[]> = {};
 const notes: Record<Guid, ClinicalNote[]> = {};
 const diagnoses: Record<Guid, Diagnosis[]> = {};
+// Solo lectura: en la app real los registra el paramédico (Mobile BFF) y viajan con la atención.
+const procedures: Record<Guid, ClinicalProcedure[]> = {};
 const prescriptions: Record<Guid, Prescription[]> = {};
 const administrations: Record<Guid, MedicationAdministration[]> = {};
 
@@ -191,9 +195,23 @@ function ensureOpen(encounter: ClinicalEncounterSummary) {
     }
 }
 
-// Primer registro clínico: Created → InProgress, igual que haría el backend al empezar la atención.
+// Primer registro clínico en la clínica de la atención: Created o Received → InProgress, igual que el backend
+// (EncounterRecordService.StartCareIfPending).
 function markStarted(encounter: ClinicalEncounterSummary) {
-    if (encounter.status === 'Created') encounter.status = 'InProgress';
+    if (encounter.status === 'Created' || encounter.status === 'Received') encounter.status = 'InProgress';
+}
+
+/** Destinos simulados: la clínica DEMO es la activa, así que no aparece. */
+const DESTINATIONS: TransferDestination[] = [
+    { id: 'mock-clinic-2', name: 'Hospital Receptor DEMO', type: 'Hospital', municipality: 'Santo Domingo', province: 'Distrito Nacional' },
+];
+
+const TRANSFERABLE: ClinicalEncounterStatus[] = ['InProgress', 'InEvolution'];
+
+function findTransfer(transferId: Guid): ClinicalTransfer {
+    const transfer = transfers.find((t) => t.id === transferId);
+    if (!transfer) throw new ClinicalApiError(404, 'Traslado no encontrado.');
+    return transfer;
 }
 
 function withEncounter<T>(id: Guid, run: (encounter: ClinicalEncounterSummary) => T, signal?: AbortSignal): Promise<T> {
@@ -235,6 +253,58 @@ const maskIdentifier = (value: string) => `***${value.replace(/[^0-9a-z]/gi, '')
 export const mockClinicalApi: ClinicalApi = {
     getClinicalContext(signal) {
         return delay({ staffId: 'mock-staff-1', clinics: [CLINIC] }, signal);
+    },
+
+    // Huella: solo existe con backend real (ADR-010). En simulación no hay lectores y no se registra nada.
+    getPatient(patientId, signal) {
+        const patient = patients.find((p) => p.id === patientId);
+        return patient ? delay(patient, signal) : Promise.reject(new ClinicalApiError(404, 'El paciente no existe.'));
+    },
+
+    listFingerprintEnrollers(signal) {
+        return delay([], signal);
+    },
+
+    listPatientFingerprints(_patientId, signal) {
+        return delay([], signal);
+    },
+
+    async openFingerprintEnrollment() {
+        throw new ClinicalApiError(409, 'El registro de huella necesita el backend real.');
+    },
+
+    async getFingerprintEnrollment() {
+        throw new ClinicalApiError(404, 'El registro de huella necesita el backend real.');
+    },
+
+    async cancelFingerprintEnrollment() {
+        throw new ClinicalApiError(404, 'El registro de huella necesita el backend real.');
+    },
+
+    async revokePatientFingerprint() {
+        throw new ClinicalApiError(404, 'La revocación de huellas necesita el backend real.');
+    },
+
+    // Rostro: solo existe con backend real (ADR-012). En simulación no hay proveedor facial.
+    listPatientFaces(_patientId, signal) {
+        return delay([], signal);
+    },
+
+    // Resumen asistido: solo con backend real (ADR-013). La simulación nunca inventa contenido generado.
+    async generateEncounterAiSummary() {
+        throw new ClinicalApiError(503, 'El resumen asistido necesita el backend real.');
+    },
+
+    async enrollPatientFace() {
+        throw new ClinicalApiError(409, 'La verificación facial necesita el backend real.');
+    },
+
+    async verifyPatientFace() {
+        throw new ClinicalApiError(409, 'La verificación facial necesita el backend real.');
+    },
+
+    async revokePatientFace() {
+        throw new ClinicalApiError(404, 'La verificación facial necesita el backend real.');
     },
 
     registerPatient(request) {
@@ -387,6 +457,10 @@ export const mockClinicalApi: ClinicalApi = {
         return readRecords(encounterId, diagnoses, signal);
     },
 
+    listProcedures(encounterId, signal) {
+        return readRecords(encounterId, procedures, signal);
+    },
+
     createDiagnosis(encounterId, request) {
         return withRecords(encounterId, () => {
             const diagnosis: Diagnosis = { ...request, id: newId(), recordedAtUtc: new Date().toISOString() };
@@ -477,5 +551,83 @@ export const mockClinicalApi: ClinicalApi = {
             encounter.clinicId = transfer.destinationClinic.id;
         }
         return delay(undefined);
+    },
+
+    listEncounterTransfers(encounterId, signal) {
+        return delay(
+            transfers.filter((t) => t.encounterId === encounterId).sort((a, b) => b.requestedAtUtc.localeCompare(a.requestedAtUtc)),
+            signal,
+        );
+    },
+
+    listTransferDestinations(_fromClinicId, signal) {
+        return delay(DESTINATIONS, signal);
+    },
+
+    requestTransfer(encounterId, request) {
+        return withEncounter(encounterId, (encounter) => {
+            if (!TRANSFERABLE.includes(encounter.status)) {
+                throw new ClinicalApiError(409, `Una atención en estado ${encounter.status} no puede trasladarse.`);
+            }
+            if (transfers.some((t) => t.encounterId === encounterId && (t.status === 'Requested' || t.status === 'InTransit'))) {
+                throw new ClinicalApiError(409, 'La atención ya tiene un traslado activo.');
+            }
+            const destination = DESTINATIONS.find((d) => d.id === request.destinationClinicId);
+            if (!destination) throw new ClinicalApiError(404, 'La clínica de destino no existe.');
+            const transfer: ClinicalTransfer = {
+                id: `mock-transfer-${Date.now()}`,
+                encounterId,
+                status: 'Requested',
+                originClinic: CLINIC,
+                destinationClinic: { id: destination.id, name: destination.name },
+                ambulance: null,
+                requestedAtUtc: new Date().toISOString(),
+                sentAtUtc: null,
+                receivedAtUtc: null,
+                cancelledAtUtc: null,
+                patient: encounter.patient,
+                temporaryPatientCode: encounter.temporaryPatientCode,
+                reason: request.reason ?? null,
+                notes: request.notes ?? null,
+                encounterStatus: encounter.status,
+                latestTriagePriority: encounter.latestTriagePriority,
+            };
+            transfers.unshift(transfer);
+            return transfer;
+        });
+    },
+
+    dispatchTransfer(transferId) {
+        try {
+            const transfer = findTransfer(transferId);
+            if (transfer.status !== 'Requested') {
+                throw new ClinicalApiError(409, `Un traslado en estado ${transfer.status} no puede despacharse.`);
+            }
+            transfer.status = 'InTransit';
+            transfer.sentAtUtc = new Date().toISOString();
+            const encounter = encounters.find((e) => e.id === transfer.encounterId);
+            if (encounter) encounter.status = 'Transferred';
+            transfer.encounterStatus = 'Transferred';
+            return delay(transfer);
+        } catch (error) {
+            return Promise.reject(error);
+        }
+    },
+
+    cancelTransfer(transferId) {
+        try {
+            const transfer = findTransfer(transferId);
+            if (transfer.status !== 'Requested' && transfer.status !== 'InTransit') {
+                throw new ClinicalApiError(409, `Un traslado en estado ${transfer.status} no puede cancelarse.`);
+            }
+            const wasInTransit = transfer.status === 'InTransit';
+            transfer.status = 'Cancelled';
+            transfer.cancelledAtUtc = new Date().toISOString();
+            const encounter = encounters.find((e) => e.id === transfer.encounterId);
+            if (wasInTransit && encounter) encounter.status = 'InProgress';
+            return delay(transfer);
+        } catch (error) {
+            return Promise.reject(error);
+        }
     },
 };

@@ -54,6 +54,25 @@ namespace SCI_PH.IntegrationTests.Security
             Assert.DoesNotContain(Permissions.Users.Manage, await PermissionsOfAsync(context, SecurityRoles.Nurse));
         }
 
+        // An installation seeded before a permission existed receives it on the next seeding.
+        [Fact]
+        public async Task NewPermissionsReachExistingRoles()
+        {
+            await using var context = new SecurityTestContext();
+            await context.SeedAsync();
+            await context.RunAsync(async sp =>
+            {
+                var roles = sp.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+                var paramedic = (await roles.FindByNameAsync(SecurityRoles.Paramedic))!;
+                await roles.RemoveClaimAsync(paramedic, new Claim(CustomClaimTypes.Permission, Permissions.Emergencies.Operate));
+            });
+            Assert.DoesNotContain(Permissions.Emergencies.Operate, await PermissionsOfAsync(context, SecurityRoles.Paramedic));
+
+            await context.SeedAsync();
+
+            Assert.Contains(Permissions.Emergencies.Operate, await PermissionsOfAsync(context, SecurityRoles.Paramedic));
+        }
+
         [Fact]
         public async Task NoAccountIsCreatedWithoutExternalBootstrapSettings()
         {

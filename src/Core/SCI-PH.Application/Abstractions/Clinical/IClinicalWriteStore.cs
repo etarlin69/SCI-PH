@@ -17,6 +17,8 @@ namespace SCI_PH.Application.Abstractions.Clinical
 
         void Add(ClinicalEncounter encounter);
 
+        void Add(EncounterStaffAssignment assignment);
+
         void Add(Triage triage);
 
         void Add(VitalSign vitalSign);
@@ -24,6 +26,8 @@ namespace SCI_PH.Application.Abstractions.Clinical
         void Add(ClinicalNote note);
 
         void Add(Diagnosis diagnosis);
+
+        void Add(ClinicalProcedure procedure);
 
         // With its details (one aggregate).
         void Add(Prescription prescription);
@@ -34,6 +38,18 @@ namespace SCI_PH.Application.Abstractions.Clinical
 
         void Add(ClinicalTransfer transfer);
 
+        // One result of an identification method (here: what a fingerprint reader reported).
+        void Add(IdentificationAttempt attempt);
+
+        void Add(PatientBiometricReference reference);
+
+        Task<PatientBiometricReference?> FindBiometricReferenceAsync(Guid referenceId, CancellationToken cancellationToken);
+
+        // Like EnsureEncounterUnchanged for a reference that is only read: the next SaveChangesAsync re-checks its Status
+        // (concurrency token), so a reference revoked after it was loaded makes the whole save fail with a
+        // ResourceConflictException instead of using it.
+        void EnsureBiometricReferenceUnchanged(PatientBiometricReference reference);
+
         void Add(ClinicalAuditEntry auditEntry);
 
         // A clinical record only inserts rows, so the encounter's concurrency tokens (Status, PatientId) would not be
@@ -41,7 +57,8 @@ namespace SCI_PH.Application.Abstractions.Clinical
         // encounter after it was loaded, the record is rejected (ResourceConflictException) instead of being written.
         void EnsureEncounterUnchanged(ClinicalEncounter encounter);
 
-        // Concurrent changes and known uniqueness violations surface as ResourceConflictException.
+        // Concurrent changes and known uniqueness violations surface as ResourceConflictException; a concurrent
+        // request that committed the same idempotency receipt first surfaces as IdempotencyKeyCollisionException.
         Task SaveChangesAsync(CancellationToken cancellationToken);
     }
 }

@@ -26,7 +26,7 @@ namespace SCI_PH.Application.Features.Clinical
         public static PatientRow ToRow(this Patient patient)
         {
             var identifier = patient.Identifiers
-                .Where(i => i.IsActive)
+                .Where(i => i.IsActive && i.Type != PatientIdentifierType.QrCode)
                 .OrderByDescending(i => i.IsPrimary)
                 .ThenBy(i => i.CreatedAtUtc)
                 .FirstOrDefault();
@@ -54,6 +54,15 @@ namespace SCI_PH.Application.Features.Clinical
                 encounter.EndedAtUtc,
                 encounter.IdentifiedAtUtc,
                 encounter.LatestTriagePriority);
+
+        public static PrehospitalEmergencySummary ToEmergency(this EncounterRow encounter) =>
+            new(
+                encounter.Id,
+                encounter.TemporaryPatientCode,
+                encounter.Status,
+                encounter.StartedAtUtc,
+                encounter.Reason,
+                encounter.Patient?.ToSummary());
 
         public static AdmissionEncounterSummary ToAdmission(this EncounterRow encounter) =>
             new(

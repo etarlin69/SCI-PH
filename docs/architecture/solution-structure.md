@@ -19,6 +19,8 @@ SCI-PH.sln
 │   ├── SCI-PH.Domain.Tests
 │   ├── SCI-PH.Application.Tests
 │   └── SCI-PH.IntegrationTests
+├── tools/
+│   └── SCI-PH.Device.Simulator   Consola que simula un dispositivo: heartbeats o lector de huella (local-containers.md)
 └── docs/
 ```
 
@@ -40,8 +42,8 @@ Casos de uso y contratos que la aplicación necesita del exterior.
 
   | Carpeta | Abstracción prevista |
   |---|---|
-  | `AI` | `IAiAssistantService` |
-  | `Biometrics` | `IFaceVerificationService`, `IFingerprintService` |
+  | `AI` | `IClinicalAiService` (Fake, Disabled y Azure OpenAI; ADR-013, ADR-014): solo operaciones clínicas cerradas, sin prompt libre; el SDK solo en Infrastructure |
+  | `Biometrics` | `IFaceVerificationService` y `IFaceCaptureNormalizer` (implementadas, ADR-012), stores de huella (implementados), `IFingerprintService` (vacía) |
   | `Documents` | `IDocumentService` |
   | `OCR` | `IOcrService` |
   | `Persistence` | `IUnitOfWork` |
@@ -106,7 +108,7 @@ Todas usan xUnit.
 |---|---|
 | `global.json` | Fija el SDK 9.0.305 (`rollForward: latestFeature`) |
 | `.editorconfig` | Estilo de código compartido |
-| `docker-compose.yml` | PostgreSQL local |
+| `docker-compose.yml` | Stack local: PostgreSQL, Azurite, migraciones, BFFs, Device API y web-admin ([detalle](local-containers.md)) |
 | `.env.example` | Plantilla de variables para Docker (`.env` está ignorado) |
-| `.github/workflows/build.yml` | CI: restore, build y test |
+| `.github/workflows/build.yml` | CI: backend (restore, build, test, migraciones), frontend (lint, test, build) e imágenes Docker |
 | `.github/pull_request_template.md` | Plantilla de PR |

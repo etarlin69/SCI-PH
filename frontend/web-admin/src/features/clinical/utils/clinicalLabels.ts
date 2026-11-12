@@ -40,6 +40,14 @@ export const isEncounterOpen = (status: ClinicalEncounterStatus) => status !== '
 /** Estados que admiten registros clínicos (EncounterRecordService.RecordableStatuses). Solo orienta la UI; el backend decide. */
 export const RECORDABLE_STATUSES: ClinicalEncounterStatus[] = ['Created', 'InProgress', 'Received', 'InEvolution'];
 export const acceptsClinicalRecords = (status: ClinicalEncounterStatus) => RECORDABLE_STATUSES.includes(status);
+/**
+ * La atención aún no empezó en esta clínica (EncounterRecordService.CarePendingStatuses): el primer registro clínico la
+ * pasa a InProgress. La UI recarga entonces la atención para mostrar el estado nuevo.
+ */
+export const startsCare = (status: ClinicalEncounterStatus) => status === 'Created' || status === 'Received';
+/** Estados desde los que el Domain permite trasladar (→ Transferred). Solo orienta la UI; el backend decide (409). */
+export const TRANSFERABLE_STATUSES: ClinicalEncounterStatus[] = ['InProgress', 'InEvolution'];
+export const canBeTransferred = (status: ClinicalEncounterStatus) => TRANSFERABLE_STATUSES.includes(status);
 
 /** Escala de cinco niveles. El color es solo visual: al backend se envía la clave del enum. */
 export const TRIAGE_PRIORITIES: { value: TriagePriority; label: string; color: string; className: string }[] = [
@@ -66,6 +74,14 @@ export const VITAL_SIGNS: { type: VitalSignType; label: string; unit: string; un
     { type: 'Weight', label: 'Peso', unit: 'kg', unitLabel: 'kg', min: 0.2, max: 500, step: 0.1 },
     { type: 'Height', label: 'Talla', unit: 'cm', unitLabel: 'cm', min: 20, max: 280, step: 1 },
 ];
+
+/**
+ * Valor medido con su unidad. En las escalas (Glasgow, dolor) `unitLabel` es el rango del campo, no una unidad: se muestra
+ * sobre el máximo ("14/15", "7/10") en lugar de "14 3–15".
+ */
+export function formatVitalValue(value: number, meta: { unit: string; unitLabel: string; max: number }): string {
+    return meta.unit === '{score}' ? `${value}/${meta.max}` : `${value} ${meta.unitLabel}`;
+}
 
 export const vitalSignMeta = (type: VitalSignType) => VITAL_SIGNS.find((v) => v.type === type)!;
 

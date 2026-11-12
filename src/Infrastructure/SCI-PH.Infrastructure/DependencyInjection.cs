@@ -1,14 +1,26 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using SCI_PH.Application.Abstractions.AI;
+using SCI_PH.Application.Abstractions.Biometrics;
 using SCI_PH.Application.Abstractions.Security;
+using SCI_PH.Application.Abstractions.Storage;
 using SCI_PH.Application.Common.Security;
+using SCI_PH.Application.Features.Clinical;
+using Azure.Storage.Blobs;
+using Microsoft.Extensions.Logging;
+using SCI_PH.Infrastructure.Biometrics.Face;
+using SCI_PH.Infrastructure.Biometrics.Face.OpenCv;
+using SCI_PH.Infrastructure.ClinicalAi;
 using SCI_PH.Infrastructure.Email;
 using SCI_PH.Infrastructure.Security;
+using SCI_PH.Infrastructure.Storage;
 using SCI_PH.Infrastructure.Web;
 
 namespace SCI_PH.Infrastructure
@@ -20,20 +32,155 @@ namespace SCI_PH.Infrastructure
             // Punto central para registrar las implementaciones de las abstracciones
             // definidas en Application (Application/Abstractions):
             // - Azure Blob Storage (IStorageService)
-            // - Verificación facial (IFaceVerificationService)
+            // - Verificación facial (IFaceVerificationService): AddFaceVerification, solo en el Web BFF
             // - OCR (IOcrService)
             // - QR (IQrService)
-            // - IA (IAiAssistantService)
+            // - IA clínica asistida (IClinicalAiService): AddClinicalAi, solo en el Web BFF
             // - Otros servicios externos
 
             services.TryAddSingleton(TimeProvider.System);
             services.TryAddSingleton<ISecureTokenGenerator, SecureTokenGenerator>();
+            services.AddDocumentStorage(configuration);
+
+            return services;
+        }
+
+        // Where document contents live (DocumentStorage:Provider, see DocumentStorageOptions). Disabled unless configured.
+        private static IServiceCollection AddDocumentStorage(this IServiceCollection services, IConfiguration configuration)
+        {
+            services.AddOptions<DocumentStorageOptions>()
+                .Bind(configuration.GetSection(DocumentStorageOptions.SectionName))
+                .ValidateOnStart();
+            services.AddSingleton<IValidateOptions<DocumentStorageOptions>, DocumentStorageOptionsValidator>();
+            services.TryAddSingleton<IStorageService>(provider =>
+            {
+                var options = provider.GetRequiredService<IOptions<DocumentStorageOptions>>().Value;
+                return options.ResolvedProvider switch
+                {
+                    DocumentStorageOptions.AzureBlobProvider =>
+                        new BlobDocumentStorage(new BlobContainerClient(options.ConnectionString, options.Container)),
+                    DocumentStorageOptions.FileSystemProvider => new FileSystemDocumentStorage(options.RootPath!),
+                    _ => new DisabledDocumentStorage()
+                };
+            });
 
             return services;
         }
 
         // Autenticación JWT de cuentas humanas para Web y Mobile BFF. El Device API no la usa:
         // los dispositivos tienen su propio esquema (AddDeviceAuthentication, ver ADR-007).
+        // Verificación facial 1:1 asistida (ADR-012): normalización de capturas (independiente del proveedor) y el proveedor
+        // elegido por configuración del servidor (FaceVerification:Provider): Fake fuera de Production, Disabled (503) en
+        // Production si no se configura otro; Fake configurado en Production impide arrancar. Con "OpenCv" (proveedor local
+        // real, ADR-012 PR 2) también registra su validación de arranque (modelos con hash fijado, claves, almacén), su almacén
+        // de plantillas cifradas y el worker de limpieza durable; sin "OpenCv" nada de eso se registra ni necesita modelos o
+        // claves.
+        public static IServiceCollection AddFaceVerification(this IServiceCollection services, IConfiguration configuration)
+        {
+            services.AddOptions<FaceVerificationOptions>()
+                .Bind(configuration.GetSection(FaceVerificationOptions.SectionName))
+                .ValidateOnStart();
+            services.AddSingleton<IValidateOptions<FaceVerificationOptions>, FaceVerificationOptionsValidator>();
+            services.AddSingleton<IFaceCaptureNormalizer, SkiaFaceCaptureNormalizer>();
+            services.AddSingleton<FakeFaceVerificationService>();
+            services.AddSingleton<IFaceVerificationService>(provider =>
+                provider.GetRequiredService<IOptions<FaceVerificationOptions>>().Value.Resolve(provider.GetRequiredService<IHostEnvironment>()) switch
+                {
+                    FaceVerificationOptions.FakeProvider => provider.GetRequiredService<FakeFaceVerificationService>(),
+                    FaceVerificationOptions.DisabledProvider => new DisabledFaceVerificationService(),
+                    FaceVerificationOptions.OpenCvProvider => provider.GetRequiredService<LocalOpenCvFaceVerificationService>(),
+                    var other => throw new InvalidOperationException($"FaceVerification:Provider '{other}' is not supported.")
+                });
+
+            var configured = configuration[$"{FaceVerificationOptions.SectionName}:{nameof(FaceVerificationOptions.Provider)}"];
+            if (string.Equals(configured, FaceVerificationOptions.OpenCvProvider, StringComparison.Ordinal))
+            {
+                services.AddOpenCvFaceProvider(configuration);
+            }
+
+            return services;
+        }
+
+        // Assisted clinical AI (ADR-013, ADR-014): the provider chosen by server configuration (ClinicalAi:Provider). Fake
+        // (deterministic, in process) outside Production, Disabled (503) in Production if nothing else is configured; Fake
+        // configured in Production prevents the host from starting. "AzureOpenAI" sends the minimized input outside SCI-PH:
+        // the host starts with it only when ClinicalAi:AllowExternalClinicalData is also true (validated on start, and
+        // checked again when the provider is built) and, in Production, only with a managed identity (never an API key).
+        // Nothing contacts the provider at startup. It also registers the summary cache Application consumes as a keyed
+        // IMemoryCache (EncounterAiSummaryService.CacheServiceKey): a dedicated, bounded MemoryCache (SizeLimit 500 entries),
+        // not the host's shared one, on the host's TimeProvider.
+        public static IServiceCollection AddClinicalAi(this IServiceCollection services, IConfiguration configuration)
+        {
+            services.TryAddSingleton(TimeProvider.System);
+            services.AddKeyedSingleton<IMemoryCache>(EncounterAiSummaryService.CacheServiceKey, (provider, _) => new MemoryCache(new MemoryCacheOptions
+            {
+                SizeLimit = ClinicalAiOptions.SummaryCacheSizeLimit,
+                Clock = new TimeProviderClock(provider.GetRequiredService<TimeProvider>())
+            }));
+            services.AddOptions<ClinicalAiOptions>()
+                .Bind(configuration.GetSection(ClinicalAiOptions.SectionName))
+                .ValidateOnStart();
+            services.AddSingleton<IValidateOptions<ClinicalAiOptions>, ClinicalAiOptionsValidator>();
+            services.AddSingleton<FakeClinicalAiService>();
+            services.AddSingleton<AzureOpenAiClinicalAiService>();
+            services.AddSingleton<IClinicalAiService>(provider =>
+            {
+                var options = provider.GetRequiredService<IOptions<ClinicalAiOptions>>().Value;
+                IClinicalAiService ai = options.Resolve(provider.GetRequiredService<IHostEnvironment>()) switch
+                {
+                    ClinicalAiOptions.FakeProvider => provider.GetRequiredService<FakeClinicalAiService>(),
+                    ClinicalAiOptions.DisabledProvider => new DisabledClinicalAiService(),
+                    ClinicalAiOptions.AzureOpenAiProvider => provider.GetRequiredService<AzureOpenAiClinicalAiService>(),
+                    var other => throw new InvalidOperationException($"ClinicalAi:Provider '{other}' is not supported.")
+                };
+
+                return ai.SendsDataExternally && !options.AllowExternalClinicalData
+                    ? throw new InvalidOperationException("The clinical AI provider sends data outside SCI-PH and ClinicalAi:AllowExternalClinicalData is not true.")
+                    : ai;
+            });
+
+            return services;
+        }
+
+        private static void AddOpenCvFaceProvider(this IServiceCollection services, IConfiguration configuration)
+        {
+            services.AddOptions<OpenCvFaceOptions>()
+                .Bind(configuration.GetSection(OpenCvFaceOptions.SectionName))
+                .ValidateOnStart();
+            services.AddSingleton<IValidateOptions<OpenCvFaceOptions>, OpenCvFaceOptionsValidator>();
+            services.AddSingleton(provider => provider.GetRequiredService<IOptions<OpenCvFaceOptions>>().Value);
+            services.AddSingleton<IFaceTemplateStore>(provider =>
+            {
+                var templates = provider.GetRequiredService<OpenCvFaceOptions>().Templates;
+                return new BlobFaceTemplateStore(new BlobContainerClient(templates.ConnectionString, templates.Container));
+            });
+            // Disposed by the container at shutdown (every detector/recognizer pair).
+            services.AddSingleton(provider =>
+            {
+                var options = provider.GetRequiredService<OpenCvFaceOptions>();
+                var environment = provider.GetRequiredService<IHostEnvironment>();
+                var yuNet = OpenCvFaceSetup.Resolve(environment, options.YuNetModelPath);
+                var sFace = OpenCvFaceSetup.Resolve(environment, options.SFaceModelPath);
+                return new FaceEnginePool(() => new FaceEngine(yuNet, sFace, options), options.ResolveEngineCapacity());
+            });
+            services.AddSingleton(provider =>
+            {
+                var encryption = provider.GetRequiredService<OpenCvFaceOptions>().Encryption;
+                return new FaceTemplateCipher(encryption.ActiveKeyId!, OpenCvFaceSetup.LoadKeys(encryption));
+            });
+            services.AddSingleton(provider => new LocalOpenCvFaceVerificationService(
+                provider.GetRequiredService<FaceEnginePool>(),
+                provider.GetRequiredService<IFaceTemplateStore>(),
+                provider.GetRequiredService<FaceTemplateCipher>(),
+                provider.GetRequiredService<OpenCvFaceOptions>(),
+                provider.GetRequiredService<ILogger<LocalOpenCvFaceVerificationService>>()));
+            services.AddSingleton<FaceTemplateReconciler>();
+            // Started in registration order: the provider (native runtime + models) is built at startup, before any
+            // request, and a failure stops the host; then the cleanup worker.
+            services.AddHostedService<OpenCvFaceProviderStartup>();
+            services.AddHostedService<FaceTemplateCleanupWorker>();
+        }
+
         public static IServiceCollection AddJwtSecurity(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddOptions<JwtOptions>().Bind(configuration.GetSection(JwtOptions.SectionName)).ValidateOnStart();
@@ -61,6 +208,10 @@ namespace SCI_PH.Infrastructure
                 authorization.AddPolicy(permission, policy =>
                     policy.RequireAuthenticatedUser().RequireClaim(CustomClaimTypes.Permission, permission));
             }
+
+            // Entry gate only (ADR-015): the own-record boundary is PatientSelfService.
+            authorization.AddPolicy(AccessPolicies.PatientSelfService, policy =>
+                policy.RequireAuthenticatedUser().RequireClaim(CustomClaimTypes.Role, SecurityRoles.Patient));
 
             return services;
         }

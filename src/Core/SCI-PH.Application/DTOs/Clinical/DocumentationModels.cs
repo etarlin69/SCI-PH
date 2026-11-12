@@ -46,4 +46,22 @@ namespace SCI_PH.Application.DTOs.Clinical
         DateTimeOffset RecordedAtUtc,
         DateTimeOffset? ConfirmedAtUtc,
         Guid RecordedByStaffId);
+
+    // Read model of a procedure of an encounter (today recorded by the paramedic, PrehospitalEmergencyService). The
+    // performer's name is resolved like a note's author; Prehospital tells the hospital which ones come from the ambulance
+    // (the prehospital catalog's code system), within the same encounter.
+    public sealed record ClinicalProcedureSummary(
+        Guid Id,
+        Guid EncounterId,
+        string Name,
+        string? CodeSystem,
+        string? Code,
+        [property: JsonConverter(typeof(TextEnumConverter))] ClinicalProcedureStatus Status,
+        DateTimeOffset? PerformedAtUtc,
+        DateTimeOffset? CompletedAtUtc,
+        string? Outcome,
+        string? PerformedByDisplayName = null)
+    {
+        public bool Prehospital => CodeSystem == Features.Clinical.PrehospitalProcedureCatalog.CodeSystem;
+    }
 }

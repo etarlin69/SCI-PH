@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ComponentType, type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { ADMIN_PERMISSIONS, Permissions, RequireAuth, RequirePermission, SessionLoading, resolveHomeRoute, useAuth, type Permission } from '../auth';
+import { ADMIN_PERMISSIONS, Permissions, RequireAuth, RequirePermission, SessionLoading, SessionUnavailable, resolveHomeRoute, useAuth, type Permission } from '../auth';
 import { DEMO_ADMIN_PERMISSIONS, HOSPITAL_SCREEN_PERMISSIONS as H, Layout, firstAdminRoute, firstHospitalRoute } from '../components/common';
 import { LoadingSpinner } from '../components/shared';
 import ForbiddenPage from '../features/auth/pages/ForbiddenPage';
@@ -34,6 +34,7 @@ const ProfilePage = page(() => import('../features/profile/pages/ProfilePage'));
 // Módulo hospitalario (Rol 4). Exportaciones con nombre: se adaptan a lazy().
 const ReceptionPage = page(() => import('../features/clinical/pages/ReceptionPage').then((m) => ({ default: m.ReceptionPage })));
 const PatientsPage = page(() => import('../features/clinical/pages/PatientsPage').then((m) => ({ default: m.PatientsPage })));
+const PatientDetailPage = page(() => import('../features/clinical/pages/PatientDetailPage').then((m) => ({ default: m.PatientDetailPage })));
 const EncounterDashboardPage = page(() =>
   import('../features/clinical/pages/EncounterDashboardPage').then((m) => ({ default: m.EncounterDashboardPage })),
 );
@@ -71,6 +72,7 @@ function AdminIndex() {
 function RootRedirect() {
   const { status, permissions } = useAuth();
   if (status === 'initializing') return <SessionLoading />;
+  if (status === 'unavailable') return <SessionUnavailable />;
   return <Navigate to={status === 'authenticated' ? resolveHomeRoute(permissions) : '/login'} replace />;
 }
 
@@ -124,6 +126,7 @@ export function AppRoutes() {
           <Route index element={<HospitalIndex />} />
           <Route path="recepcion" element={guarded(H.reception, <ReceptionPage />)} />
           <Route path="pacientes" element={guarded(H.patients, <PatientsPage />)} />
+          <Route path="pacientes/:patientId" element={guarded(H.patients, <PatientDetailPage />)} />
           <Route path="atenciones" element={guarded(H.encounters, <EncounterDashboardPage />)} />
           <Route path="atenciones/:encounterId" element={guarded(H.encounters, <EncounterDashboardPage />)} />
           <Route path="atenciones/:encounterId/triage" element={guarded(H.triage, <TriagePage />)} />

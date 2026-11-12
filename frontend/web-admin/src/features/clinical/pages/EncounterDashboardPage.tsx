@@ -1,9 +1,13 @@
 import { useState, type FormEvent } from 'react';
 import { Permissions, useAuth } from '../../../auth';
 import { Link, useParams } from 'react-router-dom';
-import { Button, Card, Checkbox, EmptyState, Input, Select, Textarea } from '../../../components/shared';
-import { clinicalApi } from '../api';
+import { Badge, Button, Card, Checkbox, EmptyState, Input, Select, Textarea } from '../../../components/shared';
+import { CLINICAL_API_IS_MOCK, clinicalApi } from '../api';
 import { ClinicSelector } from '../components/ClinicSelector';
+import { EncounterDocumentsCard } from '../components/EncounterDocumentsCard';
+import { EncounterAiSummaryCard } from '../components/EncounterAiSummaryCard';
+import { EncounterTransferCard } from '../components/EncounterTransferCard';
+import { EncounterResultsCard } from '../components/EncounterResultsCard';
 import { EncounterStatusBadge, TriagePriorityBadge } from '../components/ClinicalBadges';
 import { EncounterShell } from '../components/EncounterShell';
 import { EncounterSubject } from '../components/EncounterSubject';
@@ -13,28 +17,52 @@ import { useClinicSelection } from '../hooks/useClinicSelection';
 import { useClinicalFeedback } from '../hooks/useClinicalFeedback';
 import { useClinicalQuery } from '../hooks/useClinicalQuery';
 import { useClinicalTime } from '../hooks/useClinicalTime';
-import type { ClinicalEncounterSummary, ClinicalNoteType, DiagnosisType } from '../types/clinical.types';
+import type { ClinicalEncounterSummary, ClinicalNoteType, ClinicalProcedure, DiagnosisType } from '../types/clinical.types';
 import {
     DIAGNOSIS_TYPE_LABELS,
     ENCOUNTER_TYPE_LABELS,
     NOTE_TYPE_LABELS,
     formatDateTimeUtc,
     acceptsClinicalRecords,
+    startsCare,
 } from '../utils/clinicalLabels';
 
 /** /hospital/atenciones: atenciones abiertas. /hospital/atenciones/:id: expediente de la atención. */
 export function EncounterDashboardPage() {
     const { encounterId } = useParams();
+    const { can } = useAuth();
+    const canRead = can(Permissions.Encounters.Read);
+    const canReadTransfers = can(Permissions.Transfers.Read);
+    const canReadDocuments = can(Permissions.Documents.Read);
     if (!encounterId) return <EncounterList />;
 
     return (
         <EncounterShell encounterId={encounterId}>
-            {(encounter) => (
-                <div className="grid gap-5 xl:grid-cols-2">
-                    <DiagnosesCard encounter={encounter} />
-                    <NotesCard encounter={encounter} />
-                </div>
-            )}
+            {(encounter, reloadEncounter) => {
+                // El primer registro en esta clínica empieza la atención (Created/Received → InProgress, en el backend):
+                // se recarga la atención una vez para mostrar el estado nuevo (y habilitar el traslado).
+                const onRecorded = () => {
+                    if (startsCare(encounter.status)) reloadEncounter();
+                };
+                return (
+                    <>
+                        <div className="grid gap-5 xl:grid-cols-2">
+                            <DiagnosesCard encounter={encounter} onRecorded={onRecorded} />
+                            <NotesCard encounter={encounter} onRecorded={onRecorded} />
+                        </div>
+                        {/* Lo que hizo la ambulancia, en la MISMA atención: solo lectura, mismo acceso que leer la atención. */}
+                        {canRead && <ProceduresCard encounter={encounter} />}
+                        {/* Resultados (laboratorio, imagen…): leerlos es lectura clínica; cambiarlos, Results.Write. */}
+                        {canRead && !CLINICAL_API_IS_MOCK && <EncounterResultsCard encounter={encounter} />}
+                        {/* Traslado saliente: leerlo requiere Transfers.Read; sus acciones, Transfers.Manage (dentro de la tarjeta). */}
+                        {canRead && canReadTransfers && <EncounterTransferCard encounter={encounter} onEncounterChanged={reloadEncounter} />}
+                        {/* Resumen asistido (ADR-013): mismo acceso que leer la atención; uno nuevo por atención. */}
+                        {canRead && <EncounterAiSummaryCard key={encounter.id} encounterId={encounter.id} />}
+                        {/* Documentos (Document Service + almacenamiento): leerlos requiere Documents.Read; no hay mock. */}
+                        {canRead && canReadDocuments && !CLINICAL_API_IS_MOCK && <EncounterDocumentsCard encounter={encounter} />}
+                    </>
+                );
+            }}
         </EncounterShell>
     );
 }
@@ -106,7 +134,7 @@ const CODE_SYSTEMS = [
     { value: 'SNOMED-CT', label: 'SNOMED CT' },
 ];
 
-function DiagnosesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
+function DiagnosesCard({ encounter, onRecorded }: { encounter: ClinicalEncounterSummary; onRecorded: () => void }) {
     const canWrite = useAuth().can(Permissions.Diagnoses.Write);
     const feedback = useClinicalFeedback('diagnoses');
     const { state, reload } = useClinicalQuery(`diagnoses:${encounter.id}`, (signal) => clinicalApi.listDiagnoses(encounter.id, signal));
@@ -136,6 +164,7 @@ function DiagnosesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
             setType('');
             setIsPrimary(false);
             reload();
+            onRecorded();
         } catch (error) {
             feedback.failure('No se pudo registrar el diagnóstico.', error);
         } finally {
@@ -208,7 +237,50 @@ function DiagnosesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
 // Ayuda de redacción: inserta encabezados SOAP en el contenido. El contrato sigue siendo type + content.
 const SOAP_TEMPLATE = 'S: \nO: \nA: \nP: ';
 
-function NotesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
+/** Procedimientos de la atención; los prehospitalarios (ambulancia) se distinguen de los registrados en el hospital. */
+function ProceduresCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
+    const { state, reload } = useClinicalQuery(`procedures:${encounter.id}`, (signal) => clinicalApi.listProcedures(encounter.id, signal));
+
+    return (
+        <Card title="Procedimientos" actions={<SimulatedBadge feature="procedures" />}>
+            <QueryView
+                state={state}
+                onRetry={reload}
+                errorTitle="No se pudieron cargar los procedimientos."
+                isEmpty={(list) => list.length === 0}
+                empty={<EmptyState title="Sin procedimientos registrados" description="Los procedimientos de la atención prehospitalaria aparecen aquí." />}
+            >
+                {(list) => (
+                    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                        {list.map((p) => (
+                            <li key={p.id} className="flex flex-col gap-1 rounded-lg border border-line-soft p-3">
+                                <span className="flex flex-wrap items-center gap-2">
+                                    <span className="text-sm font-semibold text-ink">{p.name}</span>
+                                    {p.prehospital && <Badge tone="accent">Prehospitalario</Badge>}
+                                    {p.status !== 'Completed' && <Badge tone="neutral">{PROCEDURE_STATUS_LABELS[p.status]}</Badge>}
+                                </span>
+                                <span className="text-xs text-ink-muted">
+                                    {p.performedAtUtc ? formatDateTimeUtc(p.performedAtUtc) : 'Sin fecha'}
+                                    {p.performedByDisplayName && <> · {p.performedByDisplayName}</>}
+                                </span>
+                                {p.outcome && <p className="m-0 whitespace-pre-wrap text-sm text-ink-3">{p.outcome}</p>}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </QueryView>
+        </Card>
+    );
+}
+
+const PROCEDURE_STATUS_LABELS: Record<ClinicalProcedure['status'], string> = {
+    Planned: 'Planificado',
+    InProgress: 'En curso',
+    Completed: 'Completado',
+    Cancelled: 'Cancelado',
+};
+
+function NotesCard({ encounter, onRecorded }: { encounter: ClinicalEncounterSummary; onRecorded: () => void }) {
     const canWrite = useAuth().can(Permissions.ClinicalNotes.Write);
     const feedback = useClinicalFeedback('notes');
     const { state, reload } = useClinicalQuery(`notes:${encounter.id}`, (signal) => clinicalApi.listNotes(encounter.id, signal));
@@ -232,6 +304,7 @@ function NotesCard({ encounter }: { encounter: ClinicalEncounterSummary }) {
             setContent('');
             occurredAt.reset();
             reload();
+            onRecorded();
         } catch (error) {
             feedback.failure('No se pudo registrar la nota.', error);
         } finally {

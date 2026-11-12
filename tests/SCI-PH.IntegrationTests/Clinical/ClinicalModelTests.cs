@@ -9,6 +9,8 @@ using SCI_PH.Domain.Entities.Organizations;
 using SCI_PH.Domain.Entities.Patients;
 using SCI_PH.Domain.Enums.Auditing;
 using SCI_PH.Domain.ValueObjects;
+using SCI_PH.Persistence.Clinical.Biometrics;
+using SCI_PH.Persistence.Clinical.Idempotency;
 using SCI_PH.Persistence.Contexts;
 
 namespace SCI_PH.IntegrationTests.Clinical
@@ -37,18 +39,21 @@ namespace SCI_PH.IntegrationTests.Clinical
                 "Run 'dotnet ef migrations add' for ClinicalDbContext: the model differs from the snapshot.");
         }
 
+        // Domain entities, plus exactly one technical table: the idempotency receipts (ADR-008), kept in the clinical
+        // schema so they commit in the same transaction as the clinical rows they protect.
         [Fact]
         public void AllEntitiesAreDomainEntitiesInTheClinicalSchema()
         {
             using var context = CreateContext();
             var entities = context.Model.GetEntityTypes().ToList();
 
-            Assert.Equal(28, entities.Count);
-            Assert.All(entities, entity =>
-            {
-                Assert.Equal(ClinicalDbContext.Schema, entity.GetSchema());
-                Assert.StartsWith("SCI_PH.Domain.Entities", entity.ClrType.Namespace);
-            });
+            Assert.Equal(33, entities.Count);
+            Assert.All(entities, entity => Assert.Equal(ClinicalDbContext.Schema, entity.GetSchema()));
+            // Technical state committed with the clinical rows, not Domain entities.
+            var technical = entities.Where(entity => !entity.ClrType.Namespace!.StartsWith("SCI_PH.Domain.Entities", StringComparison.Ordinal))
+                .Select(entity => entity.ClrType).OrderBy(type => type.Name).ToList();
+            Assert.Equal([typeof(FaceTemplateDeletionJobEntry), typeof(FingerprintEnrollmentSessionEntry), typeof(FingerprintIdentificationSessionEntry),
+                typeof(FingerprintSlotDeletionJobEntry), typeof(IdempotencyReceiptEntry)], technical);
         }
 
         [Fact]

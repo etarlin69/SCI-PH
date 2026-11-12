@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Paramedic.ViewModels"
+             xmlns:components="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Views.Components"
+             xmlns:dto="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Models.Dtos"
+             xmlns:paramedic="clr-namespace:SCI_PH.Mobile.Features.Paramedic"
+             x:Class="SCI_PH.Mobile.Features.Paramedic.Views.IdentifyPatientPage"
+             x:DataType="vm:IdentifyPatientViewModel"
+             Style="{StaticResource SciPage}"
+             Title="Identificación">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="18">
+
+            <!-- Emergencia en curso: código NN o paciente (con el NN como trazabilidad) e "Inicio" -->
+            <components:EmergencyIdentityHeader />
+
+            <!-- Encabezado -->
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Identificar paciente" Style="{StaticResource SciTitle}" />
+                <Label Text="Usa el lector de huella o identifica al paciente con su documento."
+                       Style="{StaticResource SciSubtitle}" />
+            </VerticalStackLayout>
+
+            <!-- Error: arriba solo si no hay un formulario abierto (entonces se muestra dentro de él) -->
+            <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding ShowTopError}">
+                <Label Text="{Binding ErrorMessage}"
+                       TextColor="{StaticResource SciDanger}" FontSize="13" />
+            </Border>
+
+            <!-- Recibida por el hospital: la atención prehospitalaria terminó; no queda ninguna acción aquí -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding IsHandedOff}" AutomationId="IdentifyHandedOff">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="{x:Static paramedic:ParamedicMessages.TransferHandedOff}"
+                           TextColor="{StaticResource SciText}" FontSize="15" />
+                    <Button Text="Volver al inicio"
+                            Command="{Binding GoHomeCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Loading -->
+            <ActivityIndicator IsRunning="{Binding IsBusy}"
+                               IsVisible="{Binding IsBusy}"
+                               Color="{StaticResource SciPrimary}" />
+
+            <!-- Opciones de identificación: todas disponibles desde el inicio; la huella no es obligatoria. -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding CanIdentify}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Lectura de huella" Style="{StaticResource SciFieldLabel}" />
+                    <Label Text="Elige el lector, pide al paciente colocar el dedo y confirma el candidato."
+                           Style="{StaticResource SciSubtitle}" />
+                    <Button Text="Identificar por huella"
+                            Command="{Binding IdentifyByFingerprintCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+
+                    <!-- Lector y lectura (el estado lo da el servidor) -->
+                    <VerticalStackLayout Spacing="12" IsVisible="{Binding ShowFingerprintPanel}">
+                        <VerticalStackLayout Spacing="6" IsVisible="{Binding CanChooseReader}">
+                            <Label Text="Lector" Style="{StaticResource SciFieldLabel}" />
+                            <Border Style="{StaticResource SciField}">
+                                <Picker ItemsSource="{Binding Readers}"
+                                        ItemDisplayBinding="{Binding DisplayName, x:DataType=dto:FingerprintReaderDto}"
+                                        SelectedItem="{Binding SelectedReader}"
+                                        BackgroundColor="Transparent"
+                                        TextColor="{StaticResource SciText}" />
+                            </Border>
+                            <Button Text="Iniciar lectura"
+                                    Command="{Binding StartFingerprintReadingCommand}"
+                                    Style="{StaticResource SciSecondaryButton}" />
+                        </VerticalStackLayout>
+
+                        <ActivityIndicator IsRunning="{Binding IsWaitingForReader}"
+                                           IsVisible="{Binding IsWaitingForReader}"
+                                           Color="{StaticResource SciPrimary}" />
+
+                        <Label Text="{Binding FingerprintMessage}"
+                               IsVisible="{Binding HasFingerprintMessage}"
+                               TextColor="{StaticResource SciWarning}"
+                               FontAttributes="Bold" />
+
+                        <!-- Candidato: solo se identifica al confirmar -->
+                        <VerticalStackLayout Spacing="8" IsVisible="{Binding HasCandidate}">
+                            <Label Text="Coincidencia encontrada" Style="{StaticResource SciFieldLabel}" />
+                            <Label Text="{Binding CandidateName}" Style="{StaticResource SciTitle}" />
+                            <Label Text="{Binding CandidateBirthDate, StringFormat='Fecha de nacimiento: {0}'}"
+                                   Style="{StaticResource SciSubtitle}" />
+                            <Button Text="Confirmar identidad"
+                                    Command="{Binding ConfirmFingerprintCommand}"
+                                    Style="{StaticResource SciPrimaryButton}" />
+                        </VerticalStackLayout>
+
+                        <Button Text="Cancelar lectura"
+                                Command="{Binding CancelFingerprintCommand}"
+                                IsVisible="{Binding HasActiveFingerprint}"
+                                Style="{StaticResource SciSecondaryButton}" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- QR del paciente: otra vía, en su propia página (no se ofrece en Mac Catalyst). -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding ShowQrOption}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Código QR del paciente" Style="{StaticResource SciFieldLabel}" />
+                    <Label Text="Escanea el código de &quot;Mi QR&quot; en la app del paciente y confirma el candidato."
+                           Style="{StaticResource SciSubtitle}" />
+                    <Button Text="Escanear QR"
+                            Command="{Binding ScanQrCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding CanIdentify}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Otras opciones" Style="{StaticResource SciFieldLabel}" />
+                    <Button Text="Identificar con documento"
+                            Command="{Binding OpenDocumentFormCommand}"
+                            Style="{StaticResource SciSecondaryButton}" />
+                    <Label Text="Si no es posible identificarlo ahora, la atención continúa como paciente no identificado (NN) y puede identificarse después."
+                           Style="{StaticResource SciSubtitle}" />
+                    <Button Text="{Binding ContinueWithoutIdentifyingText}"
+                            AutomationId="IdentifyContinueWithout"
+                            Command="{Binding ContinueWithoutIdentifyingCommand}"
+                            Style="{StaticResource SciSecondaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Formulario de documento -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding ShowDocumentPanel}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Identificación con documento" Style="{StaticResource SciFieldLabel}" />
+
+                    <!-- El error de la búsqueda o la confirmación, junto al formulario que se está usando -->
+                    <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding ShowDocumentError}" AutomationId="DocumentError">
+                        <Label Text="{Binding ErrorMessage}"
+                               TextColor="{StaticResource SciDanger}" FontSize="13" />
+                    </Border>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Tipo de documento" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Picker ItemsSource="{Binding DocumentTypes}"
+                                    SelectedItem="{Binding SelectedDocumentType}"
+                                    IsEnabled="{Binding IsDocumentEntry}"
+                                    AutomationId="DocumentType"
+                                    BackgroundColor="Transparent"
+                                    TextColor="{StaticResource SciText}" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Número" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding DocumentNumber}"
+                                   Placeholder="Número del documento"
+                                   IsEnabled="{Binding IsDocumentEntry}"
+                                   AutomationId="DocumentNumber"
+                                   Style="{StaticResource SciEntry}"
+                                   MaxLength="30" />
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <Button Text="Buscar paciente"
+                            AutomationId="DocumentResolve"
+                            Command="{Binding ResolveDocumentCommand}"
+                            IsVisible="{Binding IsDocumentEntry}"
+                            Style="{StaticResource SciPrimaryButton}" />
+
+                    <!-- Candidato: nada se identifica hasta "Confirmar paciente" -->
+                    <VerticalStackLayout Spacing="10" IsVisible="{Binding HasDocumentCandidate}" AutomationId="DocumentCandidate">
+                        <Label Text="¿Es este el paciente?" Style="{StaticResource SciFieldLabel}" />
+                        <Label Text="{Binding DocumentCandidateName}" AutomationId="DocumentCandidateName"
+                               Style="{StaticResource SciTitle}" />
+                        <Label Text="{Binding DocumentCandidateBirthDate, StringFormat='Nacimiento: {0}'}"
+                               AutomationId="DocumentCandidateBirthDate"
+                               TextColor="{StaticResource SciText}" FontSize="14" />
+                        <Label Text="{Binding DocumentCandidateDocument}" AutomationId="DocumentCandidateDocument"
+                               TextColor="{StaticResource SciText}" FontSize="14" />
+                        <Label Text="Verifica sus datos con el paciente o su documento antes de confirmar."
+                               Style="{StaticResource SciSubtitle}" />
+                        <Button Text="Confirmar paciente"
+                                AutomationId="DocumentConfirm"
+                                Command="{Binding ConfirmDocumentCommand}"
+                                Style="{StaticResource SciPrimaryButton}" />
+                        <Button Text="Buscar otro"
+                                AutomationId="DocumentSearchAnother"
+                                Command="{Binding CancelDocumentCandidateCommand}"
+                                Style="{StaticResource SciSecondaryButton}" />
+                    </VerticalStackLayout>
+
+                    <ActivityIndicator IsRunning="{Binding IsDocumentWorking}" IsVisible="{Binding IsDocumentWorking}"
+                                       Color="{StaticResource SciPrimary}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Resultado: identificado -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding ShowIdentifiedResult}">
+                <VerticalStackLayout Spacing="14">
+                    <Border Style="{StaticResource SciBadgeSuccess}" HorizontalOptions="Start">
+                        <Label Text="Paciente identificado"
+                               TextColor="{StaticResource SciSuccess}"
+                               FontAttributes="Bold" FontSize="13" />
+                    </Border>
+                    <Label Text="{Binding PatientDisplayName}" Style="{StaticResource SciTitle}" />
+                    <Button Text="{Binding ContinueText}"
+                            AutomationId="IdentifyContinue"
+                            Command="{Binding ContinueCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

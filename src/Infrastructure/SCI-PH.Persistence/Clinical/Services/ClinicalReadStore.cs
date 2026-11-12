@@ -14,7 +14,8 @@ namespace SCI_PH.Persistence.Clinical.Services
 {
     internal sealed class ClinicalReadStore : IClinicalReadStore
     {
-        // Primary active identifier first, then the oldest active one.
+        // Primary active identifier first, then the oldest active one. A QR credential is never a display identifier: its
+        // value is a hash of a system-issued token, and it must not reach a summary even masked (ADR-015).
         private static readonly Expression<Func<Patient, PatientRow>> _patientRow = p => new PatientRow(
             p.Id,
             p.GivenNames,
@@ -23,7 +24,7 @@ namespace SCI_PH.Persistence.Clinical.Services
             p.Sex,
             p.IdentityStatus,
             p.Identifiers
-                .Where(i => i.Status == PatientIdentifierStatus.Active)
+                .Where(i => i.Status == PatientIdentifierStatus.Active && i.Type != PatientIdentifierType.QrCode)
                 .OrderByDescending(i => i.IsPrimary)
                 .ThenBy(i => i.CreatedAtUtc)
                 .Select(i => new PatientIdentifierRow(i.Type, i.NormalizedValue))
@@ -75,6 +76,14 @@ namespace SCI_PH.Persistence.Clinical.Services
                 .Select(_patientRow)
                 .ToListAsync(cancellationToken);
 
+        public Task<PatientIdentifierMatch?> FindPlatformIdentifierAsync(
+            PatientIdentifierType type, string normalizedValue, CancellationToken cancellationToken) =>
+            _clinical.PatientIdentifiers.AsNoTracking()
+                .Where(i => i.Type == type && i.Issuer == string.Empty && i.NormalizedValue == normalizedValue
+                    && i.Status == PatientIdentifierStatus.Active)
+                .Select(i => new PatientIdentifierMatch(i.Id, i.PatientId))
+                .SingleOrDefaultAsync(cancellationToken);
+
         // Case-insensitive "contains" over the full name. Contains is translated with escaped LIKE wildcards.
         public async Task<IReadOnlyList<PatientRow>> FindPatientsByNameAsync(string term, int limit, CancellationToken cancellationToken)
         {
@@ -87,8 +96,112 @@ namespace SCI_PH.Persistence.Clinical.Services
                 .ToListAsync(cancellationToken);
         }
 
+        public Task<BiometricReferenceRow?> FindActiveFingerprintReferenceAsync(
+            string provider, string subjectReference, CancellationToken cancellationToken) =>
+            _clinical.PatientBiometricReferences.AsNoTracking()
+                .Where(r => r.Modality == BiometricModality.Fingerprint
+                    && r.Provider == provider
+                    && r.SubjectReference == subjectReference
+                    && r.Status == BiometricReferenceStatus.Active)
+                .Select(r => new BiometricReferenceRow(r.Id, r.PatientId))
+                .SingleOrDefaultAsync(cancellationToken);
+
+        public Task<Guid?> GetActiveBiometricReferencePatientIdAsync(Guid biometricReferenceId, CancellationToken cancellationToken) =>
+            _clinical.PatientBiometricReferences.AsNoTracking()
+                .Where(r => r.Id == biometricReferenceId && r.Status == BiometricReferenceStatus.Active)
+                .Select(r => (Guid?)r.PatientId)
+                .SingleOrDefaultAsync(cancellationToken);
+
+        public Task<bool> HasActiveFingerprintReferenceAsync(
+            Guid patientId, string provider, string subjectReferencePrefix, CancellationToken cancellationToken) =>
+            _clinical.PatientBiometricReferences.AnyAsync(r => r.PatientId == patientId
+                && r.Modality == BiometricModality.Fingerprint
+                && r.Provider == provider
+                && r.Status == BiometricReferenceStatus.Active
+                && r.SubjectReference.StartsWith(subjectReferencePrefix), cancellationToken);
+
+        public async Task<IReadOnlyList<string>> ListActiveFingerprintSubjectReferencesAsync(
+            string provider, string subjectReferencePrefix, CancellationToken cancellationToken) =>
+            await _clinical.PatientBiometricReferences.AsNoTracking()
+                .Where(r => r.Modality == BiometricModality.Fingerprint
+                    && r.Provider == provider
+                    && r.Status == BiometricReferenceStatus.Active
+                    && r.SubjectReference.StartsWith(subjectReferencePrefix))
+                .Select(r => r.SubjectReference)
+                .ToListAsync(cancellationToken);
+
+        public async Task<IReadOnlyList<FingerprintReferenceRow>> ListFingerprintReferencesAsync(Guid patientId, CancellationToken cancellationToken) =>
+            await _clinical.PatientBiometricReferences.AsNoTracking()
+                .Where(r => r.PatientId == patientId && r.Modality == BiometricModality.Fingerprint)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .Select(r => new FingerprintReferenceRow(r.Id, r.Provider, r.SubjectReference, r.Status, r.CreatedAtUtc, r.RevokedAtUtc))
+                .ToListAsync(cancellationToken);
+
+        public async Task<IReadOnlyList<FaceReferenceRow>> ListFaceReferencesAsync(Guid patientId, CancellationToken cancellationToken) =>
+            await FaceReferences(patientId)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .Select(FaceRow)
+                .ToListAsync(cancellationToken);
+
+        public Task<FaceReferenceRow?> FindActiveFaceReferenceAsync(Guid patientId, CancellationToken cancellationToken) =>
+            FaceReferences(patientId)
+                .Where(r => r.Status == BiometricReferenceStatus.Active)
+                .Select(FaceRow)
+                .SingleOrDefaultAsync(cancellationToken);
+
+        public Task<string?> GetAuditChangesAsync(Guid auditEntryId, string entityName, Guid patientId, CancellationToken cancellationToken) =>
+            _clinical.ClinicalAuditEntries.AsNoTracking()
+                .Where(a => a.Id == auditEntryId && a.EntityName == entityName && a.PatientId == patientId)
+                .Select(a => a.ChangesJson)
+                .SingleOrDefaultAsync(cancellationToken);
+
+        private IQueryable<PatientBiometricReference> FaceReferences(Guid patientId) =>
+            _clinical.PatientBiometricReferences.AsNoTracking()
+                .Where(r => r.PatientId == patientId && r.Modality == BiometricModality.Face);
+
+        private static readonly Expression<Func<PatientBiometricReference, FaceReferenceRow>> FaceRow = r =>
+            new FaceReferenceRow(r.Id, r.Provider, r.SubjectReference, r.AlgorithmVersion, r.Status, r.CreatedAtUtc, r.RevokedAtUtc);
+
         public async Task<EncounterRow?> GetEncounterAsync(Guid encounterId, CancellationToken cancellationToken) =>
             (await ToRowsAsync(_clinical.ClinicalEncounters.Where(e => e.Id == encounterId), 1, cancellationToken)).SingleOrDefault();
+
+        public Task<bool> HasActiveStaffAssignmentAsync(Guid encounterId, Guid staffId, CancellationToken cancellationToken) =>
+            _clinical.EncounterStaffAssignments.AsNoTracking().AnyAsync(
+                a => a.ClinicalEncounterId == encounterId && a.ClinicalStaffId == staffId && a.UnassignedAtUtc == null,
+                cancellationToken);
+
+        public async Task<IReadOnlyList<AssignedEmergencyRow>> ListAssignedPrehospitalEmergenciesAsync(
+            Guid staffId,
+            IReadOnlyCollection<ClinicalEncounterStatus> statuses,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            var encounters = await ToRowsAsync(
+                _clinical.ClinicalEncounters.Where(e =>
+                    e.Type == ClinicalEncounterType.Prehospital
+                    && e.ClinicId == null
+                    && statuses.Contains(e.Status)
+                    && _clinical.EncounterStaffAssignments.Any(a =>
+                        a.ClinicalEncounterId == e.Id && a.ClinicalStaffId == staffId && a.UnassignedAtUtc == null)),
+                limit,
+                cancellationToken);
+            if (encounters.Count == 0)
+            {
+                return [];
+            }
+
+            // At most one active transfer per encounter (unique index).
+            var encounterIds = encounters.Select(e => e.Id).ToList();
+            var activeTransfers = await _clinical.ClinicalTransfers.AsNoTracking()
+                .Where(t => encounterIds.Contains(t.ClinicalEncounterId)
+                    && Domain.Entities.Transport.ClinicalTransfer.ActiveStatuses.Contains(t.Status))
+                .Select(t => new { t.ClinicalEncounterId, t.Status })
+                .ToDictionaryAsync(t => t.ClinicalEncounterId, t => t.Status, cancellationToken);
+
+            return encounters
+                .Select(e => new AssignedEmergencyRow(e, activeTransfers.TryGetValue(e.Id, out var status) ? status : null))
+                .ToList();
+        }
 
         public Task<IReadOnlyList<EncounterRow>> ListEncountersAsync(
             Guid clinicId,
@@ -177,6 +290,19 @@ namespace SCI_PH.Persistence.Clinical.Services
                     a.DoseUnit, a.Route, a.AdministeredAtUtc, a.AdministeredByStaffId, a.Status, a.Notes))
                 .ToListAsync(cancellationToken);
 
+        public async Task<IReadOnlyList<ClinicalProcedureSummary>> ListProceduresAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            await _clinical.ClinicalProcedures.AsNoTracking()
+                .Where(p => p.ClinicalEncounterId == encounterId)
+                .OrderByDescending(p => p.PerformedAtUtc.HasValue).ThenByDescending(p => p.PerformedAtUtc).ThenBy(p => p.Id)
+                .Select(p => new ClinicalProcedureSummary(
+                    p.Id, p.ClinicalEncounterId, p.Name, p.CodeSystem, p.Code, p.Status, p.PerformedAtUtc, p.CompletedAtUtc, p.Outcome,
+                    _clinical.ClinicalStaffMembers.Where(s => s.Id == p.PerformedByStaffId)
+                        .Select(s => s.GivenNames + " " + s.FamilyNames).FirstOrDefault()))
+                .ToListAsync(cancellationToken);
+
+        public Task<IReadOnlyList<TransferRow>> ListEncounterTransfersAsync(Guid encounterId, int limit, CancellationToken cancellationToken) =>
+            ToTransferRowsAsync(_clinical.ClinicalTransfers.Where(t => t.ClinicalEncounterId == encounterId), limit, cancellationToken);
+
         public async Task<ClinicStatus?> GetClinicStatusAsync(Guid clinicId, CancellationToken cancellationToken) =>
             await _clinical.Clinics.AsNoTracking()
                 .Where(c => c.Id == clinicId)
@@ -187,6 +313,25 @@ namespace SCI_PH.Persistence.Clinical.Services
             _clinical.ClinicalTransfers.AnyAsync(
                 t => t.ClinicalEncounterId == encounterId && Domain.Entities.Transport.ClinicalTransfer.ActiveStatuses.Contains(t.Status),
                 cancellationToken);
+
+        public async Task<Guid?> FindActiveTransferIdAsync(Guid encounterId, CancellationToken cancellationToken) =>
+            await _clinical.ClinicalTransfers.AsNoTracking()
+                .Where(t => t.ClinicalEncounterId == encounterId && Domain.Entities.Transport.ClinicalTransfer.ActiveStatuses.Contains(t.Status))
+                .Select(t => (Guid?)t.Id)
+                .SingleOrDefaultAsync(cancellationToken);
+
+        public async Task<IReadOnlyList<TransferDestinationRow>> ListTransferDestinationsAsync(CancellationToken cancellationToken) =>
+            await _clinical.Clinics.AsNoTracking()
+                .Where(c => c.Status == ClinicStatus.Active)
+                .OrderBy(c => c.Name).ThenBy(c => c.Municipality).ThenBy(c => c.Id)
+                .Select(c => new TransferDestinationRow(c.Id, c.Name, c.Type, c.Municipality, c.Province, c.Status))
+                .ToListAsync(cancellationToken);
+
+        public async Task<TransferDestinationRow?> GetTransferDestinationAsync(Guid clinicId, CancellationToken cancellationToken) =>
+            await _clinical.Clinics.AsNoTracking()
+                .Where(c => c.Id == clinicId)
+                .Select(c => new TransferDestinationRow(c.Id, c.Name, c.Type, c.Municipality, c.Province, c.Status))
+                .SingleOrDefaultAsync(cancellationToken);
 
         public async Task<TransferRow?> GetTransferAsync(Guid transferId, CancellationToken cancellationToken) =>
             (await ToTransferRowsAsync(_clinical.ClinicalTransfers.Where(t => t.Id == transferId), 1, cancellationToken)).SingleOrDefault();

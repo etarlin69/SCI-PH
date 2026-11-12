@@ -1,15 +1,24 @@
-# Entorno de desarrollo local de SCI-PH.
-# Por ahora solo incluye PostgreSQL; las APIs se agregarán más adelante.
+# Stack local de SCI-PH: PostgreSQL, Azurite (Blob), migraciones, Web BFF, Mobile BFF, Device API y web-admin.
 #
-# Uso:
-#   1. Copiar .env.example a .env y definir valores propios.
-#   2. docker compose up -d
+# Uso (detalle en docs/architecture/local-containers.md):
+#   1. Copiar .env.example a .env y reemplazar los valores REPLACE_ME (clave JWT y administrador inicial).
+#   2. docker compose up -d --build
+#   3. Detener sin borrar datos: docker compose down   (no usar -v: borra los volúmenes de PostgreSQL y Azurite)
 
 name: sci-ph
+
+x-backend-environment: &backend-environment
+  ASPNETCORE_ENVIRONMENT: Development
+  ConnectionStrings__SciPhDatabase: "Host=postgres;Port=5432;Database=${POSTGRES_DB:?Define POSTGRES_DB en .env};Username=${POSTGRES_USER:?Define POSTGRES_USER en .env};Password=${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}"
+  Logging__Console__FormatterName: json
+  Logging__Console__FormatterOptions__IncludeScopes: "true"
+  Logging__Console__FormatterOptions__UseUtcTimestamp: "true"
+  Logging__Console__FormatterOptions__TimestampFormat: "yyyy-MM-ddTHH:mm:ss.fffZ "
 
 services:
   postgres:
     image: postgres:17-alpine
+    # Mismo nombre que el contenedor local existente: Compose lo reutiliza con su volumen.
     container_name: sci-ph-postgres
     restart: unless-stopped
     environment:
@@ -17,7 +26,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
     ports:
-      # Solo expuesto en localhost.
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -28,6 +36,200 @@ services:
       retries: 5
       start_period: 10s
 
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
+    restart: unless-stopped
+    command:
+      - azurite-blob
+      - --blobHost
+      - 0.0.0.0
+      - --blobPort
+      - "10000"
+      - --location
+      - /data
+      - --silent
+      - --disableTelemetry
+    ports:
+      - "127.0.0.1:${AZURITE_BLOB_PORT:-10000}:10000"
+    volumes:
+      - azurite_data:/data
+
+  migrations:
+    build:
+      context: .
+      dockerfile: src/Presentation/SCI-PH.Web.BFF/Dockerfile
+      target: migrations
+    image: sciph-web-bff-migrations:local
+    environment:
+      <<: *backend-environment
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Define JWT_SIGNING_KEY en .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -c
+      - |
+        dotnet ef database update \
+          --context IdentityDbContext \
+          --project src/Infrastructure/SCI-PH.Persistence \
+          --startup-project src/Presentation/SCI-PH.Web.BFF \
+          --configuration Release &&
+        dotnet ef database update \
+          --context ClinicalDbContext \
+          --project src/Infrastructure/SCI-PH.Persistence \
+          --startup-project src/Presentation/SCI-PH.Web.BFF \
+          --configuration Release
+    restart: "no"
+
+  web-bff:
+    build:
+      context: .
+      dockerfile: src/Presentation/SCI-PH.Web.BFF/Dockerfile
+      target: final
+    image: sciph-web-bff:local
+    environment:
+      <<: *backend-environment
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Define JWT_SIGNING_KEY en .env}
+
+      Security__AllowedOrigins__0: "http://localhost:${WEB_PORT:-5173}"
+      Security__AllowedOrigins__1: "https://localhost:${WEB_PORT:-5173}"
+
+      AccountEmail__ActivationUrl: "http://localhost:${WEB_PORT:-5173}/activate-account"
+      AccountEmail__ConfirmEmailUrl: "http://localhost:${WEB_PORT:-5173}/confirm-email"
+      AccountEmail__ResetPasswordUrl: "http://localhost:${WEB_PORT:-5173}/reset-password"
+
+      # Administrador inicial (IdentitySeeder, idempotente). Sin estas variables solo se sincronizan los roles.
+      IdentityBootstrap__Enabled: ${IDENTITY_BOOTSTRAP_ENABLED:-false}
+      IdentityBootstrap__AdminEmail: ${IDENTITY_BOOTSTRAP_ADMIN_EMAIL:-}
+      IdentityBootstrap__AdminPassword: ${IDENTITY_BOOTSTRAP_ADMIN_PASSWORD:-}
+
+      # Cuentas de prueba, una por rol (IdentityDevelopmentAccountSeeder, idempotente). Comparten la contraseña del .env.
+      IdentityDevelopmentAccounts__Enabled: ${IDENTITY_DEV_ACCOUNTS_ENABLED:-false}
+      IdentityDevelopmentAccounts__Password: ${IDENTITY_DEV_ACCOUNTS_PASSWORD:-}
+      IdentityDevelopmentAccounts__Accounts__0__Email: doctor@sci-ph.test
+      IdentityDevelopmentAccounts__Accounts__0__Role: Doctor
+      IdentityDevelopmentAccounts__Accounts__1__Email: nurse@sci-ph.test
+      IdentityDevelopmentAccounts__Accounts__1__Role: Nurse
+      IdentityDevelopmentAccounts__Accounts__2__Email: paramedic@sci-ph.test
+      IdentityDevelopmentAccounts__Accounts__2__Role: Paramedic
+      IdentityDevelopmentAccounts__Accounts__3__Email: receptionist@sci-ph.test
+      IdentityDevelopmentAccounts__Accounts__3__Role: Receptionist
+      IdentityDevelopmentAccounts__Accounts__4__Email: patient@sci-ph.test
+      IdentityDevelopmentAccounts__Accounts__4__Role: Patient
+
+      # Clínica de desarrollo con el personal clínico de esas cuentas ya vinculado (ClinicalDevelopmentSeeder).
+      ClinicalDevelopmentSeed__Enabled: ${IDENTITY_DEV_ACCOUNTS_ENABLED:-false}
+      ClinicalDevelopmentSeed__Staff__0__LicenseNumber: DEV-DOC-01
+      ClinicalDevelopmentSeed__Staff__0__GivenNames: Doctor
+      ClinicalDevelopmentSeed__Staff__0__Type: Physician
+      ClinicalDevelopmentSeed__Staff__0__Email: doctor@sci-ph.test
+      ClinicalDevelopmentSeed__Staff__1__LicenseNumber: DEV-NUR-01
+      ClinicalDevelopmentSeed__Staff__1__GivenNames: Enfermera
+      ClinicalDevelopmentSeed__Staff__1__Type: Nurse
+      ClinicalDevelopmentSeed__Staff__1__Email: nurse@sci-ph.test
+      ClinicalDevelopmentSeed__Staff__2__LicenseNumber: DEV-PAR-01
+      ClinicalDevelopmentSeed__Staff__2__GivenNames: Paramédico
+      ClinicalDevelopmentSeed__Staff__2__Type: Paramedic
+      ClinicalDevelopmentSeed__Staff__2__Email: paramedic@sci-ph.test
+      ClinicalDevelopmentSeed__Staff__3__LicenseNumber: DEV-REC-01
+      ClinicalDevelopmentSeed__Staff__3__GivenNames: Recepción
+      ClinicalDevelopmentSeed__Staff__3__Type: OtherClinical
+      ClinicalDevelopmentSeed__Staff__3__Email: receptionist@sci-ph.test
+    ports:
+      - "127.0.0.1:${WEB_BFF_PORT:-5074}:8080"
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080 || exit 1;
+          printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3;
+          IFS= read -r line <&3 || exit 1;
+          case "$$line" in *" 200 "*) exit 0 ;; *) exit 1 ;; esac
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+  mobile-bff:
+    build:
+      context: .
+      dockerfile: src/Presentation/SCI-PH.Mobile.BFF/Dockerfile
+      target: final
+    image: sciph-mobile-bff:local
+    environment:
+      <<: *backend-environment
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Define JWT_SIGNING_KEY en .env}
+    ports:
+      - "127.0.0.1:${MOBILE_BFF_PORT:-5191}:8080"
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080 || exit 1;
+          printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3;
+          IFS= read -r line <&3 || exit 1;
+          case "$$line" in *" 200 "*) exit 0 ;; *) exit 1 ;; esac
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+  device-api:
+    build:
+      context: .
+      dockerfile: src/Presentation/SCI-PH.Device.API/Dockerfile
+      target: final
+    image: sciph-device-api:local
+    environment:
+      <<: *backend-environment
+    ports:
+      - "127.0.0.1:${DEVICE_API_PORT:-5139}:8080"
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080 || exit 1;
+          printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3;
+          IFS= read -r line <&3 || exit 1;
+          case "$$line" in *" 200 "*) exit 0 ;; *) exit 1 ;; esac
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/web-admin/Dockerfile
+    image: sciph-web:local
+    environment:
+      WEB_BFF_UPSTREAM: "http://web-bff:8080"
+      NGINX_ENVSUBST_FILTER: "WEB_BFF_UPSTREAM"
+    ports:
+      - "127.0.0.1:${WEB_PORT:-5173}:8080"
+    depends_on:
+      web-bff:
+        condition: service_started
+
 volumes:
   postgres_data:
     name: sci-ph-postgres-data
+
+  azurite_data:
+    name: sci-ph-azurite-data

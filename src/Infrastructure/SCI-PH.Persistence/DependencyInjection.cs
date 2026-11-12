@@ -6,7 +6,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using SCI_PH.Application.Abstractions.Biometrics;
 using SCI_PH.Application.Abstractions.Clinical;
+using SCI_PH.Application.Abstractions.Documents;
+using SCI_PH.Application.Abstractions.Idempotency;
 using SCI_PH.Application.Abstractions.Security;
 using SCI_PH.Persistence.Clinical.Seed;
 using SCI_PH.Persistence.Clinical.Services;
@@ -15,6 +18,7 @@ using SCI_PH.Persistence.Identity;
 using SCI_PH.Persistence.Identity.Models;
 using SCI_PH.Persistence.Identity.Seed;
 using SCI_PH.Persistence.Identity.Services;
+using SCI_PH.Persistence.HealthChecks;
 
 namespace SCI_PH.Persistence
 {
@@ -38,6 +42,11 @@ namespace SCI_PH.Persistence
             services.AddDbContext<ClinicalDbContext>(options =>
                 options.UseNpgsql(connectionString, npgsql =>
                     npgsql.MigrationsHistoryTable("__EFMigrationsHistory", ClinicalDbContext.Schema)));
+
+            services.AddHealthChecks()
+                .AddCheck<PostgreSqlReadinessHealthCheck>(
+                    "postgresql",
+                    tags: new[] { "ready" });
 
             services.TryAddSingleton(TimeProvider.System);
 
@@ -65,10 +74,21 @@ namespace SCI_PH.Persistence
             services.AddScoped<IClinicalIdentityLinkService, ClinicalIdentityLinkService>();
             services.AddScoped<IClinicalStaffDirectory, ClinicalStaffDirectory>();
             services.AddScoped<IClinicalReadStore, ClinicalReadStore>();
+            services.AddScoped<IPatientSelfReadStore, PatientSelfReadStore>();
+            services.AddScoped<IPatientQrCredentialStore, PatientQrCredentialStore>();
+            services.AddScoped<IClinicalResultStore, ClinicalResultStore>();
+            services.AddScoped<IClinicalDocumentStore, ClinicalDocumentStore>();
             services.AddScoped<IClinicalOrganizationStore, ClinicalOrganizationStore>();
             services.AddScoped<IClinicalWriteStore, ClinicalWriteStore>();
+            services.AddScoped<IIdempotencyStore, ClinicalIdempotencyStore>();
+            services.AddScoped<IFingerprintSessionStore, FingerprintSessionStore>();
+            services.AddScoped<IFingerprintEnrollmentStore, FingerprintEnrollmentStore>();
+            services.AddScoped<IFingerprintSlotDeletionStore, FingerprintSlotDeletionStore>();
+            services.AddScoped<IFaceTemplateDeletionStore, FaceTemplateDeletionStore>();
             services.AddScoped<IdentitySeeder>();
             services.AddOptions<IdentityBootstrapOptions>().Bind(configuration.GetSection(IdentityBootstrapOptions.SectionName));
+            services.AddScoped<IdentityDevelopmentAccountSeeder>();
+            services.AddOptions<IdentityDevelopmentAccountsOptions>().Bind(configuration.GetSection(IdentityDevelopmentAccountsOptions.SectionName));
             services.AddScoped<ClinicalDevelopmentSeeder>();
             services.AddOptions<ClinicalDevelopmentSeedOptions>().Bind(configuration.GetSection(ClinicalDevelopmentSeedOptions.SectionName));
 
@@ -85,6 +105,27 @@ namespace SCI_PH.Persistence
             }
 
             await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedAsync(cancellationToken);
+        }
+
+        // Cuentas de prueba (una por rol): SOLO en Development y con IdentityDevelopmentAccounts:Enabled = true. Activada
+        // fuera de Development, el host no arranca: es una configuración peligrosa, no algo que ignorar en silencio.
+        // Requiere los roles de RunIdentityBootstrapAsync.
+        public static async Task RunIdentityDevelopmentAccountsAsync(
+            this IServiceProvider services, IHostEnvironment environment, CancellationToken cancellationToken = default)
+        {
+            await using var scope = services.CreateAsyncScope();
+            if (!scope.ServiceProvider.GetRequiredService<IOptions<IdentityDevelopmentAccountsOptions>>().Value.Enabled)
+            {
+                return;
+            }
+
+            if (!environment.IsDevelopment())
+            {
+                throw new InvalidOperationException(
+                    $"IdentityDevelopmentAccounts:Enabled is only allowed in Development (current: {environment.EnvironmentName}).");
+            }
+
+            await scope.ServiceProvider.GetRequiredService<IdentityDevelopmentAccountSeeder>().SeedAsync(cancellationToken);
         }
 
         // Datos clínicos de demostración: SOLO en Development y con ClinicalDevelopmentSeed:Enabled = true.

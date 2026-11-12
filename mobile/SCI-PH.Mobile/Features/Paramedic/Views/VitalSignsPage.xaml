@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SCI_PH.Mobile.Features.Paramedic.ViewModels"
+             xmlns:components="clr-namespace:SCI_PH.Mobile.Features.Paramedic.Views.Components"
+             x:Class="SCI_PH.Mobile.Features.Paramedic.Views.VitalSignsPage"
+             x:DataType="vm:VitalSignsViewModel"
+             Style="{StaticResource SciPage}"
+             Title="Signos vitales">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="18">
+
+            <!-- Emergencia en curso: código NN o paciente (con el NN como trazabilidad) e "Inicio" -->
+            <components:EmergencyIdentityHeader />
+
+            <!-- Encabezado -->
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Signos vitales" Style="{StaticResource SciTitle}" />
+                <Label Text="Registra una toma. Todos los campos son opcionales, pero ingresa al menos uno."
+                       Style="{StaticResource SciSubtitle}" />
+            </VerticalStackLayout>
+
+            <!-- Formulario -->
+            <Border Style="{StaticResource SciCard}">
+                <VerticalStackLayout Spacing="14">
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Frecuencia cardíaca (/min)" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding HeartRate}"
+                                   Placeholder="Ej. 80"
+                                   Keyboard="Numeric"
+                                   Style="{StaticResource SciEntry}"
+                                   MaxLength="3" />
+                        </Border>
+                        <Label Text="{Binding HeartRateError}"
+                               IsVisible="{Binding HasHeartRateError}"
+                               TextColor="{StaticResource SciDanger}"
+                               FontSize="12" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Frecuencia respiratoria (/min)" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding RespiratoryRate}"
+                                   Placeholder="Ej. 16"
+                                   Keyboard="Numeric"
+                                   Style="{StaticResource SciEntry}"
+                                   MaxLength="3" />
+                        </Border>
+                        <Label Text="{Binding RespiratoryRateError}"
+                               IsVisible="{Binding HasRespiratoryRateError}"
+                               TextColor="{StaticResource SciDanger}"
+                               FontSize="12" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Presión sistólica (mmHg)" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding SystolicPressure}"
+                                   Placeholder="Ej. 120"
+                                   Keyboard="Numeric"
+                                   Style="{StaticResource SciEntry}"
+                                   MaxLength="3" />
+                        </Border>
+                        <Label Text="{Binding SystolicPressureError}"
+                               IsVisible="{Binding HasSystolicPressureError}"
+                               TextColor="{StaticResource SciDanger}"
+                               FontSize="12" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Presión diastólica (mmHg)" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding DiastolicPressure}"
+                                   Placeholder="Ej. 80"
+                                   Keyboard="Numeric"
+                                   Style="{StaticResource SciEntry}"
+                                   MaxLength="3" />
+                        </Border>
+                        <Label Text="{Binding DiastolicPressureError}"
+                               IsVisible="{Binding HasDiastolicPressureError}"
+                               TextColor="{StaticResource SciDanger}"
+                               FontSize="12" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Saturación de oxígeno (%)" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding OxygenSaturation}"
+                                   Placeholder="Ej. 98"
+                                   Keyboard="Numeric"
+                                   Style="{StaticResource SciEntry}"
+                                   MaxLength="3" />
+                        </Border>
+                        <Label Text="{Binding OxygenSaturationError}"
+                               IsVisible="{Binding HasOxygenSaturationError}"
+                               TextColor="{StaticResource SciDanger}"
+                               FontSize="12" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Temperatura (°C)" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding Temperature}"
+                                   Placeholder="Ej. 36.5"
+                                   Keyboard="Numeric"
+                                   Style="{StaticResource SciEntry}"
+                                   MaxLength="5" />
+                        </Border>
+                        <Label Text="{Binding TemperatureError}"
+                               IsVisible="{Binding HasTemperatureError}"
+                               TextColor="{StaticResource SciDanger}"
+                               FontSize="12" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Glasgow (3–15)" Style="{StaticResource SciFieldLabel}" />
+                        <Border Style="{StaticResource SciField}">
+                            <Entry Text="{Binding Glasgow}"
+                                   Placeholder="Ej. 15"
+                                   Keyboard="Numeric"
+                                   Style="{StaticResource SciEntry}"
+                                   MaxLength="2" />
+                        </Border>
+                        <Label Text="{Binding GlasgowError}"
+                               IsVisible="{Binding HasGlasgowError}"
+                               TextColor="{StaticResource SciDanger}"
+                               FontSize="12" />
+                    </VerticalStackLayout>
+
+                    <!-- Error -->
+                    <Border Style="{StaticResource SciErrorBanner}" IsVisible="{Binding HasError}">
+                        <Label Text="{Binding ErrorMessage}"
+                               TextColor="{StaticResource SciDanger}" FontSize="13" />
+                    </Border>
+
+                    <!-- Loading -->
+                    <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                       IsVisible="{Binding IsBusy}"
+                                       Color="{StaticResource SciPrimary}" />
+
+                    <Button Text="Guardar toma"
+                            Command="{Binding SaveCommand}"
+                            Style="{StaticResource SciPrimaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Tomas guardadas -->
+            <Border Style="{StaticResource SciCard}" IsVisible="{Binding HasSaved}">
+                <VerticalStackLayout Spacing="10">
+                    <Border Style="{StaticResource SciBadgeSuccess}" HorizontalOptions="Start">
+                        <Label Text="Tomas guardadas"
+                               TextColor="{StaticResource SciSuccess}"
+                               FontAttributes="Bold" FontSize="13" />
+                    </Border>
+
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding SavedSummaries}" Spacing="6">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <Label Text="{Binding .}"
+                                       TextColor="{StaticResource SciText}"
+                                       FontSize="14" />
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Button Text="Continuar a procedimientos y medicamentos"
+                    Command="{Binding ContinueCommand}"
+                    Style="{StaticResource SciSecondaryButton}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

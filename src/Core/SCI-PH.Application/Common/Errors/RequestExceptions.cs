@@ -29,6 +29,13 @@ namespace SCI_PH.Application.Common.Errors
             Resource = resource;
         }
 
+        // For a lookup by a sensitive value (a document number): the message never repeats it.
+        public ResourceNotFoundException(string resource, string message)
+            : base(message)
+        {
+            Resource = resource;
+        }
+
         public string Resource { get; }
     }
 
@@ -37,5 +44,12 @@ namespace SCI_PH.Application.Common.Errors
     public sealed class ResourceConflictException : Exception
     {
         public ResourceConflictException(string message, Exception? innerException = null) : base(message, innerException) { }
+    }
+
+    // An external dependency the request needs is not available now (a biometric provider that is down, timed out or
+    // failed internally): 503. The message is generic; the cause stays in the inner exception, never in the response.
+    public sealed class ExternalServiceUnavailableException : Exception
+    {
+        public ExternalServiceUnavailableException(string message, Exception? innerException = null) : base(message, innerException) { }
     }
 }

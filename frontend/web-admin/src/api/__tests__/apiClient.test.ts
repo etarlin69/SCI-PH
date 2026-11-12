@@ -4,6 +4,18 @@ import { createFakeBff, json, problem } from '../../test/fakeBff';
 import { ApiError, apiRequest, describeApiError, setAccessToken, setRefreshHandler } from '..';
 
 describe('apiClient', () => {
+  it('envía FormData tal cual, sin Content-Type JSON (el navegador pone el boundary del multipart)', async () => {
+    const bff = createFakeBff({ 'POST /api/web/patients/p-1/faces/verify': () => json(200, { verificationId: 'v', outcome: 'Match' }) });
+    setAccessToken('tok-123');
+    const form = new FormData();
+    form.append('clientRequestId', 'k-1');
+    await apiRequest('/api/web/patients/p-1/faces/verify', { method: 'POST', body: form });
+    const [req] = bff.calls('POST /api/web/patients/p-1/faces/verify');
+    expect(req.headers['Content-Type']).toBeUndefined();
+    expect(req.body).toBe(form);
+    expect(req.headers.Authorization).toBe('Bearer tok-123');
+  });
+
   it('adjunta el Bearer en memoria y credentials include', async () => {
     const bff = createFakeBff({ 'GET /api/web/admin/users': () => json(200, { items: [], page: 1, pageSize: 20, total: 0 }) });
     setAccessToken('tok-123');
