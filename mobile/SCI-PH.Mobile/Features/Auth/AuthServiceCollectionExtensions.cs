@@ -17,17 +17,24 @@ public static class AuthServiceCollectionExtensions
         services.AddTransient<LoginViewModel>();
         services.AddTransient<MfaViewModel>();
         services.AddTransient<ClinicalAccountViewModel>();
+        services.AddSingleton<IAccountSecurityService, AccountSecurityService>();
+        services.AddTransient<AccountSecurityViewModel>();
 
         services.AddTransient<LoginPage>();
         services.AddTransient<MfaPage>();
+        services.AddTransient<AccountSecurityPage>();
 
         return services;
     }
 
-    /// <summary>Login y MFA se apilan sobre la entrada; al autenticar se navega a <see cref="AuthRoutes.ClinicalArea"/>.</summary>
+    /// <summary>
+    /// Login y MFA se apilan sobre la entrada; al autenticar se navega a <see cref="AuthRoutes.ClinicalArea"/>. La seguridad
+    /// de la cuenta se apila sobre el área (paciente o paramédico).
+    /// </summary>
     public static void RegisterAuthRoutes()
     {
         Routing.RegisterRoute(AuthRoutes.Login, typeof(LoginPage));
         Routing.RegisterRoute(AuthRoutes.Mfa, typeof(MfaPage));
+        Routing.RegisterRoute(AuthRoutes.AccountSecurity, typeof(AccountSecurityPage));
     }
 }

@@ -24,6 +24,10 @@ public sealed partial class ClinicalAccountViewModel : BaseViewModel
 
     public string DisplayName => _session.CurrentUser?.UserName ?? string.Empty;
 
+    /// <summary>Cambiar la contraseña o cerrar todas las sesiones de la propia cuenta.</summary>
+    [RelayCommand]
+    private Task OpenAccountSecurityAsync() => _navigator.GoToAsync(AuthRoutes.AccountSecurity);
+
     [RelayCommand]
     private async Task LogoutAsync()
     {
