@@ -17,6 +17,9 @@ public static class AuthRoutes
     /// <summary>Segundo factor; se apila sobre el login.</summary>
     public const string Mfa = "ClinicalMfa";
 
+    /// <summary>Seguridad de la propia cuenta (cambiar contraseña, cerrar todas las sesiones); se apila sobre el área.</summary>
+    public const string AccountSecurity = "AccountSecurity";
+
     /// <summary>
     /// Área paramédica tras autenticar: su inicio, como raíz (login y MFA dejan de estar detrás y no hay flecha "Atrás").
     /// </summary>
