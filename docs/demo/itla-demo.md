@@ -21,7 +21,7 @@ el rol y qué mostrar. Lo que depende de credenciales o hardware se presenta seg
 | 3 | Mobile · Paramédico | Signos vitales (dos tomas), procedimientos (oxigenoterapia, vía venosa), medicación, nota | Todo en la MISMA emergencia, idempotente ante reintentos |
 | 4 | Mobile · Paramédico | Identificar por documento: buscar → candidato → **Confirmar** (o QR / huella con el simulador) | Nada se identifica sin confirmación humana; el NN se conserva como trazabilidad |
 | 5 | Mobile · Paramédico | Traslado al hospital y "En camino" | El hospital lo ve en Transferencias entrantes |
-| 6 | Web · Médico | Registrar llegada | La misma atención pasa al hospital (Recibida); la base deja de verla |
+| 6 | Web · Médico | Registrar llegada | La misma atención pasa al hospital (Recibida); el paramédico ya no puede registrar en ella |
 | 7 | Web · Médico | Expediente | Signos y **procedimientos prehospitalarios** (marcados), con quién los hizo |
 | 8 | Web · Enfermería / Médico | Triage, nota de evolución, diagnóstico, orden de **resultado** → valor final | El primer registro inicia la atención; el resultado tiene ciclo Pendiente → Final → Corregido |
 | 9 | Web · Médico | Adjuntar un PDF de laboratorio y descargarlo | Validación por contenido real; descarga como adjunto; auditoría |
@@ -35,7 +35,8 @@ el rol y qué mostrar. Lo que depende de credenciales o hardware se presenta seg
 
 ## Límites de seguridad para demostrar
 
-- Un médico de otra clínica no ve la atención (403); la base deja de verla al entregar al hospital.
+- Un médico de otra clínica no ve la atención (403). Tras la entrega al hospital, el paramédico solo la consulta como
+  entregada: cualquier registro desde el móvil responde 409 y sale de sus emergencias activas.
 - Recepción no lee datos clínicos; enfermería lee resultados pero no los registra.
 - La paciente solo ve su propio expediente; la atención de otra persona es "no disponible" (404).
 - No hay acceso administrativo "general" a datos clínicos: Administración no es personal clínico.
