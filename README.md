@@ -69,7 +69,8 @@ Detalle en [docs/architecture/solution-structure.md](docs/architecture/solution-
 | Huella — Device API + simulador | Implementado y validado con el simulador (`tools/SCI-PH.Device.Simulator`) |
 | Huella — ESP32 + R307 físicos | Firmware compilado en CI. **Requiere hardware**: prueba física pendiente |
 | Documentos — Azure Blob | Implementado; validado contra Azurite (SDK de Azure). Azure real: **no validado** (sin credenciales) |
-| QR — cámara | Validado en emulador Android; dispositivo físico pendiente |
+| QR — cámara | Validado en emulador Android. Dispositivo Android físico: **no validado** |
+| Documentos del paciente en la app | **Diferido** (decisión de producto): la app del paciente no muestra documentos; los documentos se gestionan en la atención (web hospitalaria) |
 
 Guion de demostración: [docs/demo/itla-demo.md](docs/demo/itla-demo.md).
 
